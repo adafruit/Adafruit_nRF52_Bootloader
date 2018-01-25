@@ -1,2 +1,3 @@
-# Adafruit_nRF52840_Bootloader
-USB-enabled bootloader for the nRF52840 BLE SoC
+# Adafruit nRF52840 Bootloader
+
+This repository contains the USB bootloader for Adafruit nRF52850 boards (1MB flash, 256KB SRAM).
