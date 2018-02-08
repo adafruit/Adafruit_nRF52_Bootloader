@@ -34,23 +34,23 @@
 */
 /**************************************************************************/
 
-#ifndef FEATHER52_H
-#define FEATHER52_H
+#ifndef _FEATHER52840_H
+#define _FEATHER52840_H
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          17
-#define LED_2          19
-#define LED_STATE_ON   1
+#define LED_1          13
+#define LED_2          14
+#define LED_STATE_ON   0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER 2
-#define BUTTON_1       20
-#define BUTTON_2       22
+#define BUTTON_1       11
+#define BUTTON_2       12
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
@@ -63,6 +63,6 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MODEL      "Bluefruit Feather 52"
+#define DIS_MODEL      "Bluefruit Feather 52840"
 
-#endif // FEATHER52_H
+#endif // _FEATHER52840_H

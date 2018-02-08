@@ -16,8 +16,8 @@
 #include <stdint.h>
 #include "nrf_gpio.h"
 
-#if defined BOARD_FEATHER52
-#include "feather52.h"
+#if defined BOARD_FEATHER52840
+#include "feather52840.h"
 #elif defined BOARD_METRO52
 #include "metro52.h"
 #else

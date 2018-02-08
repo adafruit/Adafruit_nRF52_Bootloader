@@ -20,6 +20,8 @@ SRC_PATH         = ..
 SD_NAME          = s140
 SD_VERSION       = 6.0.0
 
+SD_NAME_UPPER    = $(subst s,S,$(SD_NAME))
+
 SD_PATH          = ../../softdevice/$(SD_NAME)/$(SD_VERSION)
 SD_HEX           = $(SD_PATH)/hex/$(SD_NAME)_nrf52840_$(SD_VERSION)-6.alpha_softdevice.hex
 LINKER_SCRIPT    = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
@@ -32,7 +34,7 @@ BANKMODE = dual
 C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_dual_bank.c
 endif
 
-BOOTLOADER_S132_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)_$(BANKMODE)
+BOOTLOADER_SD_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)_$(BANKMODE)
 FINAL_BIN_DIR := ../../bin
 
 TEMPLATE_PATH = $(SDK_PATH)/toolchain/gcc
@@ -257,9 +259,9 @@ default: all
 #building all targets
 all:
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
-	@echo Making Feather52 board
+	@echo Making Feather52840 board
 	@echo ----------------------
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52
+	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
 	@echo Making Metro52 board
 	@echo --------------------
@@ -268,9 +270,9 @@ all:
 #target for printing all targets
 help:
 	@echo following targets are available:
-	@echo - feather52       : build for Feather nrf52 board
+	@echo - feather52840       : build for Feather nrf52 board
 	@echo - metro52         : build for Metro nrf52 board
-	@echo - flash_feather52 : flash Feather nrf52 board
+	@echo - flash_feather52840 : flash Feather nrf52 board
 	@echo - flash_metro52   : flash Metro nrf52 board
 
 C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
@@ -288,13 +290,13 @@ OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
 
 export OUTPUT_FILENAME
 export FINAL_BIN_DIR
-BOOTLOADER_WITH_S132_NAME := $(OUTPUT_FILENAME)_$(BOOTLOADER_S132_SUFFIX)
+BOOTLOADER_WITH_SD_NAME := $(OUTPUT_FILENAME)_$(BOOTLOADER_SD_SUFFIX)
 
 # Target for Feather nrf52 board
-feather52: OUTPUT_FILENAME := feather52_bootloader
-feather52: FINAL_BIN_DIR := $(FINAL_BIN_DIR)/feather52/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)/$(BANKMODE)
-feather52: CFLAGS += -DBOARD_FEATHER52
-feather52: $(BUILD_DIRECTORIES) $(OBJECTS)
+feather52840: OUTPUT_FILENAME := feather52840_bootloader
+feather52840: FINAL_BIN_DIR := $(FINAL_BIN_DIR)/feather52840/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)/$(BANKMODE)
+feather52840: CFLAGS += -DBOARD_FEATHER52840
+feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_FILENAME).out
 	$(NO_ECHO)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
 	$(NO_ECHO)$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
@@ -331,21 +333,21 @@ finalize: genhex genbin genpkg echosize
 
 ## Create binary .hex file from the .out file
 genhex: 
-	@echo Preparing: $(OUTPUT_FILENAME).hex $(BOOTLOADER_WITH_S132_NAME).hex
+	@echo Preparing: $(OUTPUT_FILENAME).hex $(BOOTLOADER_WITH_SD_NAME).hex
 	$(NO_ECHO)$(OBJCOPY) -O ihex $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
-	@mergehex -q -m $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex $(SD_HEX) -o $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_S132_NAME).hex
+	@mergehex -q -m $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex $(SD_HEX) -o $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
 	@mkdir -p $(FINAL_BIN_DIR)
-	@cp $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_S132_NAME).hex $(FINAL_BIN_DIR)/
+	@cp $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex $(FINAL_BIN_DIR)/
 
 ## Create .bin file
 genbin:
-	@echo Preparing: $(BOOTLOADER_WITH_S132_NAME).bin
-	$(NO_ECHO)$(OBJCOPY) -j .text -j .data -j .bss -O binary $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out $(FINAL_BIN_DIR)/$(BOOTLOADER_WITH_S132_NAME).bin
+	@echo Preparing: $(BOOTLOADER_WITH_SD_NAME).bin
+	$(NO_ECHO)$(OBJCOPY) -j .text -j .data -j .bss -O binary $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out $(FINAL_BIN_DIR)/$(BOOTLOADER_WITH_SD_NAME).bin
 
 ## Create pkg file for bootloader only and bootloader+SD combo to use with DFU
 genpkg:
-	@echo Preparing: $(BOOTLOADER_WITH_S132_NAME).zip
-	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision 0xADAF --bootloader $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex --softdevice $(SD_HEX) $(FINAL_BIN_DIR)/$(BOOTLOADER_WITH_S132_NAME).zip 
+	@echo Preparing: $(BOOTLOADER_WITH_SD_NAME).zip
+	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision 0xADAF --bootloader $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex --softdevice $(SD_HEX) $(FINAL_BIN_DIR)/$(BOOTLOADER_WITH_SD_NAME).zip 
 
 echosize:
 	-@echo ''
@@ -355,12 +357,12 @@ echosize:
 clean:
 	@$(RM) $(BUILD_DIRECTORIES)
 
-flash_feather52: BOOTLOADER_WITH_S132_NAME := feather52_bootloader_$(BOOTLOADER_S132_SUFFIX)
-flash_feather52: feather52
-	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_S132_NAME).hex
-	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_S132_NAME).hex -f nrf52 --chiperase --reset
+flash_feather52840: BOOTLOADER_WITH_SD_NAME := feather52840_bootloader_$(BOOTLOADER_SD_SUFFIX)
+flash_feather52840: feather52840
+	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
+	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset
 
-flash_metro52: BOOTLOADER_WITH_S132_NAME := metro52_bootloader_$(BOOTLOADER_S132_SUFFIX)
+flash_metro52: BOOTLOADER_WITH_SD_NAME := metro52_bootloader_$(BOOTLOADER_SD_SUFFIX)
 flash_metro52: metro52
-	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_S132_NAME).hex
-	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_S132_NAME).hex -f nrf52 --chiperase --reset	
+	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
+	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset	
