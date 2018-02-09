@@ -716,6 +716,8 @@ static uint32_t srdata_check(const ble_advdata_t * p_srdata)
 
 uint32_t ble_advdata_set(const ble_advdata_t * p_advdata, const ble_advdata_t * p_srdata)
 {
+    enum { BLE_GAP_ADV_MAX_SIZE = BLE_GAP_ADV_SR_MAX_LEN_DEFAULT };
+
     uint32_t  err_code;
     uint16_t  len_advdata = BLE_GAP_ADV_MAX_SIZE;
     uint16_t  len_srdata  = BLE_GAP_ADV_MAX_SIZE;
@@ -756,6 +758,9 @@ uint32_t ble_advdata_set(const ble_advdata_t * p_advdata, const ble_advdata_t * 
         len_srdata = 0;
     }
 
+    ble_data_t adv_data = { .p_data = p_encoded_advdata, .len = len_advdata };
+    ble_data_t sr_data  = { .p_data = p_encoded_srdata, .len = len_srdata };
+
     // Pass encoded advertising data and/or scan response data to the stack.
-    return sd_ble_gap_adv_data_set(p_encoded_advdata, len_advdata, p_encoded_srdata, len_srdata);
+    return sd_ble_gap_adv_data_set(BLE_GAP_ADV_SET_HANDLE_DEFAULT, &adv_data, &sr_data);
 }

@@ -7,6 +7,22 @@
 #include <stdarg.h>
 #include <app_util.h>
 
+#define NRF_LOG_MODULE_REGISTER()
+
+#define NRF_LOG_ERROR(...)
+#define NRF_LOG_WARNING(...)
+#define NRF_LOG_INFO(...)
+#define NRF_LOG_DEBUG(...)
+#define NRF_LOG_RAW_INFO(...)
+#define NRF_LOG_HEXDUMP_ERROR(p_data, len)
+#define NRF_LOG_HEXDUMP_WARNING(p_data, len)
+#define NRF_LOG_HEXDUMP_INFO(p_data, len)
+#define NRF_LOG_HEXDUMP_DEBUG(p_data, len)
+#define NRF_LOG_RAW_HEXDUMP_INFO(p_data, len)
+#define NRF_LOG_GETCHAR()
+#define NRF_LOG_PUSH(_str)
+
+
 #ifndef NRF_LOG_USES_RTT
 #define NRF_LOG_USES_RTT 0
 #endif

@@ -22,7 +22,7 @@
 #include "nrf.h"
 #include "nrf_log.h"
 #include "sdk_common.h"
-#include "nrf_drv_config.h"
+#include "sdk_config.h"
 #if CLOCK_ENABLED
 #include "nrf_drv_clock.h"
 #endif
@@ -392,7 +392,7 @@ static inline uint32_t ram_total_size_get(void)
     uint32_t total_ram_size = size_ram_blocks;
     total_ram_size = total_ram_size*(NRF_FICR->NUMRAMBLOCK);
     return total_ram_size;
-#elif defined (NRF52)
+#elif defined(NRF52832_XXAA) || defined(NRF52840_XXAA)
     return RAM_TOTAL_SIZE;
 #endif /* NRF51 */
 }

@@ -705,6 +705,12 @@ static void advertising_start(void)
         // Initialize advertising parameters (used when starting advertising).
         memset(&m_adv_params, 0, sizeof(m_adv_params));
 
+        m_adv_params.properties.connectable = 1;
+        m_adv_params.properties.scannable   = 1;
+
+        m_adv_params.properties.legacy_pdu  = 1;
+        m_adv_params.properties.tx_power    = 1;
+
         if (m_ble_peer_data_valid)
         {
             ble_gap_irk_t empty_irk = {{0}};
@@ -712,11 +718,11 @@ static void advertising_start(void)
             if (memcmp(m_ble_peer_data.irk.irk, empty_irk.irk, sizeof(empty_irk.irk)) == 0)
             {
                 advertising_init(BLE_GAP_ADV_FLAGS_LE_ONLY_LIMITED_DISC_MODE);
-                m_adv_params.type        = BLE_GAP_ADV_TYPE_ADV_DIRECT_IND;
-                m_adv_params.p_peer_addr = &m_ble_peer_data.addr;
-                m_adv_params.fp          = BLE_GAP_ADV_FP_ANY;
-                m_adv_params.interval    = 0;
-                m_adv_params.timeout     = 0;
+                m_adv_params.properties.directed = 1;
+                m_adv_params.p_peer_addr         = &m_ble_peer_data.addr;
+                m_adv_params.fp                  = BLE_GAP_ADV_FP_ANY;
+                m_adv_params.interval            = 0;
+                m_adv_params.duration            = 0;
             }
             else
             {
@@ -734,24 +740,24 @@ static void advertising_start(void)
                 APP_ERROR_CHECK(err_code);
 
                 advertising_init(BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED);
-                m_adv_params.type        = BLE_GAP_ADV_TYPE_ADV_IND;
-                m_adv_params.fp          = BLE_GAP_ADV_FP_FILTER_CONNREQ;
-                m_adv_params.interval    = APP_ADV_INTERVAL;
-                m_adv_params.timeout     = APP_ADV_TIMEOUT_IN_SECONDS;
+                m_adv_params.properties.directed = 0;
+                m_adv_params.fp                  = BLE_GAP_ADV_FP_FILTER_CONNREQ;
+                m_adv_params.interval            = APP_ADV_INTERVAL;
+                m_adv_params.duration            = APP_ADV_TIMEOUT_IN_SECONDS;
 
             }
         }
         else
         {
             advertising_init(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-            m_adv_params.type        = BLE_GAP_ADV_TYPE_ADV_IND;
-            m_adv_params.p_peer_addr = NULL;
-            m_adv_params.fp          = BLE_GAP_ADV_FP_ANY;
-            m_adv_params.interval    = APP_ADV_INTERVAL;
-            m_adv_params.timeout     = APP_ADV_TIMEOUT_IN_SECONDS;
+            m_adv_params.properties.directed = 0;
+            m_adv_params.p_peer_addr         = NULL;
+            m_adv_params.fp                  = BLE_GAP_ADV_FP_ANY;
+            m_adv_params.interval            = APP_ADV_INTERVAL;
+            m_adv_params.duration            = APP_ADV_TIMEOUT_IN_SECONDS;
         }
 
-        err_code = sd_ble_gap_adv_start(&m_adv_params, BLE_CONN_CFG_HIGH_BANDWIDTH);
+        err_code = sd_ble_gap_adv_start(BLE_GAP_ADV_SET_HANDLE_DEFAULT, &m_adv_params, BLE_CONN_CFG_HIGH_BANDWIDTH);
         APP_ERROR_CHECK(err_code);
 
 //        led_on(ADVERTISING_LED_PIN_NO);
@@ -769,7 +775,7 @@ static void advertising_stop(void)
     {
         uint32_t err_code;
 
-        err_code = sd_ble_gap_adv_stop();
+        err_code = sd_ble_gap_adv_stop(BLE_GAP_ADV_SET_HANDLE_DEFAULT);
         APP_ERROR_CHECK(err_code);
 
 //        led_off(ADVERTISING_LED_PIN_NO);
@@ -1123,7 +1129,7 @@ uint32_t dfu_transport_ble_update_start(void)
     conn_params_init();
     sec_params_init();
 
-    sd_ble_gap_tx_power_set(4); // maximum power
+    sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, 0, 4); // maximum power
     advertising_start();
 
     return NRF_SUCCESS;

@@ -106,7 +106,7 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 // Adafruit for factory reset
 #define APPDATA_ADDR_START                  (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
-STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
+STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
 
 void adafruit_factory_reset(void);
 volatile bool _freset_erased_complete = false;

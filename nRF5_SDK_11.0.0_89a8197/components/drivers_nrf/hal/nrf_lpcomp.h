@@ -1,15 +1,42 @@
-/* Copyright (c) 2014 Nordic Semiconductor. All Rights Reserved.
- *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
- *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
- *  
+/**
+ * Copyright (c) 2014 - 2017, Nordic Semiconductor ASA
+ * 
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 
+ * 2. Redistributions in binary form, except as embedded into a Nordic
+ *    Semiconductor ASA integrated circuit in a product or a software update for
+ *    such product, must reproduce the above copyright notice, this list of
+ *    conditions and the following disclaimer in the documentation and/or other
+ *    materials provided with the distribution.
+ * 
+ * 3. Neither the name of Nordic Semiconductor ASA nor the names of its
+ *    contributors may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ * 
+ * 4. This software, with or without modification, must only be used with a
+ *    Nordic Semiconductor ASA integrated circuit.
+ * 
+ * 5. Any software provided in binary form under this license must not be reverse
+ *    engineered, decompiled, modified and/or disassembled.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL NORDIC SEMICONDUCTOR ASA OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
  */
-
 /**
  * @file
  * @brief LPCOMP HAL API.
@@ -26,10 +53,15 @@
  */
 
 #include "nrf.h"
+#include "nrf_peripherals.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @enum nrf_lpcomp_ref_t
@@ -37,7 +69,7 @@
  */
 typedef enum
 {
-#ifdef NRF51
+#if (LPCOMP_REFSEL_RESOLUTION == 8) || defined(__SDK_DOXYGEN__)
     NRF_LPCOMP_REF_SUPPLY_1_8   = LPCOMP_REFSEL_REFSEL_SupplyOneEighthPrescaling,    /**< Use supply with a 1/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_2_8   = LPCOMP_REFSEL_REFSEL_SupplyTwoEighthsPrescaling,   /**< Use supply with a 2/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_3_8   = LPCOMP_REFSEL_REFSEL_SupplyThreeEighthsPrescaling, /**< Use supply with a 3/8 prescaler as reference. */
@@ -45,7 +77,7 @@ typedef enum
     NRF_LPCOMP_REF_SUPPLY_5_8   = LPCOMP_REFSEL_REFSEL_SupplyFiveEighthsPrescaling,  /**< Use supply with a 5/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_6_8   = LPCOMP_REFSEL_REFSEL_SupplySixEighthsPrescaling,   /**< Use supply with a 6/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_7_8   = LPCOMP_REFSEL_REFSEL_SupplySevenEighthsPrescaling, /**< Use supply with a 7/8 prescaler as reference. */
-#elif defined NRF52
+#elif (LPCOMP_REFSEL_RESOLUTION == 16) || defined(__SDK_DOXYGEN__)
     NRF_LPCOMP_REF_SUPPLY_1_8   = LPCOMP_REFSEL_REFSEL_Ref1_8Vdd, /**< Use supply with a 1/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_2_8   = LPCOMP_REFSEL_REFSEL_Ref2_8Vdd, /**< Use supply with a 2/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_3_8   = LPCOMP_REFSEL_REFSEL_Ref3_8Vdd, /**< Use supply with a 3/8 prescaler as reference. */
@@ -54,13 +86,13 @@ typedef enum
     NRF_LPCOMP_REF_SUPPLY_6_8   = LPCOMP_REFSEL_REFSEL_Ref6_8Vdd, /**< Use supply with a 6/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_7_8   = LPCOMP_REFSEL_REFSEL_Ref7_8Vdd, /**< Use supply with a 7/8 prescaler as reference. */
     NRF_LPCOMP_REF_SUPPLY_1_16  = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 1/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_3_16  = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 3/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_5_16  = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 5/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_7_16  = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 7/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_9_16  = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 9/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_11_16 = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 11/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_13_16 = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 13/16 prescaler as reference. */
-    NRF_LPCOMP_REF_SUPPLY_15_16 = LPCOMP_REFSEL_REFSEL_Ref1_16Vdd, /**< Use supply with a 15/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_3_16  = LPCOMP_REFSEL_REFSEL_Ref3_16Vdd, /**< Use supply with a 3/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_5_16  = LPCOMP_REFSEL_REFSEL_Ref5_16Vdd, /**< Use supply with a 5/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_7_16  = LPCOMP_REFSEL_REFSEL_Ref7_16Vdd, /**< Use supply with a 7/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_9_16  = LPCOMP_REFSEL_REFSEL_Ref9_16Vdd, /**< Use supply with a 9/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_11_16 = LPCOMP_REFSEL_REFSEL_Ref11_16Vdd, /**< Use supply with a 11/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_13_16 = LPCOMP_REFSEL_REFSEL_Ref13_16Vdd, /**< Use supply with a 13/16 prescaler as reference. */
+    NRF_LPCOMP_REF_SUPPLY_15_16 = LPCOMP_REFSEL_REFSEL_Ref15_16Vdd, /**< Use supply with a 15/16 prescaler as reference. */
 #endif
     NRF_LPCOMP_REF_EXT_REF0        = LPCOMP_REFSEL_REFSEL_ARef |
                        (LPCOMP_EXTREFSEL_EXTREFSEL_AnalogReference0 << 16), /**< External reference 0. */
@@ -132,12 +164,26 @@ typedef enum
     NRF_LPCOMP_SHORT_READY_SAMPLE_MASK = LPCOMP_SHORTS_READY_SAMPLE_Msk /*!< Short between READY event and SAMPLE task. */
 } nrf_lpcomp_short_mask_t;
 
+#ifdef LPCOMP_FEATURE_HYST_PRESENT
+/**
+ * @enum nrf_lpcomp_hysteresis_t
+ * @brief LPCOMP hysteresis.
+ */
+typedef enum
+{
+    NRF_LPCOMP_HYST_NOHYST              = LPCOMP_HYST_HYST_NoHyst,      /**< Comparator hysteresis disabled. */
+    NRF_LPCOMP_HYST_50mV                = LPCOMP_HYST_HYST_Hyst50mV     /**< Comparator hysteresis enabled (typ. 50 mV). */
+}nrf_lpcomp_hysteresis_t;
+#endif // LPCOMP_FEATURE_HYST_PRESENT
 
 /** @brief LPCOMP configuration. */
 typedef struct
 {
-    nrf_lpcomp_ref_t    reference; /**< LPCOMP reference. */
-    nrf_lpcomp_detect_t detection; /**< LPCOMP detection type. */
+    nrf_lpcomp_ref_t            reference; /**< LPCOMP reference. */
+    nrf_lpcomp_detect_t         detection; /**< LPCOMP detection type. */
+#ifdef LPCOMP_FEATURE_HYST_PRESENT
+    nrf_lpcomp_hysteresis_t     hyst;      /**< LPCOMP hysteresis. */
+#endif // LPCOMP_FEATURE_HYST_PRESENT
 } nrf_lpcomp_config_t;
 
 /** Default LPCOMP configuration. */
@@ -165,11 +211,14 @@ __STATIC_INLINE void nrf_lpcomp_configure(const nrf_lpcomp_config_t * p_config)
         NRF_LPCOMP->EXTREFSEL = (extref << LPCOMP_EXTREFSEL_EXTREFSEL_Pos) & LPCOMP_EXTREFSEL_EXTREFSEL_Msk;
     }
 
-    NRF_LPCOMP->ANADETECT =
+    NRF_LPCOMP->ANADETECT   =
         (p_config->detection << LPCOMP_ANADETECT_ANADETECT_Pos) & LPCOMP_ANADETECT_ANADETECT_Msk;
-    NRF_LPCOMP->SHORTS   = 0;
-    NRF_LPCOMP->INTENCLR = LPCOMP_INTENCLR_CROSS_Msk | LPCOMP_INTENCLR_UP_Msk |
-                           LPCOMP_INTENCLR_DOWN_Msk | LPCOMP_INTENCLR_READY_Msk;
+#ifdef LPCOMP_FEATURE_HYST_PRESENT
+    NRF_LPCOMP->HYST        = ((p_config->hyst) << LPCOMP_HYST_HYST_Pos) & LPCOMP_HYST_HYST_Msk;
+#endif //LPCOMP_FEATURE_HYST_PRESENT
+    NRF_LPCOMP->SHORTS      = 0;
+    NRF_LPCOMP->INTENCLR    = LPCOMP_INTENCLR_CROSS_Msk | LPCOMP_INTENCLR_UP_Msk |
+                               LPCOMP_INTENCLR_DOWN_Msk | LPCOMP_INTENCLR_READY_Msk;
 }
 
 
@@ -345,6 +394,10 @@ __STATIC_INLINE void nrf_lpcomp_task_trigger(nrf_lpcomp_task_t lpcomp_task)
 __STATIC_INLINE void nrf_lpcomp_event_clear(nrf_lpcomp_event_t lpcomp_event)
 {
     *( (volatile uint32_t *)( (uint8_t *)NRF_LPCOMP + lpcomp_event) ) = 0;
+#if __CORTEX_M == 0x04
+    volatile uint32_t dummy = *((volatile uint32_t *)((uint8_t *)NRF_LPCOMP + lpcomp_event));
+    (void)dummy;
+#endif
 }
 
 
@@ -363,5 +416,10 @@ __STATIC_INLINE bool nrf_lpcomp_event_check(nrf_lpcomp_event_t lpcomp_event)
 /**
  *@}
  **/
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* NRF_LPCOMP_H_ */

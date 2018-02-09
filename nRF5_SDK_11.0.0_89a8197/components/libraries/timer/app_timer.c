@@ -40,7 +40,7 @@ STATIC_ASSERT(RTC1_IRQ_PRI == SWI_IRQ_PRI);
 #ifdef NRF51
 #define SWI_IRQn SWI0_IRQn
 #define SWI_IRQHandler SWI0_IRQHandler
-#elif defined NRF52
+#elif defined(NRF52832_XXAA) || defined(NRF52840_XXAA)
 #define SWI_IRQn SWI0_EGU0_IRQn
 #define SWI_IRQHandler SWI0_EGU0_IRQHandler
 #endif

@@ -1,18 +1,45 @@
-/* Copyright (c) 2013 Nordic Semiconductor. All Rights Reserved.
- *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
- *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
- *
+/**
+ * Copyright (c) 2013 - 2017, Nordic Semiconductor ASA
+ * 
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 
+ * 2. Redistributions in binary form, except as embedded into a Nordic
+ *    Semiconductor ASA integrated circuit in a product or a software update for
+ *    such product, must reproduce the above copyright notice, this list of
+ *    conditions and the following disclaimer in the documentation and/or other
+ *    materials provided with the distribution.
+ * 
+ * 3. Neither the name of Nordic Semiconductor ASA nor the names of its
+ *    contributors may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ * 
+ * 4. This software, with or without modification, must only be used with a
+ *    Nordic Semiconductor ASA integrated circuit.
+ * 
+ * 5. Any software provided in binary form under this license must not be reverse
+ *    engineered, decompiled, modified and/or disassembled.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL NORDIC SEMICONDUCTOR ASA OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
  */
-
-#include "app_fifo.h"
 #include "sdk_common.h"
-#include "nordic_common.h"
+#if NRF_MODULE_ENABLED(APP_FIFO)
+#include "app_fifo.h"
 
 static __INLINE uint32_t fifo_length(app_fifo_t * p_fifo)
 {
@@ -21,7 +48,7 @@ static __INLINE uint32_t fifo_length(app_fifo_t * p_fifo)
 }
 
 
-#define FIFO_LENGTH fifo_length(p_fifo)  /**< Macro for calculating the FIFO length. */
+#define FIFO_LENGTH() fifo_length(p_fifo)  /**< Macro for calculating the FIFO length. */
 
 
 /**@brief Put one byte to the FIFO. */
@@ -72,7 +99,7 @@ uint32_t app_fifo_init(app_fifo_t * p_fifo, uint8_t * p_buf, uint16_t buf_size)
 
 uint32_t app_fifo_put(app_fifo_t * p_fifo, uint8_t byte)
 {
-    if (FIFO_LENGTH <= p_fifo->buf_size_mask)
+    if (FIFO_LENGTH() <= p_fifo->buf_size_mask)
     {
         fifo_put(p_fifo, byte);
         return NRF_SUCCESS;
@@ -84,7 +111,7 @@ uint32_t app_fifo_put(app_fifo_t * p_fifo, uint8_t byte)
 
 uint32_t app_fifo_get(app_fifo_t * p_fifo, uint8_t * p_byte)
 {
-    if (FIFO_LENGTH != 0)
+    if (FIFO_LENGTH() != 0)
     {
         fifo_get(p_fifo, p_byte);
         return NRF_SUCCESS;
@@ -97,7 +124,7 @@ uint32_t app_fifo_get(app_fifo_t * p_fifo, uint8_t * p_byte)
 
 uint32_t app_fifo_peek(app_fifo_t * p_fifo, uint16_t index, uint8_t * p_byte)
 {
-    if (FIFO_LENGTH > index)
+    if (FIFO_LENGTH() > index)
     {
         fifo_peek(p_fifo, index, p_byte);
         return NRF_SUCCESS;
@@ -184,3 +211,4 @@ uint32_t app_fifo_write(app_fifo_t * p_fifo, uint8_t const * p_byte_array, uint3
 
     return NRF_SUCCESS;
 }
+#endif //NRF_MODULE_ENABLED(APP_FIFO)

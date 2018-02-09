@@ -1,54 +1,82 @@
-/* Copyright (c) 2015 Nordic Semiconductor. All Rights Reserved.
- *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
- *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
- *
+/**
+ * Copyright (c) 2015 - 2017, Nordic Semiconductor ASA
+ * 
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 
+ * 2. Redistributions in binary form, except as embedded into a Nordic
+ *    Semiconductor ASA integrated circuit in a product or a software update for
+ *    such product, must reproduce the above copyright notice, this list of
+ *    conditions and the following disclaimer in the documentation and/or other
+ *    materials provided with the distribution.
+ * 
+ * 3. Neither the name of Nordic Semiconductor ASA nor the names of its
+ *    contributors may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ * 
+ * 4. This software, with or without modification, must only be used with a
+ *    Nordic Semiconductor ASA integrated circuit.
+ * 
+ * 5. Any software provided in binary form under this license must not be reverse
+ *    engineered, decompiled, modified and/or disassembled.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL NORDIC SEMICONDUCTOR ASA OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
  */
-
+#include "sdk_common.h"
+#if NRF_MODULE_ENABLED(UART)
 #include "nrf_drv_uart.h"
 #include "nrf_assert.h"
-#include "nordic_common.h"
 #include "nrf_drv_common.h"
 #include "nrf_gpio.h"
 #include "app_util_platform.h"
 
-// This set of macros makes it possible to exclude parts of code, when one type
-// of supported peripherals is not used.
-#ifdef NRF51
-#define UART_IN_USE
-#elif defined(NRF52)
-#if (UART_EASY_DMA_SUPPORT == 1)
-#define UARTE_IN_USE
-#endif
-#if (UART_LEGACY_SUPPORT == 1)
-#define UART_IN_USE
-#endif
-#endif
+#define NRF_LOG_MODULE_NAME uart
 
+#if UART_CONFIG_LOG_ENABLED
+#define NRF_LOG_LEVEL       UART_CONFIG_LOG_LEVEL
+#define NRF_LOG_INFO_COLOR  UART_CONFIG_INFO_COLOR
+#define NRF_LOG_DEBUG_COLOR UART_CONFIG_DEBUG_COLOR
+#define EVT_TO_STR(event)   (event == NRF_UART_EVENT_ERROR ? "NRF_UART_EVENT_ERROR" : "UNKNOWN EVENT")
+#else //UART_CONFIG_LOG_ENABLED
+#define EVT_TO_STR(event)   ""
+#define NRF_LOG_LEVEL       0
+#endif //UART_CONFIG_LOG_ENABLED
+#include "nrf_log.h"
+
+NRF_LOG_MODULE_REGISTER();
 
 #if (defined(UARTE_IN_USE) && defined(UART_IN_USE))
     // UARTE and UART combined
-    #define CODE_FOR_UARTE(code) if (m_cb.use_easy_dma) { code }
+    #define CODE_FOR_UARTE(code) if (m_cb[p_instance->drv_inst_idx].use_easy_dma) { code }
+    #define CODE_FOR_UARTE_INT(idx, code) if (m_cb[idx].use_easy_dma) { code }
     #define CODE_FOR_UART(code)   else { code }
 #elif (defined(UARTE_IN_USE) && !defined(UART_IN_USE))
     // UARTE only
     #define CODE_FOR_UARTE(code) { code }
+    #define CODE_FOR_UARTE_INT(idx, code) { code }
     #define CODE_FOR_UART(code)
 #elif (!defined(UARTE_IN_USE) && defined(UART_IN_USE))
     // UART only
     #define CODE_FOR_UARTE(code)
+    #define CODE_FOR_UARTE_INT(idx, code)
     #define CODE_FOR_UART(code) { code }
 #else
     #error "Wrong configuration."
-#endif
-
-#ifndef IS_EASY_DMA_RAM_ADDRESS
-    #define IS_EASY_DMA_RAM_ADDRESS(addr) (((uint32_t)addr & 0xFFFF0000) == 0x20000000)
 #endif
 
 #define TX_COUNTER_ABORT_REQ_VALUE 256
@@ -72,87 +100,113 @@ typedef struct
 #endif
 } uart_control_block_t;
 
-static uart_control_block_t m_cb;
-static const nrf_drv_uart_config_t m_default_config = NRF_DRV_UART_DEFAULT_CONFIG;
+static uart_control_block_t m_cb[UART_ENABLED_COUNT];
 
-__STATIC_INLINE void apply_config(nrf_drv_uart_config_t const * p_config)
+#ifdef NRF52810_XXAA
+    #define IRQ_HANDLER(n) void UARTE##n##_IRQHandler(void)
+#else
+    #define IRQ_HANDLER(n) void UART##n##_IRQHandler(void)
+#endif
+
+__STATIC_INLINE void apply_config(nrf_drv_uart_t const * p_instance, nrf_drv_uart_config_t const * p_config)
 {
-    nrf_gpio_pin_set(p_config->pseltxd);
-    nrf_gpio_cfg_output(p_config->pseltxd);
-    nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
+    if (p_config->pseltxd != NRF_UART_PSEL_DISCONNECTED)
+    {
+        nrf_gpio_pin_set(p_config->pseltxd);
+        nrf_gpio_cfg_output(p_config->pseltxd);
+    }
+    if (p_config->pselrxd != NRF_UART_PSEL_DISCONNECTED)
+    {
+        nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
+    }
 
     CODE_FOR_UARTE
     (
-        nrf_uarte_baudrate_set(NRF_UARTE0, (nrf_uarte_baudrate_t)p_config->baudrate);
-        nrf_uarte_configure(NRF_UARTE0, (nrf_uarte_parity_t)p_config->parity,
+        nrf_uarte_baudrate_set(p_instance->reg.p_uarte, (nrf_uarte_baudrate_t)p_config->baudrate);
+        nrf_uarte_configure(p_instance->reg.p_uarte, (nrf_uarte_parity_t)p_config->parity,
                             (nrf_uarte_hwfc_t)p_config->hwfc);
-        nrf_uarte_txrx_pins_set(NRF_UARTE0, p_config->pseltxd, p_config->pselrxd);
+        nrf_uarte_txrx_pins_set(p_instance->reg.p_uarte, p_config->pseltxd, p_config->pselrxd);
         if (p_config->hwfc == NRF_UART_HWFC_ENABLED)
         {
-            nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
-            nrf_gpio_pin_set(p_config->pselrts);
-            nrf_gpio_cfg_output(p_config->pselrts);
-            nrf_uarte_hwfc_pins_set(NRF_UARTE0, p_config->pselrts, p_config->pselcts);
+            if (p_config->pselcts != NRF_UART_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
+            }
+            if (p_config->pselrts != NRF_UART_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_pin_set(p_config->pselrts);
+                nrf_gpio_cfg_output(p_config->pselrts);
+            }
+            nrf_uarte_hwfc_pins_set(p_instance->reg.p_uarte, p_config->pselrts, p_config->pselcts);
         }
     )
     CODE_FOR_UART
     (
-        nrf_uart_baudrate_set(NRF_UART0, p_config->baudrate);
-        nrf_uart_configure(NRF_UART0, p_config->parity, p_config->hwfc);
-        nrf_uart_txrx_pins_set(NRF_UART0, p_config->pseltxd, p_config->pselrxd);
+        nrf_uart_baudrate_set(p_instance->reg.p_uart, p_config->baudrate);
+        nrf_uart_configure(p_instance->reg.p_uart, p_config->parity, p_config->hwfc);
+        nrf_uart_txrx_pins_set(p_instance->reg.p_uart, p_config->pseltxd, p_config->pselrxd);
         if (p_config->hwfc == NRF_UART_HWFC_ENABLED)
         {
-            nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
-            nrf_gpio_pin_set(p_config->pselrts);
-            nrf_gpio_cfg_output(p_config->pselrts);
-            nrf_uart_hwfc_pins_set(NRF_UART0, p_config->pselrts, p_config->pselcts);
+            if (p_config->pselcts != NRF_UART_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_cfg_input(p_config->pselcts, NRF_GPIO_PIN_NOPULL);
+            }
+            if (p_config->pselrts != NRF_UART_PSEL_DISCONNECTED)
+            {
+                nrf_gpio_pin_set(p_config->pselrts);
+                nrf_gpio_cfg_output(p_config->pselrts);
+            }
+            nrf_uart_hwfc_pins_set(p_instance->reg.p_uart, p_config->pselrts, p_config->pselcts);
         }
     )
 }
 
-__STATIC_INLINE void interrupts_enable(uint8_t interrupt_priority)
+__STATIC_INLINE void interrupts_enable(const nrf_drv_uart_t * p_instance, uint8_t interrupt_priority)
 {
     CODE_FOR_UARTE
     (
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ENDRX);
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ENDTX);
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ERROR);
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_RXTO);
-        nrf_uarte_int_enable(NRF_UARTE0, NRF_UARTE_INT_ENDRX_MASK |
+        nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDRX);
+        nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDTX);
+        nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ERROR);
+        nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_RXTO);
+        nrf_uarte_int_enable(p_instance->reg.p_uarte, NRF_UARTE_INT_ENDRX_MASK |
                                          NRF_UARTE_INT_ENDTX_MASK |
                                          NRF_UARTE_INT_ERROR_MASK |
                                          NRF_UARTE_INT_RXTO_MASK);
+        nrf_drv_common_irq_enable(nrf_drv_get_IRQn((void *)p_instance->reg.p_uarte), interrupt_priority);
     )
     CODE_FOR_UART
     (
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
-        nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_TXDRDY |
+        nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_TXDRDY);
+        nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_RXTO);
+        nrf_uart_int_enable(p_instance->reg.p_uart, NRF_UART_INT_MASK_TXDRDY |
                                        NRF_UART_INT_MASK_RXTO);
+        nrf_drv_common_irq_enable(nrf_drv_get_IRQn((void *)p_instance->reg.p_uart), interrupt_priority);
     )
-    nrf_drv_common_irq_enable(UART0_IRQn, interrupt_priority);
 }
 
-__STATIC_INLINE void interrupts_disable(void)
+__STATIC_INLINE void interrupts_disable(const nrf_drv_uart_t * p_instance)
 {
     CODE_FOR_UARTE
     (
-        nrf_uarte_int_disable(NRF_UARTE0, NRF_UARTE_INT_ENDRX_MASK |
+        nrf_uarte_int_disable(p_instance->reg.p_uarte, NRF_UARTE_INT_ENDRX_MASK |
                                           NRF_UARTE_INT_ENDTX_MASK |
                                           NRF_UARTE_INT_ERROR_MASK |
                                           NRF_UARTE_INT_RXTO_MASK);
+        nrf_drv_common_irq_disable(nrf_drv_get_IRQn((void *)p_instance->reg.p_uarte));
     )
     CODE_FOR_UART
     (
-        nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY |
+        nrf_uart_int_disable(p_instance->reg.p_uart, NRF_UART_INT_MASK_RXDRDY |
                                         NRF_UART_INT_MASK_TXDRDY |
                                         NRF_UART_INT_MASK_ERROR  |
                                         NRF_UART_INT_MASK_RXTO);
+        nrf_drv_common_irq_disable(nrf_drv_get_IRQn((void *)p_instance->reg.p_uart));
     )
-    nrf_drv_common_irq_disable(UART0_IRQn);
+
 }
 
-__STATIC_INLINE void pins_to_default(void)
+__STATIC_INLINE void pins_to_default(const nrf_drv_uart_t * p_instance)
 {
     /* Reset pins to default states */
     uint32_t txd;
@@ -162,25 +216,32 @@ __STATIC_INLINE void pins_to_default(void)
 
     CODE_FOR_UARTE
     (
-        txd = nrf_uarte_tx_pin_get(NRF_UARTE0);
-        rxd = nrf_uarte_rx_pin_get(NRF_UARTE0);
-        rts = nrf_uarte_rts_pin_get(NRF_UARTE0);
-        cts = nrf_uarte_cts_pin_get(NRF_UARTE0);
-        nrf_uarte_txrx_pins_disconnect(NRF_UARTE0);
-        nrf_uarte_hwfc_pins_disconnect(NRF_UARTE0);
+        txd = nrf_uarte_tx_pin_get(p_instance->reg.p_uarte);
+        rxd = nrf_uarte_rx_pin_get(p_instance->reg.p_uarte);
+        rts = nrf_uarte_rts_pin_get(p_instance->reg.p_uarte);
+        cts = nrf_uarte_cts_pin_get(p_instance->reg.p_uarte);
+        nrf_uarte_txrx_pins_disconnect(p_instance->reg.p_uarte);
+        nrf_uarte_hwfc_pins_disconnect(p_instance->reg.p_uarte);
     )
     CODE_FOR_UART
     (
-        txd = nrf_uart_tx_pin_get(NRF_UART0);
-        rxd = nrf_uart_rx_pin_get(NRF_UART0);
-        rts = nrf_uart_rts_pin_get(NRF_UART0);
-        cts = nrf_uart_cts_pin_get(NRF_UART0);
-        nrf_uart_txrx_pins_disconnect(NRF_UART0);
-        nrf_uart_hwfc_pins_disconnect(NRF_UART0);
+        txd = nrf_uart_tx_pin_get(p_instance->reg.p_uart);
+        rxd = nrf_uart_rx_pin_get(p_instance->reg.p_uart);
+        rts = nrf_uart_rts_pin_get(p_instance->reg.p_uart);
+        cts = nrf_uart_cts_pin_get(p_instance->reg.p_uart);
+        nrf_uart_txrx_pins_disconnect(p_instance->reg.p_uart);
+        nrf_uart_hwfc_pins_disconnect(p_instance->reg.p_uart);
     )
 
-    nrf_gpio_cfg_default(txd);
-    nrf_gpio_cfg_default(rxd);
+    if (txd != NRF_UART_PSEL_DISCONNECTED)
+    {
+        nrf_gpio_cfg_default(txd);
+    }
+
+    if (rxd != NRF_UART_PSEL_DISCONNECTED)
+    {
+        nrf_gpio_cfg_default(rxd);
+    }
 
     if (cts != NRF_UART_PSEL_DISCONNECTED)
     {
@@ -194,135 +255,141 @@ __STATIC_INLINE void pins_to_default(void)
 
 }
 
-__STATIC_INLINE void uart_enable(void)
+__STATIC_INLINE void uart_enable(const nrf_drv_uart_t * p_instance)
 {
-    CODE_FOR_UARTE(nrf_uarte_enable(NRF_UARTE0);)
-    CODE_FOR_UART(nrf_uart_enable(NRF_UART0););
+    CODE_FOR_UARTE(nrf_uarte_enable(p_instance->reg.p_uarte);)
+    CODE_FOR_UART(nrf_uart_enable(p_instance->reg.p_uart););
 }
 
-__STATIC_INLINE void uart_disable(void)
+__STATIC_INLINE void uart_disable(const nrf_drv_uart_t * p_instance)
 {
-    CODE_FOR_UARTE(nrf_uarte_disable(NRF_UARTE0);)
-    CODE_FOR_UART(nrf_uart_disable(NRF_UART0););
+    CODE_FOR_UARTE(nrf_uarte_disable(p_instance->reg.p_uarte);)
+    CODE_FOR_UART(nrf_uart_disable(p_instance->reg.p_uart););
 }
 
-ret_code_t nrf_drv_uart_init(nrf_drv_uart_config_t const * p_config,
-                             nrf_uart_event_handler_t      event_handler)
+ret_code_t nrf_drv_uart_init(const nrf_drv_uart_t * p_instance, nrf_drv_uart_config_t const * p_config,
+                             nrf_uart_event_handler_t event_handler)
 {
-    if (m_cb.state != NRF_DRV_STATE_UNINITIALIZED)
+    ASSERT(p_config);
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+    ret_code_t err_code = NRF_SUCCESS;
+
+    if (p_cb->state != NRF_DRV_STATE_UNINITIALIZED)
     {
-        return NRF_ERROR_INVALID_STATE;
+        err_code = NRF_ERROR_INVALID_STATE;
+        NRF_LOG_ERROR("Init failed. id:%d in wrong state", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
+        return err_code;
     }
 
-    if (p_config == NULL)
-    {
-        p_config = &m_default_config;
-    }
 #if (defined(UARTE_IN_USE) && defined(UART_IN_USE))
-    m_cb.use_easy_dma = p_config->use_easy_dma;
+    p_cb->use_easy_dma = p_config->use_easy_dma;
 #endif
-    apply_config(p_config);
+    apply_config(p_instance, p_config);
 
-    m_cb.handler = event_handler;
-    m_cb.p_context = p_config->p_context;
+    p_cb->handler = event_handler;
+    p_cb->p_context = p_config->p_context;
 
-    if (m_cb.handler)
+    if (p_cb->handler)
     {
-        interrupts_enable(p_config->interrupt_priority);
+        interrupts_enable(p_instance, p_config->interrupt_priority);
     }
 
-    uart_enable();
-    m_cb.rx_buffer_length = 0;
-    m_cb.rx_secondary_buffer_length = 0;
-    m_cb.tx_buffer_length = 0;
-    m_cb.state = NRF_DRV_STATE_INITIALIZED;
-    m_cb.rx_enabled = false;
-    return NRF_SUCCESS;
+    uart_enable(p_instance);
+    p_cb->rx_buffer_length = 0;
+    p_cb->rx_secondary_buffer_length = 0;
+    p_cb->tx_buffer_length = 0;
+    p_cb->state = NRF_DRV_STATE_INITIALIZED;
+    p_cb->rx_enabled = false;
+    return err_code;
 }
 
-void nrf_drv_uart_uninit(void)
+void nrf_drv_uart_uninit(const nrf_drv_uart_t * p_instance)
 {
-    uart_disable();
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
 
-    if (m_cb.handler)
+    uart_disable(p_instance);
+
+    if (p_cb->handler)
     {
-        interrupts_disable();
+        interrupts_disable(p_instance);
     }
 
-    pins_to_default();
+    pins_to_default(p_instance);
 
-    m_cb.state = NRF_DRV_STATE_UNINITIALIZED;
-    m_cb.handler = NULL;
+    p_cb->state = NRF_DRV_STATE_UNINITIALIZED;
+    p_cb->handler = NULL;
+    NRF_LOG_INFO("Uninit id: %d.",  nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
 }
 
 #if defined(UART_IN_USE)
-__STATIC_INLINE void tx_byte(void)
+__STATIC_INLINE void tx_byte(NRF_UART_Type * p_uart, uart_control_block_t * p_cb)
 {
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
-    uint8_t txd = m_cb.p_tx_buffer[m_cb.tx_counter];
-    m_cb.tx_counter++;
-    nrf_uart_txd_set(NRF_UART0, txd);
+    nrf_uart_event_clear(p_uart, NRF_UART_EVENT_TXDRDY);
+    uint8_t txd = p_cb->p_tx_buffer[p_cb->tx_counter];
+    p_cb->tx_counter++;
+    nrf_uart_txd_set(p_uart, txd);
 }
 
-__STATIC_INLINE ret_code_t nrf_drv_uart_tx_for_uart()
+__STATIC_INLINE ret_code_t nrf_drv_uart_tx_for_uart(const nrf_drv_uart_t * p_instance)
 {
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
     ret_code_t err_code = NRF_SUCCESS;
-    
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
-    nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTTX);
 
-    tx_byte();
+    nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_TXDRDY);
+    nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STARTTX);
 
-    if (m_cb.handler == NULL)
+    tx_byte(p_instance->reg.p_uart, p_cb);
+
+    if (p_cb->handler == NULL)
     {
-        while (m_cb.tx_counter < (uint16_t) m_cb.tx_buffer_length)
+        while (p_cb->tx_counter < (uint16_t) p_cb->tx_buffer_length)
         {
-            while (!nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_TXDRDY) &&
-                    m_cb.tx_counter != TX_COUNTER_ABORT_REQ_VALUE)
+            while (!nrf_uart_event_check(p_instance->reg.p_uart, NRF_UART_EVENT_TXDRDY) &&
+                    p_cb->tx_counter != TX_COUNTER_ABORT_REQ_VALUE)
             {
             }
-            if (m_cb.tx_counter != TX_COUNTER_ABORT_REQ_VALUE)
+            if (p_cb->tx_counter != TX_COUNTER_ABORT_REQ_VALUE)
             {
-                tx_byte();
+                tx_byte(p_instance->reg.p_uart, p_cb);
             }
         }
 
-        if (m_cb.tx_counter == TX_COUNTER_ABORT_REQ_VALUE)
+        if (p_cb->tx_counter == TX_COUNTER_ABORT_REQ_VALUE)
         {
             err_code = NRF_ERROR_FORBIDDEN;
         }
         else
         {
-            while (!nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_TXDRDY))
+            while (!nrf_uart_event_check(p_instance->reg.p_uart, NRF_UART_EVENT_TXDRDY))
             {
             }
-            nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPTX);
+            nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STOPTX);
         }
-        m_cb.tx_buffer_length = 0;
+        p_cb->tx_buffer_length = 0;
     }
-    
     return err_code;
 }
 #endif
 
 #if defined(UARTE_IN_USE)
-__STATIC_INLINE ret_code_t nrf_drv_uart_tx_for_uarte()
-{    
+__STATIC_INLINE ret_code_t nrf_drv_uart_tx_for_uarte(const nrf_drv_uart_t * p_instance)
+{
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
     ret_code_t err_code = NRF_SUCCESS;
-    
-    nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ENDTX);
-    nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_TXSTOPPED);
-    nrf_uarte_tx_buffer_set(NRF_UARTE0, m_cb.p_tx_buffer, m_cb.tx_buffer_length);
-    nrf_uarte_task_trigger(NRF_UARTE0, NRF_UARTE_TASK_STARTTX);
 
-    if (m_cb.handler == NULL)
+    nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDTX);
+    nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_TXSTOPPED);
+    nrf_uarte_tx_buffer_set(p_instance->reg.p_uarte, p_cb->p_tx_buffer, p_cb->tx_buffer_length);
+    nrf_uarte_task_trigger(p_instance->reg.p_uarte, NRF_UARTE_TASK_STARTTX);
+
+    if (p_cb->handler == NULL)
     {
         bool endtx;
         bool txstopped;
         do
         {
-            endtx     = nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_ENDTX);
-            txstopped = nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_TXSTOPPED);
+            endtx     = nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDTX);
+            txstopped = nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_TXSTOPPED);
         }
         while ((!endtx) && (!txstopped));
 
@@ -330,84 +397,103 @@ __STATIC_INLINE ret_code_t nrf_drv_uart_tx_for_uarte()
         {
             err_code = NRF_ERROR_FORBIDDEN;
         }
-        m_cb.tx_buffer_length = 0;
+        p_cb->tx_buffer_length = 0;
     }
-    
     return err_code;
 }
 #endif
 
-ret_code_t nrf_drv_uart_tx(uint8_t const * const p_data, uint8_t length)
+ret_code_t nrf_drv_uart_tx(const nrf_drv_uart_t * p_instance, uint8_t const * const p_data, uint8_t length)
 {
-    ASSERT(m_cb.state == NRF_DRV_STATE_INITIALIZED);
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+    ASSERT(p_cb->state == NRF_DRV_STATE_INITIALIZED);
     ASSERT(length>0);
     ASSERT(p_data);
+
+    ret_code_t err_code;
 
     CODE_FOR_UARTE
     (
         // EasyDMA requires that transfer buffers are placed in DataRAM,
         // signal error if the are not.
-        if (!IS_EASY_DMA_RAM_ADDRESS(p_data))
+        if (!nrf_drv_is_in_RAM(p_data))
         {
-            return NRF_ERROR_INVALID_ADDR;
+            err_code = NRF_ERROR_INVALID_ADDR;
+            NRF_LOG_ERROR("Id:%d, Easy-DMA buffer not in RAM: %08x",
+                                           nrf_drv_get_IRQn((void *)p_instance->reg.p_reg), p_data);
+            return err_code;
         }
     )
 
-    if (nrf_drv_uart_tx_in_progress())
+    if (nrf_drv_uart_tx_in_progress(p_instance))
     {
-        return NRF_ERROR_BUSY;
+        err_code = NRF_ERROR_BUSY;
+        NRF_LOG_WARNING("Id:%d busy",nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
+        return err_code;
     }
-    m_cb.tx_buffer_length = length;
-    m_cb.p_tx_buffer      = p_data;
-    m_cb.tx_counter       = 0;
+    p_cb->tx_buffer_length = length;
+    p_cb->p_tx_buffer      = p_data;
+    p_cb->tx_counter       = 0;
+
+    NRF_LOG_INFO("TX req id:%d length: %d.",
+                 nrf_drv_get_IRQn((void *)p_instance->reg.p_reg),
+                 p_cb->tx_buffer_length);
+    NRF_LOG_DEBUG("Tx data:");
+    NRF_LOG_HEXDUMP_DEBUG((uint8_t *)p_cb->p_tx_buffer,
+                          p_cb->tx_buffer_length * sizeof(p_cb->p_tx_buffer[0]));
 
     CODE_FOR_UARTE
     (
-        return nrf_drv_uart_tx_for_uarte();
+        return nrf_drv_uart_tx_for_uarte(p_instance);
     )
     CODE_FOR_UART
     (
-        return nrf_drv_uart_tx_for_uart();
+        return nrf_drv_uart_tx_for_uart(p_instance);
     )
 }
 
-bool nrf_drv_uart_tx_in_progress(void)
+bool nrf_drv_uart_tx_in_progress(const nrf_drv_uart_t * p_instance)
 {
-    return (m_cb.tx_buffer_length != 0);
+    return (m_cb[p_instance->drv_inst_idx].tx_buffer_length != 0);
 }
 
 #if defined(UART_IN_USE)
-__STATIC_INLINE void rx_enable(void)
+__STATIC_INLINE void rx_enable(const nrf_drv_uart_t * p_instance)
 {
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
-    nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTRX);
+    nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_ERROR);
+    nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_RXDRDY);
+    nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STARTRX);
 }
 
-__STATIC_INLINE void rx_byte(void)
+__STATIC_INLINE void rx_byte(NRF_UART_Type * p_uart, uart_control_block_t * p_cb)
 {
-    if (!m_cb.rx_buffer_length)
+    if (!p_cb->rx_buffer_length)
     {
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
+        nrf_uart_event_clear(p_uart, NRF_UART_EVENT_RXDRDY);
         // Byte received when buffer is not set - data lost.
-        (void) nrf_uart_rxd_get(NRF_UART0);
+        (void) nrf_uart_rxd_get(p_uart);
         return;
     }
-    nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXDRDY);
-    m_cb.p_rx_buffer[m_cb.rx_counter] = nrf_uart_rxd_get(NRF_UART0);
-    m_cb.rx_counter++;
+    nrf_uart_event_clear(p_uart, NRF_UART_EVENT_RXDRDY);
+    p_cb->p_rx_buffer[p_cb->rx_counter] = nrf_uart_rxd_get(p_uart);
+    p_cb->rx_counter++;
 }
 
-__STATIC_INLINE ret_code_t nrf_drv_uart_rx_for_uart(uint8_t * p_data, uint8_t length, bool second_buffer)
+__STATIC_INLINE ret_code_t nrf_drv_uart_rx_for_uart(const nrf_drv_uart_t * p_instance, uint8_t * p_data, uint8_t length, bool second_buffer)
 {
-    if ((!m_cb.rx_enabled) && (!second_buffer))
+    ret_code_t err_code;
+
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+
+    if ((!p_cb->rx_enabled) && (!second_buffer))
     {
-        rx_enable();
+        rx_enable(p_instance);
     }
-    if (m_cb.handler == NULL)
+
+    if (p_cb->handler == NULL)
     {
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
-        
+        nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_RXTO);
+
         bool rxrdy;
         bool rxto;
         bool error;
@@ -415,165 +501,194 @@ __STATIC_INLINE ret_code_t nrf_drv_uart_rx_for_uart(uint8_t * p_data, uint8_t le
         {
             do
             {
-                error = nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR);
-                rxrdy = nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY);
-                rxto  = nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO);
+                error = nrf_uart_event_check(p_instance->reg.p_uart, NRF_UART_EVENT_ERROR);
+                rxrdy = nrf_uart_event_check(p_instance->reg.p_uart, NRF_UART_EVENT_RXDRDY);
+                rxto  = nrf_uart_event_check(p_instance->reg.p_uart, NRF_UART_EVENT_RXTO);
             } while ((!rxrdy) && (!rxto) && (!error));
 
             if (error || rxto)
             {
                 break;
             }
-            rx_byte();
-        } while (m_cb.rx_buffer_length > m_cb.rx_counter);
+            rx_byte(p_instance->reg.p_uart, p_cb);
+        } while (p_cb->rx_buffer_length > p_cb->rx_counter);
 
-        m_cb.rx_buffer_length = 0;
+        p_cb->rx_buffer_length = 0;
         if (error)
         {
-            return NRF_ERROR_INTERNAL;
+            err_code = NRF_ERROR_INTERNAL;
+            NRF_LOG_WARNING("RX Id: %d, transfer error.", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
+            return err_code;
         }
 
         if (rxto)
         {
-            return NRF_ERROR_FORBIDDEN;
+            NRF_LOG_WARNING("RX Id: %d, aborted.", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
+            err_code = NRF_ERROR_FORBIDDEN;
+            return err_code;
         }
 
-        if (m_cb.rx_enabled)
+        if (p_cb->rx_enabled)
         {
-            nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTRX);
+            nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STARTRX);
         }
         else
         {
             // Skip stopping RX if driver is forced to be enabled.
-            nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPRX);
+            nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STOPRX);
         }
     }
     else
     {
-        nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+        nrf_uart_int_enable(p_instance->reg.p_uart, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
     }
-    return NRF_SUCCESS;
+    err_code = NRF_SUCCESS;
+    return err_code;
 }
 #endif
 
 #if defined(UARTE_IN_USE)
-__STATIC_INLINE ret_code_t nrf_drv_uart_rx_for_uarte(uint8_t * p_data, uint8_t length, bool second_buffer)
+__STATIC_INLINE ret_code_t nrf_drv_uart_rx_for_uarte(const nrf_drv_uart_t * p_instance, uint8_t * p_data, uint8_t length, bool second_buffer)
 {
-    nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ENDRX);
-    nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_RXTO);
-    nrf_uarte_rx_buffer_set(NRF_UARTE0, p_data, length);
+    ret_code_t err_code = NRF_SUCCESS;
+    nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDRX);
+    nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_RXTO);
+    nrf_uarte_rx_buffer_set(p_instance->reg.p_uarte, p_data, length);
     if (!second_buffer)
     {
-        nrf_uarte_task_trigger(NRF_UARTE0, NRF_UARTE_TASK_STARTRX);
+        nrf_uarte_task_trigger(p_instance->reg.p_uarte, NRF_UARTE_TASK_STARTRX);
     }
     else
     {
-        nrf_uarte_shorts_enable(NRF_UARTE0, NRF_UARTE_SHORT_ENDRX_STARTRX);
+        nrf_uarte_shorts_enable(p_instance->reg.p_uarte, NRF_UARTE_SHORT_ENDRX_STARTRX);
     }
 
-    if (m_cb.handler == NULL)
+    if (m_cb[p_instance->drv_inst_idx].handler == NULL)
     {
         bool endrx;
         bool rxto;
         bool error;
         do {
-            endrx  = nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_ENDRX);
-            rxto   = nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_RXTO);
-            error  = nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_ERROR);
+            endrx  = nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDRX);
+            rxto   = nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_RXTO);
+            error  = nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ERROR);
         }while ((!endrx) && (!rxto) && (!error));
 
-        m_cb.rx_buffer_length = 0;
+        m_cb[p_instance->drv_inst_idx].rx_buffer_length = 0;
 
         if (error)
         {
-            return NRF_ERROR_INTERNAL;
+            err_code = NRF_ERROR_INTERNAL;
         }
 
         if (rxto)
         {
-            return NRF_ERROR_FORBIDDEN;
+            err_code = NRF_ERROR_FORBIDDEN;
         }
     }
     else
     {
-        nrf_uarte_int_enable(NRF_UARTE0, NRF_UARTE_INT_ERROR_MASK | NRF_UARTE_INT_ENDRX_MASK);
+        nrf_uarte_int_enable(p_instance->reg.p_uarte, NRF_UARTE_INT_ERROR_MASK | NRF_UARTE_INT_ENDRX_MASK);
     }
-    return NRF_SUCCESS;
+    return err_code;
 }
 #endif
 
-ret_code_t nrf_drv_uart_rx(uint8_t * p_data, uint8_t length)
+ret_code_t nrf_drv_uart_rx(const nrf_drv_uart_t * p_instance, uint8_t * p_data, uint8_t length)
 {
-    ASSERT(m_cb.state == NRF_DRV_STATE_INITIALIZED);
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+
+    ASSERT(m_cb[p_instance->drv_inst_idx].state == NRF_DRV_STATE_INITIALIZED);
     ASSERT(length>0);
+
+    ret_code_t err_code;
 
     CODE_FOR_UARTE
     (
         // EasyDMA requires that transfer buffers are placed in DataRAM,
         // signal error if the are not.
-        if (!IS_EASY_DMA_RAM_ADDRESS(p_data))
+        if (!nrf_drv_is_in_RAM(p_data))
         {
-            return NRF_ERROR_INVALID_ADDR;
+            err_code = NRF_ERROR_INVALID_ADDR;
+            NRF_LOG_ERROR("Id:%d, Easy-DMA buffer not in RAM: %08x",
+                                                       nrf_drv_get_IRQn((void *)p_instance->reg.p_reg), p_data);
+            return err_code;
         }
     )
 
     bool second_buffer = false;
 
-    if (m_cb.handler)
+    if (p_cb->handler)
     {
         CODE_FOR_UARTE
         (
-            nrf_uarte_int_disable(NRF_UARTE0, NRF_UARTE_INT_ERROR_MASK | NRF_UARTE_INT_ENDRX_MASK);
+            nrf_uarte_int_disable(p_instance->reg.p_uarte, NRF_UARTE_INT_ERROR_MASK | NRF_UARTE_INT_ENDRX_MASK);
         )
         CODE_FOR_UART
         (
-            nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+            nrf_uart_int_disable(p_instance->reg.p_uart, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
         )
     }
-    if (m_cb.rx_buffer_length != 0)
+    if (p_cb->rx_buffer_length != 0)
     {
-        if (m_cb.rx_secondary_buffer_length != 0)
+        if (p_cb->rx_secondary_buffer_length != 0)
         {
-            if (m_cb.handler)
+            if (p_cb->handler)
             {
                 CODE_FOR_UARTE
                 (
-                    nrf_uarte_int_enable(NRF_UARTE0, NRF_UARTE_INT_ERROR_MASK | NRF_UARTE_INT_ENDRX_MASK);
+                    nrf_uarte_int_enable(p_instance->reg.p_uarte, NRF_UARTE_INT_ERROR_MASK | NRF_UARTE_INT_ENDRX_MASK);
                 )
                 CODE_FOR_UART
                 (
-                    nrf_uart_int_enable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+                    nrf_uart_int_enable(p_instance->reg.p_uart, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
                 )
             }
-            return NRF_ERROR_BUSY;
+            err_code = NRF_ERROR_BUSY;
+            NRF_LOG_WARNING("RX Id:%d, busy", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
+            return err_code;
         }
         second_buffer = true;
     }
 
     if (!second_buffer)
     {
-        m_cb.rx_buffer_length = length;
-        m_cb.p_rx_buffer      = p_data;
-        m_cb.rx_counter       = 0;
-        m_cb.rx_secondary_buffer_length = 0;
+        p_cb->rx_buffer_length = length;
+        p_cb->p_rx_buffer      = p_data;
+        p_cb->rx_counter       = 0;
+        p_cb->rx_secondary_buffer_length = 0;
     }
     else
     {
-        m_cb.p_rx_secondary_buffer = p_data;
-        m_cb.rx_secondary_buffer_length = length;
+        p_cb->p_rx_secondary_buffer = p_data;
+        p_cb->rx_secondary_buffer_length = length;
     }
+
+    NRF_LOG_INFO("RX Id:%d len:%d", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg), length);
 
     CODE_FOR_UARTE
     (
-        return nrf_drv_uart_rx_for_uarte(p_data, length, second_buffer);
+        return nrf_drv_uart_rx_for_uarte(p_instance, p_data, length, second_buffer);
     )
     CODE_FOR_UART
     (
-        return nrf_drv_uart_rx_for_uart(p_data, length, second_buffer);
+        return nrf_drv_uart_rx_for_uart(p_instance, p_data, length, second_buffer);
     )
 }
 
-void nrf_drv_uart_rx_enable(void)
+bool nrf_drv_uart_rx_ready(nrf_drv_uart_t const * p_instance)
+{
+    CODE_FOR_UARTE
+    (
+        return nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ENDRX);
+    )
+    CODE_FOR_UART
+    (
+        return nrf_uart_event_check(p_instance->reg.p_uart, NRF_UART_EVENT_RXDRDY);
+    )
+}
+
+void nrf_drv_uart_rx_enable(const nrf_drv_uart_t * p_instance)
 {
     //Easy dma mode does not support enabling receiver without setting up buffer.
     CODE_FOR_UARTE
@@ -582,15 +697,15 @@ void nrf_drv_uart_rx_enable(void)
     )
     CODE_FOR_UART
     (
-        if (!m_cb.rx_enabled)
+        if (!m_cb[p_instance->drv_inst_idx].rx_enabled)
         {
-            rx_enable();
-            m_cb.rx_enabled = true;
+            rx_enable(p_instance);
+            m_cb[p_instance->drv_inst_idx].rx_enabled = true;
         }
     )
 }
 
-void nrf_drv_uart_rx_disable(void)
+void nrf_drv_uart_rx_disable(const nrf_drv_uart_t * p_instance)
 {
     //Easy dma mode does not support enabling receiver without setting up buffer.
     CODE_FOR_UARTE
@@ -599,28 +714,28 @@ void nrf_drv_uart_rx_disable(void)
     )
     CODE_FOR_UART
     (
-        nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPRX);
-        m_cb.rx_enabled = false;
+        nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STOPRX);
+        m_cb[p_instance->drv_inst_idx].rx_enabled = false;
     )
 }
 
-uint32_t nrf_drv_uart_errorsrc_get(void)
+uint32_t nrf_drv_uart_errorsrc_get(const nrf_drv_uart_t * p_instance)
 {
     uint32_t errsrc;
     CODE_FOR_UARTE
     (
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ERROR);
-        errsrc = nrf_uarte_errorsrc_get_and_clear(NRF_UARTE0);
+        nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_ERROR);
+        errsrc = nrf_uarte_errorsrc_get_and_clear(p_instance->reg.p_uarte);
     )
     CODE_FOR_UART
     (
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
-        errsrc = nrf_uart_errorsrc_get_and_clear(NRF_UART0);
+        nrf_uart_event_clear(p_instance->reg.p_uart, NRF_UART_EVENT_ERROR);
+        errsrc = nrf_uart_errorsrc_get_and_clear(p_instance->reg.p_uart);
     )
     return errsrc;
 }
 
-__STATIC_INLINE void rx_done_event(uint8_t bytes, uint8_t * p_data)
+__STATIC_INLINE void rx_done_event(uart_control_block_t * p_cb, uint8_t bytes, uint8_t * p_data)
 {
     nrf_drv_uart_event_t event;
 
@@ -628,224 +743,249 @@ __STATIC_INLINE void rx_done_event(uint8_t bytes, uint8_t * p_data)
     event.data.rxtx.bytes  = bytes;
     event.data.rxtx.p_data = p_data;
 
-    m_cb.handler(&event,m_cb.p_context);
+    p_cb->handler(&event, p_cb->p_context);
 }
 
-__STATIC_INLINE void tx_done_event(uint8_t bytes)
+__STATIC_INLINE void tx_done_event(uart_control_block_t * p_cb, uint8_t bytes)
 {
     nrf_drv_uart_event_t event;
 
     event.type             = NRF_DRV_UART_EVT_TX_DONE;
     event.data.rxtx.bytes  = bytes;
-    event.data.rxtx.p_data = (uint8_t *)m_cb.p_tx_buffer;
+    event.data.rxtx.p_data = (uint8_t *)p_cb->p_tx_buffer;
 
-    m_cb.tx_buffer_length = 0;
+    p_cb->tx_buffer_length = 0;
 
-    m_cb.handler(&event,m_cb.p_context);
+    NRF_LOG_INFO("TX done len:%d", bytes);
+    p_cb->handler(&event, p_cb->p_context);
 }
 
-void nrf_drv_uart_tx_abort(void)
+void nrf_drv_uart_tx_abort(const nrf_drv_uart_t * p_instance)
 {
+    uart_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
+
     CODE_FOR_UARTE
     (
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_TXSTOPPED);
-        nrf_uarte_task_trigger(NRF_UARTE0, NRF_UARTE_TASK_STOPTX);
-        if (m_cb.handler == NULL)
+        nrf_uarte_event_clear(p_instance->reg.p_uarte, NRF_UARTE_EVENT_TXSTOPPED);
+        nrf_uarte_task_trigger(p_instance->reg.p_uarte, NRF_UARTE_TASK_STOPTX);
+        if (p_cb->handler == NULL)
         {
-            while(!nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_TXSTOPPED));
+            while (!nrf_uarte_event_check(p_instance->reg.p_uarte, NRF_UARTE_EVENT_TXSTOPPED));
         }
     )
     CODE_FOR_UART
     (
-        nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPTX);
-        if (m_cb.handler)
+        nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STOPTX);
+        if (p_cb->handler)
         {
-            tx_done_event(m_cb.tx_counter);
+            tx_done_event(p_cb, p_cb->tx_counter);
         }
         else
         {
-            m_cb.tx_counter       = TX_COUNTER_ABORT_REQ_VALUE;
+            p_cb->tx_counter       = TX_COUNTER_ABORT_REQ_VALUE;
         }
     )
+    NRF_LOG_INFO("TX abort Id:%d", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
 }
 
-void nrf_drv_uart_rx_abort(void)
+void nrf_drv_uart_rx_abort(const nrf_drv_uart_t * p_instance)
 {
     CODE_FOR_UARTE
     (
-        nrf_uarte_task_trigger(NRF_UARTE0, NRF_UARTE_TASK_STOPRX);
+        nrf_uarte_task_trigger(p_instance->reg.p_uarte, NRF_UARTE_TASK_STOPRX);
     )
     CODE_FOR_UART
     (
-        nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
-        nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPRX);
+        nrf_uart_int_disable(p_instance->reg.p_uart, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+        nrf_uart_task_trigger(p_instance->reg.p_uart, NRF_UART_TASK_STOPRX);
     )
+    NRF_LOG_INFO("RX abort Id:%d", nrf_drv_get_IRQn((void *)p_instance->reg.p_reg));
 }
 
 
 #if defined(UART_IN_USE)
-__STATIC_INLINE void uart_irq_handler()
+__STATIC_INLINE void uart_irq_handler(NRF_UART_Type * p_uart, uart_control_block_t * p_cb)
 {
-    if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_ERROR) &&
-        nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_ERROR))
+    if (nrf_uart_int_enable_check(p_uart, NRF_UART_INT_MASK_ERROR) &&
+        nrf_uart_event_check(p_uart, NRF_UART_EVENT_ERROR))
     {
         nrf_drv_uart_event_t event;
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_ERROR);
-        nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
-        if (!m_cb.rx_enabled)
+        nrf_uart_event_clear(p_uart, NRF_UART_EVENT_ERROR);
+        nrf_uart_int_disable(p_uart, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+        if (!p_cb->rx_enabled)
         {
-            nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPRX);
+            nrf_uart_task_trigger(p_uart, NRF_UART_TASK_STOPRX);
         }
         event.type                   = NRF_DRV_UART_EVT_ERROR;
-        event.data.error.error_mask  = nrf_uart_errorsrc_get_and_clear(NRF_UART0);
-        event.data.error.rxtx.bytes  = m_cb.rx_buffer_length;
-        event.data.error.rxtx.p_data = m_cb.p_rx_buffer;
+        event.data.error.error_mask  = nrf_uart_errorsrc_get_and_clear(p_uart);
+        event.data.error.rxtx.bytes  = p_cb->rx_buffer_length;
+        event.data.error.rxtx.p_data = p_cb->p_rx_buffer;
 
         //abort transfer
-        m_cb.rx_buffer_length = 0;
-        m_cb.rx_secondary_buffer_length = 0;
+        p_cb->rx_buffer_length = 0;
+        p_cb->rx_secondary_buffer_length = 0;
 
-        m_cb.handler(&event,m_cb.p_context);
+        p_cb->handler(&event,p_cb->p_context);
     }
-    else if (nrf_uart_int_enable_check(NRF_UART0, NRF_UART_INT_MASK_RXDRDY) &&
-             nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXDRDY))
+    else if (nrf_uart_int_enable_check(p_uart, NRF_UART_INT_MASK_RXDRDY) &&
+             nrf_uart_event_check(p_uart, NRF_UART_EVENT_RXDRDY))
     {
-        rx_byte();
-        if (m_cb.rx_buffer_length == m_cb.rx_counter)
+        rx_byte(p_uart, p_cb);
+        if (p_cb->rx_buffer_length == p_cb->rx_counter)
         {
-            if (m_cb.rx_secondary_buffer_length)
+            if (p_cb->rx_secondary_buffer_length)
             {
-                uint8_t * p_data     = m_cb.p_rx_buffer;
-                uint8_t   rx_counter = m_cb.rx_counter;
-                
+                uint8_t * p_data     = p_cb->p_rx_buffer;
+                uint8_t   rx_counter = p_cb->rx_counter;
+
                 //Switch to secondary buffer.
-                m_cb.rx_buffer_length = m_cb.rx_secondary_buffer_length;
-                m_cb.p_rx_buffer = m_cb.p_rx_secondary_buffer;
-                m_cb.rx_secondary_buffer_length = 0;
-                m_cb.rx_counter = 0;
-                rx_done_event(rx_counter, p_data);
+                p_cb->rx_buffer_length = p_cb->rx_secondary_buffer_length;
+                p_cb->p_rx_buffer = p_cb->p_rx_secondary_buffer;
+                p_cb->rx_secondary_buffer_length = 0;
+                p_cb->rx_counter = 0;
+                rx_done_event(p_cb, rx_counter, p_data);
             }
             else
             {
-                if (!m_cb.rx_enabled)
+                if (!p_cb->rx_enabled)
                 {
-                    nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STOPRX);
+                    nrf_uart_task_trigger(p_uart, NRF_UART_TASK_STOPRX);
                 }
-                nrf_uart_int_disable(NRF_UART0, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
-                m_cb.rx_buffer_length = 0;
-                rx_done_event(m_cb.rx_counter, m_cb.p_rx_buffer);
+                nrf_uart_int_disable(p_uart, NRF_UART_INT_MASK_RXDRDY | NRF_UART_INT_MASK_ERROR);
+                p_cb->rx_buffer_length = 0;
+                rx_done_event(p_cb, p_cb->rx_counter, p_cb->p_rx_buffer);
             }
         }
     }
 
-    if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_TXDRDY))
+    if (nrf_uart_event_check(p_uart, NRF_UART_EVENT_TXDRDY))
     {
-        if (m_cb.tx_counter < (uint16_t) m_cb.tx_buffer_length)
+        if (p_cb->tx_counter < (uint16_t) p_cb->tx_buffer_length)
         {
-            tx_byte();
+            tx_byte(p_uart, p_cb);
         }
         else
         {
-            nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_TXDRDY);
-            if (m_cb.tx_buffer_length)
+            nrf_uart_event_clear(p_uart, NRF_UART_EVENT_TXDRDY);
+            if (p_cb->tx_buffer_length)
             {
-                tx_done_event(m_cb.tx_buffer_length);
+                tx_done_event(p_cb, p_cb->tx_buffer_length);
             }
         }
     }
 
-    if (nrf_uart_event_check(NRF_UART0, NRF_UART_EVENT_RXTO))
+    if (nrf_uart_event_check(p_uart, NRF_UART_EVENT_RXTO))
     {
-        nrf_uart_event_clear(NRF_UART0, NRF_UART_EVENT_RXTO);
+        nrf_uart_event_clear(p_uart, NRF_UART_EVENT_RXTO);
 
         // RXTO event may be triggered as a result of abort call. In th
-        if (m_cb.rx_enabled)
+        if (p_cb->rx_enabled)
         {
-            nrf_uart_task_trigger(NRF_UART0, NRF_UART_TASK_STARTRX);
+            nrf_uart_task_trigger(p_uart, NRF_UART_TASK_STARTRX);
         }
-        if (m_cb.rx_buffer_length)
+        if (p_cb->rx_buffer_length)
         {
-            m_cb.rx_buffer_length = 0;
-            rx_done_event(m_cb.rx_counter, m_cb.p_rx_buffer);
+            p_cb->rx_buffer_length = 0;
+            rx_done_event(p_cb, p_cb->rx_counter, p_cb->p_rx_buffer);
         }
     }
 }
 #endif
 
 #if defined(UARTE_IN_USE)
-__STATIC_INLINE void uarte_irq_handler()
+__STATIC_INLINE void uarte_irq_handler(NRF_UARTE_Type * p_uarte, uart_control_block_t * p_cb)
 {
-    if (nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_ERROR))
+    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ERROR))
     {
         nrf_drv_uart_event_t event;
 
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ERROR);
+        nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ERROR);
 
         event.type                   = NRF_DRV_UART_EVT_ERROR;
-        event.data.error.error_mask  = nrf_uarte_errorsrc_get_and_clear(NRF_UARTE0);
-        event.data.error.rxtx.bytes  = nrf_uarte_rx_amount_get(NRF_UARTE0);
-        event.data.error.rxtx.p_data = m_cb.p_rx_buffer;
+        event.data.error.error_mask  = nrf_uarte_errorsrc_get_and_clear(p_uarte);
+        event.data.error.rxtx.bytes  = nrf_uarte_rx_amount_get(p_uarte);
+        event.data.error.rxtx.p_data = p_cb->p_rx_buffer;
 
         //abort transfer
-        m_cb.rx_buffer_length = 0;
-        m_cb.rx_secondary_buffer_length = 0;
+        p_cb->rx_buffer_length = 0;
+        p_cb->rx_secondary_buffer_length = 0;
 
-        m_cb.handler(&event,m_cb.p_context);
+        p_cb->handler(&event, p_cb->p_context);
     }
-    else if (nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_ENDRX))
+    else if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDRX))
     {
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ENDRX);
-        uint8_t amount = nrf_uarte_rx_amount_get(NRF_UARTE0);
+        nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDRX);
+        uint8_t amount = nrf_uarte_rx_amount_get(p_uarte);
         // If the transfer was stopped before completion, amount of transfered bytes
         // will not be equal to the buffer length. Interrupted trunsfer is ignored.
-        if (amount == m_cb.rx_buffer_length)
+        if (amount == p_cb->rx_buffer_length)
         {
-            if (m_cb.rx_secondary_buffer_length)
+            if (p_cb->rx_secondary_buffer_length)
             {
-                uint8_t * p_data = m_cb.p_rx_buffer;
-                nrf_uarte_shorts_disable(NRF_UARTE0, NRF_UARTE_SHORT_ENDRX_STARTRX);
-                m_cb.rx_buffer_length = m_cb.rx_secondary_buffer_length;
-                m_cb.p_rx_buffer = m_cb.p_rx_secondary_buffer;
-                m_cb.rx_secondary_buffer_length = 0;
-                rx_done_event(amount, p_data);
+                uint8_t * p_data = p_cb->p_rx_buffer;
+                nrf_uarte_shorts_disable(p_uarte, NRF_UARTE_SHORT_ENDRX_STARTRX);
+                p_cb->rx_buffer_length = p_cb->rx_secondary_buffer_length;
+                p_cb->p_rx_buffer = p_cb->p_rx_secondary_buffer;
+                p_cb->rx_secondary_buffer_length = 0;
+                rx_done_event(p_cb, amount, p_data);
             }
             else
             {
-                m_cb.rx_buffer_length = 0;
-                rx_done_event(amount, m_cb.p_rx_buffer);
+                p_cb->rx_buffer_length = 0;
+                rx_done_event(p_cb, amount, p_cb->p_rx_buffer);
             }
         }
     }
 
-    if (nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_RXTO))
+    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXTO))
     {
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_RXTO);
-        if (m_cb.rx_buffer_length)
+        nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXTO);
+        if (p_cb->rx_buffer_length)
         {
-            m_cb.rx_buffer_length = 0;
-            rx_done_event(nrf_uarte_rx_amount_get(NRF_UARTE0), m_cb.p_rx_buffer);
+            p_cb->rx_buffer_length = 0;
+            rx_done_event(p_cb, nrf_uarte_rx_amount_get(p_uarte), p_cb->p_rx_buffer);
         }
     }
 
-    if (nrf_uarte_event_check(NRF_UARTE0, NRF_UARTE_EVENT_ENDTX))
+    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDTX))
     {
-        nrf_uarte_event_clear(NRF_UARTE0, NRF_UARTE_EVENT_ENDTX);
-        if (m_cb.tx_buffer_length)
+        nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDTX);
+        if (p_cb->tx_buffer_length)
         {
-            tx_done_event(nrf_uarte_tx_amount_get(NRF_UARTE0));
+            tx_done_event(p_cb, nrf_uarte_tx_amount_get(p_uarte));
         }
     }
 }
 #endif
 
-void UART0_IRQHandler(void)
+#if UART0_ENABLED
+IRQ_HANDLER(0)
 {
-    CODE_FOR_UARTE
+    CODE_FOR_UARTE_INT
     (
-        uarte_irq_handler();
+        UART0_INSTANCE_INDEX,
+        uarte_irq_handler(NRF_UARTE0, &m_cb[UART0_INSTANCE_INDEX]);
     )
     CODE_FOR_UART
     (
-        uart_irq_handler();
+        uart_irq_handler(NRF_UART0, &m_cb[UART0_INSTANCE_INDEX]);
     )
 }
+#endif
+
+#if UART1_ENABLED
+void UARTE1_IRQHandler(void)
+{
+    CODE_FOR_UARTE_INT
+    (
+        UART1_INSTANCE_INDEX,
+        uarte_irq_handler(NRF_UARTE1, &m_cb[UART1_INSTANCE_INDEX]);
+    )
+    CODE_FOR_UART
+    (
+        uart_irq_handler(NRF_UART1, &m_cb[UART1_INSTANCE_INDEX]);
+    )
+}
+#endif
+#endif //NRF_MODULE_ENABLED(UART)
+

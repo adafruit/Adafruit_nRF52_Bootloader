@@ -104,7 +104,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
 
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/delay/nrf_delay.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 
@@ -115,7 +114,7 @@ C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dis/ble_dis.c
 
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/pstorage/pstorage_raw.c
-C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52.c
+C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
 
 C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler.c
 C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler_appsh.c
@@ -125,7 +124,7 @@ C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler_
 #******************************************************************************
 # Assembly Files
 #******************************************************************************
-ASM_SOURCE_FILES  = $(SDK_PATH)/toolchain/gcc/gcc_startup_nrf52.S
+ASM_SOURCE_FILES  = $(SDK_PATH)/toolchain/gcc/gcc_startup_nrf52840.S
 
 #******************************************************************************
 # INCLUDE PATH

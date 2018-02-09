@@ -46,6 +46,8 @@
 #ifdef USE_APP_CONFIG
 #include "app_config.h"
 #endif
+
+//#include "nrf_drv_config.h"
 // <h> nRF_BLE_DFU 
 
 //==========================================================
@@ -163,7 +165,7 @@
 // <e> CLOCK_ENABLED - nrf_drv_clock - CLOCK peripheral driver
 //==========================================================
 #ifndef CLOCK_ENABLED
-#define CLOCK_ENABLED 1
+#define CLOCK_ENABLED 0
 #endif
 // <o> CLOCK_CONFIG_XTAL_FREQ  - HF XTAL Frequency
  
@@ -202,12 +204,697 @@
 
 // </e>
 
+// <e> COMP_ENABLED - nrf_drv_comp - COMP peripheral driver
+//==========================================================
+#ifndef COMP_ENABLED
+#define COMP_ENABLED 0
+#endif
+// <o> COMP_CONFIG_REF  - Reference voltage
+ 
+// <0=> Internal 1.2V 
+// <1=> Internal 1.8V 
+// <2=> Internal 2.4V 
+// <4=> VDD 
+// <7=> ARef 
+
+#ifndef COMP_CONFIG_REF
+#define COMP_CONFIG_REF 1
+#endif
+
+// <o> COMP_CONFIG_MAIN_MODE  - Main mode
+ 
+// <0=> Single ended 
+// <1=> Differential 
+
+#ifndef COMP_CONFIG_MAIN_MODE
+#define COMP_CONFIG_MAIN_MODE 0
+#endif
+
+// <o> COMP_CONFIG_SPEED_MODE  - Speed mode
+ 
+// <0=> Low power 
+// <1=> Normal 
+// <2=> High speed 
+
+#ifndef COMP_CONFIG_SPEED_MODE
+#define COMP_CONFIG_SPEED_MODE 2
+#endif
+
+// <o> COMP_CONFIG_HYST  - Hystheresis
+ 
+// <0=> No 
+// <1=> 50mV 
+
+#ifndef COMP_CONFIG_HYST
+#define COMP_CONFIG_HYST 0
+#endif
+
+// <o> COMP_CONFIG_ISOURCE  - Current Source
+ 
+// <0=> Off 
+// <1=> 2.5 uA 
+// <2=> 5 uA 
+// <3=> 10 uA 
+
+#ifndef COMP_CONFIG_ISOURCE
+#define COMP_CONFIG_ISOURCE 0
+#endif
+
+// <o> COMP_CONFIG_INPUT  - Analog input
+ 
+// <0=> 0 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef COMP_CONFIG_INPUT
+#define COMP_CONFIG_INPUT 0
+#endif
+
+// <o> COMP_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef COMP_CONFIG_IRQ_PRIORITY
+#define COMP_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
+// <q> EGU_ENABLED  - nrf_drv_swi - SWI(EGU) peripheral driver
+ 
+
+#ifndef EGU_ENABLED
+#define EGU_ENABLED 0
+#endif
+
+// <e> GPIOTE_ENABLED - nrf_drv_gpiote - GPIOTE peripheral driver
+//==========================================================
+#ifndef GPIOTE_ENABLED
+#define GPIOTE_ENABLED 0
+#endif
+// <o> GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS - Number of lower power input pins 
+#ifndef GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS
+#define GPIOTE_CONFIG_NUM_OF_LOW_POWER_EVENTS 4
+#endif
+
+// <o> GPIOTE_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef GPIOTE_CONFIG_IRQ_PRIORITY
+#define GPIOTE_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
+// <e> I2S_ENABLED - nrf_drv_i2s - I2S peripheral driver
+//==========================================================
+#ifndef I2S_ENABLED
+#define I2S_ENABLED 0
+#endif
+// <o> I2S_CONFIG_SCK_PIN - SCK pin  <0-31> 
+
+
+#ifndef I2S_CONFIG_SCK_PIN
+#define I2S_CONFIG_SCK_PIN 31
+#endif
+
+// <o> I2S_CONFIG_LRCK_PIN - LRCK pin  <1-31> 
+
+
+#ifndef I2S_CONFIG_LRCK_PIN
+#define I2S_CONFIG_LRCK_PIN 30
+#endif
+
+// <o> I2S_CONFIG_MCK_PIN - MCK pin 
+#ifndef I2S_CONFIG_MCK_PIN
+#define I2S_CONFIG_MCK_PIN 255
+#endif
+
+// <o> I2S_CONFIG_SDOUT_PIN - SDOUT pin  <0-31> 
+
+
+#ifndef I2S_CONFIG_SDOUT_PIN
+#define I2S_CONFIG_SDOUT_PIN 29
+#endif
+
+// <o> I2S_CONFIG_SDIN_PIN - SDIN pin  <0-31> 
+
+
+#ifndef I2S_CONFIG_SDIN_PIN
+#define I2S_CONFIG_SDIN_PIN 28
+#endif
+
+// <o> I2S_CONFIG_MASTER  - Mode
+ 
+// <0=> Master 
+// <1=> Slave 
+
+#ifndef I2S_CONFIG_MASTER
+#define I2S_CONFIG_MASTER 0
+#endif
+
+// <o> I2S_CONFIG_FORMAT  - Format
+ 
+// <0=> I2S 
+// <1=> Aligned 
+
+#ifndef I2S_CONFIG_FORMAT
+#define I2S_CONFIG_FORMAT 0
+#endif
+
+// <o> I2S_CONFIG_ALIGN  - Alignment
+ 
+// <0=> Left 
+// <1=> Right 
+
+#ifndef I2S_CONFIG_ALIGN
+#define I2S_CONFIG_ALIGN 0
+#endif
+
+// <o> I2S_CONFIG_SWIDTH  - Sample width (bits)
+ 
+// <0=> 8 
+// <1=> 16 
+// <2=> 24 
+
+#ifndef I2S_CONFIG_SWIDTH
+#define I2S_CONFIG_SWIDTH 1
+#endif
+
+// <o> I2S_CONFIG_CHANNELS  - Channels
+ 
+// <0=> Stereo 
+// <1=> Left 
+// <2=> Right 
+
+#ifndef I2S_CONFIG_CHANNELS
+#define I2S_CONFIG_CHANNELS 1
+#endif
+
+// <o> I2S_CONFIG_MCK_SETUP  - MCK behavior
+ 
+// <0=> Disabled 
+// <2147483648=> 32MHz/2 
+// <1342177280=> 32MHz/3 
+// <1073741824=> 32MHz/4 
+// <805306368=> 32MHz/5 
+// <671088640=> 32MHz/6 
+// <536870912=> 32MHz/8 
+// <402653184=> 32MHz/10 
+// <369098752=> 32MHz/11 
+// <285212672=> 32MHz/15 
+// <268435456=> 32MHz/16 
+// <201326592=> 32MHz/21 
+// <184549376=> 32MHz/23 
+// <142606336=> 32MHz/30 
+// <138412032=> 32MHz/31 
+// <134217728=> 32MHz/32 
+// <100663296=> 32MHz/42 
+// <68157440=> 32MHz/63 
+// <34340864=> 32MHz/125 
+
+#ifndef I2S_CONFIG_MCK_SETUP
+#define I2S_CONFIG_MCK_SETUP 536870912
+#endif
+
+// <o> I2S_CONFIG_RATIO  - MCK/LRCK ratio
+ 
+// <0=> 32x 
+// <1=> 48x 
+// <2=> 64x 
+// <3=> 96x 
+// <4=> 128x 
+// <5=> 192x 
+// <6=> 256x 
+// <7=> 384x 
+// <8=> 512x 
+
+#ifndef I2S_CONFIG_RATIO
+#define I2S_CONFIG_RATIO 2000
+#endif
+
+// <o> I2S_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef I2S_CONFIG_IRQ_PRIORITY
+#define I2S_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
+// <e> LPCOMP_ENABLED - nrf_drv_lpcomp - LPCOMP peripheral driver
+//==========================================================
+#ifndef LPCOMP_ENABLED
+#define LPCOMP_ENABLED 0
+#endif
+// <o> LPCOMP_CONFIG_REFERENCE  - Reference voltage
+ 
+// <0=> Supply 1/8 
+// <1=> Supply 2/8 
+// <2=> Supply 3/8 
+// <3=> Supply 4/8 
+// <4=> Supply 5/8 
+// <5=> Supply 6/8 
+// <6=> Supply 7/8 
+// <8=> Supply 1/16 (nRF52) 
+// <9=> Supply 3/16 (nRF52) 
+// <10=> Supply 5/16 (nRF52) 
+// <11=> Supply 7/16 (nRF52) 
+// <12=> Supply 9/16 (nRF52) 
+// <13=> Supply 11/16 (nRF52) 
+// <14=> Supply 13/16 (nRF52) 
+// <15=> Supply 15/16 (nRF52) 
+// <7=> External Ref 0 
+// <65543=> External Ref 1 
+
+#ifndef LPCOMP_CONFIG_REFERENCE
+#define LPCOMP_CONFIG_REFERENCE 3
+#endif
+
+// <o> LPCOMP_CONFIG_DETECTION  - Detection
+ 
+// <0=> Crossing 
+// <1=> Up 
+// <2=> Down 
+
+#ifndef LPCOMP_CONFIG_DETECTION
+#define LPCOMP_CONFIG_DETECTION 2
+#endif
+
+// <o> LPCOMP_CONFIG_INPUT  - Analog input
+ 
+// <0=> 0 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef LPCOMP_CONFIG_INPUT
+#define LPCOMP_CONFIG_INPUT 0
+#endif
+
+// <q> LPCOMP_CONFIG_HYST  - Hysteresis
+ 
+
+#ifndef LPCOMP_CONFIG_HYST
+#define LPCOMP_CONFIG_HYST 0
+#endif
+
+// <o> LPCOMP_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef LPCOMP_CONFIG_IRQ_PRIORITY
+#define LPCOMP_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
+// <e> PDM_ENABLED - nrf_drv_pdm - PDM peripheral driver
+//==========================================================
+#ifndef PDM_ENABLED
+#define PDM_ENABLED 0
+#endif
+// <o> PDM_CONFIG_MODE  - Mode
+ 
+// <0=> Stereo 
+// <1=> Mono 
+
+#ifndef PDM_CONFIG_MODE
+#define PDM_CONFIG_MODE 1
+#endif
+
+// <o> PDM_CONFIG_EDGE  - Edge
+ 
+// <0=> Left falling 
+// <1=> Left rising 
+
+#ifndef PDM_CONFIG_EDGE
+#define PDM_CONFIG_EDGE 0
+#endif
+
+// <o> PDM_CONFIG_CLOCK_FREQ  - Clock frequency
+ 
+// <134217728=> 1000k 
+// <138412032=> 1032k (default) 
+// <142606336=> 1067k 
+
+#ifndef PDM_CONFIG_CLOCK_FREQ
+#define PDM_CONFIG_CLOCK_FREQ 138412032
+#endif
+
+// <o> PDM_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef PDM_CONFIG_IRQ_PRIORITY
+#define PDM_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
 // <q> PERIPHERAL_RESOURCE_SHARING_ENABLED  - nrf_drv_common - Peripheral drivers common module
  
 
 #ifndef PERIPHERAL_RESOURCE_SHARING_ENABLED
 #define PERIPHERAL_RESOURCE_SHARING_ENABLED 0
 #endif
+
+// <e> POWER_ENABLED - nrf_drv_power - POWER peripheral driver
+//==========================================================
+#ifndef POWER_ENABLED
+#define POWER_ENABLED 0
+#endif
+// <o> POWER_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef POWER_CONFIG_IRQ_PRIORITY
+#define POWER_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <q> POWER_CONFIG_DEFAULT_DCDCEN  - The default configuration of main DCDC regulator
+ 
+
+// <i> This settings means only that components for DCDC regulator are installed and it can be enabled.
+
+#ifndef POWER_CONFIG_DEFAULT_DCDCEN
+#define POWER_CONFIG_DEFAULT_DCDCEN 0
+#endif
+
+// <q> POWER_CONFIG_DEFAULT_DCDCENHV  - The default configuration of High Voltage DCDC regulator
+ 
+
+// <i> This settings means only that components for DCDC regulator are installed and it can be enabled.
+
+#ifndef POWER_CONFIG_DEFAULT_DCDCENHV
+#define POWER_CONFIG_DEFAULT_DCDCENHV 0
+#endif
+
+// </e>
+
+// <q> PPI_ENABLED  - nrf_drv_ppi - PPI peripheral driver
+ 
+
+#ifndef PPI_ENABLED
+#define PPI_ENABLED 0
+#endif
+
+// <e> PWM_ENABLED - nrf_drv_pwm - PWM peripheral driver
+//==========================================================
+#ifndef PWM_ENABLED
+#define PWM_ENABLED 0
+#endif
+// <o> PWM_DEFAULT_CONFIG_OUT0_PIN - Out0 pin  <0-31> 
+
+
+#ifndef PWM_DEFAULT_CONFIG_OUT0_PIN
+#define PWM_DEFAULT_CONFIG_OUT0_PIN 31
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_OUT1_PIN - Out1 pin  <0-31> 
+
+
+#ifndef PWM_DEFAULT_CONFIG_OUT1_PIN
+#define PWM_DEFAULT_CONFIG_OUT1_PIN 31
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_OUT2_PIN - Out2 pin  <0-31> 
+
+
+#ifndef PWM_DEFAULT_CONFIG_OUT2_PIN
+#define PWM_DEFAULT_CONFIG_OUT2_PIN 31
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_OUT3_PIN - Out3 pin  <0-31> 
+
+
+#ifndef PWM_DEFAULT_CONFIG_OUT3_PIN
+#define PWM_DEFAULT_CONFIG_OUT3_PIN 31
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_BASE_CLOCK  - Base clock
+ 
+// <0=> 16 MHz 
+// <1=> 8 MHz 
+// <2=> 4 MHz 
+// <3=> 2 MHz 
+// <4=> 1 MHz 
+// <5=> 500 kHz 
+// <6=> 250 kHz 
+// <7=> 125 kHz 
+
+#ifndef PWM_DEFAULT_CONFIG_BASE_CLOCK
+#define PWM_DEFAULT_CONFIG_BASE_CLOCK 4
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_COUNT_MODE  - Count mode
+ 
+// <0=> Up 
+// <1=> Up and Down 
+
+#ifndef PWM_DEFAULT_CONFIG_COUNT_MODE
+#define PWM_DEFAULT_CONFIG_COUNT_MODE 0
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_TOP_VALUE - Top value 
+#ifndef PWM_DEFAULT_CONFIG_TOP_VALUE
+#define PWM_DEFAULT_CONFIG_TOP_VALUE 1000
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_LOAD_MODE  - Load mode
+ 
+// <0=> Common 
+// <1=> Grouped 
+// <2=> Individual 
+// <3=> Waveform 
+
+#ifndef PWM_DEFAULT_CONFIG_LOAD_MODE
+#define PWM_DEFAULT_CONFIG_LOAD_MODE 0
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_STEP_MODE  - Step mode
+ 
+// <0=> Auto 
+// <1=> Triggered 
+
+#ifndef PWM_DEFAULT_CONFIG_STEP_MODE
+#define PWM_DEFAULT_CONFIG_STEP_MODE 0
+#endif
+
+// <o> PWM_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef PWM_DEFAULT_CONFIG_IRQ_PRIORITY
+#define PWM_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <q> PWM0_ENABLED  - Enable PWM0 instance
+ 
+
+#ifndef PWM0_ENABLED
+#define PWM0_ENABLED 0
+#endif
+
+// <q> PWM1_ENABLED  - Enable PWM1 instance
+ 
+
+#ifndef PWM1_ENABLED
+#define PWM1_ENABLED 0
+#endif
+
+// <q> PWM2_ENABLED  - Enable PWM2 instance
+ 
+
+#ifndef PWM2_ENABLED
+#define PWM2_ENABLED 0
+#endif
+
+// <q> PWM3_ENABLED  - Enable PWM3 instance
+ 
+
+#ifndef PWM3_ENABLED
+#define PWM3_ENABLED 0
+#endif
+
+// </e>
+
+// <e> QDEC_ENABLED - nrf_drv_qdec - QDEC peripheral driver
+//==========================================================
+#ifndef QDEC_ENABLED
+#define QDEC_ENABLED 0
+#endif
+// <o> QDEC_CONFIG_REPORTPER  - Report period
+ 
+// <0=> 10 Samples 
+// <1=> 40 Samples 
+// <2=> 80 Samples 
+// <3=> 120 Samples 
+// <4=> 160 Samples 
+// <5=> 200 Samples 
+// <6=> 240 Samples 
+// <7=> 280 Samples 
+
+#ifndef QDEC_CONFIG_REPORTPER
+#define QDEC_CONFIG_REPORTPER 0
+#endif
+
+// <o> QDEC_CONFIG_SAMPLEPER  - Sample period
+ 
+// <0=> 128 us 
+// <1=> 256 us 
+// <2=> 512 us 
+// <3=> 1024 us 
+// <4=> 2048 us 
+// <5=> 4096 us 
+// <6=> 8192 us 
+// <7=> 16384 us 
+
+#ifndef QDEC_CONFIG_SAMPLEPER
+#define QDEC_CONFIG_SAMPLEPER 7
+#endif
+
+// <o> QDEC_CONFIG_PIO_A - A pin  <0-31> 
+
+
+#ifndef QDEC_CONFIG_PIO_A
+#define QDEC_CONFIG_PIO_A 31
+#endif
+
+// <o> QDEC_CONFIG_PIO_B - B pin  <0-31> 
+
+
+#ifndef QDEC_CONFIG_PIO_B
+#define QDEC_CONFIG_PIO_B 31
+#endif
+
+// <o> QDEC_CONFIG_PIO_LED - LED pin  <0-31> 
+
+
+#ifndef QDEC_CONFIG_PIO_LED
+#define QDEC_CONFIG_PIO_LED 31
+#endif
+
+// <o> QDEC_CONFIG_LEDPRE - LED pre 
+#ifndef QDEC_CONFIG_LEDPRE
+#define QDEC_CONFIG_LEDPRE 511
+#endif
+
+// <o> QDEC_CONFIG_LEDPOL  - LED polarity
+ 
+// <0=> Active low 
+// <1=> Active high 
+
+#ifndef QDEC_CONFIG_LEDPOL
+#define QDEC_CONFIG_LEDPOL 1
+#endif
+
+// <q> QDEC_CONFIG_DBFEN  - Debouncing enable
+ 
+
+#ifndef QDEC_CONFIG_DBFEN
+#define QDEC_CONFIG_DBFEN 0
+#endif
+
+// <q> QDEC_CONFIG_SAMPLE_INTEN  - Sample ready interrupt enable
+ 
+
+#ifndef QDEC_CONFIG_SAMPLE_INTEN
+#define QDEC_CONFIG_SAMPLE_INTEN 0
+#endif
+
+// <o> QDEC_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef QDEC_CONFIG_IRQ_PRIORITY
+#define QDEC_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
 
 // <e> RNG_ENABLED - nrf_drv_rng - RNG peripheral driver
 //==========================================================
@@ -241,6 +928,755 @@
 
 #ifndef RNG_CONFIG_IRQ_PRIORITY
 #define RNG_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
+// <e> RTC_ENABLED - nrf_drv_rtc - RTC peripheral driver
+//==========================================================
+#ifndef RTC_ENABLED
+#define RTC_ENABLED 0
+#endif
+// <o> RTC_DEFAULT_CONFIG_FREQUENCY - Frequency  <16-32768> 
+
+
+#ifndef RTC_DEFAULT_CONFIG_FREQUENCY
+#define RTC_DEFAULT_CONFIG_FREQUENCY 32768
+#endif
+
+// <q> RTC_DEFAULT_CONFIG_RELIABLE  - Ensures safe compare event triggering
+ 
+
+#ifndef RTC_DEFAULT_CONFIG_RELIABLE
+#define RTC_DEFAULT_CONFIG_RELIABLE 0
+#endif
+
+// <o> RTC_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef RTC_DEFAULT_CONFIG_IRQ_PRIORITY
+#define RTC_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <q> RTC0_ENABLED  - Enable RTC0 instance
+ 
+
+#ifndef RTC0_ENABLED
+#define RTC0_ENABLED 0
+#endif
+
+// <q> RTC1_ENABLED  - Enable RTC1 instance
+ 
+
+#ifndef RTC1_ENABLED
+#define RTC1_ENABLED 0
+#endif
+
+// <q> RTC2_ENABLED  - Enable RTC2 instance
+ 
+
+#ifndef RTC2_ENABLED
+#define RTC2_ENABLED 0
+#endif
+
+// <o> NRF_MAXIMUM_LATENCY_US - Maximum possible time[us] in highest priority interrupt 
+#ifndef NRF_MAXIMUM_LATENCY_US
+#define NRF_MAXIMUM_LATENCY_US 2000
+#endif
+
+// </e>
+
+// <e> SAADC_ENABLED - nrf_drv_saadc - SAADC peripheral driver
+//==========================================================
+#ifndef SAADC_ENABLED
+#define SAADC_ENABLED 0
+#endif
+// <o> SAADC_CONFIG_RESOLUTION  - Resolution
+ 
+// <0=> 8 bit 
+// <1=> 10 bit 
+// <2=> 12 bit 
+// <3=> 14 bit 
+
+#ifndef SAADC_CONFIG_RESOLUTION
+#define SAADC_CONFIG_RESOLUTION 1
+#endif
+
+// <o> SAADC_CONFIG_OVERSAMPLE  - Sample period
+ 
+// <0=> Disabled 
+// <1=> 2x 
+// <2=> 4x 
+// <3=> 8x 
+// <4=> 16x 
+// <5=> 32x 
+// <6=> 64x 
+// <7=> 128x 
+// <8=> 256x 
+
+#ifndef SAADC_CONFIG_OVERSAMPLE
+#define SAADC_CONFIG_OVERSAMPLE 0
+#endif
+
+// <q> SAADC_CONFIG_LP_MODE  - Enabling low power mode
+ 
+
+#ifndef SAADC_CONFIG_LP_MODE
+#define SAADC_CONFIG_LP_MODE 0
+#endif
+
+// <o> SAADC_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef SAADC_CONFIG_IRQ_PRIORITY
+#define SAADC_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// </e>
+
+// <e> SPIS_ENABLED - nrf_drv_spis - SPI Slave driver
+//==========================================================
+#ifndef SPIS_ENABLED
+#define SPIS_ENABLED 0
+#endif
+// <o> SPIS_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef SPIS_DEFAULT_CONFIG_IRQ_PRIORITY
+#define SPIS_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <o> SPIS_DEFAULT_MODE  - Mode
+ 
+// <0=> MODE_0 
+// <1=> MODE_1 
+// <2=> MODE_2 
+// <3=> MODE_3 
+
+#ifndef SPIS_DEFAULT_MODE
+#define SPIS_DEFAULT_MODE 0
+#endif
+
+// <o> SPIS_DEFAULT_BIT_ORDER  - SPIS default bit order
+ 
+// <0=> MSB first 
+// <1=> LSB first 
+
+#ifndef SPIS_DEFAULT_BIT_ORDER
+#define SPIS_DEFAULT_BIT_ORDER 0
+#endif
+
+// <o> SPIS_DEFAULT_DEF - SPIS default DEF character  <0-255> 
+
+
+#ifndef SPIS_DEFAULT_DEF
+#define SPIS_DEFAULT_DEF 255
+#endif
+
+// <o> SPIS_DEFAULT_ORC - SPIS default ORC character  <0-255> 
+
+
+#ifndef SPIS_DEFAULT_ORC
+#define SPIS_DEFAULT_ORC 255
+#endif
+
+// <q> SPIS0_ENABLED  - Enable SPIS0 instance
+ 
+
+#ifndef SPIS0_ENABLED
+#define SPIS0_ENABLED 0
+#endif
+
+// <q> SPIS1_ENABLED  - Enable SPIS1 instance
+ 
+
+#ifndef SPIS1_ENABLED
+#define SPIS1_ENABLED 0
+#endif
+
+// <q> SPIS2_ENABLED  - Enable SPIS2 instance
+ 
+
+#ifndef SPIS2_ENABLED
+#define SPIS2_ENABLED 0
+#endif
+
+// </e>
+
+// <e> SPI_ENABLED - nrf_drv_spi - SPI/SPIM peripheral driver
+//==========================================================
+#ifndef SPI_ENABLED
+#define SPI_ENABLED 0
+#endif
+// <o> SPI_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef SPI_DEFAULT_CONFIG_IRQ_PRIORITY
+#define SPI_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <e> SPI0_ENABLED - Enable SPI0 instance
+//==========================================================
+#ifndef SPI0_ENABLED
+#define SPI0_ENABLED 0
+#endif
+// <q> SPI0_USE_EASY_DMA  - Use EasyDMA
+ 
+
+#ifndef SPI0_USE_EASY_DMA
+#define SPI0_USE_EASY_DMA 1
+#endif
+
+// <o> SPI0_DEFAULT_FREQUENCY  - SPI frequency
+ 
+// <33554432=> 125 kHz 
+// <67108864=> 250 kHz 
+// <134217728=> 500 kHz 
+// <268435456=> 1 MHz 
+// <536870912=> 2 MHz 
+// <1073741824=> 4 MHz 
+// <2147483648=> 8 MHz 
+
+#ifndef SPI0_DEFAULT_FREQUENCY
+#define SPI0_DEFAULT_FREQUENCY 1073741824
+#endif
+
+// </e>
+
+// <e> SPI1_ENABLED - Enable SPI1 instance
+//==========================================================
+#ifndef SPI1_ENABLED
+#define SPI1_ENABLED 0
+#endif
+// <q> SPI1_USE_EASY_DMA  - Use EasyDMA
+ 
+
+#ifndef SPI1_USE_EASY_DMA
+#define SPI1_USE_EASY_DMA 1
+#endif
+
+// <o> SPI1_DEFAULT_FREQUENCY  - SPI frequency
+ 
+// <33554432=> 125 kHz 
+// <67108864=> 250 kHz 
+// <134217728=> 500 kHz 
+// <268435456=> 1 MHz 
+// <536870912=> 2 MHz 
+// <1073741824=> 4 MHz 
+// <2147483648=> 8 MHz 
+
+#ifndef SPI1_DEFAULT_FREQUENCY
+#define SPI1_DEFAULT_FREQUENCY 1073741824
+#endif
+
+// </e>
+
+// <e> SPI2_ENABLED - Enable SPI2 instance
+//==========================================================
+#ifndef SPI2_ENABLED
+#define SPI2_ENABLED 0
+#endif
+// <q> SPI2_USE_EASY_DMA  - Use EasyDMA
+ 
+
+#ifndef SPI2_USE_EASY_DMA
+#define SPI2_USE_EASY_DMA 1
+#endif
+
+// <o> SPI2_DEFAULT_FREQUENCY  - SPI frequency
+ 
+// <33554432=> 125 kHz 
+// <67108864=> 250 kHz 
+// <134217728=> 500 kHz 
+// <268435456=> 1 MHz 
+// <536870912=> 2 MHz 
+// <1073741824=> 4 MHz 
+// <2147483648=> 8 MHz 
+
+#ifndef SPI2_DEFAULT_FREQUENCY
+#define SPI2_DEFAULT_FREQUENCY 1073741824
+#endif
+
+// </e>
+
+// </e>
+
+// <e> TIMER_ENABLED - nrf_drv_timer - TIMER periperal driver
+//==========================================================
+#ifndef TIMER_ENABLED
+#define TIMER_ENABLED 0
+#endif
+// <o> TIMER_DEFAULT_CONFIG_FREQUENCY  - Timer frequency if in Timer mode
+ 
+// <0=> 16 MHz 
+// <1=> 8 MHz 
+// <2=> 4 MHz 
+// <3=> 2 MHz 
+// <4=> 1 MHz 
+// <5=> 500 kHz 
+// <6=> 250 kHz 
+// <7=> 125 kHz 
+// <8=> 62.5 kHz 
+// <9=> 31.25 kHz 
+
+#ifndef TIMER_DEFAULT_CONFIG_FREQUENCY
+#define TIMER_DEFAULT_CONFIG_FREQUENCY 0
+#endif
+
+// <o> TIMER_DEFAULT_CONFIG_MODE  - Timer mode or operation
+ 
+// <0=> Timer 
+// <1=> Counter 
+
+#ifndef TIMER_DEFAULT_CONFIG_MODE
+#define TIMER_DEFAULT_CONFIG_MODE 0
+#endif
+
+// <o> TIMER_DEFAULT_CONFIG_BIT_WIDTH  - Timer counter bit width
+ 
+// <0=> 16 bit 
+// <1=> 8 bit 
+// <2=> 24 bit 
+// <3=> 32 bit 
+
+#ifndef TIMER_DEFAULT_CONFIG_BIT_WIDTH
+#define TIMER_DEFAULT_CONFIG_BIT_WIDTH 0
+#endif
+
+// <o> TIMER_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef TIMER_DEFAULT_CONFIG_IRQ_PRIORITY
+#define TIMER_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <q> TIMER0_ENABLED  - Enable TIMER0 instance
+ 
+
+#ifndef TIMER0_ENABLED
+#define TIMER0_ENABLED 0
+#endif
+
+// <q> TIMER1_ENABLED  - Enable TIMER1 instance
+ 
+
+#ifndef TIMER1_ENABLED
+#define TIMER1_ENABLED 0
+#endif
+
+// <q> TIMER2_ENABLED  - Enable TIMER2 instance
+ 
+
+#ifndef TIMER2_ENABLED
+#define TIMER2_ENABLED 0
+#endif
+
+// <q> TIMER3_ENABLED  - Enable TIMER3 instance
+ 
+
+#ifndef TIMER3_ENABLED
+#define TIMER3_ENABLED 0
+#endif
+
+// <q> TIMER4_ENABLED  - Enable TIMER4 instance
+ 
+
+#ifndef TIMER4_ENABLED
+#define TIMER4_ENABLED 0
+#endif
+
+// </e>
+
+// <e> TWIS_ENABLED - nrf_drv_twis - TWIS peripheral driver
+//==========================================================
+#ifndef TWIS_ENABLED
+#define TWIS_ENABLED 0
+#endif
+// <o> TWIS_DEFAULT_CONFIG_ADDR0 - Address0 
+#ifndef TWIS_DEFAULT_CONFIG_ADDR0
+#define TWIS_DEFAULT_CONFIG_ADDR0 0
+#endif
+
+// <o> TWIS_DEFAULT_CONFIG_ADDR1 - Address1 
+#ifndef TWIS_DEFAULT_CONFIG_ADDR1
+#define TWIS_DEFAULT_CONFIG_ADDR1 0
+#endif
+
+// <o> TWIS_DEFAULT_CONFIG_SCL_PULL  - SCL pin pull configuration
+ 
+// <0=> Disabled 
+// <1=> Pull down 
+// <3=> Pull up 
+
+#ifndef TWIS_DEFAULT_CONFIG_SCL_PULL
+#define TWIS_DEFAULT_CONFIG_SCL_PULL 0
+#endif
+
+// <o> TWIS_DEFAULT_CONFIG_SDA_PULL  - SDA pin pull configuration
+ 
+// <0=> Disabled 
+// <1=> Pull down 
+// <3=> Pull up 
+
+#ifndef TWIS_DEFAULT_CONFIG_SDA_PULL
+#define TWIS_DEFAULT_CONFIG_SDA_PULL 0
+#endif
+
+// <o> TWIS_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef TWIS_DEFAULT_CONFIG_IRQ_PRIORITY
+#define TWIS_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <q> TWIS0_ENABLED  - Enable TWIS0 instance
+ 
+
+#ifndef TWIS0_ENABLED
+#define TWIS0_ENABLED 0
+#endif
+
+// <q> TWIS1_ENABLED  - Enable TWIS1 instance
+ 
+
+#ifndef TWIS1_ENABLED
+#define TWIS1_ENABLED 0
+#endif
+
+// <q> TWIS_ASSUME_INIT_AFTER_RESET_ONLY  - Assume that any instance would be initialized only once
+ 
+
+// <i> Optimization flag. Registers used by TWIS are shared by other peripherals. Normally, during initialization driver tries to clear all registers to known state before doing the initialization itself. This gives initialization safe procedure, no matter when it would be called. If you activate TWIS only once and do never uninitialize it - set this flag to 1 what gives more optimal code.
+
+#ifndef TWIS_ASSUME_INIT_AFTER_RESET_ONLY
+#define TWIS_ASSUME_INIT_AFTER_RESET_ONLY 0
+#endif
+
+// <q> TWIS_NO_SYNC_MODE  - Remove support for synchronous mode
+ 
+
+// <i> Synchronous mode would be used in specific situations. And it uses some additional code and data memory to safely process state machine by polling it in status functions. If this functionality is not required it may be disabled to free some resources.
+
+#ifndef TWIS_NO_SYNC_MODE
+#define TWIS_NO_SYNC_MODE 0
+#endif
+
+// </e>
+
+// <e> TWI_ENABLED - nrf_drv_twi - TWI/TWIM peripheral driver
+//==========================================================
+#ifndef TWI_ENABLED
+#define TWI_ENABLED 0
+#endif
+// <o> TWI_DEFAULT_CONFIG_FREQUENCY  - Frequency
+ 
+// <26738688=> 100k 
+// <67108864=> 250k 
+// <104857600=> 400k 
+
+#ifndef TWI_DEFAULT_CONFIG_FREQUENCY
+#define TWI_DEFAULT_CONFIG_FREQUENCY 26738688
+#endif
+
+// <q> TWI_DEFAULT_CONFIG_CLR_BUS_INIT  - Enables bus clearing procedure during init
+ 
+
+#ifndef TWI_DEFAULT_CONFIG_CLR_BUS_INIT
+#define TWI_DEFAULT_CONFIG_CLR_BUS_INIT 0
+#endif
+
+// <q> TWI_DEFAULT_CONFIG_HOLD_BUS_UNINIT  - Enables bus holding after uninit
+ 
+
+#ifndef TWI_DEFAULT_CONFIG_HOLD_BUS_UNINIT
+#define TWI_DEFAULT_CONFIG_HOLD_BUS_UNINIT 0
+#endif
+
+// <o> TWI_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef TWI_DEFAULT_CONFIG_IRQ_PRIORITY
+#define TWI_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <e> TWI0_ENABLED - Enable TWI0 instance
+//==========================================================
+#ifndef TWI0_ENABLED
+#define TWI0_ENABLED 0
+#endif
+// <q> TWI0_USE_EASY_DMA  - Use EasyDMA (if present)
+ 
+
+#ifndef TWI0_USE_EASY_DMA
+#define TWI0_USE_EASY_DMA 0
+#endif
+
+// </e>
+
+// <e> TWI1_ENABLED - Enable TWI1 instance
+//==========================================================
+#ifndef TWI1_ENABLED
+#define TWI1_ENABLED 0
+#endif
+// <q> TWI1_USE_EASY_DMA  - Use EasyDMA (if present)
+ 
+
+#ifndef TWI1_USE_EASY_DMA
+#define TWI1_USE_EASY_DMA 0
+#endif
+
+// </e>
+
+// </e>
+
+// <e> UART_ENABLED - nrf_drv_uart - UART/UARTE peripheral driver
+//==========================================================
+#ifndef UART_ENABLED
+#define UART_ENABLED 1
+#endif
+// <o> UART_DEFAULT_CONFIG_HWFC  - Hardware Flow Control
+ 
+// <0=> Disabled 
+// <1=> Enabled 
+
+#ifndef UART_DEFAULT_CONFIG_HWFC
+#define UART_DEFAULT_CONFIG_HWFC 0
+#endif
+
+// <o> UART_DEFAULT_CONFIG_PARITY  - Parity
+ 
+// <0=> Excluded 
+// <14=> Included 
+
+#ifndef UART_DEFAULT_CONFIG_PARITY
+#define UART_DEFAULT_CONFIG_PARITY 0
+#endif
+
+// <o> UART_DEFAULT_CONFIG_BAUDRATE  - Default Baudrate
+ 
+// <323584=> 1200 baud 
+// <643072=> 2400 baud 
+// <1290240=> 4800 baud 
+// <2576384=> 9600 baud 
+// <3862528=> 14400 baud 
+// <5152768=> 19200 baud 
+// <7716864=> 28800 baud 
+// <10289152=> 38400 baud 
+// <15400960=> 57600 baud 
+// <20615168=> 76800 baud 
+// <30801920=> 115200 baud 
+// <61865984=> 230400 baud 
+// <67108864=> 250000 baud 
+// <121634816=> 460800 baud 
+// <251658240=> 921600 baud 
+// <268435456=> 1000000 baud 
+
+#ifndef UART_DEFAULT_CONFIG_BAUDRATE
+#define UART_DEFAULT_CONFIG_BAUDRATE 30801920
+#endif
+
+// <o> UART_DEFAULT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef UART_DEFAULT_CONFIG_IRQ_PRIORITY
+#define UART_DEFAULT_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <q> UART_EASY_DMA_SUPPORT  - Driver supporting EasyDMA
+ 
+
+#ifndef UART_EASY_DMA_SUPPORT
+#define UART_EASY_DMA_SUPPORT 1
+#endif
+
+// <q> UART_LEGACY_SUPPORT  - Driver supporting Legacy mode
+ 
+
+#ifndef UART_LEGACY_SUPPORT
+#define UART_LEGACY_SUPPORT 1
+#endif
+
+// <e> UART0_ENABLED - Enable UART0 instance
+//==========================================================
+#ifndef UART0_ENABLED
+#define UART0_ENABLED 1
+#endif
+// <q> UART0_CONFIG_USE_EASY_DMA  - Default setting for using EasyDMA
+ 
+
+#ifndef UART0_CONFIG_USE_EASY_DMA
+#define UART0_CONFIG_USE_EASY_DMA 1
+#endif
+
+// </e>
+
+// <e> UART1_ENABLED - Enable UART1 instance
+//==========================================================
+#ifndef UART1_ENABLED
+#define UART1_ENABLED 0
+#endif
+// <q> UART1_CONFIG_USE_EASY_DMA  - Default setting for using EasyDMA
+ 
+
+#ifndef UART1_CONFIG_USE_EASY_DMA
+#define UART1_CONFIG_USE_EASY_DMA 1
+#endif
+
+// </e>
+
+// </e>
+
+// <e> USBD_ENABLED - nrf_drv_usbd - USB driver
+//==========================================================
+#ifndef USBD_ENABLED
+#define USBD_ENABLED 0
+#endif
+// <o> USBD_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef USBD_CONFIG_IRQ_PRIORITY
+#define USBD_CONFIG_IRQ_PRIORITY 7
+#endif
+
+// <o> NRF_DRV_USBD_DMASCHEDULER_MODE  - USBD SMA scheduler working scheme
+ 
+// <0=> Prioritized access 
+// <1=> Round Robin 
+
+#ifndef NRF_DRV_USBD_DMASCHEDULER_MODE
+#define NRF_DRV_USBD_DMASCHEDULER_MODE 0
+#endif
+
+// </e>
+
+// <e> WDT_ENABLED - nrf_drv_wdt - WDT peripheral driver
+//==========================================================
+#ifndef WDT_ENABLED
+#define WDT_ENABLED 0
+#endif
+// <o> WDT_CONFIG_BEHAVIOUR  - WDT behavior in CPU SLEEP or HALT mode
+ 
+// <1=> Run in SLEEP, Pause in HALT 
+// <8=> Pause in SLEEP, Run in HALT 
+// <9=> Run in SLEEP and HALT 
+// <0=> Pause in SLEEP and HALT 
+
+#ifndef WDT_CONFIG_BEHAVIOUR
+#define WDT_CONFIG_BEHAVIOUR 1
+#endif
+
+// <o> WDT_CONFIG_RELOAD_VALUE - Reload value  <15-4294967295> 
+
+
+#ifndef WDT_CONFIG_RELOAD_VALUE
+#define WDT_CONFIG_RELOAD_VALUE 2000
+#endif
+
+// <o> WDT_CONFIG_IRQ_PRIORITY  - Interrupt priority
+ 
+
+// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
+// <0=> 0 (highest) 
+// <1=> 1 
+// <2=> 2 
+// <3=> 3 
+// <4=> 4 
+// <5=> 5 
+// <6=> 6 
+// <7=> 7 
+
+#ifndef WDT_CONFIG_IRQ_PRIORITY
+#define WDT_CONFIG_IRQ_PRIORITY 7
 #endif
 
 // </e>
@@ -351,6 +1787,91 @@
 #endif
 
 // </e>
+
+// <q> NRF_TWI_MNGR_ENABLED  - nrf_twi_mngr - TWI transaction manager
+ 
+
+#ifndef NRF_TWI_MNGR_ENABLED
+#define NRF_TWI_MNGR_ENABLED 0
+#endif
+
+// <e> APP_UART_ENABLED - app_uart - UART driver
+//==========================================================
+#ifndef APP_UART_ENABLED
+#define APP_UART_ENABLED 1
+#endif
+// <o> APP_UART_DRIVER_INSTANCE  - UART instance used
+ 
+// <0=> 0 
+
+#ifndef APP_UART_DRIVER_INSTANCE
+#define APP_UART_DRIVER_INSTANCE 0
+#endif
+
+// </e>
+
+// <q> APP_USBD_CLASS_AUDIO_ENABLED  - app_usbd_audio - USB AUDIO class
+ 
+
+#ifndef APP_USBD_CLASS_AUDIO_ENABLED
+#define APP_USBD_CLASS_AUDIO_ENABLED 0
+#endif
+
+// <q> APP_USBD_CLASS_CDC_ACM_ENABLED  - app_usbd_cdc_acm - USB CDC ACM class
+ 
+
+#ifndef APP_USBD_CLASS_CDC_ACM_ENABLED
+#define APP_USBD_CLASS_CDC_ACM_ENABLED 0
+#endif
+
+// <q> APP_USBD_CLASS_HID_ENABLED  - app_usbd_hid - USB HID class
+ 
+
+#ifndef APP_USBD_CLASS_HID_ENABLED
+#define APP_USBD_CLASS_HID_ENABLED 0
+#endif
+
+// <q> APP_USBD_HID_GENERIC_ENABLED  - app_usbd_hid_generic - USB HID generic
+ 
+
+#ifndef APP_USBD_HID_GENERIC_ENABLED
+#define APP_USBD_HID_GENERIC_ENABLED 0
+#endif
+
+// <q> APP_USBD_HID_KBD_ENABLED  - app_usbd_hid_kbd - USB HID keyboard
+ 
+
+#ifndef APP_USBD_HID_KBD_ENABLED
+#define APP_USBD_HID_KBD_ENABLED 0
+#endif
+
+// <q> APP_USBD_HID_MOUSE_ENABLED  - app_usbd_hid_mouse - USB HID mouse
+ 
+
+#ifndef APP_USBD_HID_MOUSE_ENABLED
+#define APP_USBD_HID_MOUSE_ENABLED 0
+#endif
+
+// <q> APP_USBD_MSC_ENABLED  - app_usbd_msc - USB MSC class
+ 
+
+#ifndef APP_USBD_MSC_ENABLED
+#define APP_USBD_MSC_ENABLED 0
+#endif
+
+// <q> BUTTON_ENABLED  - app_button - buttons handling module
+ 
+
+#ifndef BUTTON_ENABLED
+#define BUTTON_ENABLED 0
+#endif
+
+// <q> CRC16_ENABLED  - crc16 - CRC16 calculation routines
+ 
+
+#ifndef CRC16_ENABLED
+#define CRC16_ENABLED 1
+#endif
 
 // <q> CRC32_ENABLED  - crc32 - CRC32 calculation routines
  
@@ -640,9 +2161,9 @@
 // <7=> Cyan 
 // <8=> White 
 
-#ifndef NRF_LOG_COLOR_DEFAULT
-#define NRF_LOG_COLOR_DEFAULT 0
-#endif
+//#ifndef NRF_LOG_COLOR_DEFAULT
+//#define NRF_LOG_COLOR_DEFAULT 0
+//#endif
 
 // <o> NRF_LOG_ERROR_COLOR  - ANSI escape code prefix.
  
