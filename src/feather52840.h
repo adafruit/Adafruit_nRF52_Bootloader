@@ -60,7 +60,7 @@
 #define TX_PIN_NUMBER  6
 #define CTS_PIN_NUMBER 7
 #define RTS_PIN_NUMBER 5
-#define HWFC           false
+#define HWFC           true
 
 // Used as model string in OTA mode
 #define DIS_MODEL      "Bluefruit Feather 52840"

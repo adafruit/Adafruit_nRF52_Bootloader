@@ -32,7 +32,7 @@
 
 #define HCI_SLIP_UART_CTS_PIN_NUMBER CTS_PIN_NUMBER                     /**< Defines the UART CTS pin number. The default pin for the board is chosen, but can be overwritten. */
 
-#define HCI_SLIP_UART_MODE           APP_UART_FLOW_CONTROL_DISABLED     /**< Defines the UART mode to be used. Use UART Low Power with Flow Control - Valid values are defined in \ref app_uart_flow_control_t. For further information on the UART Low Power mode, please refer to: \ref app_uart . */
+#define HCI_SLIP_UART_MODE           HWFC                               /**< Defines the UART mode to be used. Use UART Low Power with Flow Control - Valid values are defined in \ref app_uart_flow_control_t. For further information on the UART Low Power mode, please refer to: \ref app_uart . */
 
 #define HCI_SLIP_UART_BAUDRATE       UART_BAUDRATE_BAUDRATE_Baud115200 // UART_BAUDRATE_BAUDRATE_Baud38400   /**< Defines the UART Baud rate. Default is 38400 baud. */
 
