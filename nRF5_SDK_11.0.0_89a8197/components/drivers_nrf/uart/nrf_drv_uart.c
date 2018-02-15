@@ -57,7 +57,6 @@
 #define NRF_LOG_LEVEL       0
 #endif //UART_CONFIG_LOG_ENABLED
 #include "nrf_log.h"
-
 NRF_LOG_MODULE_REGISTER();
 
 #if (defined(UARTE_IN_USE) && defined(UART_IN_USE))

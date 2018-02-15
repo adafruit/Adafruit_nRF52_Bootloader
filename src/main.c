@@ -32,11 +32,11 @@
 #include <string.h>
 #include <stddef.h>
 
+#include "nordic_common.h"
+#include "sdk_common.h"
 #include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
-#include "nordic_common.h"
-#include "sdk_common.h"
 
 #include "nrf.h"
 #include "nrf_soc.h"
@@ -46,7 +46,7 @@
 #include "nrf.h"
 #include "ble_hci.h"
 #include "app_scheduler.h"
-#include "app_timer_appsh.h"
+#include "app_timer.h"
 #include "nrf_error.h"
 #include "boards.h"
 
@@ -87,7 +87,7 @@
 #define APP_TIMER_PRESCALER                 0                                /**< Value of the RTC1 PRESCALER register. */
 #define APP_TIMER_OP_QUEUE_SIZE             4                                /**< Size of timer operation queues. */
 
-#define SCHED_MAX_EVENT_DATA_SIZE           MAX(APP_TIMER_SCHED_EVT_SIZE, 0) /**< Maximum size of scheduler events. */
+#define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    20                               /**< Maximum number of events in the scheduler queue. */
 
 // Helper function
@@ -249,10 +249,17 @@ static uint32_t ble_stack_init(bool init_softdevice)
   uint32_t         err_code;
   nrf_clock_lf_cfg_t clock_lf_cfg =
   {
+#if 0
       .source       = NRF_CLOCK_LF_SRC_RC,
       .rc_ctiv      = 16,
       .rc_temp_ctiv = 2,
       .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
+#else
+      .source       = NRF_CLOCK_LF_SRC_XTAL,
+      .rc_ctiv      = 0,
+      .rc_temp_ctiv = 0,
+      .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
+#endif
   };
 
   if (init_softdevice)
@@ -322,7 +329,7 @@ static void scheduler_init(void)
 
   /* Initialize a blinky timer to show that we're in bootloader */
   (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
-  app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL, APP_TIMER_PRESCALER), NULL);
+  app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
 }
 
 
@@ -368,7 +375,9 @@ int main(void)
   led_pin_init(LED_BLUE); // on metro52 will override FRESET
 
   // Initialize timer module, already configred to use with the scheduler.
-  APP_TIMER_APPSH_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, true);
+//  APP_TIMER_APPSH_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, true);
+
+  app_timer_init();
 
   (void) bootloader_init();
 
@@ -474,18 +483,16 @@ void freset_erase_and_wait(pstorage_handle_t* hdl, uint32_t addr, uint32_t size)
   // Time to erase a page is 100 ms max
   // It is better to force a timeout to prevent lock-up
   uint32_t timeout_tck = (size/CODE_PAGE_SIZE)*100;
-  timeout_tck = APP_TIMER_TICKS(timeout_tck, APP_TIMER_PRESCALER);
+  timeout_tck = APP_TIMER_TICKS(timeout_tck);
 
-  uint32_t start_tck;
-  app_timer_cnt_get(&start_tck);
+  uint32_t start_tck = app_timer_cnt_get();
 
   while(!_freset_erased_complete)
   {
     sd_app_evt_wait();
     app_sched_execute();
 
-    uint32_t now_tck;
-    app_timer_cnt_get(&now_tck);
+    uint32_t now_tck = app_timer_cnt_get();
     if ( (now_tck - start_tck) > timeout_tck ) break;
   }
 }

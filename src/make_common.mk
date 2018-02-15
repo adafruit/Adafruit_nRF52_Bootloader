@@ -92,7 +92,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
 
 C_SOURCE_FILES += $(SDK_PATH)/libraries/timer/app_timer.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/timer/app_timer_appsh.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error_weak.c

@@ -47,6 +47,72 @@
 #include "app_config.h"
 #endif
 
+// <e> HCI_SLIP_ENABLED - hci_slip - SLIP protocol implementation used by HCI
+//==========================================================
+#ifndef HCI_SLIP_ENABLED
+#define HCI_SLIP_ENABLED 1
+#endif
+// <o> HCI_UART_BAUDRATE  - Default Baudrate
+
+// <323584=> 1200 baud
+// <643072=> 2400 baud
+// <1290240=> 4800 baud
+// <2576384=> 9600 baud
+// <3862528=> 14400 baud
+// <5152768=> 19200 baud
+// <7716864=> 28800 baud
+// <10289152=> 38400 baud
+// <15400960=> 57600 baud
+// <20615168=> 76800 baud
+// <30801920=> 115200 baud
+// <61865984=> 230400 baud
+// <67108864=> 250000 baud
+// <121634816=> 460800 baud
+// <251658240=> 921600 baud
+// <268435456=> 1000000 baud
+
+#ifndef HCI_UART_BAUDRATE
+#define HCI_UART_BAUDRATE 30801920
+#endif
+
+// <o> HCI_UART_FLOW_CONTROL  - Hardware Flow Control
+
+// <0=> Disabled
+// <1=> Enabled
+
+#ifndef HCI_UART_FLOW_CONTROL
+#define HCI_UART_FLOW_CONTROL 0
+#endif
+
+// <o> HCI_UART_RX_PIN - UART RX pin
+#ifndef HCI_UART_RX_PIN
+#define HCI_UART_RX_PIN 8
+#endif
+
+// <o> HCI_UART_TX_PIN - UART TX pin
+#ifndef HCI_UART_TX_PIN
+#define HCI_UART_TX_PIN 6
+#endif
+
+// <o> HCI_UART_RTS_PIN - UART RTS pin
+#ifndef HCI_UART_RTS_PIN
+#define HCI_UART_RTS_PIN 5
+#endif
+
+// <o> HCI_UART_CTS_PIN - UART CTS pin
+#ifndef HCI_UART_CTS_PIN
+#define HCI_UART_CTS_PIN 7
+#endif
+
+
+#ifndef HCI_TRANSPORT_ENABLED
+#define HCI_TRANSPORT_ENABLED 1
+#endif
+// <o> HCI_MAX_PACKET_SIZE_IN_BITS - Maximum size of a single application packet in bits.
+#ifndef HCI_MAX_PACKET_SIZE_IN_BITS
+#define HCI_MAX_PACKET_SIZE_IN_BITS 8000
+#endif
+
 //#include "nrf_drv_config.h"
 // <h> nRF_BLE_DFU 
 
@@ -1585,7 +1651,7 @@
  
 
 #ifndef UART0_CONFIG_USE_EASY_DMA
-#define UART0_CONFIG_USE_EASY_DMA 1
+#define UART0_CONFIG_USE_EASY_DMA 0
 #endif
 
 // </e>

@@ -1,22 +1,50 @@
-/* Copyright (c) 2012 Nordic Semiconductor. All Rights Reserved.
- *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
- *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
- *
+/**
+ * Copyright (c) 2012 - 2017, Nordic Semiconductor ASA
+ * 
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 
+ * 2. Redistributions in binary form, except as embedded into a Nordic
+ *    Semiconductor ASA integrated circuit in a product or a software update for
+ *    such product, must reproduce the above copyright notice, this list of
+ *    conditions and the following disclaimer in the documentation and/or other
+ *    materials provided with the distribution.
+ * 
+ * 3. Neither the name of Nordic Semiconductor ASA nor the names of its
+ *    contributors may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ * 
+ * 4. This software, with or without modification, must only be used with a
+ *    Nordic Semiconductor ASA integrated circuit.
+ * 
+ * 5. Any software provided in binary form under this license must not be reverse
+ *    engineered, decompiled, modified and/or disassembled.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL NORDIC SEMICONDUCTOR ASA OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
  */
-
+#include "sdk_common.h"
+#if NRF_MODULE_ENABLED(APP_SCHEDULER)
 #include "app_scheduler.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include "nrf_soc.h"
 #include "nrf_assert.h"
-#include "app_util.h"
 #include "app_util_platform.h"
 
 /**@brief Structure for holding a scheduled event header. */
@@ -35,8 +63,13 @@ static volatile uint8_t m_queue_end_index;      /**< Index of queue entry at the
 static uint16_t         m_queue_event_size;     /**< Maximum event size in queue. */
 static uint16_t         m_queue_size;           /**< Number of queue entries. */
 
-#ifdef APP_SCHEDULER_WITH_PROFILER
+#if APP_SCHEDULER_WITH_PROFILER
 static uint16_t m_max_queue_utilization;    /**< Maximum observed queue utilization. */
+#endif
+
+#if APP_SCHEDULER_WITH_PAUSE
+static uint32_t m_scheduler_paused_counter = 0; /**< Counter storing the difference between pausing
+                                                     and resuming the scheduler. */
 #endif
 
 /**@brief Function for incrementing a queue index, and handle wrap-around.
@@ -89,7 +122,7 @@ uint32_t app_sched_init(uint16_t event_size, uint16_t queue_size, void * p_event
     m_queue_event_size    = event_size;
     m_queue_size          = queue_size;
 
-#ifdef APP_SCHEDULER_WITH_PROFILER
+#if APP_SCHEDULER_WITH_PROFILER
     m_max_queue_utilization = 0;
 #endif
 
@@ -97,7 +130,17 @@ uint32_t app_sched_init(uint16_t event_size, uint16_t queue_size, void * p_event
 }
 
 
-#ifdef APP_SCHEDULER_WITH_PROFILER
+uint16_t app_sched_queue_space_get()
+{
+    uint16_t start = m_queue_start_index;
+    uint16_t end   = m_queue_end_index;
+    uint16_t free_space = m_queue_size - ((end >= start) ?
+                           (end - start) : (m_queue_size + 1 - start + end));
+    return free_space;
+}
+
+
+#if APP_SCHEDULER_WITH_PROFILER
 static void queue_utilization_check(void)
 {
     uint16_t start = m_queue_start_index;
@@ -115,10 +158,10 @@ uint16_t app_sched_queue_utilization_get(void)
 {
     return m_max_queue_utilization;
 }
-#endif
+#endif // APP_SCHEDULER_WITH_PROFILER
 
 
-uint32_t app_sched_event_put(void                    * p_event_data,
+uint32_t app_sched_event_put(void const              * p_event_data,
                              uint16_t                  event_data_size,
                              app_sched_event_handler_t handler)
 {
@@ -135,7 +178,7 @@ uint32_t app_sched_event_put(void                    * p_event_data,
             event_index       = m_queue_end_index;
             m_queue_end_index = next_index(m_queue_end_index);
 
-        #ifdef APP_SCHEDULER_WITH_PROFILER
+        #if APP_SCHEDULER_WITH_PROFILER
             // This function call must be protected with critical region because
             // it modifies 'm_max_queue_utilization'.
             queue_utilization_check();
@@ -177,51 +220,69 @@ uint32_t app_sched_event_put(void                    * p_event_data,
 }
 
 
-/**@brief Function for reading the next event from specified event queue.
- *
- * @param[out]  pp_event_data       Pointer to pointer to event data.
- * @param[out]  p_event_data_size   Pointer to size of event data.
- * @param[out]  p_event_handler     Pointer to event handler function pointer.
- *
- * @return      NRF_SUCCESS if new event, NRF_ERROR_NOT_FOUND if event queue is empty.
- */
-static uint32_t app_sched_event_get(void                     ** pp_event_data,
-                                    uint16_t *                  p_event_data_size,
-                                    app_sched_event_handler_t * p_event_handler)
+#if APP_SCHEDULER_WITH_PAUSE
+void app_sched_pause(void)
 {
-    uint32_t err_code = NRF_ERROR_NOT_FOUND;
+    CRITICAL_REGION_ENTER();
 
-    if (!APP_SCHED_QUEUE_EMPTY())
+    if (m_scheduler_paused_counter < UINT32_MAX)
     {
-        uint16_t event_index;
-
-        // NOTE: There is no need for a critical region here, as this function will only be called
-        //       from app_sched_execute() from inside the main loop, so it will never interrupt
-        //       app_sched_event_put(). Also, updating of (i.e. writing to) the start index will be
-        //       an atomic operation.
-        event_index         = m_queue_start_index;
-        m_queue_start_index = next_index(m_queue_start_index);
-
-        *pp_event_data     = &m_queue_event_data[event_index * m_queue_event_size];
-        *p_event_data_size = m_queue_event_headers[event_index].event_data_size;
-        *p_event_handler   = m_queue_event_headers[event_index].handler;
-
-        err_code = NRF_SUCCESS;
+        m_scheduler_paused_counter++;
     }
+    CRITICAL_REGION_EXIT();
+}
 
-    return err_code;
+void app_sched_resume(void)
+{
+    CRITICAL_REGION_ENTER();
+
+    if (m_scheduler_paused_counter > 0)
+    {
+        m_scheduler_paused_counter--;
+    }
+    CRITICAL_REGION_EXIT();
+}
+#endif //APP_SCHEDULER_WITH_PAUSE
+
+
+/**@brief Function for checking if scheduler is paused which means that should break processing
+ *        events.
+ *
+ * @return    Boolean value - true if scheduler is paused, false otherwise.
+ */
+static __INLINE bool is_app_sched_paused(void)
+{
+#if APP_SCHEDULER_WITH_PAUSE
+    return (m_scheduler_paused_counter > 0);
+#else
+    return false;
+#endif
 }
 
 
 void app_sched_execute(void)
 {
-    void                    * p_event_data;
-    uint16_t                  event_data_size;
-    app_sched_event_handler_t event_handler;
-
-    // Get next event (if any), and execute handler
-    while ((app_sched_event_get(&p_event_data, &event_data_size, &event_handler) == NRF_SUCCESS))
+    while (!is_app_sched_paused() && !APP_SCHED_QUEUE_EMPTY())
     {
+        // Since this function is only called from the main loop, there is no
+        // need for a critical region here, however a special care must be taken
+        // regarding update of the queue start index (see the end of the loop).
+        uint16_t event_index = m_queue_start_index;
+
+        void * p_event_data;
+        uint16_t event_data_size;
+        app_sched_event_handler_t event_handler;
+
+        p_event_data = &m_queue_event_data[event_index * m_queue_event_size];
+        event_data_size = m_queue_event_headers[event_index].event_data_size;
+        event_handler   = m_queue_event_headers[event_index].handler;
+
         event_handler(p_event_data, event_data_size);
+
+        // Event processed, now it is safe to move the queue start index,
+        // so the queue entry occupied by this event can be used to store
+        // a next one.
+        m_queue_start_index = next_index(m_queue_start_index);
     }
 }
+#endif //NRF_MODULE_ENABLED(APP_SCHEDULER)

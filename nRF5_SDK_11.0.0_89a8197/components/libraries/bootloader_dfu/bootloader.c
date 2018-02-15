@@ -10,6 +10,7 @@
  *
  */
 
+#include "sdk_common.h"
 #include "bootloader.h"
 #include "bootloader_types.h"
 #include "bootloader_util.h"
@@ -25,9 +26,8 @@
 #include "pstorage.h"
 #include "app_scheduler.h"
 #include "nrf_delay.h"
-#include "sdk_common.h"
 
-#include "app_timer_appsh.h"
+#include "app_timer.h"
 
 #define APP_TIMER_PRESCALER    0
 
@@ -326,7 +326,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
         _terminate_startup_dfu = false;
 
         (void) app_timer_create(&_forced_startup_dfu_timer, APP_TIMER_MODE_SINGLE_SHOT, forced_startup_dfu_timer_handler);
-        app_timer_start(_forced_startup_dfu_timer, APP_TIMER_TICKS(timeout_ms, APP_TIMER_PRESCALER), NULL);
+        app_timer_start(_forced_startup_dfu_timer, APP_TIMER_TICKS(timeout_ms), NULL);
       }
 
       err_code = dfu_transport_serial_update_start();
