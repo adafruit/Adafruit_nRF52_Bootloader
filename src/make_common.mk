@@ -16,6 +16,7 @@ VERSION_REVISION = 0
 
 SDK_PATH         = ../../nRF5_SDK_11.0.0_89a8197/components
 SRC_PATH         = ..
+TUSB_PATH		 = ../../tinyusb/tinyusb
 
 SD_NAME          = s140
 SD_VERSION       = 6.0.0
@@ -94,7 +95,7 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/timer/app_timer.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error_weak.c
+#C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error_weak.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_util_platform.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/crc16/crc16.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_mem_pool.c
@@ -105,6 +106,7 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
 
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
+C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/power/nrf_drv_power.c
 
 C_SOURCE_FILES += $(SDK_PATH)/ble/common/ble_advdata.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/common/ble_conn_params.c
@@ -118,7 +120,14 @@ C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
 C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler.c
 C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler_appsh.c
 
+C_SOURCE_FILES += $(SRC_PATH)/tusb_descriptors.c
 
+C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
+C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
+C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
+C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
+C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
+C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
 #******************************************************************************
 # Assembly Files
@@ -130,6 +139,7 @@ ASM_SOURCE_FILES  = $(SDK_PATH)/toolchain/gcc/gcc_startup_nrf52840.S
 #******************************************************************************
 INC_PATHS += -I$(SRC_PATH)/
 
+INC_PATHS += -I$(TUSB_PATH)/
 INC_PATHS += -I$(SDK_PATH)/libraries/bootloader_dfu/hci_transport
 INC_PATHS += -I$(SDK_PATH)/libraries/bootloader_dfu
 
@@ -146,6 +156,8 @@ INC_PATHS += -I$(SDK_PATH)/drivers_nrf/hal
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/config
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/delay
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/uart
+INC_PATHS += -I$(SDK_PATH)/drivers_nrf/power
+INC_PATHS += -I$(SDK_PATH)/drivers_nrf/usbd
 
 INC_PATHS += -I../../softdevice/common
 INC_PATHS += -I../../softdevice/common/softdevice_handler/

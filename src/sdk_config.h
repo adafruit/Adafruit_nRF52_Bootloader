@@ -684,7 +684,7 @@
 // <e> POWER_ENABLED - nrf_drv_power - POWER peripheral driver
 //==========================================================
 #ifndef POWER_ENABLED
-#define POWER_ENABLED 0
+#define POWER_ENABLED 1
 #endif
 // <o> POWER_CONFIG_IRQ_PRIORITY  - Interrupt priority
  

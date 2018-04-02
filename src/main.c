@@ -521,3 +521,32 @@ void adafruit_factory_reset(void)
   blinky_fast_set(false);
   led_off(LED_BLUE);
 }
+
+
+void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
+{
+  NVIC_SystemReset();
+}
+
+//--------------------------------------------------------------------+
+// tinyusb callbacks
+//--------------------------------------------------------------------+
+void tud_mount_cb(uint8_t port)
+{
+
+}
+
+void tud_umount_cb(uint8_t port)
+{
+}
+
+void tud_cdc_rx_cb(uint8_t port)
+{
+
+}
+
+
+uint32_t tusb_hal_millis(void)
+{
+  return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
+}
