@@ -74,6 +74,7 @@
     </folder>
     <configuration
       Name="Debug"
+      gcc_optimization_level="Debug"
       link_use_linker_script_file="No"
       linker_section_placement_file="flash_placement.xml" />
     <folder
