@@ -65,7 +65,7 @@
 #define SOFTDEVICE_CENTRAL_SEC_COUNT   1
 
 /* Global nvic state instance, required by nrf_nvic.h */
-nrf_nvic_state_t nrf_nvic_state;
+//nrf_nvic_state_t nrf_nvic_state;
 
 static softdevice_evt_schedule_func_t m_evt_schedule_func;              /**< Pointer to function for propagating SoftDevice events to the scheduler. */
 

@@ -15,6 +15,8 @@ VERSION_MINOR    = 0
 VERSION_REVISION = 0
 
 SDK_PATH         = ../../nRF5_SDK_11.0.0_89a8197/components
+SDK15_PATH       = ./../nRF5_SDK_15.0.0_a53641a/components
+
 SRC_PATH         = ..
 TUSB_PATH		 = ../../tinyusb/tinyusb
 
@@ -23,8 +25,8 @@ SD_VERSION       = 6.0.0
 
 SD_NAME_UPPER    = $(subst s,S,$(SD_NAME))
 
-SD_PATH          = ../../softdevice/$(SD_NAME)/$(SD_VERSION)
-SD_HEX           = $(SD_PATH)/hex/$(SD_NAME)_nrf52840_$(SD_VERSION)-6.alpha_softdevice.hex
+SD_PATH          = ../../softdevice/$(SD_VERSION)
+SD_HEX           = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
 LINKER_SCRIPT    = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 
 ifeq ($(VERSION_SINGLEBANK),1)
@@ -37,9 +39,6 @@ endif
 
 BOOTLOADER_SD_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)_$(BANKMODE)
 FINAL_BIN_DIR := ../../bin
-
-TEMPLATE_PATH = $(SDK_PATH)/toolchain/gcc
-
 
 #******************************************************************************
 # Tool configure
@@ -95,7 +94,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/timer/app_timer.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error.c
-#C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error_weak.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_util_platform.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/crc16/crc16.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_mem_pool.c
@@ -106,9 +104,8 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
 
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/power/nrf_drv_power.c
+#C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/power/nrf_drv_power.c
 
-C_SOURCE_FILES += $(SDK_PATH)/ble/common/ble_advdata.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/common/ble_conn_params.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/common/ble_srv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
@@ -117,17 +114,17 @@ C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dis/ble_dis.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/pstorage/pstorage_raw.c
 C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
 
-C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler.c
-C_SOURCE_FILES += ../../softdevice/common/softdevice_handler/softdevice_handler_appsh.c
+C_SOURCE_FILES += $(SD_PATH)/common/softdevice_handler/softdevice_handler.c
+C_SOURCE_FILES += $(SD_PATH)/common/softdevice_handler/softdevice_handler_appsh.c
 
-C_SOURCE_FILES += $(SRC_PATH)/tusb_descriptors.c
+#C_SOURCE_FILES += $(SRC_PATH)/tusb_descriptors.c
 
-C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
-C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
-C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
-C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
-C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
-C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
+#C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
+#C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
+#C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
+#C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
+#C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
+#C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
 #******************************************************************************
 # Assembly Files
@@ -159,10 +156,10 @@ INC_PATHS += -I$(SDK_PATH)/drivers_nrf/uart
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/power
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/usbd
 
-INC_PATHS += -I../../softdevice/common
-INC_PATHS += -I../../softdevice/common/softdevice_handler/
-INC_PATHS += -I$(SD_PATH)/headers
-INC_PATHS += -I$(SD_PATH)/headers/nrf52
+INC_PATHS += -I$(SD_PATH)/common
+INC_PATHS += -I$(SD_PATH)/common/softdevice_handler/
+INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers
+INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers/nrf52
 
 INC_PATHS += -I$(SDK_PATH)/device
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/pstorage
@@ -223,7 +220,7 @@ CFLAGS += -fno-builtin --short-enums
 
 # keep every function in separate section. This will allow linker to dump unused functions
 LDFLAGS += -Xlinker -Map=$(LISTING_DIRECTORY)/$(OUTPUT_FILENAME).map
-LDFLAGS += -mthumb -mabi=aapcs -L $(TEMPLATE_PATH) -T$(LINKER_SCRIPT)
+LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/ -T$(LINKER_SCRIPT)
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
