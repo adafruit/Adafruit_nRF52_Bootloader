@@ -53,7 +53,7 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 // DIS_MODEL is defined in boards.h
 
 // TODO Update when upgrade bootloader
-#define DIS_FIRMWARE                         "S132 5.1.0, 5.1.0"
+#define DIS_FIRMWARE                         "S140 6.0.0, 6.0.0"
 
 
 #define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */

@@ -53,8 +53,6 @@
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
-//#include "nrf_log.h"
-
 #include "nrf_wdt.h"
 #include "nrf_delay.h"
 #include "pstorage.h"
