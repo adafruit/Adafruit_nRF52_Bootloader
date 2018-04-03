@@ -1,0 +1,97 @@
+<!DOCTYPE CrossStudio_Project_File>
+<solution Name="nrf52840_bootloader" target="8" version="2">
+  <project Name="nrf52840_bootloader">
+    <configuration
+      Name="Common"
+      Placement="Flash"
+      Target="nRF52840_xxAA"
+      arm_architecture="v7EM"
+      arm_core_type="Cortex-M4"
+      arm_endian="Little"
+      arm_fp_abi="Hard"
+      arm_fpu_type="FPv4-SP-D16"
+      arm_interwork="No"
+      arm_linker_heap_size="1024"
+      arm_linker_process_stack_size="0"
+      arm_linker_stack_size="1024"
+      arm_simulator_memory_simulation_parameter="ROM;0x00000000;0x00100000;RAM;0x20000000;0x00040000"
+      arm_target_debug_interface_type="ADIv5"
+      arm_target_device_name="nRF52840_xxAA"
+      arm_target_interface_type="SWD"
+      c_preprocessor_definitions="NRF52840_XXAA;__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;BOARD_FEATHER52840;BOOTLOADER_VERSION=0x06000001;S140;CONFIG_GPIO_AS_PINRESET;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD;DFU_APP_DATA_RESERVED=7*4096"
+      c_user_include_directories="$(TusbDir)/hw/cmsis/Include;$(TusbDir)/hw;$(TusbDir)/tinyusb;$(SdkDir);$(SdkDir)/device;$(SdkDir)/toolchain;$(SdkDir)/drivers_nrf/hal;$(SdkDir)/drivers_nrf/systick;$(SdkDir)/drivers_nrf/uart;$(SdkDir)/drivers_nrf/usbd;$(SdkDir)/drivers_nrf/common;$(SdkDir)/drivers_nrf/delay;$(SdkDir)/drivers_nrf/power;$(SdkDir)/drivers_nrf/clock;$(SdkDir)/drivers_nrf/pstorage;$(SdkDir)/external/fprintf;$(SdkDir)/libraries/util;$(SdkDir)/libraries/strerror;$(SdkDir)/libraries/atomic;$(SdkDir)/libraries/balloc;$(SdkDir)/libraries/experimental_log/src;$(SdkDir)/libraries/experimental_log;$(SdkDir)/libraries/experimental_section_vars;$(SdkDir)/libraries/experimental_memobj;$(SdkDir)/libraries/timer;$(SdkDir)/libraries/scheduler;$(SdkDir)/libraries/crc16;$(SdkDir)/libraries/util;$(SdkDir)/libraries/hci/config;$(SdkDir)/libraries/uart;$(SdkDir)/libraries/hci;$(SdkDir)/libraries/bootloader_dfu;$(SdkDir)/libraries/bootloader_dfu/hci_transport;$(SdkDir)/ble/common/;$(SdkDir)/ble/ble_services/ble_dfu;$(SdkDir)/ble/ble_services/ble_dis;$(SdDir)/s140/headers;$(SdDir)/s140/headers/nrf52;$(SdDir)/common/softdevice_handler;../"
+      debug_register_definition_file="$(ProjectDir)/nrf52840_Registers.xml"
+      debug_target_connection="J-Link"
+      gcc_entry_point="Reset_Handler"
+      linker_memory_map_file="$(ProjectDir)/nRF52840_xxAA_MemoryMap.xml"
+      linker_section_placement_file="$(ProjectDir)/flash_placement.xml"
+      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;TusbDir=../../tinyusb;SdkDir=../../nRF5_SDK_11.0.0_89a8197/components;SdDir=../../softdevice/6.0.0"
+      project_directory=""
+      project_type="Executable"
+      target_reset_script="Reset();"
+      target_script_file="$(ProjectDir)/nRF_Target.js"
+      target_trace_initialize_script="EnableTrace(&quot;$(TraceInterfaceType)&quot;)" />
+    <folder Name="RTT Files">
+      <file file_name="SEGGER_RTT.c" />
+      <file file_name="SEGGER_RTT.h" />
+      <file file_name="SEGGER_RTT_Conf.h" />
+      <file file_name="SEGGER_RTT_SES.c" />
+    </folder>
+    <folder Name="Script Files">
+      <file file_name="nRF_Target.js">
+        <configuration Name="Common" file_type="Reset Script" />
+      </file>
+    </folder>
+    <folder Name="System Files">
+      <file file_name="thumb_crt0.s" />
+      <file file_name="flash_placement.xml" />
+      <file file_name="nRF52840_xxAA_MemoryMap.xml" />
+      <file file_name="ses_nRF_Startup.s" />
+      <file file_name="ses_nrf52840_Vectors.s" />
+    </folder>
+    <folder
+      Name="tinyusb"
+      exclude=""
+      filter="*.h"
+      path="../../tinyusb/tinyusb"
+      recurse="Yes" />
+    <folder Name="sdk">
+      <folder
+        Name="components"
+        exclude=""
+        filter="*.c;*.h;*.s;*.S"
+        path="../../nRF5_SDK_11.0.0_89a8197/components"
+        recurse="Yes" />
+    </folder>
+    <folder Name="src">
+      <file file_name="../boards.h" />
+      <file file_name="../dfu_ble_svc.c" />
+      <file file_name="../feather52840.h" />
+      <file file_name="../main.c" />
+      <file file_name="../metro52.h" />
+      <file file_name="../pstorage_platform.h" />
+      <file file_name="../sdk_config.h" />
+    </folder>
+    <configuration
+      Name="Debug"
+      link_use_linker_script_file="No"
+      linker_section_placement_file="flash_placement.xml" />
+    <folder
+      Name="softdevice"
+      exclude=""
+      filter="*.c;*.h"
+      path="../../softdevice"
+      recurse="Yes" />
+  </project>
+  <configuration
+    Name="Debug"
+    c_preprocessor_definitions="DEBUG"
+    gcc_debugging_level="Level 3"
+    gcc_optimization_level="None" />
+  <configuration
+    Name="Release"
+    c_preprocessor_definitions="NDEBUG"
+    gcc_debugging_level="None"
+    gcc_omit_frame_pointer="Yes"
+    gcc_optimization_level="Level 1" />
+</solution>
