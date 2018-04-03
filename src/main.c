@@ -523,8 +523,18 @@ void adafruit_factory_reset(void)
 }
 
 
+static inline void verify_breakpoint(void)
+{
+  // Cortex M CoreDebug->DHCSR
+  volatile uint32_t* ARM_CM_DHCSR =  ((volatile uint32_t*) 0xE000EDF0UL);
+
+  // Only halt mcu if debugger is attached
+  if ( (*ARM_CM_DHCSR) & 1UL ) __asm("BKPT #0\n");
+}
+
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
+  verify_breakpoint();
   NVIC_SystemReset();
 }
 
