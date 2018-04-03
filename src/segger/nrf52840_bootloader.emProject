@@ -56,12 +56,216 @@
       path="../../tinyusb/tinyusb"
       recurse="Yes" />
     <folder Name="sdk">
-      <folder
-        Name="components"
-        exclude=""
-        filter="*.c;*.h;*.s;*.S"
-        path="../../nRF5_SDK_11.0.0_89a8197/components"
-        recurse="Yes" />
+      <folder Name="components">
+        <folder Name="ble">
+          <folder Name="ble_services">
+            <folder Name="ble_dfu">
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/ble_services/ble_dfu/ble_dfu.c" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/ble_services/ble_dfu/ble_dfu.h" />
+            </folder>
+            <folder Name="ble_dis">
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/ble_services/ble_dis/ble_dis.c" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/ble_services/ble_dis/ble_dis.h" />
+            </folder>
+          </folder>
+          <folder Name="common">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/common/ble_conn_params.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/common/ble_conn_params.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/common/ble_srv_common.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/common/ble_srv_common.h" />
+          </folder>
+        </folder>
+        <folder Name="device">
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/compiler_abstraction.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf51_to_nrf52.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf51_to_nrf52840.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52832_peripherals.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52840.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52840_bitfields.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52840_peripherals.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52_bitfields.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52_name_change.h" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/device/nrf52_to_nrf52840.h" />
+        </folder>
+        <folder Name="drivers_nrf">
+          <folder Name="common">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/common/nrf_drv_common.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/common/nrf_drv_common.h" />
+          </folder>
+          <folder Name="delay">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/delay/nrf_delay.h" />
+          </folder>
+          <folder Name="hal">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_clock.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_comp.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_ecb.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_ecb.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_egu.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_gpio.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_gpiote.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_i2s.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_lpcomp.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_nvmc.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_nvmc.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_pdm.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_peripherals.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_power.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_ppi.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_pwm.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_qdec.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_qspi.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_rng.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_rtc.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_saadc.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_saadc.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_spi.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_spim.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_spis.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_systick.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_temp.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_timer.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_twi.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_twim.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_twis.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_uart.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_uarte.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_usbd.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/hal/nrf_wdt.h" />
+          </folder>
+          <folder Name="pstorage">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/pstorage/pstorage.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/pstorage/pstorage_raw.c" />
+          </folder>
+          <folder Name="timer">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/timer/nrf_drv_timer.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/timer/nrf_drv_timer.h" />
+          </folder>
+          <folder Name="uart">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/uart/nrf_drv_uart.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/uart/nrf_drv_uart.h" />
+          </folder>
+          <folder Name="usbd">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/drivers_nrf/usbd/nrf_drv_usbd_errata.h" />
+          </folder>
+        </folder>
+        <folder Name="libraries">
+          <folder Name="bootloader_dfu">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader_settings.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader_settings.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader_types.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader_util.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/bootloader_util.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_bank_internal.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_ble_svc.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_ble_svc_internal.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_dual_bank.c">
+              <configuration
+                Name="Debug Single"
+                build_exclude_from_build="Yes" />
+              <configuration
+                Name="Release Single"
+                build_exclude_from_build="Yes" />
+            </file>
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_init.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_init_template.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_single_bank.c">
+              <configuration
+                Name="Debug Dual"
+                build_exclude_from_build="Yes" />
+              <configuration
+                Name="Release Dual"
+                build_exclude_from_build="Yes" />
+            </file>
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_transport.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_transport_ble.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_transport_serial.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_types.h" />
+            <folder
+              Name="ble_transport"
+              path="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/ble_transport" />
+            <folder
+              Name="hci_transport"
+              path="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/hci_transport" />
+          </folder>
+          <folder Name="crc16">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/crc16/crc16.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/crc16/crc16.h" />
+          </folder>
+          <folder Name="fifo">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/fifo/app_fifo.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/fifo/app_fifo.h" />
+          </folder>
+          <folder Name="hci">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/hci/hci_mem_pool.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/hci/hci_mem_pool.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/hci/hci_slip.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/hci/hci_slip.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/hci/hci_transport.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/hci/hci_transport.h" />
+          </folder>
+          <folder Name="scheduler">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/scheduler/app_scheduler.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/scheduler/app_scheduler.h" />
+          </folder>
+          <folder Name="timer">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/timer/app_timer.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/timer/app_timer.h" />
+          </folder>
+          <folder Name="uart">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/uart/app_uart.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/uart/app_uart.h" />
+          </folder>
+          <folder Name="util">
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_error.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_error.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_error_weak.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_util.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_util_bds.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_util_platform.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/app_util_platform.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/nordic_common.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/nrf_assert.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/nrf_assert.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/nrf_bitmask.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/nrf_log.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/nrf_log.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_common.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_errors.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_macros.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_mapped_flags.c" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_mapped_flags.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_os.h" />
+            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/util/sdk_resources.h" />
+          </folder>
+        </folder>
+        <folder Name="toolchain">
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/system_nrf52840.c" />
+          <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/system_nrf52840.h" />
+          <folder Name="cmsis">
+            <folder Name="include">
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/arm_common_tables.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/arm_const_structs.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/arm_math.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/cmsis_armcc.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/cmsis_armcc_V6.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/cmsis_gcc.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cm0.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cm0plus.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cm3.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cm4.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cm7.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cmFunc.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cmInstr.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/toolchain/cmsis/include/core_cmSimd.h" />
+            </folder>
+          </folder>
+        </folder>
+      </folder>
     </folder>
     <folder Name="src">
       <file file_name="../boards.h" />
@@ -77,22 +281,74 @@
       gcc_optimization_level="Debug"
       link_use_linker_script_file="No"
       linker_section_placement_file="flash_placement.xml" />
-    <folder
-      Name="softdevice"
-      exclude=""
-      filter="*.c;*.h"
-      path="../../softdevice"
-      recurse="Yes" />
+    <folder Name="softdevice">
+      <folder Name="6.0.0">
+        <folder Name="common">
+          <folder Name="softdevice_handler">
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/ant_stack_handler_types.h" />
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/app_ram_base.h" />
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/ble_stack_handler_types.h" />
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/softdevice_handler.c" />
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/softdevice_handler.h" />
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/softdevice_handler_appsh.c" />
+            <file file_name="../../softdevice/6.0.0/common/softdevice_handler/softdevice_handler_appsh.h" />
+          </folder>
+        </folder>
+        <folder Name="mbr">
+          <folder Name="nrf52840">
+            <folder Name="headers">
+              <file file_name="../../softdevice/6.0.0/mbr/nrf52840/headers/nrf_mbr.h" />
+              <file file_name="../../softdevice/6.0.0/mbr/nrf52840/headers/nrf_svc.h" />
+            </folder>
+          </folder>
+        </folder>
+        <folder Name="s140">
+          <folder Name="headers">
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_err.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gap.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gatt.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gattc.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gatts.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_hci.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_l2cap.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_ranges.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/ble_types.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_error.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_error_sdm.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_error_soc.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_nvic.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_sd_def.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_sdm.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_soc.h" />
+            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_svc.h" />
+            <folder Name="nrf52">
+              <file file_name="../../softdevice/6.0.0/s140/headers/nrf52/nrf_mbr.h" />
+            </folder>
+          </folder>
+        </folder>
+      </folder>
+    </folder>
+    <configuration Name="Debug Single" gcc_optimization_level="Debug" />
+    <configuration Name="Debug Dual" gcc_optimization_level="Debug" />
+    <configuration
+      Name="Release Dual"
+      gcc_optimization_level="Optimize For Size" />
+    <configuration
+      Name="Release Single"
+      gcc_optimization_level="Optimize For Size" />
   </project>
   <configuration
-    Name="Debug"
+    Name="Debug Single"
     c_preprocessor_definitions="DEBUG"
     gcc_debugging_level="Level 3"
     gcc_optimization_level="None" />
   <configuration
-    Name="Release"
+    Name="Release Single"
     c_preprocessor_definitions="NDEBUG"
     gcc_debugging_level="None"
     gcc_omit_frame_pointer="Yes"
     gcc_optimization_level="Level 1" />
+  <configuration Name="Debug Dual" />
+  <configuration Name="Release Dual" />
 </solution>
