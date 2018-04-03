@@ -114,9 +114,6 @@ C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dis/ble_dis.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/pstorage/pstorage_raw.c
 C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
 
-C_SOURCE_FILES += $(SD_PATH)/common/softdevice_handler/softdevice_handler.c
-C_SOURCE_FILES += $(SD_PATH)/common/softdevice_handler/softdevice_handler_appsh.c
-
 #C_SOURCE_FILES += $(SRC_PATH)/tusb_descriptors.c
 
 #C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
@@ -157,7 +154,6 @@ INC_PATHS += -I$(SDK_PATH)/drivers_nrf/power
 INC_PATHS += -I$(SDK_PATH)/drivers_nrf/usbd
 
 INC_PATHS += -I$(SD_PATH)/common
-INC_PATHS += -I$(SD_PATH)/common/softdevice_handler/
 INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers
 INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers/nrf52
 

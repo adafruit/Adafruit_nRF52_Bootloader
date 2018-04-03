@@ -20,9 +20,7 @@
 #include "nrf_gpio.h"
 #include "app_util.h"
 #include "app_error.h"
-#include "softdevice_handler.h"
-#include "ble_stack_handler_types.h"
-//#include "ble_advdata.h"
+
 #include "ble_l2cap.h"
 #include "ble_gap.h"
 #include "ble_gatt.h"
@@ -982,7 +980,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
  *
  * @param[in] p_ble_evt S110 SoftDevice event.
  */
-static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
+/*static*/ void ble_evt_dispatch(ble_evt_t * p_ble_evt)
 {
     ble_conn_params_on_ble_evt(p_ble_evt);
     ble_dfu_on_ble_evt(&m_dfu, p_ble_evt);
@@ -1102,9 +1100,6 @@ uint32_t dfu_transport_ble_update_start(void)
     m_pkt_type              = PKT_TYPE_INVALID;
 
     leds_init();
-
-    err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
-    VERIFY_SUCCESS(err_code);
 
     dfu_register_callback(dfu_cb_handler);
 

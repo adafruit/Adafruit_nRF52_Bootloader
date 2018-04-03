@@ -40,6 +40,7 @@
 
 #include "nrf.h"
 #include "nrf_soc.h"
+#include "nrf_nvic.h"
 #include "app_error.h"
 #include "nrf_gpio.h"
 #include "ble.h"
@@ -49,12 +50,6 @@
 #include "app_timer.h"
 #include "nrf_error.h"
 #include "boards.h"
-
-#include "softdevice_handler_appsh.h"
-//#include "nrf_sdh.h"
-//#include "nrf_sdh_ble.h"
-//#include "nrf_sdh_soc.h"
-
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
@@ -222,19 +217,10 @@ void blinky_ota_disconneted(void)
   isOTAConnected = false;
 }
 
-
-/**@brief Function for dispatching a BLE stack event to all modules with a BLE stack event handler.
- *
- * @details This function is called from the scheduler in the main loop after a BLE stack
- *          event has been received.
- *
- * @param[in]   p_ble_evt   Bluetooth stack event.
- */
-static void sys_evt_dispatch(uint32_t event)
+static void nrf_error_cb(uint32_t id, uint32_t pc, uint32_t info)
 {
-  pstorage_sys_event_handler(event);
-}
 
+}
 
 /**@brief Function for initializing the BLE stack.
  *
@@ -247,7 +233,18 @@ static void sys_evt_dispatch(uint32_t event)
 static uint32_t ble_stack_init(bool init_softdevice)
 {
   uint32_t         err_code;
-  nrf_clock_lf_cfg_t clock_lf_cfg =
+  if (init_softdevice)
+  {
+    sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
+    err_code = sd_mbr_command(&com);
+    APP_ERROR_CHECK(err_code);
+  }
+
+  err_code = sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START);
+  APP_ERROR_CHECK(err_code);
+
+  // Enable Softdevice
+  nrf_clock_lf_cfg_t clock_cfg =
   {
 #if 0
       .source       = NRF_CLOCK_LF_SRC_RC,
@@ -262,18 +259,9 @@ static uint32_t ble_stack_init(bool init_softdevice)
 #endif
   };
 
-  if (init_softdevice)
-  {
-    sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
-    err_code = sd_mbr_command(&com);
-    APP_ERROR_CHECK(err_code);
-  }
-
-  err_code = sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START);
-  APP_ERROR_CHECK(err_code);
-
   // equivalent to nrf_sdh_enable_request()
-  SOFTDEVICE_HANDLER_APPSH_INIT(&clock_lf_cfg, true);
+  APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, nrf_error_cb) );
+  sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/
   extern uint32_t  __data_start__[]; // defined in linker
@@ -311,9 +299,6 @@ static uint32_t ble_stack_init(bool init_softdevice)
 
   // Enable BLE stack.
   err_code = sd_ble_enable(&ram_start);
-  VERIFY_SUCCESS(err_code);
-
-  err_code = softdevice_sys_evt_handler_set(sys_evt_dispatch);
   VERIFY_SUCCESS(err_code);
 
   return err_code;
@@ -411,6 +396,8 @@ int main(void)
 
   // DFU + FRESET are pressed --> OTA
   _ota_update = _ota_update  || ( button_pressed(BOOTLOADER_BUTTON) && button_pressed(FRESET_BUTTON) ) ;
+  
+  _ota_update = 1;
 
 #ifdef BOARD_METRO52
   led_pin_init(LED_BLUE);
@@ -559,4 +546,73 @@ void tud_cdc_rx_cb(uint8_t port)
 uint32_t tusb_hal_millis(void)
 {
   return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
+}
+
+/*------------------------------------------------------------------*/
+/* SoftDevice Event handler
+ *------------------------------------------------------------------*/
+
+void ada_ble_task(void* evt_data, uint16_t evt_size);
+void ada_soc_task(void* evt_data, uint16_t evt_size);
+
+void SD_EVT_IRQHandler(void)
+{
+  // Use App Scheduler to defer handling code in non-isr context
+  app_sched_event_put(NULL, 0, ada_ble_task);
+  app_sched_event_put(NULL, 0, ada_soc_task);
+}
+
+void ada_ble_hanlder(ble_evt_t* evt)
+{
+  // from dfu_transport_ble
+  extern void ble_evt_dispatch(ble_evt_t * p_ble_evt);
+
+  ble_evt_dispatch(evt);
+}
+
+void ada_ble_task(void* evt_data, uint16_t evt_size)
+{
+  (void) evt_data;
+  (void) evt_size;
+
+  // TODO Should check alignment 4
+  __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
+
+  uint32_t err = NRF_SUCCESS;
+
+  // Until no pending events
+  while( NRF_ERROR_NOT_FOUND != err )
+  {
+    uint16_t ev_len = BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX);
+
+    // Get BLE Event
+    err = sd_ble_evt_get(ev_buf, &ev_len);
+
+    // Handle valid event, ignore error
+    if( NRF_SUCCESS == err)
+    {
+      ada_ble_hanlder( (ble_evt_t*) ev_buf );
+    }
+  }
+}
+
+void ada_soc_task(void* evt_data, uint16_t evt_size)
+{
+  (void) evt_data;
+  (void) evt_size;
+
+  uint32_t soc_evt;
+  uint32_t err = NRF_SUCCESS;
+
+  // until no more pending events
+  while ( NRF_ERROR_NOT_FOUND != err )
+  {
+    err = sd_evt_get(&soc_evt);
+
+    if (NRF_SUCCESS == err)
+    {
+      // Flash is the only soc event
+      pstorage_sys_event_handler(soc_evt);
+    }
+  }
 }
