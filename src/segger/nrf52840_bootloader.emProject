@@ -185,12 +185,13 @@
             <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_transport_ble.c" />
             <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_transport_serial.c" />
             <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/dfu_types.h" />
-            <folder
-              Name="ble_transport"
-              path="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/ble_transport" />
-            <folder
-              Name="hci_transport"
-              path="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/hci_transport" />
+            <folder Name="ble_transport">
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/ble_transport/hci_mem_pool_internal.h" />
+            </folder>
+            <folder Name="hci_transport">
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/hci_transport/hci_mem_pool_internal.h" />
+              <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/bootloader_dfu/hci_transport/hci_transport_config.h" />
+            </folder>
           </folder>
           <folder Name="crc16">
             <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/libraries/crc16/crc16.c" />
