@@ -95,8 +95,6 @@
 #define BLEGATT_ATT_MTU_MAX             247
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
-
-
 // Adafruit for factory reset
 #define APPDATA_ADDR_START                  (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
 STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
@@ -114,11 +112,6 @@ APP_TIMER_DEF( blinky_timer_id );
 bool _ota_update = false;
 
 bool is_ota(void) { return _ota_update; }
-
-void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
-{
-    app_error_handler(0xDEADBEEF, line_num, p_file_name);
-}
 
 static void button_pin_init(uint32_t pin)
 {
@@ -215,10 +208,6 @@ void blinky_ota_disconneted(void)
   isOTAConnected = false;
 }
 
-static void nrf_error_cb(uint32_t id, uint32_t pc, uint32_t info)
-{
-
-}
 
 /**@brief Function for initializing the BLE stack.
  *
@@ -257,8 +246,7 @@ static uint32_t ble_stack_init(bool init_softdevice)
 #endif
   };
 
-  // equivalent to nrf_sdh_enable_request()
-  APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, nrf_error_cb) );
+  APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler) );
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/
@@ -304,19 +292,6 @@ static uint32_t ble_stack_init(bool init_softdevice)
 
 
 /**
- * @brief Function for event scheduler initialization.
- */
-static void scheduler_init(void)
-{
-  APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-
-  /* Initialize a blinky timer to show that we're in bootloader */
-  (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
-  app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
-}
-
-
-/**
  * @brief Function for bootloader main entry.
  */
 int main(void)
@@ -333,11 +308,8 @@ int main(void)
   // start bootloader either serial or ble
   bool dfu_start = _ota_update || (NRF_POWER->GPREGRET == BOOTLOADER_DFU_SERIAL_MAGIC);
 
-  if (dfu_start)
-  {
-    // Clear GPREGRET if it is our values
-    NRF_POWER->GPREGRET = 0;
-  }
+  // Clear GPREGRET if it is our values
+  if (dfu_start) NRF_POWER->GPREGRET = 0;
 
   // Save bootloader version to pre-defined register, retrieved by application
   BOOTLOADER_VERSION_REGISTER = (BOOTLOADER_VERSION);
@@ -348,8 +320,7 @@ int main(void)
   APP_ERROR_CHECK_BOOL(NRF_FICR->CODEPAGESIZE == CODE_PAGE_SIZE);
 
   /* Initialize GPIOs
-   * For metro52 LED_BLUE is muxed with FRESET
-   */
+   * For metro52 LED_BLUE is muxed with FRESET */
   button_pin_init(BOOTLOADER_BUTTON);
   button_pin_init(FRESET_BUTTON);
   nrf_delay_us(100); // wait for the pin state is stable
@@ -357,11 +328,15 @@ int main(void)
   led_pin_init(LED_RED);
   led_pin_init(LED_BLUE); // on metro52 will override FRESET
 
-  // Initialize timer module, already configred to use with the scheduler.
-//  APP_TIMER_APPSH_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, true);
-
+  // Init scheduler and timer (use scheduler)
+  APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
   app_timer_init();
 
+  /* Initialize a blinky timer to show that we're in bootloader */
+  (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
+  app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
+
+  // Init bootloader and SD
   (void) bootloader_init();
 
   if (bootloader_dfu_sd_in_progress())
@@ -370,17 +345,16 @@ int main(void)
     APP_ERROR_CHECK(err_code);
 
     ble_stack_init(!sd_inited);
-    scheduler_init();
 
     err_code = bootloader_dfu_sd_update_finalize();
     APP_ERROR_CHECK(err_code);
   }
   else
   {
-    // If stack is present then continue initialization of bootloader.
     ble_stack_init(!sd_inited);
-    scheduler_init();
   }
+
+  /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
 
   /* For metro52 LED_BLUE is muxed with FRESET. We only init FRESET BUTTON
    * as needed and reconfigure as LED BLUE when done. */
@@ -409,12 +383,11 @@ int main(void)
   {
     /* Adafruit Modification
      * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
-     * to support auto programming from Arduino IDE
-     */
+     * to support auto programming from Arduino IDE */
     (void) bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
   }
 
-  // Adafruit Factory reset
+  /*------------- Adafruit Factory reset -------------*/
 #ifdef BOARD_METRO52
   button_pin_init(FRESET_BUTTON);
   nrf_delay_us(100); // wait for the pin state is stable
@@ -431,6 +404,7 @@ int main(void)
     adafruit_factory_reset();
   }
 
+  /*------------- Stop timer and jump to application -------------*/
   app_timer_stop(blinky_timer_id);
 
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
@@ -519,6 +493,11 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
   verify_breakpoint();
   NVIC_SystemReset();
+}
+
+void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
+{
+    app_error_handler(0xDEADBEEF, line_num, p_file_name);
 }
 
 //--------------------------------------------------------------------+
