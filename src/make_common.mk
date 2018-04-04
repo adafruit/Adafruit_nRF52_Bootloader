@@ -106,7 +106,6 @@ C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 #C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/power/nrf_drv_power.c
 
-C_SOURCE_FILES += $(SDK_PATH)/ble/common/ble_srv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
 C_SOURCE_FILES += $(SDK_PATH)/ble/ble_services/ble_dis/ble_dis.c
 

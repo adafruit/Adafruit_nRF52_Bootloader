@@ -69,7 +69,6 @@
             </folder>
           </folder>
           <folder Name="common">
-            <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/common/ble_srv_common.c" />
             <file file_name="../../nRF5_SDK_11.0.0_89a8197/components/ble/common/ble_srv_common.h" />
           </folder>
         </folder>
