@@ -25,7 +25,7 @@ SD_VERSION       = 6.0.0
 
 SD_NAME_UPPER    = $(subst s,S,$(SD_NAME))
 
-SD_PATH          = ../../softdevice/$(SD_VERSION)
+SD_PATH          = ../../lib/softdevice/$(SD_VERSION)
 SD_HEX           = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
 LINKER_SCRIPT    = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 

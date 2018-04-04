@@ -25,7 +25,7 @@
       gcc_entry_point="Reset_Handler"
       linker_memory_map_file="$(ProjectDir)/nRF52840_xxAA_MemoryMap.xml"
       linker_section_placement_file="$(ProjectDir)/flash_placement.xml"
-      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;SdkDir=../../lib/sdk/components;Sdk11Dir=../../lib/sdk11/components;SdDir=../../softdevice/6.0.0;TusbDir=../../lib/tinyusb/tinyusb"
+      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;SdkDir=../../lib/sdk/components;Sdk11Dir=../../lib/sdk11/components;SdDir=../../lib/softdevice/6.0.0;TusbDir=../../lib/tinyusb/tinyusb"
       project_directory=""
       project_type="Executable"
       target_reset_script="Reset();"
@@ -66,44 +66,6 @@
       gcc_optimization_level="Debug"
       link_use_linker_script_file="No"
       linker_section_placement_file="flash_placement.xml" />
-    <folder Name="softdevice">
-      <folder Name="6.0.0">
-        <folder Name="common" />
-        <folder Name="mbr">
-          <folder Name="nrf52840">
-            <folder Name="headers">
-              <file file_name="../../softdevice/6.0.0/mbr/nrf52840/headers/nrf_mbr.h" />
-              <file file_name="../../softdevice/6.0.0/mbr/nrf52840/headers/nrf_svc.h" />
-            </folder>
-          </folder>
-        </folder>
-        <folder Name="s140">
-          <folder Name="headers">
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_err.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gap.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gatt.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gattc.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_gatts.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_hci.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_l2cap.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_ranges.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/ble_types.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_error.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_error_sdm.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_error_soc.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_nvic.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_sd_def.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_sdm.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_soc.h" />
-            <file file_name="../../softdevice/6.0.0/s140/headers/nrf_svc.h" />
-            <folder Name="nrf52">
-              <file file_name="../../softdevice/6.0.0/s140/headers/nrf52/nrf_mbr.h" />
-            </folder>
-          </folder>
-        </folder>
-      </folder>
-    </folder>
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration Name="Debug Dual" gcc_optimization_level="Debug" />
     <configuration
@@ -244,6 +206,35 @@
               <folder Name="nrf5x">
                 <file file_name="../../lib/tinyusb/tinyusb/portable/nordic/nrf5x/dcd_nrf5x.c" />
                 <file file_name="../../lib/tinyusb/tinyusb/portable/nordic/nrf5x/hal_nrf5x.c" />
+              </folder>
+            </folder>
+          </folder>
+        </folder>
+      </folder>
+      <folder Name="softdevice">
+        <folder Name="6.0.0">
+          <folder Name="s140">
+            <folder Name="headers">
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_err.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gap.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gatt.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gattc.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gatts.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_hci.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_l2cap.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_ranges.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_types.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_error.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_error_sdm.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_error_soc.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_nvic.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_sd_def.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_sdm.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_soc.h" />
+              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_svc.h" />
+              <folder Name="nrf52">
+                <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf52/nrf_mbr.h" />
               </folder>
             </folder>
           </folder>
