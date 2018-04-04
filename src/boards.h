@@ -34,22 +34,6 @@
 
 #define bit(b) (1UL << (b))
 
-static inline uint32_t bit_set(uint32_t value, uint8_t n)
-{
-  return value | bit(n);
-}
-
-static inline uint32_t bit_clear(uint32_t value, uint8_t n)
-{
-  return value & (~bit(n));
-}
-
-static inline bool bit_test(uint32_t value, uint8_t n)
-{
-  return (value & bit(n)) ? true : false;
-}
-
-
 void led_control(uint32_t pin, bool state);
 
 static inline void led_on(uint32_t pin)

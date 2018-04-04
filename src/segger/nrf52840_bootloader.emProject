@@ -273,6 +273,9 @@
       <file file_name="../metro52.h" />
       <file file_name="../pstorage_platform.h" />
       <file file_name="../sdk_config.h" />
+      <file file_name="../tusb_config.h" />
+      <file file_name="../tusb_descriptors.c" />
+      <file file_name="../tusb_descriptors.h" />
     </folder>
     <configuration
       Name="Debug"

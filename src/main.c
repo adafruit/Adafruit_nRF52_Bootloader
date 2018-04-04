@@ -57,6 +57,8 @@
 #include "nrf_delay.h"
 #include "pstorage.h"
 
+#include "tusb.h"
+
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]
 
@@ -334,7 +336,6 @@ int main(void)
 
   /* Initialize a blinky timer to show that we're in bootloader */
   (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
-  app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
 
   // Init bootloader and SD
   (void) bootloader_init();
@@ -345,6 +346,7 @@ int main(void)
     APP_ERROR_CHECK(err_code);
 
     ble_stack_init(!sd_inited);
+    app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
 
     err_code = bootloader_dfu_sd_update_finalize();
     APP_ERROR_CHECK(err_code);
@@ -352,6 +354,30 @@ int main(void)
   else
   {
     ble_stack_init(!sd_inited);
+    app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
+  }
+
+  // Init usb stack
+  tusb_init();
+
+  // TODO temporarily code to test usb cdc
+  while( true )
+  {
+    sd_app_evt_wait();
+    app_sched_execute();
+
+    tusb_task();
+
+    // connected and there are data available -> echo back
+    if ( tud_mounted() && tud_cdc_available() )
+    {
+      uint8_t buf[64];
+
+      // read and echo back
+      uint32_t count = tud_cdc_read(buf, sizeof(buf));
+
+      tud_cdc_write(buf, count);
+    }
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
@@ -480,7 +506,7 @@ void adafruit_factory_reset(void)
 }
 
 
-static inline void verify_breakpoint(void)
+static inline void halt_breakpoint(void)
 {
   // Cortex M CoreDebug->DHCSR
   volatile uint32_t* ARM_CM_DHCSR =  ((volatile uint32_t*) 0xE000EDF0UL);
@@ -491,7 +517,7 @@ static inline void verify_breakpoint(void)
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-  verify_breakpoint();
+  halt_breakpoint();
   NVIC_SystemReset();
 }
 
@@ -586,8 +612,10 @@ void ada_soc_task(void* evt_data, uint16_t evt_size)
 
     if (NRF_SUCCESS == err)
     {
-      // Flash is the only soc event
+      extern void power_usb_event_handler(uint32_t evt);
+
       pstorage_sys_event_handler(soc_evt);
+      power_usb_event_handler(soc_evt);
     }
   }
 }
