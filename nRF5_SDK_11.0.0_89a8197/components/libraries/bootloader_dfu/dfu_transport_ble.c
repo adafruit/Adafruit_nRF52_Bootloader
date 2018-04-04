@@ -28,7 +28,6 @@
 #include "ble_dfu.h"
 #include "ble_dis.h"
 #include "app_timer.h"
-#include "ble_conn_params.h"
 #include "hci_mem_pool.h"
 #include "bootloader.h"
 #include "dfu_ble_svc_internal.h"
@@ -62,10 +61,6 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define CONN_SUP_TIMEOUT                     (4 * 100)                                               /**< Connection supervisory timeout (4 seconds). */
 
 #define APP_TIMER_PRESCALER                  0                                                       /**< Value of the RTC1 PRESCALER register. */
-
-#define FIRST_CONN_PARAMS_UPDATE_DELAY       APP_TIMER_TICKS(100)               /**< Time from the Connected event to first time sd_ble_gap_conn_param_update is called (100 milliseconds). */
-#define NEXT_CONN_PARAMS_UPDATE_DELAY        APP_TIMER_TICKS(500)               /**< Time between each call to sd_ble_gap_conn_param_update after the first call (500 milliseconds). */
-#define MAX_CONN_PARAMS_UPDATE_COUNT         3                                                       /**< Number of attempts before giving up the connection parameter negotiation. */
 
 #define APP_ADV_INTERVAL                     MSEC_TO_UNITS(25, UNIT_0_625_MS)                        /**< The advertising interval (25 ms.). */
 #define APP_ADV_TIMEOUT_IN_SECONDS           BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED                   /**< The advertising timeout in units of seconds. This is set to @ref BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED so that the advertisement is done as long as there there is a call to @ref dfu_transport_close function.*/
@@ -536,40 +531,6 @@ static void on_dfu_pkt_write(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
     }
 }
 
-
-/**@brief     Function for handling a Connection Parameters error.
- *
- * @param[in] nrf_error Error code.
- */
-static void conn_params_error_handler(uint32_t nrf_error)
-{
-    APP_ERROR_HANDLER(nrf_error);
-}
-
-
-/**@brief Function for initializing the Connection Parameters module.
- */
-static void conn_params_init(void)
-{
-    uint32_t               err_code;
-    ble_conn_params_init_t cp_init;
-
-    memset(&cp_init, 0, sizeof(cp_init));
-
-    cp_init.p_conn_params                  = NULL;
-    cp_init.first_conn_params_update_delay = FIRST_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.next_conn_params_update_delay  = NEXT_CONN_PARAMS_UPDATE_DELAY;
-    cp_init.max_conn_params_update_count   = MAX_CONN_PARAMS_UPDATE_COUNT;
-    cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
-    cp_init.disconnect_on_fail             = false;
-    cp_init.evt_handler                    = NULL;
-    cp_init.error_handler                  = conn_params_error_handler;
-
-    err_code = ble_conn_params_init(&cp_init);
-    APP_ERROR_CHECK(err_code);
-}
-
-
 /**@brief     Function for the Device Firmware Update Service event handler.
  *
  * @details   This function will be called for all Device Firmware Update Service events which
@@ -982,7 +943,6 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
  */
 /*static*/ void ble_evt_dispatch(ble_evt_t * p_ble_evt)
 {
-    ble_conn_params_on_ble_evt(p_ble_evt);
     ble_dfu_on_ble_evt(&m_dfu, p_ble_evt);
     on_ble_evt(p_ble_evt);
 }
@@ -1130,7 +1090,6 @@ uint32_t dfu_transport_ble_update_start(void)
 
     gap_params_init();
     services_init();
-    conn_params_init();
     sec_params_init();
 
     sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, 0, 4); // maximum power
@@ -1157,9 +1116,6 @@ uint32_t dfu_transport_ble_close()
         // If not connected, then the device will be advertising. Hence stop the advertising.
         advertising_stop();
     }
-
-    err_code = ble_conn_params_stop();
-    APP_ERROR_CHECK(err_code);
 
     return NRF_SUCCESS;
 }
