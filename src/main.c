@@ -552,7 +552,6 @@ uint32_t tusb_hal_millis(void)
 /*------------------------------------------------------------------*/
 /* SoftDevice Event handler
  *------------------------------------------------------------------*/
-
 void ada_ble_task(void* evt_data, uint16_t evt_size);
 void ada_soc_task(void* evt_data, uint16_t evt_size);
 
@@ -612,6 +611,7 @@ void ada_soc_task(void* evt_data, uint16_t evt_size)
 
     if (NRF_SUCCESS == err)
     {
+      // from hal_nrf5x.c
       extern void power_usb_event_handler(uint32_t evt);
 
       pstorage_sys_event_handler(soc_evt);
