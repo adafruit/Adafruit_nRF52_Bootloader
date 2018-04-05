@@ -75,7 +75,12 @@
       Name="Release Single"
       gcc_optimization_level="Optimize For Size" />
     <folder Name="lib">
-      <folder Name="sdk" path="../../lib/sdk" />
+      <folder
+        Name="sdk"
+        exclude=""
+        filter="*.h;*.c"
+        path="../../lib/sdk"
+        recurse="Yes" />
       <folder Name="sdk11">
         <folder Name="components">
           <folder Name="ble">
