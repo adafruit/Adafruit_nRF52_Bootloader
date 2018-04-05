@@ -443,6 +443,10 @@ int main(void)
   NVIC_SystemReset();
 }
 
+
+/*------------------------------------------------------------------*/
+/* FACTORY RESET
+ *------------------------------------------------------------------*/
 /**
  * Pstorage callback, fired after erased  Application Data
  */
@@ -505,7 +509,9 @@ void adafruit_factory_reset(void)
   led_off(LED_BLUE);
 }
 
-
+//--------------------------------------------------------------------+
+// Error Handler
+//--------------------------------------------------------------------+
 static inline void halt_breakpoint(void)
 {
   // Cortex M CoreDebug->DHCSR
