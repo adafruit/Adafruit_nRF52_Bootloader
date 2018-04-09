@@ -360,26 +360,6 @@ int main(void)
   // Init usb stack
   tusb_init();
 
-  // TODO temporarily code to test usb cdc
-  while( true )
-  {
-    sd_app_evt_wait();
-    app_sched_execute();
-
-    tusb_task();
-
-    // connected and there are data available -> echo back
-    if ( tud_mounted() && tud_cdc_available() )
-    {
-      uint8_t buf[64];
-
-      // read and echo back
-      uint32_t count = tud_cdc_read(buf, sizeof(buf));
-
-      tud_cdc_write(buf, count);
-    }
-  }
-
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
 
   /* For metro52 LED_BLUE is muxed with FRESET. We only init FRESET BUTTON
@@ -543,12 +523,6 @@ void tud_mount_cb(uint8_t port)
 void tud_umount_cb(uint8_t port)
 {
 }
-
-void tud_cdc_rx_cb(uint8_t port)
-{
-
-}
-
 
 uint32_t tusb_hal_millis(void)
 {

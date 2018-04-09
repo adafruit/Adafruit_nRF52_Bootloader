@@ -29,6 +29,8 @@
 
 #include "app_timer.h"
 
+#include "tusb.h"
+
 #define APP_TIMER_PRESCALER    0
 
 #define IRQ_ENABLED            0x01                    /**< Field identifying if an interrupt is enabled. */
@@ -121,6 +123,9 @@ static void wait_for_events(void)
 
         // Event received. Process it from the scheduler.
         app_sched_execute();
+
+        // USB stack
+        tusb_task();
 
         if ((m_update_status == BOOTLOADER_COMPLETE) ||
             (m_update_status == BOOTLOADER_TIMEOUT)  ||
