@@ -36,60 +36,56 @@
 */
 /**************************************************************************/
 
-#ifndef _TUSB_TUSB_CONFIG_H_
-#define _TUSB_TUSB_CONFIG_H_
+#ifndef _TUSB_CONFIG_H_
+#define _TUSB_CONFIG_H_
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
 //--------------------------------------------------------------------+
-// CONTROLLER CONFIGURATION
+// COMMON CONFIGURATION
 //--------------------------------------------------------------------+
-//#define TUSB_CFG_MCU will be passed from IDE/command line for easy board/mcu switching
+#define CFG_TUSB_CONTROLLER_0_MODE        (TUSB_MODE_DEVICE)
 
-#define TUSB_CFG_CONTROLLER_0_MODE  (TUSB_MODE_DEVICE)
-//#define TUSB_CFG_CONTROLLER_1_MODE  (TUSB_MODE_DEVICE)
+#define CFG_TUSB_DEBUG                    2
+
+#define CFG_TUSB_OS                       TUSB_OS_NONE
+//#define CFG_TUSB_OS_TASK_PRIO             0
 
 //--------------------------------------------------------------------+
 // DEVICE CONFIGURATION
 //--------------------------------------------------------------------+
-#define TUSB_CFG_DEVICE_CONTROL_ENDOINT_SIZE    64
+#define CFG_TUSB_DEVICE_ENDOINT0_SIZE     64
 
 //------------- CLASS -------------//
-#define TUSB_CFG_DEVICE_HID_KEYBOARD            0
-#define TUSB_CFG_DEVICE_HID_MOUSE               0
-#define TUSB_CFG_DEVICE_HID_GENERIC             0 // not supported yet
-#define TUSB_CFG_DEVICE_MSC                     0
-#define TUSB_CFG_DEVICE_CDC                     1
+#define CFG_TUSB_DEVICE_HID_KEYBOARD      0
+#define CFG_TUSB_DEVICE_HID_MOUSE         0
+#define CFG_TUSB_DEVICE_HID_GENERIC       0 // not supported yet
+#define CFG_TUSB_DEVICE_MSC               0
+#define CFG_TUSB_DEVICE_CDC               1
 
-//--------------------------------------------------------------------+
-// COMMON CONFIGURATION
-//--------------------------------------------------------------------+
-#define TUSB_CFG_DEBUG                2
 
-#define TUSB_CFG_OS                   TUSB_OS_NONE // be passed from IDE/command line for easy project switching
-//#define TUSB_CFG_OS_TASK_PRIO         0            // be passed from IDE/command line for easy project switching
-#define TUSB_CFG_TICKS_HZ             1000
+/*------------------------------------------------------------------*/
+/* CLASS
+ * TUD Stand for Tiny Usb Device
+ *------------------------------------------------------------------*/
 
-//#define TUSB_CFG_OS       TUSB_OS_NONE
+// FIFO size of CDC TX and RX
+#define CFG_TUD_CDC_BUFSIZE               1024
+
+// TX is sent automatically in Start of Frame event.
+// If not enabled, application must call tud_cdc_flush() periodically
+#define CFG_TUD_CDC_FLUSH_ON_SOF          1
 
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT
 //--------------------------------------------------------------------+
-#define TUSB_CFG_ATTR_USBRAM
-
-// LPC11uxx and LPC13uxx requires each buffer has to be 64-byte alignment
-#if TUSB_CFG_MCU == MCU_LPC11UXX || TUSB_CFG_MCU == MCU_LPC13UXX
- #define ATTR_USB_MIN_ALIGNMENT   ATTR_ALIGNED(64)
-#elif defined NRF52840_XXAA
- #define ATTR_USB_MIN_ALIGNMENT   ATTR_ALIGNED(4)
-#else
- #define ATTR_USB_MIN_ALIGNMENT
-#endif
+#define CFG_TUSB_ATTR_USBRAM
+#define CFG_TUSB_MEM_ALIGN                ATTR_ALIGNED(4)
 
 #ifdef __cplusplus
  }
 #endif
 
-#endif /* _TUSB_TUSB_CONFIG_H_ */
+#endif /* _TUSB_CONFIG_H_ */

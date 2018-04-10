@@ -397,7 +397,7 @@ static uint32_t slip_uart_open(void)
 
 void tud_cdc_rx_cb(uint8_t port)
 {
-  while ( tud_cdc_available() )
+  while ( tud_cdc_available() && !rx_buffer_overflowed() )
   {
     int8_t ch = tud_cdc_read_char();
     handle_rx_byte((uint8_t) ch);
