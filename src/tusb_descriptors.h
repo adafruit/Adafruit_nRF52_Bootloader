@@ -50,7 +50,7 @@
 // each combination of interfaces need to have a unique productid, as windows will bind & remember device driver after the first plug.
 // Auto ProductID layout's Bitmap: (MSB) MassStorage | Generic | Mouse | Key | CDC (LSB)
 #ifndef CFG_PRODUCTID
-  #define PRODUCTID_BITMAP(interface, n)  ( (CFG_TUSB_DEVICE_##interface) << (n) )
+  #define PRODUCTID_BITMAP(interface, n)  ( (CFG_TUD_##interface) << (n) )
   #define CFG_PRODUCTID                   (0x4000 | ( PRODUCTID_BITMAP(CDC, 0) | PRODUCTID_BITMAP(HID_KEYBOARD, 1) | \
                                            PRODUCTID_BITMAP(HID_MOUSE, 2) | PRODUCTID_BITMAP(HID_GENERIC, 3) | \
                                            PRODUCTID_BITMAP(MSC, 4) ) )
@@ -60,7 +60,7 @@
 #define ITF_NUM_MSC    2
 
 // total number of interfaces
-#define ITF_TOTAL      (CFG_TUSB_DEVICE_CDC*2 + CFG_TUSB_DEVICE_MSC)
+#define ITF_TOTAL      (CFG_TUD_CDC*2 + CFG_TUD_MSC)
 
 //--------------------------------------------------------------------+
 // Endpoints Address & Max Packet Size
@@ -87,7 +87,7 @@ typedef struct ATTR_PACKED
 {
   tusb_desc_configuration_t           configuration;
 
-#if CFG_TUSB_DEVICE_CDC
+#if CFG_TUD_CDC
   struct ATTR_PACKED
   {
     tusb_desc_interface_assoc_t       iad;
@@ -107,7 +107,7 @@ typedef struct ATTR_PACKED
   }cdc;
 #endif
 
-#if CFG_TUSB_DEVICE_MSC
+#if CFG_TUD_MSC
   struct ATTR_PACKED
   {
     tusb_desc_interface_t             interface;

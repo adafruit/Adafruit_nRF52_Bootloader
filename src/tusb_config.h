@@ -46,29 +46,30 @@
 //--------------------------------------------------------------------+
 // COMMON CONFIGURATION
 //--------------------------------------------------------------------+
-#define CFG_TUSB_CONTROLLER_0_MODE        (TUSB_MODE_DEVICE)
+#define CFG_TUSB_MCU                      OPT_MCU_NRF5X
+#define CFG_TUSB_CONTROLLER_0_MODE        (OPT_MODE_DEVICE)
 
 #define CFG_TUSB_DEBUG                    2
 
-#define CFG_TUSB_OS                       TUSB_OS_NONE
+#define CFG_TUSB_OS                       OPT_OS_NONE
 //#define CFG_TUSB_OS_TASK_PRIO             0
 
 //--------------------------------------------------------------------+
 // DEVICE CONFIGURATION
+// Note: TUD Stand for Tiny Usb Device
 //--------------------------------------------------------------------+
-#define CFG_TUSB_DEVICE_ENDOINT0_SIZE     64
+#define CFG_TUD_ENDOINT0_SIZE     64
 
-//------------- CLASS -------------//
-#define CFG_TUSB_DEVICE_HID_KEYBOARD      0
-#define CFG_TUSB_DEVICE_HID_MOUSE         0
-#define CFG_TUSB_DEVICE_HID_GENERIC       0 // not supported yet
-#define CFG_TUSB_DEVICE_MSC               0
-#define CFG_TUSB_DEVICE_CDC               1
+//------------- Class enabled -------------//
+#define CFG_TUD_HID_KEYBOARD      0
+#define CFG_TUD_HID_MOUSE         0
+#define CFG_TUD_HID_GENERIC       0 // not supported yet
+#define CFG_TUD_MSC               0
+#define CFG_TUD_CDC               1
 
 
 /*------------------------------------------------------------------*/
-/* CLASS
- * TUD Stand for Tiny Usb Device
+/* CLASS DRIVER
  *------------------------------------------------------------------*/
 
 // FIFO size of CDC TX and RX
@@ -83,6 +84,14 @@
 //--------------------------------------------------------------------+
 #define CFG_TUSB_ATTR_USBRAM
 #define CFG_TUSB_MEM_ALIGN                ATTR_ALIGNED(4)
+
+
+#define BREAKPOINT_IGNORE_COUNT(n) \
+  do {\
+    static uint8_t ignore_count = 0;\
+    ignore_count++;\
+    if ( ignore_count > n ) verify_breakpoint();\
+  }while(0)
 
 #ifdef __cplusplus
  }

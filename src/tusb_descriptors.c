@@ -53,7 +53,7 @@ tusb_desc_device_t const desc_device =
     .bDeviceSubClass    = MISC_SUBCLASS_COMMON,
     .bDeviceProtocol    = MISC_PROTOCOL_IAD,
 
-    .bMaxPacketSize0    = CFG_TUSB_DEVICE_ENDOINT0_SIZE,
+    .bMaxPacketSize0    = CFG_TUD_ENDOINT0_SIZE,
 
     .idVendor           = CFG_VENDORID,
     .idProduct          = CFG_PRODUCTID,
@@ -85,7 +85,7 @@ app_descriptor_configuration_t const desc_configuration =
         .bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(500)
     },
 
-#if CFG_TUSB_DEVICE_CDC
+#if CFG_TUD_CDC
     // IAD points to CDC Interfaces
     .cdc =
     {
@@ -199,7 +199,7 @@ app_descriptor_configuration_t const desc_configuration =
     },
 #endif
 
-#if CFG_TUSB_DEVICE_MSC
+#if CFG_TUD_MSC
     .msc =
     {
       .interface =
