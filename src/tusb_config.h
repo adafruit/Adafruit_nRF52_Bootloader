@@ -52,7 +52,7 @@
 #define CFG_TUSB_DEBUG                    2
 
 #define CFG_TUSB_OS                       OPT_OS_NONE
-//#define CFG_TUSB_OS_TASK_PRIO             0
+//#define CFG_TUD_TASK_PRIO             0
 
 //--------------------------------------------------------------------+
 // DEVICE CONFIGURATION
