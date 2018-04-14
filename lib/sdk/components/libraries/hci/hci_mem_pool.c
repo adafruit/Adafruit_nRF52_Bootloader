@@ -65,7 +65,7 @@ typedef struct
 } rx_buffer_queue_t;
 
 static bool              m_is_tx_allocated;                         /**< Boolean value to determine if the TX buffer is allocated. */
-static rx_buffer_elem_t  m_rx_buffer_elem_queue[HCI_RX_BUF_QUEUE_SIZE]; /**< RX buffer element instances. */
+static rx_buffer_elem_t  m_rx_buffer_elem_queue[HCI_RX_BUF_QUEUE_SIZE] __ALIGN(4); /**< RX buffer element instances. */
 static rx_buffer_queue_t m_rx_buffer_queue;                         /**< RX buffer queue element instance. */
 
 

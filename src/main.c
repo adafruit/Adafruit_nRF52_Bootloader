@@ -83,7 +83,7 @@
 #define APP_TIMER_OP_QUEUE_SIZE             4                                /**< Size of timer operation queues. */
 
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
-#define SCHED_QUEUE_SIZE                    20                               /**< Maximum number of events in the scheduler queue. */
+#define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
 // Helper function
 #define memclr(buffer, size)                memset(buffer, 0, size)
@@ -492,18 +492,9 @@ void adafruit_factory_reset(void)
 //--------------------------------------------------------------------+
 // Error Handler
 //--------------------------------------------------------------------+
-static inline void halt_breakpoint(void)
-{
-  // Cortex M CoreDebug->DHCSR
-  volatile uint32_t* ARM_CM_DHCSR =  ((volatile uint32_t*) 0xE000EDF0UL);
-
-  // Only halt mcu if debugger is attached
-  if ( (*ARM_CM_DHCSR) & 1UL ) __asm("BKPT #0\n");
-}
-
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-  halt_breakpoint();
+  verify_breakpoint();
   NVIC_SystemReset();
 }
 
@@ -529,19 +520,6 @@ uint32_t tusb_hal_millis(void)
   return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
 }
 
-/*------------------------------------------------------------------*/
-/* SoftDevice Event handler
- *------------------------------------------------------------------*/
-void ada_ble_task(void* evt_data, uint16_t evt_size);
-void ada_soc_task(void* evt_data, uint16_t evt_size);
-
-void SD_EVT_IRQHandler(void)
-{
-  // Use App Scheduler to defer handling code in non-isr context
-  app_sched_event_put(NULL, 0, ada_ble_task);
-  app_sched_event_put(NULL, 0, ada_soc_task);
-}
-
 void ada_ble_hanlder(ble_evt_t* evt)
 {
   // from dfu_transport_ble
@@ -550,52 +528,59 @@ void ada_ble_hanlder(ble_evt_t* evt)
   ble_evt_dispatch(evt);
 }
 
-void ada_ble_task(void* evt_data, uint16_t evt_size)
+/*------------------------------------------------------------------*/
+/* SoftDevice Event handler
+ *------------------------------------------------------------------*/
+uint32_t proc_ble(void)
 {
-  (void) evt_data;
-  (void) evt_size;
-
-  // TODO Should check alignment 4
   __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
+  uint16_t ev_len = BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX);
 
-  uint32_t err = NRF_SUCCESS;
+  // Get BLE Event
+  uint32_t err = sd_ble_evt_get(ev_buf, &ev_len);
 
-  // Until no pending events
-  while( NRF_ERROR_NOT_FOUND != err )
+  // Handle valid event, ignore error
+  if( NRF_SUCCESS == err)
   {
-    uint16_t ev_len = BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX);
-
-    // Get BLE Event
-    err = sd_ble_evt_get(ev_buf, &ev_len);
-
-    // Handle valid event, ignore error
-    if( NRF_SUCCESS == err)
-    {
-      ada_ble_hanlder( (ble_evt_t*) ev_buf );
-    }
+    ada_ble_hanlder( (ble_evt_t*) ev_buf );
   }
+
+  return err;
 }
 
-void ada_soc_task(void* evt_data, uint16_t evt_size)
+uint32_t proc_soc(void)
+{
+  uint32_t soc_evt;
+  uint32_t err = sd_evt_get(&soc_evt);
+
+  if (NRF_SUCCESS == err)
+  {
+    // from hal_nrf5x.c
+    extern void power_usb_event_handler(uint32_t evt);
+
+    pstorage_sys_event_handler(soc_evt);
+    power_usb_event_handler(soc_evt);
+  }
+
+  return err;
+}
+
+void ada_sd_task(void* evt_data, uint16_t evt_size)
 {
   (void) evt_data;
   (void) evt_size;
 
-  uint32_t soc_evt;
-  uint32_t err = NRF_SUCCESS;
-
-  // until no more pending events
-  while ( NRF_ERROR_NOT_FOUND != err )
+  // process BLE and SOC until there is no more events
+  while( (NRF_ERROR_NOT_FOUND != proc_ble()) || (NRF_ERROR_NOT_FOUND != proc_soc()) )
   {
-    err = sd_evt_get(&soc_evt);
 
-    if (NRF_SUCCESS == err)
-    {
-      // from hal_nrf5x.c
-      extern void power_usb_event_handler(uint32_t evt);
-
-      pstorage_sys_event_handler(soc_evt);
-      power_usb_event_handler(soc_evt);
-    }
   }
 }
+
+void SD_EVT_IRQHandler(void)
+{
+  // Use App Scheduler to defer handling code in non-isr context
+  app_sched_event_put(NULL, 0, ada_sd_task);
+}
+
+
