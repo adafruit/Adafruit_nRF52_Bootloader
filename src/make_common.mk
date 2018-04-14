@@ -109,8 +109,8 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
+#C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
+#C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 
@@ -122,6 +122,7 @@ C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
 C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
 C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
+C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
 #******************************************************************************
@@ -371,4 +372,8 @@ flash_feather52840: feather52840
 flash_metro52: BOOTLOADER_WITH_SD_NAME := metro52_bootloader_$(BOOTLOADER_SD_SUFFIX)
 flash_metro52: metro52
 	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
-	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset	
+	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset
+	
+flash_sd:
+	@echo Flashing: $(SD_HEX)
+	nrfjprog --program $(SD_HEX) -f nrf52 --chiperase --reset
