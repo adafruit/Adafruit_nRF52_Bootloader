@@ -118,8 +118,8 @@ static void wait_for_events(void)
     for (;;)
     {
         // Wait in low power state for any events.
-        uint32_t err_code = sd_app_evt_wait();
-        APP_ERROR_CHECK(err_code);
+//        uint32_t err_code = sd_app_evt_wait();
+//        APP_ERROR_CHECK(err_code);
 
         // Event received. Process it from the scheduler.
         app_sched_execute();
