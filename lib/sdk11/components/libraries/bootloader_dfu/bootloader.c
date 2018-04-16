@@ -376,12 +376,6 @@ void bootloader_app_start(uint32_t app_addr)
 
     interrupts_disable();
 
-    // Disable RTC1
-    NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
-    NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
-    NRF_RTC1->TASKS_STOP  = 1;
-    NRF_RTC1->TASKS_CLEAR = 1;
-
     err_code = sd_softdevice_vector_table_base_set(CODE_REGION_1_START);
     APP_ERROR_CHECK(err_code);
 
