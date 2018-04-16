@@ -57,6 +57,7 @@
 #include "nrf_delay.h"
 #include "pstorage.h"
 
+#include "nrf_usbd.h"
 #include "tusb.h"
 #include "tusb_descriptors.h"
 
@@ -419,6 +420,36 @@ int main(void)
 
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
   {
+    // Stop RTC1
+    NVIC_DisableIRQ(RTC1_IRQn);
+    NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
+    NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
+    NRF_RTC1->TASKS_STOP  = 1;
+    NRF_RTC1->TASKS_CLEAR = 1;
+
+    // Stop USB
+    if ( NRF_USBD->ENABLE )
+    {
+      // Abort all transfers
+
+      // Disable pull up
+      nrf_usbd_pullup_disable();
+
+      // Disable Interrupt
+      NVIC_DisableIRQ(USBD_IRQn);
+
+      // disable all interrupt
+      NRF_USBD->INTENCLR = NRF_USBD->INTEN;
+
+      nrf_usbd_disable();
+      sd_clock_hfclk_release();
+
+      sd_power_usbdetected_enable(false);
+      sd_power_usbpwrrdy_enable(false);
+      sd_power_usbremoved_enable(false);
+    }
+
+
     // Select a bank region to use as application region.
     // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
     bootloader_app_start(DFU_BANK_0_REGION_START);
