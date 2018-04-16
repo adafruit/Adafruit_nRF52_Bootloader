@@ -46,26 +46,26 @@
 //--------------------------------------------------------------------+
 // COMMON CONFIGURATION
 //--------------------------------------------------------------------+
-#define CFG_TUSB_MCU                      OPT_MCU_NRF5X
-#define CFG_TUSB_CONTROLLER_0_MODE        (OPT_MODE_DEVICE)
+#define CFG_TUSB_MCU                OPT_MCU_NRF5X
+#define CFG_TUSB_RHPORT0_MODE       OPT_MODE_DEVICE
 
-#define CFG_TUSB_DEBUG                    2
+#define CFG_TUSB_DEBUG              2
 
-#define CFG_TUSB_OS                       OPT_OS_NONE
-//#define CFG_TUD_TASK_PRIO             0
+#define CFG_TUSB_OS                 OPT_OS_NONE
+//#define CFG_TUD_TASK_PRIO           0
 
 //--------------------------------------------------------------------+
 // DEVICE CONFIGURATION
 // Note: TUD Stand for Tiny Usb Device
 //--------------------------------------------------------------------+
-#define CFG_TUD_ENDOINT0_SIZE     64
+#define CFG_TUD_ENDOINT0_SIZE       64
 
 //------------- Class enabled -------------//
-#define CFG_TUD_HID_KEYBOARD      0
-#define CFG_TUD_HID_MOUSE         0
-#define CFG_TUD_HID_GENERIC       0 // not supported yet
-#define CFG_TUD_MSC               0
-#define CFG_TUD_CDC               1
+#define CFG_TUD_HID_KEYBOARD        0
+#define CFG_TUD_HID_MOUSE           0
+#define CFG_TUD_HID_GENERIC         0 // not supported yet
+#define CFG_TUD_MSC                 0
+#define CFG_TUD_CDC                 1
 
 
 /*------------------------------------------------------------------*/
@@ -73,17 +73,17 @@
  *------------------------------------------------------------------*/
 
 // FIFO size of CDC TX and RX
-#define CFG_TUD_CDC_BUFSIZE               1024
+#define CFG_TUD_CDC_BUFSIZE         1024
 
-// TX is sent automatically in Start of Frame event.
+// TX is sent automatically every Start of Frame event.
 // If not enabled, application must call tud_cdc_flush() periodically
-#define CFG_TUD_CDC_FLUSH_ON_SOF          1
+#define CFG_TUD_CDC_FLUSH_ON_SOF    1
 
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT
 //--------------------------------------------------------------------+
 #define CFG_TUSB_ATTR_USBRAM
-#define CFG_TUSB_MEM_ALIGN                ATTR_ALIGNED(4)
+#define CFG_TUSB_MEM_ALIGN          ATTR_ALIGNED(4)
 
 
 #define BREAKPOINT_IGNORE_COUNT(n) \

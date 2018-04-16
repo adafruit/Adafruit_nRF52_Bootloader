@@ -58,6 +58,7 @@
 #include "pstorage.h"
 
 #include "tusb.h"
+#include "tusb_descriptors.h"
 
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]
@@ -359,6 +360,9 @@ int main(void)
 
   // Init usb stack
   tusb_init();
+
+  // Set usb descriptors
+  tud_set_descriptors(&usb_desc_init);
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
 
