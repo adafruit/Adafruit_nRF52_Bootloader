@@ -66,7 +66,13 @@
 
 #elif  defined(NRF52840_XXAA)
 
+#ifdef DEBUG_SIZE_EXPAND
+// Increase bootloader size for easy debugging
+#define BOOTLOADER_REGION_START             0x000E4000
+#else
 #define BOOTLOADER_REGION_START             0x000F4000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
+#endif
+
 #define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000                  /**< The field specifies the page location of the bootloader settings address. */
 #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x000FE000                  /**< The field specifies the page location of the mbr params page address. */
 

@@ -127,6 +127,9 @@
                 <configuration
                   Name="Release Single"
                   build_exclude_from_build="Yes" />
+                <configuration
+                  Name="Debug Size++"
+                  build_exclude_from_build="Yes" />
               </file>
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_init.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_init_template.c" />
@@ -249,6 +252,9 @@
         </folder>
       </folder>
     </folder>
+    <configuration
+      Name="Debug Size++"
+      c_preprocessor_definitions="DEBUG_SIZE_EXPAND" />
   </project>
   <configuration
     Name="Debug Single"
@@ -263,4 +269,5 @@
     gcc_optimization_level="Level 1" />
   <configuration Name="Debug Dual" />
   <configuration Name="Release Dual" />
+  <configuration Name="Debug Size++" />
 </solution>
