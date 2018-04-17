@@ -49,7 +49,7 @@
 #define CFG_TUSB_MCU                OPT_MCU_NRF5X
 #define CFG_TUSB_RHPORT0_MODE       OPT_MODE_DEVICE
 
-#define CFG_TUSB_DEBUG              2
+#define CFG_TUSB_DEBUG              1
 
 #define CFG_TUSB_OS                 OPT_OS_NONE
 //#define CFG_TUD_TASK_PRIO           0
@@ -64,7 +64,7 @@
 #define CFG_TUD_HID_KEYBOARD        0
 #define CFG_TUD_HID_MOUSE           0
 #define CFG_TUD_HID_GENERIC         0 // not supported yet
-#define CFG_TUD_MSC                 0
+#define CFG_TUD_MSC                 1
 #define CFG_TUD_CDC                 1
 
 
