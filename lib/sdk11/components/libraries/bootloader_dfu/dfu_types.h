@@ -66,11 +66,16 @@
 
 #elif  defined(NRF52840_XXAA)
 
+// Increase bootloader size to application data region for easy debugging
 #ifdef DEBUG_SIZE_EXPAND
-// Increase bootloader size for easy debugging
-#define BOOTLOADER_REGION_START             0x000E4000
+
+#define BOOTLOADER_REGION_START             (0x000F4000 - CODE_PAGE_SIZE*7)
+#define DFU_APP_DATA_RESERVED               0
+
 #else
+
 #define BOOTLOADER_REGION_START             0x000F4000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
+
 #endif
 
 #define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000                  /**< The field specifies the page location of the bootloader settings address. */
@@ -87,7 +92,7 @@
 #define DFU_REGION_TOTAL_SIZE           (BOOTLOADER_REGION_START - CODE_REGION_1_START)                 /**< Total size of the region between SD and Bootloader. */
 
 #ifndef DFU_APP_DATA_RESERVED
-#define DFU_APP_DATA_RESERVED           CODE_PAGE_SIZE * 7                                              /**< Size of Application Data that must be preserved between application updates. This value must be a multiple of page size. Page size is 0x400 (1024d) bytes, thus this value must be 0x0000, 0x0400, 0x0800, 0x0C00, 0x1000, etc. */
+#define DFU_APP_DATA_RESERVED           CODE_PAGE_SIZE*7                                                /**< Size of Application Data that must be preserved between application updates. This value must be a multiple of page size. Page size is 0x400 (1024d) bytes, thus this value must be 0x0000, 0x0400, 0x0800, 0x0C00, 0x1000, etc. */
 #endif
 
 #define DFU_IMAGE_MAX_SIZE_FULL         (DFU_REGION_TOTAL_SIZE - DFU_APP_DATA_RESERVED)                 /**< Maximum size of an application, excluding save data from the application. */
