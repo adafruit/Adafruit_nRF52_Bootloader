@@ -57,7 +57,12 @@
 
 VERIFY_STATIC( MSC_FLASH_ADDR_START+MSC_FLASH_SIZE == BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED, );
 
+/*------------------------------------------------------------------*/
+/*
+ *------------------------------------------------------------------*/
 
+ATTR_WEAK void msc_flash_mount(void);
+ATTR_WEAK void msc_flash_umount(void);
 
 
 

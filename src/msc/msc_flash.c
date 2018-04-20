@@ -51,9 +51,9 @@ static scsi_inquiry_data_t const mscd_inquiry_data =
     .is_removable         = 1,
     .version              = 2,
     .response_data_format = 2,
-    .vendor_id            = "tinyusb",
-    .product_id           = "MSC Example",
-    .product_revision     = "0.01"
+    .vendor_id            = "Adafruit",
+    .product_id           = "Feather52840",
+    .product_revision     = "1.0"
 };
 
 static scsi_read_capacity10_data_t const mscd_read_capacity10_data =
@@ -88,12 +88,12 @@ static scsi_mode_parameters_t const msc_dev_mode_para =
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
-void msc_app_mount(uint8_t rhport)
+void msc_flash_mount(void)
 {
 
 }
 
-void msc_app_umount(uint8_t rhport)
+void msc_flash_umount(void)
 {
 
 }
