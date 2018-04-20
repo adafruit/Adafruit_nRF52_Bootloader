@@ -1,13 +1,13 @@
 /**************************************************************************/
 /*!
-    @file     msc_device_app.c
+    @file     msc_flash.c
     @author   hathach (tinyusb.org)
 
     @section LICENSE
 
     Software License Agreement (BSD License)
 
-    Copyright (c) 2013, hathach (tinyusb.org)
+    Copyright (c) 2018, Adafruit Industries (adafruit.com)
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -31,21 +31,21 @@
     ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-    This file is part of the tinyusb stack.
 */
 /**************************************************************************/
 
-#include "msc_device_app.h"
+#include "msc_flash.h"
 
 #if CFG_TUD_MSC
-//--------------------------------------------------------------------+
-// INCLUDE
-//--------------------------------------------------------------------+
 
-//--------------------------------------------------------------------+
-// MACRO CONSTANT TYPEDEF
-//--------------------------------------------------------------------+
+/*------------------------------------------------------------------*/
+/* MACRO TYPEDEF CONSTANT ENUM
+ *------------------------------------------------------------------*/
+
+/*------------------------------------------------------------------*/
+/* VARIABLE DECLARATION
+ *------------------------------------------------------------------*/
+
 static scsi_inquiry_data_t const mscd_inquiry_data =
 {
     .is_removable         = 1,
@@ -58,11 +58,11 @@ static scsi_inquiry_data_t const mscd_inquiry_data =
 
 static scsi_read_capacity10_data_t const mscd_read_capacity10_data =
 {
-    .last_lba   = ENDIAN_BE(DISK_BLOCK_NUM-1), // read capacity
-    .block_size = ENDIAN_BE(DISK_BLOCK_SIZE)
+    .last_lba   = ENDIAN_BE(MSC_FLASH_BLOCK_NUM-1), // read capacity
+    .block_size = ENDIAN_BE(MSC_FLASH_BLOCK_SIZE)
 };
 
-scsi_sense_fixed_data_t mscd_sense_data =
+static scsi_sense_fixed_data_t mscd_sense_data =
 {
     .response_code        = 0x70,
     .sense_key            = 0, // no errors
@@ -72,9 +72,9 @@ scsi_sense_fixed_data_t mscd_sense_data =
 static scsi_read_format_capacity_data_t const mscd_format_capacity_data =
 {
     .list_length     = 8,
-    .block_num       = ENDIAN_BE(DISK_BLOCK_NUM), // write capacity
+    .block_num       = ENDIAN_BE(MSC_FLASH_BLOCK_NUM), // write capacity
     .descriptor_type = 2, // TODO formatted media, refractor to const
-    .block_size_u16  = ENDIAN_BE16(DISK_BLOCK_SIZE)
+    .block_size_u16  = ENDIAN_BE16(MSC_FLASH_BLOCK_SIZE)
 };
 
 static scsi_mode_parameters_t const msc_dev_mode_para =
@@ -102,8 +102,11 @@ bool tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t scsi_cmd[16], void* b
 {
   // read10 & write10 has their own callback and MUST not be handled here
 
-  void* bufptr = NULL;
+  void const* bufptr = NULL;
   uint16_t buflen = 0;
+
+  // most scsi handled is input
+  bool in_xfer = true;
 
   switch (scsi_cmd[0])
   {
@@ -147,7 +150,7 @@ bool tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t scsi_cmd[16], void* b
       return false;
   }
 
-  if ( bufptr && buflen )
+  if ( bufptr && buflen && in_xfer)
   {
     // Response len must not larger than expected from host
     TU_ASSERT( (*p_len) >= buflen );
@@ -167,22 +170,20 @@ bool tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t scsi_cmd[16], void* b
   return true;
 }
 
-//--------------------------------------------------------------------+
-// APPLICATION CODE
-//--------------------------------------------------------------------+
-void msc_app_task(void* param)
-{ // no need to implement the task yet
-  (void) param;
 
-  OSAL_TASK_BEGIN
-
-  OSAL_TASK_END
-}
-
-void msc_app_init (void)
+uint32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
+//  uint8_t* addr = msc_device_ramdisk[lba] + offset;
+//  memcpy(buffer, addr, bufsize);
 
+  return bufsize;
 }
+uint32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
+{
+//  uint8_t* addr = msc_device_ramdisk[lba] + offset;
+//  memcpy(addr, buffer, bufsize);
 
+  return bufsize;
+}
 
 #endif

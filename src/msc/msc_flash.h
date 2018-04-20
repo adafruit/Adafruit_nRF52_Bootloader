@@ -1,13 +1,13 @@
 /**************************************************************************/
 /*!
-    @file     msc_device_app.h
+    @file     msc_flash.h
     @author   hathach (tinyusb.org)
 
     @section LICENSE
 
     Software License Agreement (BSD License)
 
-    Copyright (c) 2013, hathach (tinyusb.org)
+    Copyright (c) 2018, Adafruit Industries (adafruit.com)
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,10 @@
     ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-    This file is part of the tinyusb stack.
 */
 /**************************************************************************/
-
-/** \ingroup group_demo
- *  \defgroup Mass Storage Device App
- *  @{ */
-
-#ifndef _TUSB_MSCD_DEVICE_APP_H_
-#define _TUSB_MSCD_DEVICE_APP_H_
+#ifndef MSC_FLASH_H_
+#define MSC_FLASH_H_
 
 #include "tusb.h"
 
@@ -49,46 +42,27 @@
  extern "C" {
 #endif
 
-#if CFG_TUD_MSC
+// for checking flash size
+#include "dfu_types.h"
 
-enum
-{
-  DISK_BLOCK_NUM  = 16, // 8KB is the smallest size that windows allow to mount
-  DISK_BLOCK_SIZE = 512
-};
+/*------------------------------------------------------------------*/
+/* FLASH Configuration
+ *------------------------------------------------------------------*/
+#define MSC_FLASH_ADDR_START      0xAD000
+#define MSC_FLASH_SIZE            (256*1024)
 
-#define README_CONTENTS \
-"This is tinyusb's MassStorage Class demo.\r\n\r\n\
-If you find any bugs or get any questions, feel free to file an\r\n\
-issue at github.com/hathach/tinyusb"
+#define MSC_FLASH_BLOCK_SIZE      512
+#define MSC_FLASH_BLOCK_NUM       (MSC_FLASH_SIZE/MSC_FLASH_BLOCK_SIZE)
 
-#if CFG_TUSB_MCU==OPT_MCU_LPC11UXX || CFG_TUSB_MCU==OPT_MCU_LPC13UXX
-  #define MSCD_APP_ROMDISK
-#else // defaults is ram disk
-  #define MSCD_APP_RAMDISK
-#endif
 
-void msc_app_init(void);
-void msc_app_task(void* param);
+VERIFY_STATIC( MSC_FLASH_ADDR_START+MSC_FLASH_SIZE == BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED, );
 
-void msc_app_mount(uint8_t rhport);
-void msc_app_umount(uint8_t rhport);
 
-extern scsi_sense_fixed_data_t mscd_sense_data;
 
-#else
 
-#define msc_app_init()
-#define msc_app_task(x)
-#define msc_app_mount(x)
-#define msc_app_umount(x)
-
-#endif
 
 #ifdef __cplusplus
  }
 #endif
 
-#endif /* _TUSB_MSCD_DEVICE_APP_H_ */
-
-/** @} */
+#endif /* MSC_FLASH_H_ */

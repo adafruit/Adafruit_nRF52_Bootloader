@@ -80,10 +80,11 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #******************************************************************************
 # SOURCE FILES
 #******************************************************************************
-#source common to all targets
+
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 C_SOURCE_FILES += $(SRC_PATH)/tusb_descriptors.c
+C_SOURCE_FILES += $(SRC_PATH)/msc/msc_flash.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
