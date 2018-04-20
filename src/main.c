@@ -419,6 +419,9 @@ int main(void)
   /*------------- Stop timer and jump to application -------------*/
   app_timer_stop(blinky_timer_id);
 
+  led_off(LED_BLUE);
+  led_off(LED_RED);
+
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
   {
     // Stop RTC1
