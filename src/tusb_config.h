@@ -80,10 +80,10 @@
 #define CFG_TUD_CDC_FLUSH_ON_SOF    1
 
 // Number of supported Logical Unit Number
-#define CFG_TUD_MSC_MAXLUN        1
+#define CFG_TUD_MSC_MAXLUN          1
 
 // Buffer size of Device Mass storage
-#define CFG_TUD_MSC_BUFSIZE       512
+#define CFG_TUD_MSC_BUFSIZE         (4*1024)
 
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT

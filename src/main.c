@@ -61,6 +61,8 @@
 #include "tusb.h"
 #include "tusb_descriptors.h"
 
+#include "msc/msc_flash.h"
+
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]
 
@@ -340,8 +342,9 @@ int main(void)
   /* Initialize a blinky timer to show that we're in bootloader */
   (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
 
-  // Init bootloader and SD
+  // Init bootloader
   (void) bootloader_init();
+  msc_flash_init(); // init flash, must be after bootloader_init();
 
   if (bootloader_dfu_sd_in_progress())
   {
