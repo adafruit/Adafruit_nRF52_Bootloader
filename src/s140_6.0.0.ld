@@ -14,7 +14,9 @@ MEMORY
   FLASH (rx) : ORIGIN = 0xF4000, LENGTH = 0xA000 /* 40 KB */
 
   /** RAM Region for bootloader. */
-  RAM (rwx) :  ORIGIN = 0x20003400, LENGTH = 0x20007F80-0x20003400
+  /*RAM (rwx) :  ORIGIN = 0x20003400, LENGTH = 0x20007F80-0x200034008 */
+  /* Avoid conflict with NOINIT for OTA bond sharing */
+  RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20040000-0x20008000
 
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
    *  from application to bootloader when using buttonluss DFU OTA. 
