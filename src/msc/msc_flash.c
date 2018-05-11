@@ -327,7 +327,7 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
       _wr10_state = WRITE10_WRITING;
       return 0;
     break;
-
+    
     case WRITE10_WRITING:
       return 0;
     break;
@@ -358,6 +358,7 @@ typedef struct ATTR_PACKED {
   uint16_t byte_per_sector    ; ///< Bytes per sector. Allowed values include 512, 1024, 2048, and 4096.
   uint8_t  sector_per_cluster ; ///< Sectors per cluster (data unit). Allowed values are powers of 2, but the cluster size must be 32KB or smaller.
   uint16_t reserved_sectors   ; ///< Size in sectors of the reserved area.
+
   uint8_t  fat_num            ; ///< Number of FATs. Typically two for redundancy, but according to Microsoft it can be one for some small storage devices.
   uint16_t root_entry_count   ; ///< Maximum number of files in the root directory for FAT12 and FAT16. This is 0 for FAT32 and typically 512 for FAT16.
   uint16_t sector_count       ; ///< 16-bit number of sectors in file system. If the number of sectors is larger than can be represented in this 2-byte value, a 4-byte value exists later in the data structure and this should be 0.
@@ -435,7 +436,7 @@ static void fat12_mkfs(void)
 {
   memclr_(_page_cached, sizeof(_page_cached));
 
-  /*------------- Boot Sector cluster -------------*/
+  /*------------- Sector 0: Boot Sector -------------*/
   fat12_boot_sector_t* boot_sect = (fat12_boot_sector_t*) _page_cached;
 
   memcpy(boot_sect->jump_code, "\xEB\xFE\x90", 3);
@@ -450,7 +451,7 @@ static void fat12_mkfs(void)
   set16(&boot_sect->sector_count, MSC_FLASH_BLOCK_NUM);
 
   boot_sect->media_type              = 0xf8; // fixed disk
-  set16(&boot_sect->sector_per_fat, 1);
+  set16(&boot_sect->sector_per_fat, 7); //  8 minus boot sector
   set16(&boot_sect->sector_per_track, 63);
   set16(&boot_sect->head_num, 255);
 
@@ -461,16 +462,12 @@ static void fat12_mkfs(void)
   memcpy(boot_sect->fs_type,  "FAT12   ", 8);
   set16(&boot_sect->signature, BOOTSECT_SIGNATURE);
 
-  // Erase and Write cluster.
-  fat12_write_cluster(0, _page_cached, FL_PAGE_SIZE);
-
-  //------------- FAT12 Table cluster -------------//
+  //------------- Sector 1: FAT12 Table  -------------//
   // first 2 entries are F8FF, third entry is cluster end of readme file
-  memclr_(_page_cached, sizeof(_page_cached));
-  memcpy(_page_cached, "\xF8\xFF\xFF\xFF\x0F", 5);
+  memcpy(_page_cached+MSC_FLASH_BLOCK_SIZE, "\xF8\xFF\xFF\xFF\x0F", 5);
 
-  // Erase and Write cluster.
-  fat12_write_cluster(1, _page_cached, FL_PAGE_SIZE);
+  // Erase and Write first cluster.
+  fat12_write_cluster(0, _page_cached, FL_PAGE_SIZE);
 
   //------------- Root Directory cluster -------------//
   uint8_t const readme_contents[] = "Adafruit Feather nRF52840";
@@ -508,14 +505,14 @@ static void fat12_mkfs(void)
   };
 
   // Erase and Write cluster.
-  fat12_write_cluster(2, _page_cached, FL_PAGE_SIZE);
+  fat12_write_cluster(1, _page_cached, FL_PAGE_SIZE);
 
   //------------- Readme Content cluster -------------//
   memclr_(_page_cached, sizeof(_page_cached));
   memcpy(_page_cached, readme_contents, sizeof(readme_contents)-1);
 
   // Erase and Write cluster.
-  fat12_write_cluster(3, _page_cached, FL_PAGE_SIZE);
+  fat12_write_cluster(2, _page_cached, FL_PAGE_SIZE);
 }
 
 #if 0
