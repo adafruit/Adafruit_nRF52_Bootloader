@@ -53,9 +53,13 @@
 
 #define MSC_FLASH_BLOCK_SIZE      512
 #define MSC_FLASH_BLOCK_NUM       (MSC_FLASH_SIZE/MSC_FLASH_BLOCK_SIZE)
+#define MSC_FLASH_CLUSTER_SIZE    (8*MSC_FLASH_BLOCK_SIZE)
 
 
 VERIFY_STATIC( MSC_FLASH_ADDR_START+MSC_FLASH_SIZE == BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED, );
+
+// must be 11 bytes padded with space
+#define MSC_FLASH_VOL_LABEL       "FEATHER5284"
 
 /*------------------------------------------------------------------*/
 /* Note ATTR_WEAK is used when CFG_TUD_MSC = 0
@@ -64,7 +68,6 @@ VERIFY_STATIC( MSC_FLASH_ADDR_START+MSC_FLASH_SIZE == BOOTLOADER_REGION_START-DF
 ATTR_WEAK void msc_flash_init(void);
 ATTR_WEAK void msc_flash_mount(void);
 ATTR_WEAK void msc_flash_umount(void);
-
 
 
 #ifdef __cplusplus

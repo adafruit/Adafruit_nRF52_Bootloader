@@ -344,7 +344,9 @@ int main(void)
 
   // Init bootloader
   (void) bootloader_init();
-  msc_flash_init(); // init flash, must be after bootloader_init();
+
+  // Init msc flash, must be after bootloader_init(), before SD init
+  msc_flash_init();
 
   if (bootloader_dfu_sd_in_progress())
   {
