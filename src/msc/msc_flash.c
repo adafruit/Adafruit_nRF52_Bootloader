@@ -447,7 +447,7 @@ static void fat12_mkfs(void)
   set16(&boot_sect->reserved_sectors, 1);
 
   boot_sect->fat_num                 = 1;
-  set16(&boot_sect->root_entry_count, 512);
+  set16(&boot_sect->root_entry_count, 16*8); // root directory occupies 1 cluster 4KB
   set16(&boot_sect->sector_count, MSC_FLASH_BLOCK_NUM);
 
   boot_sect->media_type              = 0xf8; // fixed disk
@@ -464,7 +464,7 @@ static void fat12_mkfs(void)
 
   //------------- Sector 1: FAT12 Table  -------------//
   // first 2 entries are F8FF, third entry is cluster end of readme file
-  memcpy(_page_cached+MSC_FLASH_BLOCK_SIZE, "\xF8\xFF\xFF\xFF\x0F", 5);
+  memcpy(_page_cached+MSC_FLASH_BLOCK_SIZE, "\xF8\xFF\xFF\xFF\x0F\x00", 6);
 
   // Erase and Write first cluster.
   fat12_write_cluster(0, _page_cached, FL_PAGE_SIZE);
