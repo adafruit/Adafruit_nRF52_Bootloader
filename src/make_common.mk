@@ -114,6 +114,7 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 #C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
+C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
 C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
 
