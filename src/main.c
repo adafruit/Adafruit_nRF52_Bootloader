@@ -602,11 +602,22 @@ uint32_t proc_soc(void)
 
   if (NRF_SUCCESS == err)
   {
-    // from hal_nrf5x.c
-    extern void power_usb_event_handler(uint32_t evt);
-
     pstorage_sys_event_handler(soc_evt);
-    power_usb_event_handler(soc_evt);
+
+    /*------------- usb power event handler -------------*/
+    extern void tusb_hal_nrf_power_event(uint32_t evt);
+    enum // TODO remove when migrating to SDK15
+    {
+      NRFX_POWER_USB_EVT_DETECTED = 0,
+      NRFX_POWER_USB_EVT_REMOVED,
+      NRFX_POWER_USB_EVT_READY
+    };
+
+    int32_t usbevt = (soc_evt == NRF_EVT_POWER_USB_DETECTED   ) ? NRFX_POWER_USB_EVT_DETECTED:
+                     (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY   :
+                     (soc_evt == NRF_EVT_POWER_USB_REMOVED    ) ? NRFX_POWER_USB_EVT_REMOVED : -1;
+
+    if ( usbevt >= 0) tusb_hal_nrf_power_event(usbevt);
   }
 
   return err;
