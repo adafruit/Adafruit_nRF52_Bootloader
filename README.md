@@ -41,6 +41,17 @@ toolchain.
 Make sure that `mergehex` is available from the command-line. This binary is
 part of of Nordic's [nRF5x Command Line Tools](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.tools%2Fdita%2Ftools%2Fnrf5x_command_line_tools%2Fnrf5x_installation.html).
 
+#### 3. `make: nrfjprog: No such file or directory`
+
+Make sure that `nrfjprog` is available from the command-line. This binary is
+part of of Nordic's [nRF5x Command Line Tools](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.tools%2Fdita%2Ftools%2Fnrf5x_command_line_tools%2Fnrf5x_installation.html).
+
+On POSIX-type systems you can temporarily add the path to `nrfjprog` via a
+variation on the following command:
+
+```
+$ export PATH=$PATH:/Users/Kevin/Downloads/nRF5x-Command-Line-Tools_9_7_2_OSX/nrfjprog
+```
 
 ## Option 2: Build using Segger Embeded Studio
 
