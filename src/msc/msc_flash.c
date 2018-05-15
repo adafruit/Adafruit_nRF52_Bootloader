@@ -65,7 +65,7 @@ enum { FL_PAGE_SIZE = 4096 };
  *------------------------------------------------------------------*/
 static uint8_t _page_cached[FL_PAGE_SIZE] ATTR_ALIGNED(4);
 
-static uint8_t _wr10_state;
+volatile static uint8_t _wr10_state;
 static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = MSC_FLASH_ADDR_START } ;
 
 static scsi_inquiry_data_t const mscd_inquiry_data =
@@ -355,6 +355,8 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
 typedef struct ATTR_PACKED {
   uint8_t  jump_code[3]       ; ///< Assembly instruction to jump to boot code.
   uint8_t  oem_name[8]        ; ///< OEM Name in ASCII.
+
+  // Bios Parameter Block
   uint16_t byte_per_sector    ; ///< Bytes per sector. Allowed values include 512, 1024, 2048, and 4096.
   uint8_t  sector_per_cluster ; ///< Sectors per cluster (data unit). Allowed values are powers of 2, but the cluster size must be 32KB or smaller.
   uint16_t reserved_sectors   ; ///< Size in sectors of the reserved area.
@@ -369,8 +371,9 @@ typedef struct ATTR_PACKED {
   uint32_t not_used1          ; ///< Number of sectors before the start of partition.
   uint32_t not_used2          ; ///< 32-bit value of number of sectors in file system. Either this value or the 16-bit value above must be 0.
 
+  // Extended BPB
   uint8_t  drive_number       ; ///< Physical drive number (0x00 for (first) removable media, 0x80 for (first) fixed disk
-  uint8_t  not_used3          ;
+  uint8_t  not_used3          ; ///< Some OS uses this as drive letter (e.g 0 = C:, 1 = D: etc ...), should be 0 when formatted
   uint8_t  ext_boot_signature ; ///< should be 0x29
   uint32_t volume_id          ; ///< Volume serial number, which some versions of Windows will calculate based on the creation date and time.
   uint8_t  volume_label[11]   ;
