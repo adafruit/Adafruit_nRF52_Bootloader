@@ -226,16 +226,13 @@ void blinky_ota_disconneted(void)
  */
 static uint32_t ble_stack_init(bool init_softdevice)
 {
-  uint32_t         err_code;
   if (init_softdevice)
   {
     sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
-    err_code = sd_mbr_command(&com);
-    APP_ERROR_CHECK(err_code);
+    APP_ERROR_CHECK( sd_mbr_command(&com) );
   }
 
-  err_code = sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START);
-  APP_ERROR_CHECK(err_code);
+  APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
 
   // Enable Softdevice
   nrf_clock_lf_cfg_t clock_cfg =
@@ -267,34 +264,30 @@ static uint32_t ble_stack_init(bool init_softdevice)
   blecfg.gap_cfg.role_count_cfg.periph_role_count  = 1;
   blecfg.gap_cfg.role_count_cfg.central_role_count = 0;
   blecfg.gap_cfg.role_count_cfg.central_sec_count  = 0;
-  err_code = sd_ble_cfg_set(BLE_GAP_CFG_ROLE_COUNT, &blecfg, ram_start);
+  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_GAP_CFG_ROLE_COUNT, &blecfg, ram_start) );
 
   // NRF_DFU_BLE_REQUIRES_BONDS
   varclr(&blecfg);
   blecfg.gatts_cfg.service_changed.service_changed = 1;
-  err_code = sd_ble_cfg_set(BLE_GATTS_CFG_SERVICE_CHANGED, &blecfg, ram_start);
-  VERIFY_SUCCESS(err_code);
+  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_GATTS_CFG_SERVICE_CHANGED, &blecfg, ram_start) );
 
   // ATT MTU
   varclr(&blecfg);
   blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
   blecfg.conn_cfg.params.gatt_conn_cfg.att_mtu = BLEGATT_ATT_MTU_MAX;
-  err_code = sd_ble_cfg_set(BLE_CONN_CFG_GATT, &blecfg, ram_start);
-  VERIFY_SUCCESS ( err_code );
+  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GATT, &blecfg, ram_start) );
 
   // Event Length + HVN queue + WRITE CMD queue setting affecting bandwidth
   varclr(&blecfg);
   blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
   blecfg.conn_cfg.params.gap_conn_cfg.conn_count   = 1;
   blecfg.conn_cfg.params.gap_conn_cfg.event_length = BLEGAP_EVENT_LENGTH;
-  err_code = sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start);
-  VERIFY_SUCCESS ( err_code );
+  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start) );
 
   // Enable BLE stack.
-  err_code = sd_ble_enable(&ram_start);
-  VERIFY_SUCCESS(err_code);
+  APP_ERROR_CHECK( sd_ble_enable(&ram_start) );
 
-  return err_code;
+  return NRF_SUCCESS;
 }
 
 
@@ -303,8 +296,6 @@ static uint32_t ble_stack_init(bool init_softdevice)
  */
 int main(void)
 {
-  uint32_t err_code;
-
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
   bool sd_inited = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC);
 
@@ -350,14 +341,12 @@ int main(void)
 
   if (bootloader_dfu_sd_in_progress())
   {
-    err_code = bootloader_dfu_sd_update_continue();
-    APP_ERROR_CHECK(err_code);
+    APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
 
     ble_stack_init(!sd_inited);
     app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
 
-    err_code = bootloader_dfu_sd_update_finalize();
-    APP_ERROR_CHECK(err_code);
+    APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
   }
   else
   {
@@ -393,8 +382,7 @@ int main(void)
   if (dfu_start || (!bootloader_app_is_valid(DFU_BANK_0_REGION_START)))
   {
     // Initiate an update of the firmware.
-    err_code = bootloader_dfu_start(_ota_update, 0);
-    APP_ERROR_CHECK(err_code);
+    APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
   }
   else
   {
@@ -544,7 +532,7 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
-    app_error_handler(0xDEADBEEF, line_num, p_file_name);
+  app_error_handler(0xDEADBEEF, line_num, p_file_name);
 }
 
 //--------------------------------------------------------------------+
@@ -567,14 +555,6 @@ uint32_t tusb_hal_millis(void)
   return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
 }
 
-void ada_ble_hanlder(ble_evt_t* evt)
-{
-  // from dfu_transport_ble
-  extern void ble_evt_dispatch(ble_evt_t * p_ble_evt);
-
-  ble_evt_dispatch(evt);
-}
-
 /*------------------------------------------------------------------*/
 /* SoftDevice Event handler
  *------------------------------------------------------------------*/
@@ -589,7 +569,11 @@ uint32_t proc_ble(void)
   // Handle valid event, ignore error
   if( NRF_SUCCESS == err)
   {
-    ada_ble_hanlder( (ble_evt_t*) ev_buf );
+    // from dfu_transport_ble
+    extern void ble_evt_dispatch(ble_evt_t * p_ble_evt);
+
+    ble_evt_t* evt = (ble_evt_t*) ev_buf;
+    ble_evt_dispatch(evt);
   }
 
   return err;
