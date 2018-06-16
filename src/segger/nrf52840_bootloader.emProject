@@ -185,6 +185,10 @@
               <file file_name="../../lib/tinyusb/tinyusb/class/msc/msc_device.c" />
               <file file_name="../../lib/tinyusb/tinyusb/class/msc/msc_device.h" />
             </folder>
+            <folder Name="custom">
+              <file file_name="../../lib/tinyusb/tinyusb/class/custom/custom_device.c" />
+              <file file_name="../../lib/tinyusb/tinyusb/class/custom/custom_device.h" />
+            </folder>
           </folder>
           <folder Name="common">
             <file file_name="../../lib/tinyusb/tinyusb/common/binary.h" />

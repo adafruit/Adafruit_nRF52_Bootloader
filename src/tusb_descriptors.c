@@ -82,7 +82,7 @@ app_descriptor_configuration_t const desc_configuration =
         .bConfigurationValue = 1,
         .iConfiguration      = 0x00,
         .bmAttributes        = TUSB_DESC_CONFIG_ATT_BUS_POWER,
-        .bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(500)
+        .bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(100)
     },
 
 #if CFG_TUD_CDC
@@ -114,7 +114,7 @@ app_descriptor_configuration_t const desc_configuration =
           .bInterfaceClass    = TUSB_CLASS_CDC,
           .bInterfaceSubClass = CDC_COMM_SUBCLASS_ABSTRACT_CONTROL_MODEL,
           .bInterfaceProtocol = CDC_COMM_PROTOCOL_ATCOMMAND,
-          .iInterface         = 0x00
+          .iInterface         = 0x04
       },
 
       .header =
@@ -202,7 +202,7 @@ app_descriptor_configuration_t const desc_configuration =
 #if CFG_TUD_MSC
     .msc =
     {
-      .interface =
+      .itf =
       {
           .bLength            = sizeof(tusb_desc_interface_t),
           .bDescriptorType    = TUSB_DESC_INTERFACE,
@@ -212,7 +212,7 @@ app_descriptor_configuration_t const desc_configuration =
           .bInterfaceClass    = TUSB_CLASS_MSC,
           .bInterfaceSubClass = MSC_SUBCLASS_SCSI,
           .bInterfaceProtocol = MSC_PROTOCOL_BOT,
-          .iInterface         = 0x07
+          .iInterface         = 0x05
       },
 
       .ep_out =
@@ -234,6 +234,44 @@ app_descriptor_configuration_t const desc_configuration =
           .wMaxPacketSize   = { .size = MSC_EDPT_SIZE},
           .bInterval        = 1
       }
+    },
+#endif
+
+#if CFG_TUD_CUSTOM_CLASS
+    .cus =
+    {
+      .itf =
+      {
+          .bLength            = sizeof(tusb_desc_interface_t),
+          .bDescriptorType    = TUSB_DESC_INTERFACE,
+          .bInterfaceNumber   = ITF_NUM_CUS,
+          .bAlternateSetting  = 0x00,
+          .bNumEndpoints      = 2,
+          .bInterfaceClass    = TUSB_CLASS_VENDOR_SPECIFIC,
+          .bInterfaceSubClass = 0,
+          .bInterfaceProtocol = 0,
+          .iInterface         = 0x06
+      },
+
+      .ep_out =
+      {
+          .bLength          = sizeof(tusb_desc_endpoint_t),
+          .bDescriptorType  = TUSB_DESC_ENDPOINT,
+          .bEndpointAddress = CUS_EDPT_OUT,
+          .bmAttributes     = { .xfer = TUSB_XFER_BULK },
+          .wMaxPacketSize   = { .size = CUS_EDPT_SIZE},
+          .bInterval        = 1
+      },
+
+      .ep_in =
+      {
+          .bLength          = sizeof(tusb_desc_endpoint_t),
+          .bDescriptorType  = TUSB_DESC_ENDPOINT,
+          .bEndpointAddress = CUS_EDPT_IN,
+          .bmAttributes     = { .xfer = TUSB_XFER_BULK },
+          .wMaxPacketSize   = { .size = CUS_EDPT_SIZE},
+          .bInterval        = 1
+      }
     }
 #endif
 };
@@ -253,38 +291,33 @@ uint16_t const * const string_descriptor_arr [] =
     },
 
     [1] = (uint16_t []) { // manufacturer
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(11), TUSB_DESC_STRING),
-        't', 'i', 'n', 'y', 'u', 's', 'b', '.', 'o', 'r', 'g' // len = 11
+        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(19), TUSB_DESC_STRING),
+        'A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'
     },
 
     [2] = (uint16_t []) { // product
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(14), TUSB_DESC_STRING),
-        't', 'i', 'n', 'y', 'u', 's', 'b', ' ', 'd', 'e', 'v', 'i', 'c', 'e' // len = 14
+        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(18), TUSB_DESC_STRING),
+        'B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0'
     },
 
-    [3] = (uint16_t []) { // serials
+    [3] = (uint16_t []) { // serials TODO use chip ID
         ENDIAN_BE16_FROM( STRING_LEN_UNICODE(4), TUSB_DESC_STRING),
         '1', '2', '3', '4' // len = 4
     },
 
     [4] = (uint16_t []) { // CDC Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(3), TUSB_DESC_STRING),
-        'c', 'd', 'c' // len = 3
+        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(16), TUSB_DESC_STRING),
+        'B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'
     },
 
-    [5] = (uint16_t []) { // Keyboard Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(5), TUSB_DESC_STRING),
-        'm', 'o', 'u', 's', 'e' // len = 5
+    [5] = (uint16_t []) { // MSC Interface
+        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(17), TUSB_DESC_STRING),
+        'B','l','u','e','f','r','u','i','t',' ','S','t','o','r','a','g','e'
     },
 
-    [6] = (uint16_t []) { // Keyboard Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(8), TUSB_DESC_STRING),
-        'k', 'e', 'y', 'b', 'o', 'a', 'r', 'd' // len = 8
-    },
-
-    [7] = (uint16_t []) { // MSC Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(3), TUSB_DESC_STRING),
-        'm', 's', 'c' // len = 3
+    [6] = (uint16_t []) { // Custom Interface
+        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(16), TUSB_DESC_STRING),
+        'B','l','u','e','f','r','u','i','t',' ','C','u','s','t','o','m'
     }
 };
 

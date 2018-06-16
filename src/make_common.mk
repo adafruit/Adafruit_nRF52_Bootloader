@@ -125,6 +125,7 @@ C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
 C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
+C_SOURCE_FILES += $(TUSB_PATH)/class/custom/custom_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
 #******************************************************************************
@@ -271,10 +272,10 @@ all:
 	@echo Making Feather52840 board
 	@echo ----------------------
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
-	@echo Making Metro52 board
-	@echo --------------------
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e metro52
+	#@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
+	#@echo Making Metro52 board
+	#@echo --------------------
+	#@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e metro52
 
 #target for printing all targets
 help:

@@ -58,9 +58,10 @@
 
 #define ITF_NUM_CDC    0
 #define ITF_NUM_MSC    2
+#define ITF_NUM_CUS    3
 
 // total number of interfaces
-#define ITF_TOTAL      (CFG_TUD_CDC*2 + CFG_TUD_MSC)
+#define ITF_TOTAL      (CFG_TUD_CDC*2 + CFG_TUD_MSC + CFG_TUD_CUSTOM_CLASS)
 
 //--------------------------------------------------------------------+
 // Endpoints Address & Max Packet Size
@@ -78,6 +79,10 @@
 #define MSC_EDPT_OUT         EDPT_OUT(3)
 #define MSC_EDPT_IN          EDPT_IN(3)
 #define MSC_EDPT_SIZE        64
+
+#define CUS_EDPT_OUT         EDPT_OUT(4)
+#define CUS_EDPT_IN          EDPT_IN(4)
+#define CUS_EDPT_SIZE        64
 
 
 //--------------------------------------------------------------------+
@@ -110,10 +115,19 @@ typedef struct ATTR_PACKED
 #if CFG_TUD_MSC
   struct ATTR_PACKED
   {
-    tusb_desc_interface_t             interface;
+    tusb_desc_interface_t             itf;
     tusb_desc_endpoint_t              ep_out;
     tusb_desc_endpoint_t              ep_in;
   }msc;
+#endif
+
+#if CFG_TUD_CUSTOM_CLASS
+  struct ATTR_PACKED
+  {
+    tusb_desc_interface_t             itf;
+    tusb_desc_endpoint_t              ep_out;
+    tusb_desc_endpoint_t              ep_in;
+  }cus;
 #endif
 
 } app_descriptor_configuration_t;
