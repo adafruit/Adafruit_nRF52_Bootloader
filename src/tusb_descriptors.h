@@ -44,17 +44,9 @@
 //--------------------------------------------------------------------+
 // Descriptors Value (calculated by enabled Classes)
 //--------------------------------------------------------------------+
-#define CFG_VENDORID            0xCAFE
-//#define CFG_PRODUCTID           0x4567 // use auto product id to prevent conflict with pc's driver
+#define CFG_VENDORID            0x239A
+#define CFG_PRODUCTID           0x0029
 
-// each combination of interfaces need to have a unique productid, as windows will bind & remember device driver after the first plug.
-// Auto ProductID layout's Bitmap: (MSB) MassStorage | Generic | Mouse | Key | CDC (LSB)
-#ifndef CFG_PRODUCTID
-  #define PRODUCTID_BITMAP(interface, n)  ( (CFG_TUD_##interface) << (n) )
-  #define CFG_PRODUCTID                   (0x4000 | ( PRODUCTID_BITMAP(CDC, 0) | PRODUCTID_BITMAP(HID_KEYBOARD, 1) | \
-                                           PRODUCTID_BITMAP(HID_MOUSE, 2) | PRODUCTID_BITMAP(HID_GENERIC, 3) | \
-                                           PRODUCTID_BITMAP(MSC, 4) ) )
-#endif
 
 #define ITF_NUM_CDC    0
 #define ITF_NUM_MSC    2
