@@ -18,7 +18,7 @@ SDK_PATH         = ../../lib/sdk/components
 SDK11_PATH       = ../../lib/sdk11/components
 
 SRC_PATH         = ..
-TUSB_PATH		     = ../../lib/tinyusb/tinyusb
+TUSB_PATH		     = ../../lib/tinyusb/src
 
 SD_NAME          = s140
 SD_VERSION       = 6.0.0

@@ -25,7 +25,7 @@
       gcc_entry_point="Reset_Handler"
       linker_memory_map_file="$(ProjectDir)/nRF52840_xxAA_MemoryMap.xml"
       linker_section_placement_file="$(ProjectDir)/flash_placement.xml"
-      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;SdkDir=../../lib/sdk/components;Sdk11Dir=../../lib/sdk11/components;SdDir=../../lib/softdevice/6.0.0;TusbDir=../../lib/tinyusb/tinyusb"
+      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;SdkDir=../../lib/sdk/components;Sdk11Dir=../../lib/sdk11/components;SdDir=../../lib/softdevice/6.0.0;TusbDir=../../lib/tinyusb/src"
       project_directory=""
       project_type="Executable"
       target_reset_script="Reset();"
@@ -163,65 +163,63 @@
       </folder>
       <folder Name="tinyusb">
         <folder Name="tinyusb">
-          <file file_name="../../lib/tinyusb/tinyusb/tusb.c" />
-          <file file_name="../../lib/tinyusb/tinyusb/tusb.h" />
-          <file file_name="../../lib/tinyusb/tinyusb/tusb_hal.h" />
-          <file file_name="../../lib/tinyusb/tinyusb/tusb_option.h" />
+          <file file_name="../../lib/tinyusb/src/tusb.c" />
+          <file file_name="../../lib/tinyusb/src/tusb.h" />
+          <file file_name="../../lib/tinyusb/src/tusb_hal.h" />
+          <file file_name="../../lib/tinyusb/src/tusb_option.h" />
           <folder Name="class">
-            <file file_name="../../lib/tinyusb/tinyusb/class/custom_class.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/class/custom_class_host.c" />
             <folder Name="cdc">
-              <file file_name="../../lib/tinyusb/tinyusb/class/cdc/cdc.h" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/cdc/cdc_device.c" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/cdc/cdc_device.h" />
+              <file file_name="../../lib/tinyusb/src/class/cdc/cdc.h" />
+              <file file_name="../../lib/tinyusb/src/class/cdc/cdc_device.c" />
+              <file file_name="../../lib/tinyusb/src/class/cdc/cdc_device.h" />
             </folder>
             <folder Name="hid">
-              <file file_name="../../lib/tinyusb/tinyusb/class/hid/hid.h" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/hid/hid_device.c" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/hid/hid_device.h" />
+              <file file_name="../../lib/tinyusb/src/class/hid/hid.h" />
+              <file file_name="../../lib/tinyusb/src/class/hid/hid_device.c" />
+              <file file_name="../../lib/tinyusb/src/class/hid/hid_device.h" />
             </folder>
             <folder Name="msc">
-              <file file_name="../../lib/tinyusb/tinyusb/class/msc/msc.h" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/msc/msc_device.c" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/msc/msc_device.h" />
+              <file file_name="../../lib/tinyusb/src/class/msc/msc.h" />
+              <file file_name="../../lib/tinyusb/src/class/msc/msc_device.c" />
+              <file file_name="../../lib/tinyusb/src/class/msc/msc_device.h" />
             </folder>
             <folder Name="custom">
-              <file file_name="../../lib/tinyusb/tinyusb/class/custom/custom_device.c" />
-              <file file_name="../../lib/tinyusb/tinyusb/class/custom/custom_device.h" />
+              <file file_name="../../lib/tinyusb/src/class/custom/custom_device.c" />
+              <file file_name="../../lib/tinyusb/src/class/custom/custom_device.h" />
             </folder>
           </folder>
           <folder Name="common">
-            <file file_name="../../lib/tinyusb/tinyusb/common/binary.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/timeout_timer.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_common.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_compiler.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_error.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_fifo.c" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_fifo.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_types.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/common/tusb_verify.h" />
+            <file file_name="../../lib/tinyusb/src/common/binary.h" />
+            <file file_name="../../lib/tinyusb/src/common/timeout_timer.h" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_common.h" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_compiler.h" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_error.h" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_fifo.c" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_fifo.h" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_types.h" />
+            <file file_name="../../lib/tinyusb/src/common/tusb_verify.h" />
             <folder Name="compiler">
-              <file file_name="../../lib/tinyusb/tinyusb/common/compiler/tusb_compiler_gcc.h" />
-              <file file_name="../../lib/tinyusb/tinyusb/common/compiler/tusb_compiler_iar.h" />
+              <file file_name="../../lib/tinyusb/src/common/compiler/tusb_compiler_gcc.h" />
+              <file file_name="../../lib/tinyusb/src/common/compiler/tusb_compiler_iar.h" />
             </folder>
           </folder>
           <folder Name="device">
-            <file file_name="../../lib/tinyusb/tinyusb/device/dcd.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/device/usbd.c" />
-            <file file_name="../../lib/tinyusb/tinyusb/device/usbd.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/device/usbd_pvt.h" />
+            <file file_name="../../lib/tinyusb/src/device/dcd.h" />
+            <file file_name="../../lib/tinyusb/src/device/usbd.c" />
+            <file file_name="../../lib/tinyusb/src/device/usbd.h" />
+            <file file_name="../../lib/tinyusb/src/device/usbd_pvt.h" />
           </folder>
           <folder Name="osal">
-            <file file_name="../../lib/tinyusb/tinyusb/osal/osal.c" />
-            <file file_name="../../lib/tinyusb/tinyusb/osal/osal.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/osal/osal_freeRTOS.h" />
-            <file file_name="../../lib/tinyusb/tinyusb/osal/osal_none.h" />
+            <file file_name="../../lib/tinyusb/src/osal/osal.c" />
+            <file file_name="../../lib/tinyusb/src/osal/osal.h" />
+            <file file_name="../../lib/tinyusb/src/osal/osal_freeRTOS.h" />
+            <file file_name="../../lib/tinyusb/src/osal/osal_none.h" />
           </folder>
           <folder Name="portable">
             <folder Name="nordic">
               <folder Name="nrf5x">
-                <file file_name="../../lib/tinyusb/tinyusb/portable/nordic/nrf5x/dcd_nrf5x.c" />
-                <file file_name="../../lib/tinyusb/tinyusb/portable/nordic/nrf5x/hal_nrf5x.c" />
+                <file file_name="../../lib/tinyusb/src/portable/nordic/nrf5x/dcd_nrf5x.c" />
+                <file file_name="../../lib/tinyusb/src/portable/nordic/nrf5x/hal_nrf5x.c" />
               </folder>
             </folder>
           </folder>
