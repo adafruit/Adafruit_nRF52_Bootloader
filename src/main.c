@@ -58,10 +58,10 @@
 #include "pstorage.h"
 
 #include "nrf_usbd.h"
-#include "tusb.h"
-#include "tusb_descriptors.h"
 
-#include "msc/msc_flash.h"
+#include "tusb.h"
+#include "usb/tusb_descriptors.h"
+#include "usb/msc_flash.h"
 
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]

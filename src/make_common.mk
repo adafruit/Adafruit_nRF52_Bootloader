@@ -83,8 +83,8 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
-C_SOURCE_FILES += $(SRC_PATH)/tusb_descriptors.c
-C_SOURCE_FILES += $(SRC_PATH)/msc/msc_flash.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/msc_flash.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
@@ -137,6 +137,7 @@ ASM_SOURCE_FILES  = $(SDK_PATH)/toolchain/gcc/gcc_startup_nrf52840.S
 # INCLUDE PATH
 #******************************************************************************
 INC_PATHS += -I$(SRC_PATH)/
+INC_PATHS += -I$(SRC_PATH)/usb
 INC_PATHS += -I$(TUSB_PATH)/
 
 INC_PATHS += -I$(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
