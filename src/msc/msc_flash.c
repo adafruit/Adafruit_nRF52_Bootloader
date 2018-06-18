@@ -276,7 +276,8 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
 
   uint32_t addr = lba2addr(lba) + offset;
 
-  /* 1. queue flash erase pstorage_clear(), return 0 until erasing is done
+  /* 0. Check if flash is the same as data -> skip if matches
+   * 1. queue flash erase pstorage_clear(), return 0 until erasing is done
    * 2. queue flash writing, return 0 until writing is complete
    * 3. return written bytes.
    *
@@ -287,6 +288,9 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
   {
     case WRITE10_IDLE:
     {
+      // No need to write if flash's content matches with data
+      if ( 0 == memcmp(buffer, (void*) addr, bufsize) ) return bufsize;
+
       uint32_t page_addr = align4k(addr);
       uint32_t off4k     = offset4k(addr);
 
