@@ -38,7 +38,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_dual_bank.c
 endif
 
 BOOTLOADER_SD_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)_$(BANKMODE)
-FINAL_BIN_DIR := ../../bin
 
 #******************************************************************************
 # Tool configure
@@ -273,6 +272,7 @@ all:
 	@echo Making Feather52840 board
 	@echo ----------------------
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840
+	
 	#@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
 	#@echo Making Metro52 board
 	#@echo --------------------
@@ -305,7 +305,7 @@ BOOTLOADER_WITH_SD_NAME := $(OUTPUT_FILENAME)_$(BOOTLOADER_SD_SUFFIX)
 
 # Target for Feather nrf52 board
 feather52840: OUTPUT_FILENAME := feather52840_bootloader
-feather52840: FINAL_BIN_DIR := $(FINAL_BIN_DIR)/feather52840/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)/$(BANKMODE)
+feather52840: FINAL_BIN_DIR := ../../bin/feather52840/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)/$(BANKMODE)
 feather52840: CFLAGS += -DBOARD_FEATHER52840
 feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_FILENAME).out
@@ -314,7 +314,7 @@ feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
 
 # Target for Metro nrf52 board
 metro52: OUTPUT_FILENAME := metro52_bootloader
-metro52: FINAL_BIN_DIR := $(FINAL_BIN_DIR)/metro52/$(BANKMODE)
+metro52: FINAL_BIN_DIR := ../../bin/metro52/$(BANKMODE)
 metro52: CFLAGS += -DBOARD_METRO52
 metro52: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_FILENAME).out
