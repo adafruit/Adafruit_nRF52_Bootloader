@@ -43,6 +43,9 @@
 // for formatting fatfs when Softdevice is not enabled
 #include "nrf_nvmc.h"
 
+#include "uf2/uf2.h"
+
+
 /*------------------------------------------------------------------*/
 /* MACRO TYPEDEF CONSTANT ENUM
  *------------------------------------------------------------------*/
@@ -410,9 +413,9 @@ typedef ATTR_PACKED_STRUCT(struct) {
   uint16_t written_date;
   uint16_t cluster_low;
   uint32_t file_size;
-}fat_directory_t;
+}fat_dirent_t;
 
-VERIFY_STATIC(sizeof(fat_directory_t) == 32, "size is not correct");
+VERIFY_STATIC(sizeof(fat_dirent_t) == 32, "size is not correct");
 
 
 fat12_boot_sector_t const _boot_sect =
@@ -466,16 +469,46 @@ fat12_boot_sector_t const _boot_sect =
 static inline bool fat12_formatted(void)
 {
   const uint8_t* boot_sect = (uint8_t* ) lba2addr(0);
-  return (boot_sect[510] == 0x55) && (boot_sect[511] == 0xAA);
+  return false;
+  //return (boot_sect[510] == 0x55) && (boot_sect[511] == 0xAA);
 }
 
-static void fat12_write_sector(uint32_t lba, uint8_t const* buf, uint32_t bufsize)
+static void fat12_write_sector(uint32_t sect, uint8_t const* buf, uint32_t bufsize)
 {
-  uint32_t addr = lba2addr(lba);
+  uint32_t addr = lba2addr(sect);
 
   nrf_nvmc_page_erase( addr );
   nrf_nvmc_write_words(addr, (uint32_t const*) buf, bufsize/4);
 }
+
+
+const char infoUf2File[] = //
+    "UF2 Bootloader " UF2_VERSION "\r\n"
+    "Model: " PRODUCT_NAME "\r\n"
+    "Board-ID: " BOARD_ID "\r\n";
+
+const char indexFile[] = //
+    "<!doctype html>\n"
+    "<html>"
+    "<body>"
+    "<script>\n"
+    "location.replace(\"" INDEX_URL "\");\n"
+    "</script>"
+    "</body>"
+    "</html>\n";
+
+uint8_t const readme_contents[] = "Adafruit Feather nRF52840";
+
+struct TextFile {
+    const char name[11];
+    const char *content;
+};
+
+static const struct TextFile info[] = {
+    {.name = "INFO_UF2TXT", .content = infoUf2File},
+    {.name = "INDEX   HTM", .content = indexFile},
+    {.name = "CURRENT UF2", .content = readme_contents},
+};
 
 static void fat12_mkfs(void)
 {
@@ -495,48 +528,59 @@ static void fat12_mkfs(void)
   fat12_write_sector(0, _page_cached, FL_PAGE_SIZE);
 
   //------------- Root Directory cluster -------------//
-  uint8_t const readme_contents[] = "Adafruit Feather nRF52840";
-
   memclr_(_page_cached, sizeof(_page_cached));
-  fat_directory_t* p_entry = (fat_directory_t*) _page_cached;
+  fat_dirent_t* p_entry = (fat_dirent_t*) _page_cached;
 
   // first entry is volume label
-  (*p_entry) = (fat_directory_t)
+  (*p_entry) = (fat_dirent_t)
   {
     .name = MSC_FLASH_VOL_LABEL,
     .attr.volume_label = 1,
   };
+  p_entry++; // next entry
 
-  p_entry += 1; // advance to second entry, which is readme file
-  (*p_entry) = (fat_directory_t)
+  uint16_t data_cluster = 2; // logical data cluster always start from 2
+  for(int i=0; i<arrcount_(info); i++)
   {
-    .name = "README  TXT",
+    (*p_entry) = (fat_dirent_t)
+    {
+      .name = { 0 },
 
-    .attr = { 0 },
-    .reserved = 0,
-    .created_time_tenths_of_seconds = 0,
+      .attr = { 0 },
+      .reserved = 0,
+      .created_time_tenths_of_seconds = 0,
 
-    .created_time = 0x6D52,
-    .created_date = 0x4365,
-    .accessed_date = 0x4365,
+      .created_time = 0x6D52,
+      .created_date = 0x4365,
+      .accessed_date = 0x4365,
 
-    .cluster_high = 0,
+      .cluster_high = 0,
 
-    .written_time = 0x6D52,
-    .written_date = 0x4365,
+      .written_time = 0x6D52,
+      .written_date = 0x4365,
 
-    .cluster_low = 2,
-    .file_size = sizeof(readme_contents)-1 // exclude NULL
-  };
+      .cluster_low = data_cluster,
+      .file_size = strlen(info[i].content)
+    };
+
+    memcpy(p_entry->name, info[i].name, 11);
+
+    data_cluster++;
+    p_entry++;
+  }
 
   // Erase and Write cluster.
   fat12_write_sector(8, _page_cached, FL_PAGE_SIZE);
 
-  //------------- Readme Content cluster -------------//
+  //------------- Data Contents -------------//
   memclr_(_page_cached, sizeof(_page_cached));
-  memcpy(_page_cached, readme_contents, sizeof(readme_contents)-1);
 
-  // Erase and Write cluster.
+  for(int i=0; i<arrcount_(info); i++)
+  {
+    memcpy(_page_cached + i*512, info[i].content, strlen(info[i].content));
+  }
+
+  // Erase and Write data cluster.
   fat12_write_sector(16, _page_cached, FL_PAGE_SIZE);
 }
 
