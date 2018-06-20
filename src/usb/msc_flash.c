@@ -457,6 +457,7 @@ fat12_boot_sector_t const _boot_sect =
  * . |             |
  * . |             |
  * . |    Data     |
+ * . |    Area     |
  * . |             |
  * . |             |
  *   |_____________|
@@ -486,8 +487,9 @@ static void fat12_mkfs(void)
   _page_cached[511] = 0xAA;
 
   //------------- Sector 1: FAT12 Table  -------------//
-  // first 2 entries are F8FF, third entry is cluster end of readme file
-  memcpy(_page_cached+MSC_FLASH_BLOCK_SIZE, "\xF8\xFF\xFF\xFF\x0F\x00", 6);
+  // first 2 entries are FF8 and FF8,
+  // 3rd entry is cluster end of readme file FFF, 4th is unused 000
+  memcpy(_page_cached+MSC_FLASH_BLOCK_SIZE, "\xF8\x8F\xFF\xFF\x0F\x00", 6);
 
   // Erase and Write first cluster.
   fat12_write_sector(0, _page_cached, FL_PAGE_SIZE);
