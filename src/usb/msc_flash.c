@@ -421,7 +421,7 @@ fat12_boot_sector_t const _boot_sect =
     .oem_name           = "MSDOS5.0",
 
     .sector_sz          = MSC_FLASH_BLOCK_SIZE,
-    .sector_per_cluster = MSC_FLASH_CLUSTER_SIZE/MSC_FLASH_BLOCK_SIZE,
+    .sector_per_cluster = 1,
     .reserved_sectors   = 1,
 
     .fat_copies         = 1,
@@ -429,15 +429,15 @@ fat12_boot_sector_t const _boot_sect =
     .sector_count       = MSC_FLASH_BLOCK_NUM,
     .media_type         = 0xf8, // fixed disk
     .sector_per_fat     = 7,
-    .sector_per_track   = 63,
-    .head_num           = 255,
+    .sector_per_track   = 1,
+    .head_num           = 1,
     .not_used1          = 0,
     .not_used2          = 0,
 
     .drive_number       = 0,
     .not_used3          = 0,
     .ext_boot_signature = 0x29,
-    .volume_id          = 0, // change later to typically date + time
+    .volume_id          = 0x00420042, // change later to typically date + time
     .volume_label       = MSC_FLASH_VOL_LABEL,
     .fs_type            = "FAT12   "
 };
