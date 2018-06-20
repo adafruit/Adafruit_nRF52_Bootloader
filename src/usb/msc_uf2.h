@@ -57,7 +57,7 @@
 VERIFY_STATIC( MSC_FLASH_ADDR_START+MSC_FLASH_SIZE == BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED, );
 
 // must be 11 bytes padded with space
-#define MSC_FLASH_VOL_LABEL       "FEATHER5284"
+#define MSC_FLASH_VOL_LABEL       "NRF52BOOT  "
 
 /*------------------------------------------------------------------*/
 /* Note ATTR_WEAK is used when CFG_TUD_MSC = 0

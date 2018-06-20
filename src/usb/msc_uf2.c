@@ -235,13 +235,14 @@ void msc_flash_init(void)
 {
   pstorage_module_param_t  fat_psp = { .cb = fat_pstorage_cb};
   pstorage_register(&fat_psp, &_fat_psh);
-
-  fat12_mkfs();
 }
 
 void msc_flash_mount(void)
 {
   _wr10_state = WRITE10_IDLE;
+
+  // reset every time it is plugged
+  fat12_mkfs();
 }
 
 void msc_flash_umount(void)
