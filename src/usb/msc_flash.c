@@ -361,11 +361,11 @@ typedef struct ATTR_PACKED {
   uint8_t  oem_name[8]        ; ///< OEM Name in ASCII.
 
   // Bios Parameter Block
-  uint16_t byte_per_sector    ; ///< Bytes per sector. Allowed values include 512, 1024, 2048, and 4096.
+  uint16_t sector_sz          ; ///< Bytes per sector. Allowed values include 512, 1024, 2048, and 4096.
   uint8_t  sector_per_cluster ; ///< Sectors per cluster (data unit). Allowed values are powers of 2, but the cluster size must be 32KB or smaller.
   uint16_t reserved_sectors   ; ///< Size in sectors of the reserved area.
 
-  uint8_t  fat_num            ; ///< Number of FATs. Typically two for redundancy, but according to Microsoft it can be one for some small storage devices.
+  uint8_t  fat_copies         ; ///< Number of FATs. Typically two for redundancy, but according to Microsoft it can be one for some small storage devices.
   uint16_t root_entry_count   ; ///< Maximum number of files in the root directory for FAT12 and FAT16. This is 0 for FAT32 and typically 512 for FAT16.
   uint16_t sector_count       ; ///< 16-bit number of sectors in file system. If the number of sectors is larger than can be represented in this 2-byte value, a 4-byte value exists later in the data structure and this should be 0.
   uint8_t  media_type         ; ///< 0xf8 should be used for fixed disks and 0xf0 for removable.
@@ -382,11 +382,11 @@ typedef struct ATTR_PACKED {
   uint32_t volume_id          ; ///< Volume serial number, which some versions of Windows will calculate based on the creation date and time.
   uint8_t  volume_label[11]   ;
   uint8_t  fs_type[8]         ; ///< File system type label in ASCII, padded with blank (0x20). Standard values include "FAT," "FAT12," and "FAT16," but nothing is required.
-  uint8_t  not_used4[448]     ;
-  uint16_t signature          ; ///< Signature value (0xAA55).
+//  uint8_t  not_used4[448]     ;
+//  uint16_t signature          ; ///< Signature value (0xAA55).
 }fat12_boot_sector_t;
 
-VERIFY_STATIC(sizeof(fat12_boot_sector_t) == 512, "size is not correct");
+VERIFY_STATIC(sizeof(fat12_boot_sector_t) == 62, "size is not correct");
 
 typedef ATTR_PACKED_STRUCT(struct) {
   uint8_t name[11];
@@ -414,21 +414,38 @@ typedef ATTR_PACKED_STRUCT(struct) {
 
 VERIFY_STATIC(sizeof(fat_directory_t) == 32, "size is not correct");
 
-static inline void set16(void* ptr, uint16_t value)
-{
-  memcpy(ptr, &value, 2);
-}
 
-static inline void set32(void* ptr, uint32_t value)
+fat12_boot_sector_t const _boot_sect =
 {
-  memcpy(ptr, &value, 4);
-}
+    .jump_code          = { 0xEB, 0xFE, 0x90 },
+    .oem_name           = "MSDOS5.0",
 
+    .sector_sz          = MSC_FLASH_BLOCK_SIZE,
+    .sector_per_cluster = MSC_FLASH_CLUSTER_SIZE/MSC_FLASH_BLOCK_SIZE,
+    .reserved_sectors   = 1,
+
+    .fat_copies         = 1,
+    .root_entry_count   = 16*8,
+    .sector_count       = MSC_FLASH_BLOCK_NUM,
+    .media_type         = 0xf8, // fixed disk
+    .sector_per_fat     = 7,
+    .sector_per_track   = 63,
+    .head_num           = 255,
+    .not_used1          = 0,
+    .not_used2          = 0,
+
+    .drive_number       = 0,
+    .not_used3          = 0,
+    .ext_boot_signature = 0x29,
+    .volume_id          = 0, // change later to typically date + time
+    .volume_label       = MSC_FLASH_VOL_LABEL,
+    .fs_type            = "FAT12   "
+};
 
 static inline bool fat12_formatted(void)
 {
-  const fat12_boot_sector_t* boot_sect = (fat12_boot_sector_t* ) lba2addr(0);
-  return boot_sect->signature == BOOTSECT_SIGNATURE;
+  const uint8_t* boot_sect = (uint8_t* ) lba2addr(0);
+  return (boot_sect[510] == 0x55) && (boot_sect[511] == 0xAA);
 }
 
 static void fat12_write_cluster(uint16_t cluster_num, uint8_t const* buf, uint32_t bufsize)
@@ -444,30 +461,9 @@ static void fat12_mkfs(void)
   memclr_(_page_cached, sizeof(_page_cached));
 
   /*------------- Sector 0: Boot Sector -------------*/
-  fat12_boot_sector_t* boot_sect = (fat12_boot_sector_t*) _page_cached;
-
-  memcpy(boot_sect->jump_code, "\xEB\xFE\x90", 3);
-  memcpy(boot_sect->oem_name, "MSDOS5.0", 8);
-
-  set16(&boot_sect->byte_per_sector, MSC_FLASH_BLOCK_SIZE);
-  boot_sect->sector_per_cluster      = MSC_FLASH_CLUSTER_SIZE/MSC_FLASH_BLOCK_SIZE;
-  set16(&boot_sect->reserved_sectors, 1);
-
-  boot_sect->fat_num                 = 1;
-  set16(&boot_sect->root_entry_count, 16*8); // root directory occupies 1 cluster 4KB
-  set16(&boot_sect->sector_count, MSC_FLASH_BLOCK_NUM);
-
-  boot_sect->media_type              = 0xf8; // fixed disk
-  set16(&boot_sect->sector_per_fat, 7); //  8 minus boot sector
-  set16(&boot_sect->sector_per_track, 63);
-  set16(&boot_sect->head_num, 255);
-
-  boot_sect->drive_number            = 0x80;
-  boot_sect->ext_boot_signature = 0x29;
-  set32(&boot_sect->volume_id, tusb_hal_millis()); // typically date + time
-  memcpy(boot_sect->volume_label   , MSC_FLASH_VOL_LABEL, 11);
-  memcpy(boot_sect->fs_type,  "FAT12   ", 8);
-  set16(&boot_sect->signature, BOOTSECT_SIGNATURE);
+  memcpy(_page_cached, &_boot_sect, sizeof(_boot_sect));
+  _page_cached[510] = 0x55;
+  _page_cached[511] = 0xAA;
 
   //------------- Sector 1: FAT12 Table  -------------//
   // first 2 entries are F8FF, third entry is cluster end of readme file
