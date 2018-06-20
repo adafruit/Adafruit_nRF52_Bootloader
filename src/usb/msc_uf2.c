@@ -66,6 +66,10 @@ enum
 
 enum { FL_PAGE_SIZE = 4096 };
 
+
+/*------------------------------------------------------------------*/
+/* FAT12
+ *------------------------------------------------------------------*/
 typedef struct ATTR_PACKED {
   uint8_t  jump_code[3]       ; ///< Assembly instruction to jump to boot code.
   uint8_t  oem_name[8]        ; ///< OEM Name in ASCII.
@@ -130,6 +134,38 @@ typedef struct ATTR_PACKED {
 }fat12_dirpair_t;
 
 VERIFY_STATIC(sizeof(fat12_dirpair_t) == 3, "size is not correct");
+
+
+/*------------------------------------------------------------------*/
+/* UF2
+ *------------------------------------------------------------------*/
+const char infoUf2File[] = //
+    "UF2 Bootloader " UF2_VERSION "\r\n"
+    "Model: " PRODUCT_NAME "\r\n"
+    "Board-ID: " BOARD_ID "\r\n";
+
+const char indexFile[] = //
+    "<!doctype html>\n"
+    "<html>"
+    "<body>"
+    "<script>\n"
+    "location.replace(\"" INDEX_URL "\");\n"
+    "</script>"
+    "</body>"
+    "</html>\n";
+
+const char readme_contents[] = "Adafruit Feather nRF52840";
+
+struct TextFile {
+    const char name[11];
+    const char *content;
+};
+
+static const struct TextFile info[] = {
+    {.name = "INFO_UF2TXT", .content = infoUf2File},
+    {.name = "INDEX   HTM", .content = indexFile},
+    {.name = "CURRENT UF2", .content = readme_contents},
+};
 
 /*------------------------------------------------------------------*/
 /* VARIABLES
@@ -352,10 +388,18 @@ int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t o
   if ( lba < SECTOR_DATA )
   {
     memcpy(buffer, ((uint8_t*) &_disk_ram) + lba*MSC_FLASH_BLOCK_SIZE, bufsize);
-  }else
+  }
+  else if ( lba < SECTOR_DATA + arrcount_(info))
   {
+    // INFO_UF2.TXT & INDEX.HTM contents
+    strcpy(buffer, info[lba-SECTOR_DATA].content);
+
 //    uint32_t addr = lba2addr(lba) + offset;
 //    memcpy(buffer, (uint8_t*) addr, bufsize);
+  }
+  else
+  {
+
   }
 
   return bufsize;
@@ -452,6 +496,27 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
 //--------------------------------------------------------------------+
 // FAT12
 //--------------------------------------------------------------------+
+/* 0  ______________
+ *   | Boot Sector |  Fat copies = 1, Fat size = 7
+ *   |_____________|  Root Dir = 16*8 (4KB), sector per cluster = 1
+ * 1 |    FAT0     |
+ * . |             |
+ * . |  ( 7x512 )  |
+ * 7 |_____________|
+ * 8 |   Root Dir  |
+ * . |             |
+ * . |  ( 8x512 )  |
+ * 15|_____________|
+ * 16|             |
+ * . |             |
+ * . |             |
+ * . |    Data     |
+ * . |    Area     |
+ * . |             |
+ * . |             |
+ *   |_____________|
+ */
+
 fat12_boot_sector_t const _boot_sect =
 {
     .jump_code          = { 0xEB, 0xFE, 0x90 },
@@ -479,54 +544,6 @@ fat12_boot_sector_t const _boot_sect =
     .fs_type            = "FAT12   "
 };
 
-/* 0  ______________
- *   | Boot Sector |  Fat copies = 1, Fat size = 7
- *   |_____________|  Root Dir = 16*8 (4KB), sector per cluster = 1
- * 1 |    FAT0     |
- * . |             |
- * . |  ( 7x512 )  |
- * 7 |_____________|
- * 8 |   Root Dir  |
- * . |             |
- * . |  ( 8x512 )  |
- * 15|_____________|
- * 16|             |
- * . |             |
- * . |             |
- * . |    Data     |
- * . |    Area     |
- * . |             |
- * . |             |
- *   |_____________|
- */
-
-const char infoUf2File[] = //
-    "UF2 Bootloader " UF2_VERSION "\r\n"
-    "Model: " PRODUCT_NAME "\r\n"
-    "Board-ID: " BOARD_ID "\r\n";
-
-const char indexFile[] = //
-    "<!doctype html>\n"
-    "<html>"
-    "<body>"
-    "<script>\n"
-    "location.replace(\"" INDEX_URL "\");\n"
-    "</script>"
-    "</body>"
-    "</html>\n";
-
-const char readme_contents[] = "Adafruit Feather nRF52840";
-
-struct TextFile {
-    const char name[11];
-    const char *content;
-};
-
-static const struct TextFile info[] = {
-    {.name = "INFO_UF2TXT", .content = infoUf2File},
-    {.name = "INDEX   HTM", .content = indexFile},
-    {.name = "CURRENT UF2", .content = readme_contents},
-};
 
 static void fat12_mkfs(void)
 {
