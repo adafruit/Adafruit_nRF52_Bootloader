@@ -8,7 +8,7 @@
 
 #include "app_util.h"
 
-#include "nrf_bootloader_info.h"
+#include "dfu_types.h"
 
 #define SD_MAGIC_NUMBER 0x51b1e5db
 #define SD_MAGIC_OK() (*((uint32_t*)(SOFTDEVICE_INFO_STRUCT_ADDRESS+4)) == 0x51b1e5db)

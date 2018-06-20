@@ -1,12 +1,8 @@
 
 #include "uf2.h"
-
-#include "nrf_log.h"
 #include "nrf_nvmc.h"
-#include "nrf_sdh.h"
-#include "nrf_dfu_settings.h"
-
 #include <string.h>
+#include "tusb.h"
 
 typedef struct {
     uint8_t JumpInstruction[3];
@@ -115,11 +111,14 @@ static const FAT_BootBlock BootBlock = {
 
 #define NO_CACHE 0xffffffff
 
+#define NRF_LOG_DEBUG(...)
+
 uint32_t flashAddr = NO_CACHE;
 uint8_t flashBuf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
 bool firstFlush = true;
 bool hadWrite = false;
 
+#if 0
 void flushFlash() {
     if (flashAddr == NO_CACHE)
         return;
@@ -186,6 +185,7 @@ void uf2_timer(void *p_context) {
 }
 
 void uf2_timer_start(int ms);
+#endif
 
 void padded_memcpy(char *dst, const char *src, int len) {
     for (int i = 0; i < len; ++i) {
@@ -196,6 +196,7 @@ void padded_memcpy(char *dst, const char *src, int len) {
         dst++;
     }
 }
+
 
 void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
@@ -256,6 +257,27 @@ void read_block(uint32_t block_no, uint8_t *data) {
             }
         }
     }
+}
+
+int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
+{
+  (void) rhport; (void) lun;
+
+  // since we return block size each, offset should always be zero
+  TU_ASSERT(offset == 0, -1);
+
+  uint32_t count = 0;
+
+  while ( count < bufsize )
+  {
+    read_block(lba, buffer);
+
+    lba++;
+    buffer += 512;
+    count  += 512;
+  }
+
+  return count;
 }
 
 void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state) {
