@@ -442,15 +442,35 @@ fat12_boot_sector_t const _boot_sect =
     .fs_type            = "FAT12   "
 };
 
+/* 0  ______________
+ *   | Boot Sector |  Fat copies = 1, Fat size = 7
+ *   |_____________|  Root Dir = 16*8 (4KB), sector per cluster = 1
+ * 1 |    FAT0     |
+ * . |             |
+ * . |  ( 7x512 )  |
+ * 7 |_____________|
+ * 8 |   Root Dir  |
+ * . |             |
+ * . |  ( 8x512 )  |
+ * 15|_____________|
+ * 16|             |
+ * . |             |
+ * . |             |
+ * . |    Data     |
+ * . |             |
+ * . |             |
+ *   |_____________|
+ */
+
 static inline bool fat12_formatted(void)
 {
   const uint8_t* boot_sect = (uint8_t* ) lba2addr(0);
   return (boot_sect[510] == 0x55) && (boot_sect[511] == 0xAA);
 }
 
-static void fat12_write_cluster(uint16_t cluster_num, uint8_t const* buf, uint32_t bufsize)
+static void fat12_write_sector(uint32_t lba, uint8_t const* buf, uint32_t bufsize)
 {
-  uint32_t addr = lba2addr(cluster_num*8);
+  uint32_t addr = lba2addr(lba);
 
   nrf_nvmc_page_erase( addr );
   nrf_nvmc_write_words(addr, (uint32_t const*) buf, bufsize/4);
@@ -470,7 +490,7 @@ static void fat12_mkfs(void)
   memcpy(_page_cached+MSC_FLASH_BLOCK_SIZE, "\xF8\xFF\xFF\xFF\x0F\x00", 6);
 
   // Erase and Write first cluster.
-  fat12_write_cluster(0, _page_cached, FL_PAGE_SIZE);
+  fat12_write_sector(0, _page_cached, FL_PAGE_SIZE);
 
   //------------- Root Directory cluster -------------//
   uint8_t const readme_contents[] = "Adafruit Feather nRF52840";
@@ -508,14 +528,14 @@ static void fat12_mkfs(void)
   };
 
   // Erase and Write cluster.
-  fat12_write_cluster(1, _page_cached, FL_PAGE_SIZE);
+  fat12_write_sector(8, _page_cached, FL_PAGE_SIZE);
 
   //------------- Readme Content cluster -------------//
   memclr_(_page_cached, sizeof(_page_cached));
   memcpy(_page_cached, readme_contents, sizeof(readme_contents)-1);
 
   // Erase and Write cluster.
-  fat12_write_cluster(2, _page_cached, FL_PAGE_SIZE);
+  fat12_write_sector(16, _page_cached, FL_PAGE_SIZE);
 }
 
 #endif
