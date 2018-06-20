@@ -83,7 +83,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/msc_flash.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c

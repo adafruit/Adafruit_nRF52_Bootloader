@@ -61,7 +61,7 @@
 
 #include "tusb.h"
 #include "usb/tusb_descriptors.h"
-#include "usb/msc_flash.h"
+#include "usb/msc_uf2.h"
 
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]

@@ -1,6 +1,6 @@
 /**************************************************************************/
 /*!
-    @file     msc_flash.h
+    @file     msc_uf2.h
     @author   hathach (tinyusb.org)
 
     @section LICENSE

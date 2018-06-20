@@ -58,8 +58,6 @@
       <file file_name="../pstorage_platform.h" />
       <file file_name="../sdk_config.h" />
       <folder Name="usb">
-        <file file_name="../usb/msc_flash.c" />
-        <file file_name="../usb/msc_flash.h" />
         <file file_name="../usb/tusb_config.h" />
         <file file_name="../usb/tusb_descriptors.c" />
         <file file_name="../usb/tusb_descriptors.h" />
@@ -67,6 +65,8 @@
           <file file_name="../usb/uf2/uf2cfg.h" />
           <file file_name="../usb/uf2/uf2.h" />
         </folder>
+        <file file_name="../usb/msc_uf2.c" />
+        <file file_name="../usb/msc_uf2.h" />
       </folder>
     </folder>
     <configuration

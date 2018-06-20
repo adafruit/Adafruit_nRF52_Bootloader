@@ -1,6 +1,6 @@
 /**************************************************************************/
 /*!
-    @file     msc_flash.c
+    @file     msc_uf2.c
     @author   hathach (tinyusb.org)
 
     @section LICENSE
@@ -34,7 +34,7 @@
 */
 /**************************************************************************/
 
-#include "msc_flash.h"
+#include "msc_uf2.h"
 
 #if CFG_TUD_MSC
 
@@ -468,8 +468,8 @@ fat12_boot_sector_t const _boot_sect =
 
 static inline bool fat12_formatted(void)
 {
-  const uint8_t* boot_sect = (uint8_t* ) lba2addr(0);
   return false;
+//  const uint8_t* boot_sect = (uint8_t* ) lba2addr(0);
   //return (boot_sect[510] == 0x55) && (boot_sect[511] == 0xAA);
 }
 
@@ -497,7 +497,7 @@ const char indexFile[] = //
     "</body>"
     "</html>\n";
 
-uint8_t const readme_contents[] = "Adafruit Feather nRF52840";
+const char readme_contents[] = "Adafruit Feather nRF52840";
 
 struct TextFile {
     const char name[11];
