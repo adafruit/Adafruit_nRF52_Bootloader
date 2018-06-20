@@ -337,7 +337,7 @@ int main(void)
   (void) bootloader_init();
 
   // Init msc flash, must be after bootloader_init(), before SD init
-  msc_flash_init();
+  msc_uf2_init();
 
   if (bootloader_dfu_sd_in_progress())
   {
@@ -541,13 +541,13 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 void tud_mount_cb(uint8_t rhport)
 {
   (void) rhport;
-  msc_flash_mount();
+  msc_uf2_mount();
 }
 
 void tud_umount_cb(uint8_t rhport)
 {
   (void) rhport;
-  msc_flash_umount();
+  msc_uf2_umount();
 }
 
 uint32_t tusb_hal_millis(void)

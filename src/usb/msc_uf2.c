@@ -267,13 +267,13 @@ static void fat_pstorage_cb(pstorage_handle_t * p_handle, uint8_t op_code, uint3
 /*------------------------------------------------------------------*/
 /* API
  *------------------------------------------------------------------*/
-void msc_flash_init(void)
+void msc_uf2_init(void)
 {
   pstorage_module_param_t  fat_psp = { .cb = fat_pstorage_cb};
   pstorage_register(&fat_psp, &_fat_psh);
 }
 
-void msc_flash_mount(void)
+void msc_uf2_mount(void)
 {
   _wr10_state = WRITE10_IDLE;
 
@@ -281,7 +281,7 @@ void msc_flash_mount(void)
   fat12_mkfs();
 }
 
-void msc_flash_umount(void)
+void msc_uf2_umount(void)
 {
 
 }
@@ -389,17 +389,20 @@ int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t o
   {
     memcpy(buffer, ((uint8_t*) &_disk_ram) + lba*MSC_FLASH_BLOCK_SIZE, bufsize);
   }
-  else if ( lba < SECTOR_DATA + arrcount_(info))
-  {
-    // INFO_UF2.TXT & INDEX.HTM contents
-    strcpy(buffer, info[lba-SECTOR_DATA].content);
-
-//    uint32_t addr = lba2addr(lba) + offset;
-//    memcpy(buffer, (uint8_t*) addr, bufsize);
-  }
   else
   {
+    lba -= SECTOR_DATA;
 
+    if ( lba <  arrcount_(info) - 1 )
+    {
+      strcpy(buffer, info[lba].content); // INFO_UF2.TXT & INDEX.HTM contents
+    }
+    else
+    {
+      lba -= (arrcount_(info) - 1);
+
+
+    }
   }
 
   return bufsize;
