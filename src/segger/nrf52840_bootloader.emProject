@@ -63,6 +63,11 @@
         <file file_name="../usb/tusb_config.h" />
         <file file_name="../usb/tusb_descriptors.c" />
         <file file_name="../usb/tusb_descriptors.h" />
+        <folder Name="uf2">
+          <file file_name="../usb/uf2/ghostfat.c" />
+          <file file_name="../usb/uf2/uf2cfg.h" />
+          <file file_name="../usb/uf2/uf2.h" />
+        </folder>
       </folder>
     </folder>
     <configuration
