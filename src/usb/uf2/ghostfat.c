@@ -4,6 +4,7 @@
 #include <string.h>
 #include "tusb.h"
 
+#if 1
 typedef struct {
     uint8_t JumpInstruction[3];
     uint8_t OEMInfo[8];
@@ -157,6 +158,8 @@ void flushFlash() {
     flashAddr = NO_CACHE;
 }
 
+
+
 void flash_write(uint32_t dst, const uint8_t *src, int len) {
     uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
 
@@ -243,7 +246,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             memcpy(data, info[sectionIdx].content, strlen(info[sectionIdx].content));
         } else {
             sectionIdx -= NUM_INFO - 1;
-            uint32_t addr = sectionIdx * 256;
+            uint32_t addr = USER_FLASH_START + sectionIdx * 256;
             if (addr < FLASH_SIZE) {
                 UF2_Block *bl = (void *)data;
                 bl->magicStart0 = UF2_MAGIC_START0;
@@ -259,27 +262,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
     }
 }
 
-int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
-{
-  (void) rhport; (void) lun;
-
-  // since we return block size each, offset should always be zero
-  TU_ASSERT(offset == 0, -1);
-
-  uint32_t count = 0;
-
-  while ( count < bufsize )
-  {
-    read_block(lba, buffer);
-
-    lba++;
-    buffer += 512;
-    count  += 512;
-  }
-
-  return count;
-}
-
+#if 0
 void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state) {
     UF2_Block *bl = (void *)data;
 
@@ -337,3 +320,6 @@ void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state
         // uf2_timer_start(500);
     }
 }
+#endif
+
+#endif
