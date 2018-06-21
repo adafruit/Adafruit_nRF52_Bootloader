@@ -248,7 +248,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
         } else {
             sectionIdx -= NUM_INFO - 1;
             uint32_t addr = USER_FLASH_START + sectionIdx * 256;
-            if (addr < FLASH_SIZE) {
+            if (addr < USER_FLASH_START+FLASH_SIZE) {
                 UF2_Block *bl = (void *)data;
                 bl->magicStart0 = UF2_MAGIC_START0;
                 bl->magicStart1 = UF2_MAGIC_START1;
