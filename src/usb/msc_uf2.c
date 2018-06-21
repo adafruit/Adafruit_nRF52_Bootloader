@@ -43,8 +43,6 @@
 // for formatting fatfs when Softdevice is not enabled
 #include "nrf_nvmc.h"
 
-#include "uf2/uf2.h"
-
 
 #define SECTORS_PER_FAT   7
 #define ROOT_DIR_SECTOR   8
@@ -66,132 +64,18 @@ enum
 
 enum { FL_PAGE_SIZE = 4096 };
 
-
-/*------------------------------------------------------------------*/
-/* FAT12
- *------------------------------------------------------------------*/
-typedef struct ATTR_PACKED {
-  uint8_t  jump_code[3]       ; ///< Assembly instruction to jump to boot code.
-  uint8_t  oem_name[8]        ; ///< OEM Name in ASCII.
-
-  // Bios Parameter Block
-  uint16_t sector_sz          ; ///< Bytes per sector. Allowed values include 512, 1024, 2048, and 4096.
-  uint8_t  sector_per_cluster ; ///< Sectors per cluster (data unit). Allowed values are powers of 2, but the cluster size must be 32KB or smaller.
-  uint16_t reserved_sectors   ; ///< Size in sectors of the reserved area.
-
-  uint8_t  fat_copies         ; ///< Number of FATs. Typically two for redundancy, but according to Microsoft it can be one for some small storage devices.
-  uint16_t root_entry_count   ; ///< Maximum number of files in the root directory for FAT12 and FAT16. This is 0 for FAT32 and typically 512 for FAT16.
-  uint16_t sector_count       ; ///< 16-bit number of sectors in file system. If the number of sectors is larger than can be represented in this 2-byte value, a 4-byte value exists later in the data structure and this should be 0.
-  uint8_t  media_type         ; ///< 0xf8 should be used for fixed disks and 0xf0 for removable.
-  uint16_t sector_per_fat     ; ///< 16-bit size in sectors of each FAT for FAT12 and FAT16. For FAT32, this field is 0.
-  uint16_t sector_per_track   ; ///< Sectors per track of storage device.
-  uint16_t head_num           ; ///< Number of heads in storage device.
-  uint32_t not_used1          ; ///< Number of sectors before the start of partition.
-  uint32_t not_used2          ; ///< 32-bit value of number of sectors in file system. Either this value or the 16-bit value above must be 0.
-
-  // Extended BPB
-  uint8_t  drive_number       ; ///< Physical drive number (0x00 for (first) removable media, 0x80 for (first) fixed disk
-  uint8_t  not_used3          ; ///< Some OS uses this as drive letter (e.g 0 = C:, 1 = D: etc ...), should be 0 when formatted
-  uint8_t  ext_boot_signature ; ///< should be 0x29
-  uint32_t volume_id          ; ///< Volume serial number, which some versions of Windows will calculate based on the creation date and time.
-  uint8_t  volume_label[11]   ;
-  uint8_t  fs_type[8]         ; ///< File system type label in ASCII, padded with blank (0x20). Standard values include "FAT," "FAT12," and "FAT16," but nothing is required.
-//  uint8_t  not_used4[448]     ;
-//  uint16_t signature          ; ///< Signature value (0xAA55).
-}fat12_boot_sector_t;
-
-VERIFY_STATIC(sizeof(fat12_boot_sector_t) == 62, "size is not correct");
-
-typedef struct ATTR_PACKED {
-  uint8_t name[11];
-
-  ATTR_PACKED_STRUCT(struct){
-    uint8_t readonly       : 1;
-    uint8_t hidden         : 1;
-    uint8_t system         : 1;
-    uint8_t volume_label   : 1;
-    uint8_t directory      : 1;
-    uint8_t archive        : 1;
-  } attr; // Long File Name = 0x0f
-
-  uint8_t reserved;
-  uint8_t created_time_tenths_of_seconds;
-  uint16_t created_time;
-  uint16_t created_date;
-  uint16_t accessed_date;
-  uint16_t cluster_high;
-  uint16_t written_time;
-  uint16_t written_date;
-  uint16_t cluster_low;
-  uint32_t file_size;
-}fat_dirent_t;
-
-VERIFY_STATIC(sizeof(fat_dirent_t) == 32, "size is not correct");
-
-typedef struct ATTR_PACKED {
-  uint16_t dir0 : 12;
-  uint16_t dir1 : 12;
-}fat12_dirpair_t;
-
-VERIFY_STATIC(sizeof(fat12_dirpair_t) == 3, "size is not correct");
-
-
 /*------------------------------------------------------------------*/
 /* UF2
  *------------------------------------------------------------------*/
-const char infoUf2File[] = //
-    "UF2 Bootloader " UF2_VERSION "\r\n"
-    "Model: " PRODUCT_NAME "\r\n"
-    "Board-ID: " BOARD_ID "\r\n";
-
-const char indexFile[] = //
-    "<!doctype html>\n"
-    "<html>"
-    "<body>"
-    "<script>\n"
-    "location.replace(\"" INDEX_URL "\");\n"
-    "</script>"
-    "</body>"
-    "</html>\n";
-
-const char readme_contents[] = "Adafruit Feather nRF52840";
-
-struct TextFile {
-    const char name[11];
-    const char *content;
-};
-
-static const struct TextFile info[] = {
-    {.name = "INFO_UF2TXT", .content = infoUf2File},
-    {.name = "INDEX   HTM", .content = indexFile},
-    {.name = "CURRENT UF2", .content = readme_contents},
-};
+void read_block(uint32_t block_no, uint8_t *data);
 
 /*------------------------------------------------------------------*/
 /* VARIABLES
  *------------------------------------------------------------------*/
-struct
-{
-  // Boot sector
-  fat12_boot_sector_t boot;
-  uint8_t  not_used4[448] ;
-  uint16_t signature      ; ///< Signature value (0xAA55).
-
-  // Fat
-  uint8_t fat[SECTORS_PER_FAT*MSC_FLASH_BLOCK_SIZE];
-
-  // Root Dir
-  struct {
-    fat_dirent_t dirent[(ROOT_DIR_SECTOR*MSC_FLASH_BLOCK_SIZE)/32];
-  }root;
-} _disk_ram ATTR_ALIGNED(4);
-
-VERIFY_STATIC(sizeof(_disk_ram) == 16*MSC_FLASH_BLOCK_SIZE, "size is not correct");
-
 static uint8_t _page_cached[FL_PAGE_SIZE] ATTR_ALIGNED(4);
 
 volatile static uint8_t _wr10_state;
-static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = MSC_FLASH_ADDR_START } ;
+static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = MSC_UF2_FLASH_ADDR_START } ;
 
 static scsi_inquiry_data_t const mscd_inquiry_data =
 {
@@ -205,8 +89,8 @@ static scsi_inquiry_data_t const mscd_inquiry_data =
 
 static scsi_read_capacity10_data_t const mscd_read_capacity10_data =
 {
-    .last_lba   = ENDIAN_BE(MSC_FLASH_BLOCK_NUM-1), // read capacity
-    .block_size = ENDIAN_BE(MSC_FLASH_BLOCK_SIZE)
+    .last_lba   = ENDIAN_BE(MSC_UF2_BLOCK_NUM-1), // read capacity
+    .block_size = ENDIAN_BE(MSC_UF2_BLOCK_SIZE)
 };
 
 static scsi_sense_fixed_data_t mscd_sense_data =
@@ -219,9 +103,9 @@ static scsi_sense_fixed_data_t mscd_sense_data =
 static scsi_read_format_capacity_data_t const mscd_format_capacity_data =
 {
     .list_length     = 8,
-    .block_num       = ENDIAN_BE(MSC_FLASH_BLOCK_NUM), // write capacity
+    .block_num       = ENDIAN_BE(MSC_UF2_BLOCK_NUM), // write capacity
     .descriptor_type = 2, // TODO formatted media, refractor to const
-    .block_size_u16  = ENDIAN_BE16(MSC_FLASH_BLOCK_SIZE)
+    .block_size_u16  = ENDIAN_BE16(MSC_UF2_BLOCK_SIZE)
 };
 
 static scsi_mode_parameters_t const msc_dev_mode_para =
@@ -237,7 +121,7 @@ static scsi_mode_parameters_t const msc_dev_mode_para =
  *------------------------------------------------------------------*/
 static inline uint32_t lba2addr(uint32_t lba)
 {
-  return MSC_FLASH_ADDR_START + lba*MSC_FLASH_BLOCK_SIZE;
+  return MSC_UF2_FLASH_ADDR_START + lba*MSC_UF2_BLOCK_SIZE;
 }
 
 static void fat12_mkfs(void);
@@ -278,7 +162,6 @@ void msc_uf2_mount(void)
   _wr10_state = WRITE10_IDLE;
 
   // reset every time it is plugged
-  fat12_mkfs();
 }
 
 void msc_uf2_umount(void)
@@ -385,39 +268,30 @@ int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t o
 {
   (void) rhport; (void) lun;
 
-  if ( lba < SECTOR_DATA )
+  // since we return block size each, offset should always be zero
+  TU_ASSERT(offset == 0, -1);
+
+  uint32_t count = 0;
+
+  while ( count < bufsize )
   {
-    memcpy(buffer, ((uint8_t*) &_disk_ram) + lba*MSC_FLASH_BLOCK_SIZE, bufsize);
-  }
-  else
-  {
-    lba -= SECTOR_DATA;
+    read_block(lba, buffer);
 
-    if ( lba <  arrcount_(info) - 1 )
-    {
-      strcpy(buffer, info[lba].content); // INFO_UF2.TXT & INDEX.HTM contents
-    }
-    else
-    {
-      lba -= (arrcount_(info) - 1);
-
-
-    }
+    lba++;
+    buffer += 512;
+    count  += 512;
   }
 
-  return bufsize;
+  return count;
 }
 
 int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
   (void) rhport; (void) lun;
 
-  uint32_t addr = lba2addr(lba) + offset;
+  return bufsize;
 
-  if ( lba < SECTOR_DATA )
-  {
-    memcpy(((uint8_t*) &_disk_ram) + lba*MSC_FLASH_BLOCK_SIZE, buffer, bufsize);
-  }
+  uint32_t addr = lba2addr(lba) + offset;
 
   /* 0. Check if flash is the same as data -> skip if matches
    * 1. queue flash erase pstorage_clear(), return 0 until erasing is done
@@ -493,134 +367,6 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
 
     default: return -1; break;
   }
-}
-
-
-//--------------------------------------------------------------------+
-// FAT12
-//--------------------------------------------------------------------+
-/* 0  ______________
- *   | Boot Sector |  Fat copies = 1, Fat size = 7
- *   |_____________|  Root Dir = 16*8 (4KB), sector per cluster = 1
- * 1 |    FAT0     |
- * . |             |
- * . |  ( 7x512 )  |
- * 7 |_____________|
- * 8 |   Root Dir  |
- * . |             |
- * . |  ( 8x512 )  |
- * 15|_____________|
- * 16|             |
- * . |             |
- * . |             |
- * . |    Data     |
- * . |    Area     |
- * . |             |
- * . |             |
- *   |_____________|
- */
-
-fat12_boot_sector_t const _boot_sect =
-{
-    .jump_code          = { 0xEB, 0xFE, 0x90 },
-    .oem_name           = "MSDOS5.0",
-
-    .sector_sz          = MSC_FLASH_BLOCK_SIZE,
-    .sector_per_cluster = 1,
-    .reserved_sectors   = 1,
-
-    .fat_copies         = 1,
-    .root_entry_count   = (ROOT_DIR_SECTOR*MSC_FLASH_BLOCK_SIZE)/32,
-    .sector_count       = MSC_FLASH_BLOCK_NUM,
-    .media_type         = 0xf8, // fixed disk
-    .sector_per_fat     = SECTORS_PER_FAT,
-    .sector_per_track   = 1,
-    .head_num           = 1,
-    .not_used1          = 0,
-    .not_used2          = 0,
-
-    .drive_number       = 0,
-    .not_used3          = 0,
-    .ext_boot_signature = 0x29,
-    .volume_id          = 0x00420042, // change later to typically date + time
-    .volume_label       = MSC_FLASH_VOL_LABEL,
-    .fs_type            = "FAT12   "
-};
-
-
-static void fat12_mkfs(void)
-{
-  varclr_(&_disk_ram);
-
-  /*------------- Sector 0: Boot Sector -------------*/
-  _disk_ram.boot = _boot_sect;
-  _disk_ram.signature = 0xAA55;
-
-  //------------- Sector 1: FAT12 Table  -------------//
-  // Dir entry 0 & 1 are always FF8 and FF8
-  fat12_dirpair_t* dirpair;
-
-  dirpair = (fat12_dirpair_t*) _disk_ram.fat;
-  dirpair->dir0 = dirpair->dir1 = 0xFF8;
-
-  // Dir entry 2 & 3 are FFF (end) of info and index since their size are less than 512
-  dirpair = (fat12_dirpair_t*) (_disk_ram.fat+3);
-  dirpair->dir0 = dirpair->dir1 = 0xFFF;
-
-  // Dir entry chain for uf2 file
-  dirpair = (fat12_dirpair_t*) (_disk_ram.fat+6);
-  dirpair->dir0 = 0xFFF;
-  dirpair->dir1 = 0x000;
-
-  //------------- Root Directory -------------//
-  // first entry is volume label
-  _disk_ram.root.dirent[0] = (fat_dirent_t)
-  {
-    .name = MSC_FLASH_VOL_LABEL,
-    .attr.volume_label = 1,
-  };
-
-  uint16_t data_cluster = 2; // logical data cluster always start from 2
-  for(int i=0; i<arrcount_(info); i++)
-  {
-    fat_dirent_t* p_dir = _disk_ram.root.dirent+1+i;
-
-    (*p_dir) = (fat_dirent_t)
-    {
-      .name = { 0 },
-
-      .attr = { 0 },
-      .reserved = 0,
-      .created_time_tenths_of_seconds = 0,
-
-      .created_time = 0x6D52,
-      .created_date = 0x4365,
-      .accessed_date = 0x4365,
-
-      .cluster_high = 0,
-
-      .written_time = 0x6D52,
-      .written_date = 0x4365,
-
-      .cluster_low = data_cluster,
-      .file_size = strlen(info[i].content)
-    };
-
-    memcpy(p_dir->name, info[i].name, 11);
-
-    data_cluster++;
-  }
-
-  //------------- Data Contents -------------//
-//  memclr_(_page_cached, sizeof(_page_cached));
-//
-//  for(int i=0; i<arrcount_(info); i++)
-//  {
-//    memcpy(_page_cached + i*512, info[i].content, strlen(info[i].content));
-//  }
-//
-//  // Erase and Write data cluster.
-//  fat12_write_sector(16, _page_cached, FL_PAGE_SIZE);
 }
 
 #endif
