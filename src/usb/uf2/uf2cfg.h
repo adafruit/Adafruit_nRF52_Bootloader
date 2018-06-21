@@ -2,7 +2,9 @@
 #define PRODUCT_NAME "Adafruit Bluefruit nRF52"
 #define BOARD_ID "NRF52-Bluefruit-v0"
 #define INDEX_URL "https://www.adafruit.com/product/0000"
-#define UF2_NUM_BLOCKS 8000
+#define BOOTLOADER_ID  MK_DIS_FIRMWARE
+
+#define UF2_NUM_BLOCKS 8000   // at least 4,1 MB for FAT16
 #define VOLUME_LABEL "NRF52BOOT  "
 #define FLASH_SIZE (BOOTLOADER_REGION_START-USER_FLASH_START)
 
