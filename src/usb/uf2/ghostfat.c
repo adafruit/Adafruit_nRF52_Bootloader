@@ -4,7 +4,10 @@
 #include <string.h>
 #include "tusb.h"
 
-#if 1
+// to determine application size
+#include "bootloader_settings.h"
+#include "bootloader.h"
+
 typedef struct {
     uint8_t JumpInstruction[3];
     uint8_t OEMInfo[8];
@@ -78,36 +81,36 @@ static const struct TextFile info[] = {
 };
 #define NUM_INFO (sizeof(info) / sizeof(info[0]))
 
-#define UF2_SIZE (FLASH_SIZE * 2)
-#define UF2_SECTORS (UF2_SIZE / 512)
-#define UF2_FIRST_SECTOR (NUM_INFO + 1)
-#define UF2_LAST_SECTOR (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
+#define UF2_SIZE           (get_flash_size() * 2)
+#define UF2_SECTORS        (UF2_SIZE / 512)
+#define UF2_FIRST_SECTOR   (NUM_INFO + 1)
+#define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
 
-#define RESERVED_SECTORS 1
-#define ROOT_DIR_SECTORS 4
-#define SECTORS_PER_FAT ((NUM_FAT_BLOCKS * 2 + 511) / 512)
+#define RESERVED_SECTORS   1
+#define ROOT_DIR_SECTORS   4
+#define SECTORS_PER_FAT    ((NUM_FAT_BLOCKS * 2 + 511) / 512)
 
-#define START_FAT0 RESERVED_SECTORS
-#define START_FAT1 (START_FAT0 + SECTORS_PER_FAT)
-#define START_ROOTDIR (START_FAT1 + SECTORS_PER_FAT)
-#define START_CLUSTERS (START_ROOTDIR + ROOT_DIR_SECTORS)
+#define START_FAT0         RESERVED_SECTORS
+#define START_FAT1         (START_FAT0 + SECTORS_PER_FAT)
+#define START_ROOTDIR      (START_FAT1 + SECTORS_PER_FAT)
+#define START_CLUSTERS     (START_ROOTDIR + ROOT_DIR_SECTORS)
 
 static const FAT_BootBlock BootBlock = {
-    .JumpInstruction = {0xeb, 0x3c, 0x90},
-    .OEMInfo = "UF2 UF2 ",
-    .SectorSize = 512,
-    .SectorsPerCluster = 1,
-    .ReservedSectors = RESERVED_SECTORS,
-    .FATCopies = 2,
+    .JumpInstruction      = {0xeb, 0x3c, 0x90},
+    .OEMInfo              = "UF2 UF2 ",
+    .SectorSize           = 512,
+    .SectorsPerCluster    = 1,
+    .ReservedSectors      = RESERVED_SECTORS,
+    .FATCopies            = 2,
     .RootDirectoryEntries = (ROOT_DIR_SECTORS * 512 / 32),
-    .TotalSectors16 = NUM_FAT_BLOCKS - 2,
-    .MediaDescriptor = 0xF8,
-    .SectorsPerFAT = SECTORS_PER_FAT,
-    .SectorsPerTrack = 1,
-    .Heads = 1,
-    .ExtendedBootSig = 0x29,
-    .VolumeSerialNumber = 0x00420042,
-    .VolumeLabel = VOLUME_LABEL,
+    .TotalSectors16       = NUM_FAT_BLOCKS - 2,
+    .MediaDescriptor      = 0xF8,
+    .SectorsPerFAT        = SECTORS_PER_FAT,
+    .SectorsPerTrack      = 1,
+    .Heads                = 1,
+    .ExtendedBootSig      = 0x29,
+    .VolumeSerialNumber   = 0x00420042,
+    .VolumeLabel          = VOLUME_LABEL,
     .FilesystemIdentifier = "FAT16   ",
 };
 
@@ -119,6 +122,18 @@ uint32_t flashAddr = NO_CACHE;
 uint8_t flashBuf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
 bool firstFlush = true;
 bool hadWrite = false;
+
+
+static uint32_t get_flash_size(void)
+{
+  // return 1 block of 256 bytes
+  if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) ) return 256;
+
+  const bootloader_settings_t * boot_setting;
+  bootloader_util_settings_get(&boot_setting);
+
+  return boot_setting->bank_0_size;
+}
 
 #if 0
 void flushFlash() {
@@ -321,6 +336,4 @@ void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state
         // uf2_timer_start(500);
     }
 }
-#endif
-
 #endif
