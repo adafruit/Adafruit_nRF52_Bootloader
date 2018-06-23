@@ -167,7 +167,7 @@
         </folder>
       </folder>
       <folder Name="tinyusb">
-        <folder Name="tinyusb">
+        <folder Name="src">
           <file file_name="../../lib/tinyusb/src/tusb.c" />
           <file file_name="../../lib/tinyusb/src/tusb.h" />
           <file file_name="../../lib/tinyusb/src/tusb_hal.h" />

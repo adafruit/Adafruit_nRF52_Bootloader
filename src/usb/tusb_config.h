@@ -75,11 +75,15 @@
  *------------------------------------------------------------------*/
 
 // FIFO size of CDC TX and RX
-#define CFG_TUD_CDC_BUFSIZE         1024
+#define CFG_TUD_CDC_RX_BUFSIZE      1024
+#define CFG_TUD_CDC_TX_BUFSIZE      1024
 
-// TX is sent automatically every Start of Frame event.
-// If not enabled, application must call tud_cdc_flush() periodically
-#define CFG_TUD_CDC_FLUSH_ON_SOF    1
+/* TX is sent automatically on every Start of Frame event ~ 1ms.
+ * If not enabled, application must call tud_cdc_flush() periodically
+ * Note: Enabled this could overflow device task, if it does, define
+ * CFG_TUD_TASK_QUEUE_SZ with large value
+ */
+#define CFG_TUD_CDC_FLUSH_ON_SOF    0
 
 // Number of supported Logical Unit Number
 #define CFG_TUD_MSC_MAXLUN          1

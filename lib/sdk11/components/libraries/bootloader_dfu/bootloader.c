@@ -128,6 +128,9 @@ static void wait_for_events(void)
         // USB stack
         tusb_task();
 
+        // Send out cdc's data
+        tud_cdc_flush();
+
         if ((m_update_status == BOOTLOADER_COMPLETE) ||
             (m_update_status == BOOTLOADER_TIMEOUT)  ||
             (m_update_status == BOOTLOADER_RESET))
