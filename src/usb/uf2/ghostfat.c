@@ -126,13 +126,25 @@ bool hadWrite = false;
 
 static uint32_t get_flash_size(void)
 {
-  // return 1 block of 256 bytes
-  if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) ) return 256;
+  static uint32_t flash_sz = 0;
 
-  const bootloader_settings_t * boot_setting;
-  bootloader_util_settings_get(&boot_setting);
+  // only need to compute once
+  if ( flash_sz == 0 )
+  {
+    // return 1 block of 256 bytes
+    if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
+    {
+      flash_sz = 256;
+    }else
+    {
+      const bootloader_settings_t * boot_setting;
+      bootloader_util_settings_get(&boot_setting);
 
-  return boot_setting->bank_0_size;
+      flash_sz = boot_setting->bank_0_size;
+    }
+  }
+
+  return flash_sz;
 }
 
 #if 0
