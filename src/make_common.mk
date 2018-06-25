@@ -84,6 +84,7 @@ C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
