@@ -131,6 +131,10 @@ volatile bool _is_flashing = false;
 static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = USER_FLASH_END } ;
 
 
+// from main.c to signal writing uf2 is on the way
+extern void blinky_fast_set(bool isFast);
+
+
 static uint32_t get_flash_size(void)
 {
   static uint32_t flash_sz = 0;
@@ -254,6 +258,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /** inform bootloader to update setting and reset */
 static void uf2_write_complete(void)
 {
+  blinky_fast_set(false);
+
   dfu_update_status_t update_status;
 
   memset(&update_status, 0, sizeof(dfu_update_status_t ));
@@ -300,6 +306,8 @@ void flushFlash() {
         // Init pstorage
         pstorage_module_param_t  fat_psp = { .cb = fat_pstorage_cb};
         pstorage_register(&fat_psp, &_fat_psh);
+
+        blinky_fast_set(true);
     }
 
     NRF_LOG_DEBUG("Flush at %x", flashAddr);
