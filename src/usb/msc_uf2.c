@@ -52,33 +52,16 @@
 /*------------------------------------------------------------------*/
 /* MACRO TYPEDEF CONSTANT ENUM
  *------------------------------------------------------------------*/
-enum
-{
-  WRITE10_IDLE,
-  WRITE10_ERASING,
-  WRITE10_ERASED,
-  WRITE10_WRITING,
-  WRITE10_WRITTEN,
-  WRITE10_FAILED
-};
-
-enum { FL_PAGE_SIZE = 4096 };
 
 /*------------------------------------------------------------------*/
 /* UF2
  *------------------------------------------------------------------*/
 void read_block(uint32_t block_no, uint8_t *data);
 int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *state*/);
-void ghostfat_init();
 
 /*------------------------------------------------------------------*/
 /* VARIABLES
  *------------------------------------------------------------------*/
-static uint8_t _page_cached[FL_PAGE_SIZE] ATTR_ALIGNED(4);
-
-volatile static uint8_t _wr10_state;
-
-
 static scsi_inquiry_data_t const mscd_inquiry_data =
 {
     .is_removable         = 1,
@@ -136,7 +119,7 @@ static inline uint32_t lba2addr(uint32_t lba)
  *------------------------------------------------------------------*/
 void msc_uf2_init(void)
 {
-  ghostfat_init();
+
 }
 
 void msc_uf2_mount(void)
@@ -232,8 +215,6 @@ int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16]
 /*------------------------------------------------------------------*/
 /* Tinyusb Flash READ10 & WRITE10
  *------------------------------------------------------------------*/
-
-
 int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
   (void) rhport; (void) lun;
