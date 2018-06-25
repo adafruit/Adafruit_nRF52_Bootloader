@@ -4,9 +4,10 @@
 #include <string.h>
 #include "tusb.h"
 
-// to determine application size
 #include "bootloader_settings.h"
 #include "bootloader.h"
+#include "pstorage.h"
+
 
 typedef struct {
     uint8_t JumpInstruction[3];
@@ -117,11 +118,19 @@ static const FAT_BootBlock BootBlock = {
 #define NO_CACHE 0xffffffff
 
 #define NRF_LOG_DEBUG(...)
+#define NRF_LOG_WARNING(...)
 
 uint32_t flashAddr = NO_CACHE;
 uint8_t flashBuf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
 bool firstFlush = true;
-bool hadWrite = false;
+//bool hadWrite = false;
+
+static WriteState uf2_wr_state = { 0 };
+static WriteState* state = &uf2_wr_state;
+
+volatile bool _is_flashing = false;
+
+static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = USER_FLASH_END } ;
 
 
 static uint32_t get_flash_size(void)
@@ -147,19 +156,59 @@ static uint32_t get_flash_size(void)
   return flash_sz;
 }
 
-#if 0
+void fat_pstorage_cb(pstorage_handle_t * p_handle, uint8_t op_code, uint32_t result, uint8_t  * p_data, uint32_t  data_len)
+{
+  if ( result != NRF_SUCCESS )
+  {
+    TU_ASSERT(false, );
+  }
+
+  if ( PSTORAGE_CLEAR_OP_CODE == op_code)
+  {
+    // erase complete start writing
+    _fat_psh.block_id = p_handle->block_id;
+    TU_ASSERT( pstorage_store(&_fat_psh, flashBuf, FLASH_PAGE_SIZE, 0), );
+  }
+  else if ( PSTORAGE_STORE_OP_CODE ==  op_code)
+  {
+    // write completes
+    _is_flashing = false;
+
+    // whole uf2 file is written, inform bootloader to update setting and reset
+    if ( state->numWritten >= state->numBlocks )
+    {
+      dfu_update_status_t update_status;
+
+      memset(&update_status, 0, sizeof(dfu_update_status_t ));
+      update_status.status_code = DFU_UPDATE_APP_COMPLETE;
+      update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
+      update_status.app_size    = state->numBlocks*256;
+
+      bootloader_dfu_update_process(update_status);
+    }
+  }
+}
+
+void ghostfat_init(void)
+{
+  pstorage_module_param_t  fat_psp = { .cb = fat_pstorage_cb};
+  pstorage_register(&fat_psp, &_fat_psh);
+}
+
+
 void flushFlash() {
     if (flashAddr == NO_CACHE)
         return;
 
     if (firstFlush) {
+        firstFlush = false;
+#if 0
         if (sdRunning) {
             // disable SD - we need sync access to flash, and we might be also overwriting the SD
             nrf_sdh_disable_request();
             nrf_dfu_settings_init(false);
         }
 
-        firstFlush = false;
 
         s_dfu_settings.write_offset = 0;
         s_dfu_settings.sd_size = 0;
@@ -170,17 +219,21 @@ void flushFlash() {
         memset(&s_dfu_settings.bank_1, 0, sizeof(s_dfu_settings.bank_1));
 
         nrf_dfu_settings_write(NULL);
+#endif
     }
 
-    int32_t sz = flashAddr + FLASH_PAGE_SIZE;
-    if (s_dfu_settings.bank_0.image_size < sz)
-        s_dfu_settings.bank_0.image_size = sz;
+//    int32_t sz = flashAddr + FLASH_PAGE_SIZE;
+//    if (s_dfu_settings.bank_0.image_size < sz)
+//        s_dfu_settings.bank_0.image_size = sz;
 
     NRF_LOG_DEBUG("Flush at %x", flashAddr);
     if (memcmp(flashBuf, (void *)flashAddr, FLASH_PAGE_SIZE) != 0) {
         NRF_LOG_DEBUG("Write flush at %x", flashAddr);
-        nrf_nvmc_page_erase(flashAddr);
-        nrf_nvmc_write_words(flashAddr, (uint32_t *)flashBuf, FLASH_PAGE_SIZE / sizeof(uint32_t));
+        _is_flashing = true;
+
+        // Writing to flash will be done in erase complete callback
+        _fat_psh.block_id = flashAddr;
+        TU_ASSERT ( pstorage_clear(&_fat_psh, FLASH_PAGE_SIZE), );
     }
 
     flashAddr = NO_CACHE;
@@ -191,16 +244,22 @@ void flushFlash() {
 void flash_write(uint32_t dst, const uint8_t *src, int len) {
     uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
 
-    hadWrite = true;
+    // hadWrite = true;
 
     if (newAddr != flashAddr) {
         flushFlash();
+
+        // writing previous cached data, skip current data until flashing is done
+        // tinyusb stack will invoke write_block() with the same parameters later on
+        if ( _is_flashing ) return;
+
         flashAddr = newAddr;
         memcpy(flashBuf, (void *)newAddr, FLASH_PAGE_SIZE);
     }
     memcpy(flashBuf + (dst & (FLASH_PAGE_SIZE - 1)), src, len);
 }
 
+#if 0
 void uf2_timer(void *p_context) {
     UNUSED_PARAMETER(p_context);
     if (hadWrite) {
@@ -229,6 +288,9 @@ void padded_memcpy(char *dst, const char *src, int len) {
 }
 
 
+/*------------------------------------------------------------------*/
+/*
+ *------------------------------------------------------------------*/
 void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
     uint32_t sectionIdx = block_no;
@@ -290,15 +352,24 @@ void read_block(uint32_t block_no, uint8_t *data) {
     }
 }
 
-#if 0
-void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state) {
+/** Write an block
+ *
+ * @return number of bytes processed, only 3 following values
+ *  -1 : if not an uf2 block
+ * 512 : write is successful
+ *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
+ */
+int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *state*/) {
     UF2_Block *bl = (void *)data;
 
-    // NRF_LOG_DEBUG("Write magic: %x", bl->magicStart0);
+     NRF_LOG_DEBUG("Write magic: %x", bl->magicStart0);
 
     if (!is_uf2_block(bl)) {
-        return;
+        return -1;
     }
+
+    // still busy with flashing previous blocks
+    if ( _is_flashing ) return 0;
 
     if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
         bl->targetAddr < USER_FLASH_START || bl->targetAddr + bl->payloadSize > USER_FLASH_END) {
@@ -315,7 +386,10 @@ void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state
         flash_write(bl->targetAddr, bl->data, bl->payloadSize);
     }
 
-    bool isSet = false;
+    // flash_write cause a flush to write previous cached data, this write data is not consumed yet
+    if ( _is_flashing ) return 0;
+
+//    bool isSet = false;
 
     if (state && bl->numBlocks) {
         if (state->numBlocks != bl->numBlocks) {
@@ -336,16 +410,21 @@ void write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state
                 // wait a little bit before resetting, to avoid Windows transmit error
                 // https://github.com/Microsoft/uf2-samd21/issues/11
                 if (!quiet) {
-                    uf2_timer_start(30);
-                    isSet = true;
+                    // uf2_timer_start(30);
+                    // isSet = true;
                 }
+
+                // flush last blocks
+                flushFlash();
             }
         }
         NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
     }
 
-    if (!isSet && !quiet) {
-        // uf2_timer_start(500);
-    }
+//    if (!isSet && !quiet) {
+//        // uf2_timer_start(500);
+//    }
+
+    return 512;
 }
-#endif
+

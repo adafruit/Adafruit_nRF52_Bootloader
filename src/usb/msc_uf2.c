@@ -68,6 +68,8 @@ enum { FL_PAGE_SIZE = 4096 };
 /* UF2
  *------------------------------------------------------------------*/
 void read_block(uint32_t block_no, uint8_t *data);
+int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *state*/);
+void ghostfat_init();
 
 /*------------------------------------------------------------------*/
 /* VARIABLES
@@ -75,7 +77,7 @@ void read_block(uint32_t block_no, uint8_t *data);
 static uint8_t _page_cached[FL_PAGE_SIZE] ATTR_ALIGNED(4);
 
 volatile static uint8_t _wr10_state;
-static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = MSC_UF2_FLASH_ADDR_START } ;
+
 
 static scsi_inquiry_data_t const mscd_inquiry_data =
 {
@@ -124,44 +126,22 @@ static inline uint32_t lba2addr(uint32_t lba)
   return MSC_UF2_FLASH_ADDR_START + lba*MSC_UF2_BLOCK_SIZE;
 }
 
-static void fat12_mkfs(void);
-
 
 /*------------------------------------------------------------------*/
 /*
  *------------------------------------------------------------------*/
-static void fat_pstorage_cb(pstorage_handle_t * p_handle, uint8_t op_code, uint32_t result, uint8_t  * p_data, uint32_t  data_len)
-{
-  if ( result != NRF_SUCCESS )
-  {
-    _wr10_state = WRITE10_FAILED;
-    TU_ASSERT(false, );
-  }
-
-  if ( PSTORAGE_CLEAR_OP_CODE == op_code)
-  {
-    if ( WRITE10_ERASING == _wr10_state) _wr10_state = WRITE10_ERASED;
-  }
-  else if ( PSTORAGE_STORE_OP_CODE ==  op_code)
-  {
-    if ( WRITE10_WRITING == _wr10_state) _wr10_state = WRITE10_WRITTEN;
-  }
-}
 
 /*------------------------------------------------------------------*/
 /* API
  *------------------------------------------------------------------*/
 void msc_uf2_init(void)
 {
-  pstorage_module_param_t  fat_psp = { .cb = fat_pstorage_cb};
-  pstorage_register(&fat_psp, &_fat_psh);
+  ghostfat_init();
 }
 
 void msc_uf2_mount(void)
 {
-  _wr10_state = WRITE10_IDLE;
 
-  // reset every time it is plugged
 }
 
 void msc_uf2_umount(void)
@@ -252,17 +232,7 @@ int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16]
 /*------------------------------------------------------------------*/
 /* Tinyusb Flash READ10 & WRITE10
  *------------------------------------------------------------------*/
-static bool fl_page_erase(uint32_t addr)
-{
-  _fat_psh.block_id = addr;
-  return NRF_SUCCESS == pstorage_clear(&_fat_psh, FL_PAGE_SIZE);
-}
 
-static bool fl_page_write(uint32_t addr, uint8_t* buf, uint16_t bufsize)
-{
-  _fat_psh.block_id = addr;
-  return NRF_SUCCESS == pstorage_store(&_fat_psh, buf, bufsize, 0);
-}
 
 int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
@@ -289,84 +259,18 @@ int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t 
 {
   (void) rhport; (void) lun;
 
-  return bufsize;
+  uint32_t count = 0;
+  int wr_ret;
 
-  uint32_t addr = lba2addr(lba) + offset;
-
-  /* 0. Check if flash is the same as data -> skip if matches
-   * 1. queue flash erase pstorage_clear(), return 0 until erasing is done
-   * 2. queue flash writing, return 0 until writing is complete
-   * 3. return written bytes.
-   *
-   * Note since CFG_TUD_MSC_BUFSIZE is 4KB, bufsize is cap at 4KB
-   */
-
-  switch(_wr10_state)
+  while ( (count < bufsize) && ((wr_ret = write_block(lba, buffer, false)) > 0) )
   {
-    case WRITE10_IDLE:
-    {
-      // No need to write if flash's content matches with data
-      if ( 0 == memcmp(buffer, (void*) addr, bufsize) ) return bufsize;
-
-      uint32_t page_addr = align4k(addr);
-      uint32_t off4k     = offset4k(addr);
-
-      // Cache contents from start of page to current address
-      if ( off4k )
-      {
-        memcpy(_page_cached, (uint8_t*) page_addr, off4k);
-      }
-
-      // Copy new data
-      memcpy(_page_cached+off4k, buffer, bufsize);
-
-      // Cache contents after data to end of page
-      if ( off4k + bufsize < FL_PAGE_SIZE)
-      {
-        memcpy(_page_cached+off4k+bufsize, (uint8_t*) (addr+bufsize), FL_PAGE_SIZE - (off4k + bufsize ) );
-      }
-
-      // Start erasing
-      TU_ASSERT( fl_page_erase(align4k(addr)), -1);
-
-      _wr10_state = WRITE10_ERASING;
-
-      // Tell tinyusb that we are not ready to consume its data
-      // The stack will keep the data and call again
-      return 0;
-    }
-    break;
-
-    case WRITE10_ERASING:
-      // still erasing, nothing else to do
-      return 0;
-    break;
-
-    case WRITE10_ERASED:
-      // Start writing
-      TU_ASSERT( fl_page_write(align4k(addr), _page_cached, FL_PAGE_SIZE), -1);
-      _wr10_state = WRITE10_WRITING;
-      return 0;
-    break;
-    
-    case WRITE10_WRITING:
-      return 0;
-    break;
-
-    case WRITE10_WRITTEN:
-      _wr10_state = WRITE10_IDLE; // back to idle
-
-      // positive return means we complete the operation, tinyusb can receiving next write10
-      return bufsize;
-    break;
-
-    case WRITE10_FAILED:
-      _wr10_state = WRITE10_IDLE;
-      return -1;
-    break;
-
-    default: return -1; break;
+    lba++;
+    buffer += 512;
+    count  += 512;
   }
+
+  // Consider non-uf2 block write as successful
+  return  (wr_ret < 0) ? bufsize : count;
 }
 
 #endif
