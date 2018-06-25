@@ -6,7 +6,7 @@
 
 #define UF2_NUM_BLOCKS     8000   // at least 4,1 MB for FAT16
 #define VOLUME_LABEL       "NRF52BOOT  "
-#define FLASH_SIZE         (USER_FLASH_END-USER_FLASH_START)
+#define FLASH_SIZE         (USER_FLASH_END-USER_FLASH_START) // Max flash size
 
 // Only allow to write application
 #define USER_FLASH_START   0x26000
