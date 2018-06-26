@@ -10,6 +10,8 @@
 # - SD_VERSION : e.g 5.1.0
 # - SD_HEX     : path to bootloader hex binary
 #******************************************************************************
+VERSION_SINGLEBANK = 1
+
 VERSION_MAJOR    = 6
 VERSION_MINOR    = 0
 VERSION_REVISION = 0
