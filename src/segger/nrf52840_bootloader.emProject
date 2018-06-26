@@ -76,10 +76,6 @@
       link_use_linker_script_file="No"
       linker_section_placement_file="flash_placement.xml" />
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
-    <configuration Name="Debug Dual" gcc_optimization_level="Debug" />
-    <configuration
-      Name="Release Dual"
-      gcc_optimization_level="Optimize For Size" />
     <configuration
       Name="Release Single"
       gcc_optimization_level="Optimize For Size" />
@@ -126,27 +122,8 @@
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_bank_internal.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_ble_svc.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_ble_svc_internal.h" />
-              <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_dual_bank.c">
-                <configuration
-                  Name="Debug Single"
-                  build_exclude_from_build="Yes" />
-                <configuration
-                  Name="Release Single"
-                  build_exclude_from_build="Yes" />
-                <configuration
-                  Name="Debug Size++"
-                  build_exclude_from_build="Yes" />
-              </file>
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_init.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_init_template.c" />
-              <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_single_bank.c">
-                <configuration
-                  Name="Debug Dual"
-                  build_exclude_from_build="Yes" />
-                <configuration
-                  Name="Release Dual"
-                  build_exclude_from_build="Yes" />
-              </file>
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_transport.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_transport_ble.c" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_transport_serial.c" />
@@ -158,6 +135,7 @@
                 <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/hci_transport/hci_mem_pool_internal.h" />
                 <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/hci_transport/hci_transport_config.h" />
               </folder>
+              <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_single_bank.c" />
             </folder>
             <folder Name="util">
               <file file_name="../../lib/sdk11/components/libraries/util/nrf_log.c" />
@@ -276,7 +254,5 @@
     gcc_debugging_level="None"
     gcc_omit_frame_pointer="Yes"
     gcc_optimization_level="Level 1" />
-  <configuration Name="Debug Dual" />
-  <configuration Name="Release Dual" />
   <configuration Name="Debug Size++" />
 </solution>

@@ -16,30 +16,22 @@ VERSION_MAJOR    = 6
 VERSION_MINOR    = 0
 VERSION_REVISION = 0
 
-SDK_PATH         = ../../lib/sdk/components
-SDK11_PATH       = ../../lib/sdk11/components
+SDK_PATH         = ../lib/sdk/components
+SDK11_PATH       = ../lib/sdk11/components
 
-SRC_PATH         = ..
-TUSB_PATH		     = ../../lib/tinyusb/src
+SRC_PATH         = .
+TUSB_PATH		     = ../lib/tinyusb/src
 
 SD_NAME          = s140
 SD_VERSION       = 6.0.0
 
 MK_DIS_FIRMWARE  = "$(subst s,S,$(SD_NAME)) $(SD_VERSION), $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)"
 
-SD_PATH          = ../../lib/softdevice/$(SD_VERSION)
+SD_PATH          = ../lib/softdevice/$(SD_VERSION)
 SD_HEX           = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
 LINKER_SCRIPT    = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 
-ifeq ($(VERSION_SINGLEBANK),1)
-BANKMODE = single
-C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
-else
-BANKMODE = dual
-C_SOURCE_FILES += $(SDK_PATH)/libraries/bootloader_dfu/dfu_dual_bank.c
-endif
-
-BOOTLOADER_SD_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)_$(BANKMODE)
+BOOTLOADER_SD_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)
 
 #******************************************************************************
 # Tool configure
@@ -95,6 +87,7 @@ C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_init_template.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
+C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
 
 C_SOURCE_FILES += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c
 
@@ -308,7 +301,7 @@ BOOTLOADER_WITH_SD_NAME := $(OUTPUT_FILENAME)_$(BOOTLOADER_SD_SUFFIX)
 
 # Target for Feather nrf52 board
 feather52840: OUTPUT_FILENAME := feather52840_bootloader
-feather52840: FINAL_BIN_DIR := ../../bin/feather52840/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)/$(BANKMODE)
+feather52840: FINAL_BIN_DIR := ../bin/feather52840/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
 feather52840: CFLAGS += -DBOARD_FEATHER52840
 feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_FILENAME).out
@@ -317,7 +310,7 @@ feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
 
 # Target for Metro nrf52 board
 metro52: OUTPUT_FILENAME := metro52_bootloader
-metro52: FINAL_BIN_DIR := ../../bin/metro52/$(BANKMODE)
+metro52: FINAL_BIN_DIR := ../bin/metro52/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
 metro52: CFLAGS += -DBOARD_METRO52
 metro52: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_FILENAME).out
