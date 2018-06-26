@@ -34,38 +34,35 @@
 */
 /**************************************************************************/
 
-#ifndef METRO52_H
-#define METRO52_H
-
-// Note: FRST and LED2 are on the same pin, so can't be used together
-//       LED2 will be disabled since it is less critical
+#ifndef PCA10056_H
+#define PCA10056_H
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          29
-#define LED_2          22
-#define LED_STATE_ON   1
+#define LED_1          13
+#define LED_2          14
+#define LED_STATE_ON   0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER 2
-#define BUTTON_1       18
-#define BUTTON_2       22
+#define BUTTON_1       11
+#define BUTTON_2       12
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER  23
-#define TX_PIN_NUMBER  8
-#define CTS_PIN_NUMBER 0
-#define RTS_PIN_NUMBER 0
+#define RX_PIN_NUMBER  8
+#define TX_PIN_NUMBER  6
+#define CTS_PIN_NUMBER 7
+#define RTS_PIN_NUMBER 5
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MODEL      "Bluefruit Metro 52"
+#define DIS_MODEL      "Nordic PCA10056"
 
-#endif // METRO52_H
+#endif // PCA10056_H

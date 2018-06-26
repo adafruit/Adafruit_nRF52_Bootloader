@@ -18,8 +18,8 @@
 
 #if defined BOARD_FEATHER52840
 #include "feather52840.h"
-#elif defined BOARD_METRO52
-#include "metro52.h"
+#elif defined BOARD_PCA10056
+#include "pca10056.h"
 #else
 #error No boards defined
 #endif

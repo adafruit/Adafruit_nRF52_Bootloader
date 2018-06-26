@@ -267,12 +267,11 @@ all:
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
 	@echo Making feather52840 board
 	@echo ----------------------
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840
-	
-	#@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
-	#@echo Making Metro52 board
-	#@echo --------------------
-	#@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e metro52
+	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840	
+	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
+	@echo Making pca10056 board
+	@echo --------------------
+	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e pca10056
 
 #target for printing all targets
 help:
@@ -310,10 +309,10 @@ feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
 	$(NO_ECHO)$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
 
 # Target for Metro nrf52 board
-metro52: OUTPUT_FILENAME := metro52_bootloader
-metro52: FINAL_BIN_DIR := ../bin/metro52/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
-metro52: CFLAGS += -DBOARD_METRO52
-metro52: $(BUILD_DIRECTORIES) $(OBJECTS)
+pca10056: OUTPUT_FILENAME := pca10056_bootloader
+pca10056: FINAL_BIN_DIR := ../bin/pca10056/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
+pca10056: CFLAGS += -DBOARD_PCA10056
+pca10056: $(BUILD_DIRECTORIES) $(OBJECTS)
 	@echo Linking target: $(OUTPUT_FILENAME).out
 	$(NO_ECHO)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
 	$(NO_ECHO)$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
@@ -370,8 +369,8 @@ flash_feather52840: feather52840
 	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
 	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset
 
-flash_metro52: BOOTLOADER_WITH_SD_NAME := metro52_bootloader_$(BOOTLOADER_SD_SUFFIX)
-flash_metro52: metro52
+flash_pca10056: BOOTLOADER_WITH_SD_NAME := pca10056_bootloader_$(BOOTLOADER_SD_SUFFIX)
+flash_pca10056: pca10056
 	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
 	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset
 	
