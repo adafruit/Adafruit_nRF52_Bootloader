@@ -265,7 +265,7 @@ default: all
 #building all targets
 all:
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
-	@echo Making Feather52840 board
+	@echo Making feather52840 board
 	@echo ----------------------
 	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840
 	
@@ -277,10 +277,11 @@ all:
 #target for printing all targets
 help:
 	@echo following targets are available:
-	@echo - feather52840       : build for Feather nrf52 board
-	@echo - metro52         : build for Metro nrf52 board
-	@echo - flash_feather52840 : flash Feather nrf52 board
-	@echo - flash_metro52   : flash Metro nrf52 board
+	@echo - feather52840       : build for Feather nRF52840
+	@echo - flash_feather52840 : flash Feather nRF52840
+	@echo - pca10056           : build for pca10056 DK
+	@echo - flash_pca10056     : flash pca10056 DK
+	@echo - flash_sd           : flash SoftDevice only
 
 C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
 C_PATHS = $(call remduplicates, $(dir $(C_SOURCE_FILES) ) )
