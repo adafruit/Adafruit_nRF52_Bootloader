@@ -49,15 +49,22 @@
 #define CFG_TUSB_MCU                OPT_MCU_NRF5X
 #define CFG_TUSB_RHPORT0_MODE       OPT_MODE_DEVICE
 
-#define CFG_TUSB_OS                 OPT_OS_NONE
-//#define CFG_TUD_TASK_PRIO           0
-
 #define CFG_TUSB_DEBUG              0
+
+/*------------- RTOS -------------*/
+#define CFG_TUSB_OS               OPT_OS_NONE
+//#define CFG_TUD_TASK_PRIO         0
+//#define CFG_TUD_TASK_QUEUE_SZ     16
+//#define CFG_TUD_TASK_STACK_SZ     150
+
 
 //--------------------------------------------------------------------+
 // DEVICE CONFIGURATION
 // Note: TUD Stand for Tiny Usb Device
 //--------------------------------------------------------------------+
+
+/*------------- Core -------------*/
+#define CFG_TUD_DESC_AUTO           0
 #define CFG_TUD_ENDOINT0_SIZE       64
 
 //------------- Class enabled -------------//

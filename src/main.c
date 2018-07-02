@@ -60,7 +60,6 @@
 #include "nrf_usbd.h"
 
 #include "tusb.h"
-#include "usb/tusb_descriptors.h"
 #include "usb/msc_uf2.h"
 
 
@@ -356,9 +355,6 @@ int main(void)
 
   // Init usb stack
   tusb_init();
-
-  // Set usb descriptors
-  tud_set_descriptors(&usb_desc_init);
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
 
