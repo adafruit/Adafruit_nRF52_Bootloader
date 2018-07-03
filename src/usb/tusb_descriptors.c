@@ -279,46 +279,30 @@ app_descriptor_configuration_t const desc_configuration =
 //--------------------------------------------------------------------+
 // STRING DESCRIPTORS
 //--------------------------------------------------------------------+
-#define STRING_LEN_UNICODE(n) (2 + (2*(n))) // also includes 2 byte header
-#define ENDIAN_BE16_FROM( high, low) ENDIAN_BE16(high << 8 | low)
 
 // array of pointer to string descriptors
 uint16_t const * const string_desc_arr [] =
 {
-    [0] = (uint16_t []) { // supported language
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(1), TUSB_DESC_STRING ),
-        0x0409 // English
-    },
+    // 0 index is supported language = English
+    TUD_DESC_STRCONV(0x0409),
 
-    [1] = (uint16_t []) { // manufacturer
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(19), TUSB_DESC_STRING),
-        'A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'
-    },
+    // Manufacturer
+    TUD_DESC_STRCONV('A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'),
 
-    [2] = (uint16_t []) { // product
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(18), TUSB_DESC_STRING),
-        'B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0'
-    },
+    // Product
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0'),
 
-    [3] = (uint16_t []) { // serials TODO use chip ID
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(4), TUSB_DESC_STRING),
-        '1', '2', '3', '4' // len = 4
-    },
+    // Serials TODO use chip ID
+    TUD_DESC_STRCONV('1', '2', '3', '4'),
 
-    [4] = (uint16_t []) { // CDC Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(16), TUSB_DESC_STRING),
-        'B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'
-    },
+    // CDC Interface
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'),
 
-    [5] = (uint16_t []) { // MSC Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(17), TUSB_DESC_STRING),
-        'B','l','u','e','f','r','u','i','t',' ','S','t','o','r','a','g','e'
-    },
+    // MSC Interface
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','S','t','o','r','a','g','e'),
 
-    [6] = (uint16_t []) { // Custom Interface
-        ENDIAN_BE16_FROM( STRING_LEN_UNICODE(16), TUSB_DESC_STRING),
-        'B','l','u','e','f','r','u','i','t',' ','C','u','s','t','o','m'
-    }
+    // Custom Interface
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','C','u','s','t','o','m')
 };
 
 
