@@ -53,16 +53,6 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
 /*------------------------------------------------------------------*/
 /* VARIABLES
  *------------------------------------------------------------------*/
-static scsi_inquiry_data_t const mscd_inquiry_data =
-{
-    .is_removable         = 1,
-    .version              = 2,
-    .response_data_format = 2,
-    .vendor_id            = "Adafruit",
-    .product_id           = "Feather52840",
-    .product_revision     = "1.0"
-};
-
 static scsi_sense_fixed_data_t mscd_sense_data =
 {
     .response_code        = 0x70,
@@ -111,11 +101,6 @@ int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16]
 
   switch (scsi_cmd[0])
   {
-    case SCSI_CMD_INQUIRY:
-      ptr = &mscd_inquiry_data;
-      len = sizeof(scsi_inquiry_data_t);
-    break;
-
     case SCSI_CMD_REQUEST_SENSE:
       ptr = &mscd_sense_data;
       len = sizeof(scsi_sense_fixed_data_t);
