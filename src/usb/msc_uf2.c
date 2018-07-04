@@ -40,15 +40,6 @@
 
 #include "pstorage.h"
 
-// for formatting fatfs when Softdevice is not enabled
-#include "nrf_nvmc.h"
-
-
-#define SECTORS_PER_FAT   7
-#define ROOT_DIR_SECTOR   8
-
-#define SECTOR_DATA       (1+SECTORS_PER_FAT+ROOT_DIR_SECTOR)
-
 /*------------------------------------------------------------------*/
 /* MACRO TYPEDEF CONSTANT ENUM
  *------------------------------------------------------------------*/
@@ -72,25 +63,11 @@ static scsi_inquiry_data_t const mscd_inquiry_data =
     .product_revision     = "1.0"
 };
 
-static scsi_read_capacity10_data_t const mscd_read_capacity10_data =
-{
-    .last_lba   = ENDIAN_BE(MSC_UF2_BLOCK_NUM-1), // read capacity
-    .block_size = ENDIAN_BE(MSC_UF2_BLOCK_SIZE)
-};
-
 static scsi_sense_fixed_data_t mscd_sense_data =
 {
     .response_code        = 0x70,
     .sense_key            = 0, // no errors
     .additional_sense_len = sizeof(scsi_sense_fixed_data_t) - 8
-};
-
-static scsi_read_format_capacity_data_t const mscd_format_capacity_data =
-{
-    .list_length     = 8,
-    .block_num       = ENDIAN_BE(MSC_UF2_BLOCK_NUM), // write capacity
-    .descriptor_type = 2, // TODO formatted media, refractor to const
-    .block_size_u16  = ENDIAN_BE16(MSC_UF2_BLOCK_SIZE)
 };
 
 static scsi_mode_parameters_t const msc_dev_mode_para =
@@ -100,19 +77,6 @@ static scsi_mode_parameters_t const msc_dev_mode_para =
     .device_specific_para    = 0,
     .block_descriptor_length = 0
 };
-
-/*------------------------------------------------------------------*/
-/*
- *------------------------------------------------------------------*/
-static inline uint32_t lba2addr(uint32_t lba)
-{
-  return MSC_UF2_FLASH_ADDR_START + lba*MSC_UF2_BLOCK_SIZE;
-}
-
-
-/*------------------------------------------------------------------*/
-/*
- *------------------------------------------------------------------*/
 
 /*------------------------------------------------------------------*/
 /* API
@@ -152,19 +116,9 @@ int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16]
       len = sizeof(scsi_inquiry_data_t);
     break;
 
-    case SCSI_CMD_READ_CAPACITY_10:
-      ptr = &mscd_read_capacity10_data;
-      len = sizeof(scsi_read_capacity10_data_t);
-    break;
-
     case SCSI_CMD_REQUEST_SENSE:
       ptr = &mscd_sense_data;
       len = sizeof(scsi_sense_fixed_data_t);
-    break;
-
-    case SCSI_CMD_READ_FORMAT_CAPACITY:
-      ptr = &mscd_format_capacity_data;
-      len = sizeof(scsi_read_format_capacity_data_t);
     break;
 
     case SCSI_CMD_MODE_SENSE_6:

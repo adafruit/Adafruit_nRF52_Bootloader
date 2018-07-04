@@ -43,6 +43,8 @@
  extern "C" {
 #endif
 
+#include "uf2/uf2cfg.h" // for block num
+
 //--------------------------------------------------------------------+
 // COMMON CONFIGURATION
 //--------------------------------------------------------------------+
@@ -92,11 +94,18 @@
  */
 #define CFG_TUD_CDC_FLUSH_ON_SOF    0
 
-// Number of supported Logical Unit Number (At least 1)
+// Number of supported Logical Unit Number
 #define CFG_TUD_MSC_MAXLUN          1
 
-// Buffer size of Device Mass storage
+// Number of Blocks
+#define CFG_TUD_MSC_BLOCK_NUM       UF2_NUM_BLOCKS
+
+// Block size
+#define CFG_TUD_MSC_BLOCK_SZ        512
+
+// Buffer size for each read/write transfer, the more the better
 #define CFG_TUD_MSC_BUFSIZE         (4*1024)
+
 
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT
