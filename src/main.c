@@ -131,35 +131,12 @@ bool button_pressed(uint32_t pin)
 
 static void led_pin_init(uint32_t pin)
 {
-#ifdef BOARD_METRO52
-  // LED BLUE is muxed with FRESET. We need to make sure it is
-  // not wired to GND before configuring it as output.
-  // Only check if it is not yet configured as OUTPUT
-  if (pin == LED_BLUE && !bit_test(NRF_GPIO->PIN_CNF[pin], GPIO_PIN_CNF_DIR_Pos))
-  {
-    // skip and configure as input if grounded instead of output !!!
-    if ( button_pressed(pin) ) return;
-  }
-#endif
-
   nrf_gpio_cfg_output(pin);
   led_off(pin);
 }
 
 void led_control(uint32_t pin, bool state)
 {
-#ifdef BOARD_METRO52
-  // Skip if LED_BLUE is configured as input and wiring to GND
-  // Otherwise configure it as output (it may just transition from hardware GND to open)
-  if ( pin == LED_2 && !bit_test(NRF_GPIO->PIN_CNF[pin], GPIO_PIN_CNF_DIR_Pos) )
-  {
-    if ( button_pressed(pin) ) return;
-
-    // configure as output
-    nrf_gpio_cfg_output(pin);
-  }
-#endif
-
   nrf_gpio_pin_write(pin, state ? LED_STATE_ON : (1-LED_STATE_ON));
 }
 
@@ -357,48 +334,20 @@ int main(void)
   tusb_init();
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-
-  /* For metro52 LED_BLUE is muxed with FRESET. We only init FRESET BUTTON
-   * as needed and reconfigure as LED BLUE when done. */
-#ifdef BOARD_METRO52
-  button_pin_init(FRESET_BUTTON);
-  nrf_delay_us(100); // wait for the pin state is stable
-#endif
-
   // DFU button pressed
   dfu_start  = dfu_start || button_pressed(BOOTLOADER_BUTTON);
 
   // DFU + FRESET are pressed --> OTA
   _ota_update = _ota_update  || ( button_pressed(BOOTLOADER_BUTTON) && button_pressed(FRESET_BUTTON) ) ;
 
-#ifdef BOARD_METRO52
-  led_pin_init(LED_BLUE);
-#endif
-
   if (dfu_start || (!bootloader_app_is_valid(DFU_BANK_0_REGION_START)))
   {
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
   }
-  else
-  {
-    /* Adafruit Modification
-     * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
-     * to support auto programming from Arduino IDE */
-    (void) bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
-  }
 
   /*------------- Adafruit Factory reset -------------*/
-#ifdef BOARD_METRO52
-  button_pin_init(FRESET_BUTTON);
-  nrf_delay_us(100); // wait for the pin state is stable
-#endif
-
   bool is_freset = ( !button_pressed(BOOTLOADER_BUTTON) && button_pressed(FRESET_BUTTON) );
-
-#ifdef BOARD_METRO52
-  led_pin_init(LED_BLUE);
-#endif
 
   if (is_freset)
   {
