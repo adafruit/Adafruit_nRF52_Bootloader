@@ -54,7 +54,7 @@
 #define CFG_TUSB_DEBUG              0
 
 /*------------- RTOS -------------*/
-#define CFG_TUSB_OS               OPT_OS_NONE
+#define CFG_TUSB_OS                 OPT_OS_NONE
 //#define CFG_TUD_TASK_PRIO         0
 //#define CFG_TUD_TASK_QUEUE_SZ     16
 //#define CFG_TUD_TASK_STACK_SZ     150
@@ -66,17 +66,19 @@
 //--------------------------------------------------------------------+
 
 /*------------- Core -------------*/
-#define CFG_TUD_DESC_AUTO           0
+#define CFG_TUD_DESC_AUTO           1
+#define CFG_TUD_DESC_VID            0x239A
+#define CFG_TUD_DESC_PID            0x0029
+
 #define CFG_TUD_ENDOINT0_SIZE       64
 
 //------------- Class enabled -------------//
+#define CFG_TUD_CDC                 1
+#define CFG_TUD_MSC                 1
 #define CFG_TUD_HID_KEYBOARD        0
 #define CFG_TUD_HID_MOUSE           0
 #define CFG_TUD_HID_GENERIC         0 // not supported yet
-#define CFG_TUD_MSC                 1
-#define CFG_TUD_CDC                 1
-
-#define CFG_TUD_CUSTOM_CLASS        1
+#define CFG_TUD_CUSTOM_CLASS        0
 
 
 /*------------------------------------------------------------------*/
