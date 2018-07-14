@@ -129,7 +129,7 @@ static void wait_for_events(void)
         tusb_task();
 
         // Send out cdc's data
-        tud_cdc_flush();
+        tud_cdc_write_flush();
 
         if ((m_update_status == BOOTLOADER_COMPLETE) ||
             (m_update_status == BOOTLOADER_TIMEOUT)  ||

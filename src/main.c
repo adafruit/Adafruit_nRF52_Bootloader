@@ -483,15 +483,13 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
-void tud_mount_cb(uint8_t rhport)
+void tud_mount_cb(void)
 {
-  (void) rhport;
   msc_uf2_mount();
 }
 
-void tud_umount_cb(uint8_t rhport)
+void tud_umount_cb(void)
 {
-  (void) rhport;
   msc_uf2_umount();
 }
 
