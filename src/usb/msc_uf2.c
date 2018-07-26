@@ -53,13 +53,6 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
 /*------------------------------------------------------------------*/
 /* VARIABLES
  *------------------------------------------------------------------*/
-static scsi_sense_fixed_data_t mscd_sense_data =
-{
-    .response_code        = 0x70,
-    .sense_key            = 0, // no errors
-    .additional_sense_len = sizeof(scsi_sense_fixed_data_t) - 8
-};
-
 static scsi_mode_parameters_t const msc_dev_mode_para =
 {
     .mode_data_length        = 3,
@@ -89,7 +82,7 @@ void msc_uf2_umount(void)
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
-int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize)
+int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize)
 {
   // read10 & write10 has their own callback and MUST not be handled here
 
@@ -101,23 +94,24 @@ int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16]
 
   switch (scsi_cmd[0])
   {
-    case SCSI_CMD_REQUEST_SENSE:
-      ptr = &mscd_sense_data;
-      len = sizeof(scsi_sense_fixed_data_t);
-    break;
-
     case SCSI_CMD_MODE_SENSE_6:
       ptr = &msc_dev_mode_para;
       len = sizeof(msc_dev_mode_para);
     break;
 
     case SCSI_CMD_TEST_UNIT_READY:
-      ptr = NULL;
+      // Command that host uses to check our readiness before sending other commands
       len = 0;
     break;
 
     case SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
-      ptr = NULL;
+      // Host is about to read/write etc ... better not to disconnect disk
+      len = 0;
+    break;
+
+    case SCSI_CMD_START_STOP_UNIT:
+      // Host try to eject/safe remove/powerof us. We could safely disconnect with disk storage, or go into lower power
+      // scsi_start_stop_unit_t const * cmd_start_stop = (scsi_start_stop_unit_t const *) scsi_cmd
       len = 0;
     break;
 
@@ -140,23 +134,15 @@ int32_t tud_msc_scsi_cb (uint8_t rhport, uint8_t lun, uint8_t const scsi_cmd[16]
     }
   }
 
-  //------------- clear sense data if it is not request sense command -------------//
-  if ( SCSI_CMD_REQUEST_SENSE != scsi_cmd[0] )
-  {
-    mscd_sense_data.sense_key                  = SCSI_SENSEKEY_NONE;
-    mscd_sense_data.additional_sense_code      = 0;
-    mscd_sense_data.additional_sense_qualifier = 0;
-  }
-
   return len;
 }
 
 /*------------------------------------------------------------------*/
 /* Tinyusb Flash READ10 & WRITE10
  *------------------------------------------------------------------*/
-int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
+int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
-  (void) rhport; (void) lun;
+  (void) lun;
 
   // since we return block size each, offset should always be zero
   TU_ASSERT(offset == 0, -1);
@@ -175,9 +161,9 @@ int32_t tud_msc_read10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t o
   return count;
 }
 
-int32_t tud_msc_write10_cb (uint8_t rhport, uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
+int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
-  (void) rhport; (void) lun;
+  (void) lun;
 
   uint32_t count = 0;
   int wr_ret;
