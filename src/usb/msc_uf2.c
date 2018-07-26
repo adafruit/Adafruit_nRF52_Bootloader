@@ -51,17 +51,6 @@ void read_block(uint32_t block_no, uint8_t *data);
 int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *state*/);
 
 /*------------------------------------------------------------------*/
-/* VARIABLES
- *------------------------------------------------------------------*/
-static scsi_mode_parameters_t const msc_dev_mode_para =
-{
-    .mode_data_length        = 3,
-    .medium_type             = 0,
-    .device_specific_para    = 0,
-    .block_descriptor_length = 0
-};
-
-/*------------------------------------------------------------------*/
 /* API
  *------------------------------------------------------------------*/
 void msc_uf2_init(void)
@@ -94,11 +83,6 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
 
   switch (scsi_cmd[0])
   {
-    case SCSI_CMD_MODE_SENSE_6:
-      ptr = &msc_dev_mode_para;
-      len = sizeof(msc_dev_mode_para);
-    break;
-
     case SCSI_CMD_TEST_UNIT_READY:
       // Command that host uses to check our readiness before sending other commands
       len = 0;
