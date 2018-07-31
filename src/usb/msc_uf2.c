@@ -71,59 +71,61 @@ void msc_uf2_umount(void)
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
+
+// Callback invoked when received an SCSI command not in built-in list below
+// - READ_CAPACITY10, READ_FORMAT_CAPACITY, INQUIRY, MODE_SENSE6, REQUEST_SENSE
+// - READ10 and WRITE10 has their own callbacks
 int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize)
 {
-  // read10 & write10 has their own callback and MUST not be handled here
+  void const* response = NULL;
+  uint16_t resplen = 0;
 
-  void const* ptr = NULL;
-  uint16_t len = 0;
-
-  // most scsi handled is input
-  bool in_xfer = true;
-
-  switch (scsi_cmd[0])
+  switch ( scsi_cmd[0] )
   {
     case SCSI_CMD_TEST_UNIT_READY:
       // Command that host uses to check our readiness before sending other commands
-      len = 0;
+      resplen = 0;
     break;
 
     case SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
       // Host is about to read/write etc ... better not to disconnect disk
-      len = 0;
+      resplen = 0;
     break;
 
     case SCSI_CMD_START_STOP_UNIT:
-      // Host try to eject/safe remove/powerof us. We could safely disconnect with disk storage, or go into lower power
-      // scsi_start_stop_unit_t const * cmd_start_stop = (scsi_start_stop_unit_t const *) scsi_cmd
-      len = 0;
+      // Host try to eject/safe remove/poweroff us. We could safely disconnect with disk storage, or go into lower power
+      /* scsi_start_stop_unit_t const * start_stop = (scsi_start_stop_unit_t const *) scsi_cmd;
+       // Start bit = 0 : low power mode, if load_eject = 1 : unmount disk storage as well
+       // Start bit = 1 : Ready mode, if load_eject = 1 : mount disk storage
+       start_stop->start;
+       start_stop->load_eject;
+       */
+      resplen = 0;
     break;
 
     default:
-      // negative is error -> Data stage is STALL, status = failed
-      return -1;
+      // Set Sense = Invalid Command Operation
+      tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0x00);
+
+      // negative means error -> tinyusb could stall and/or response with failed status
+      resplen = -1;
+    break;
   }
 
   // return len must not larger than bufsize
-  TU_ASSERT( bufsize >= len );
+  if ( resplen > bufsize ) resplen = bufsize;
 
-  if ( ptr && len )
+  // copy response to stack's buffer if any
+  if ( response && resplen )
   {
-    if(in_xfer)
-    {
-      memcpy(buffer, ptr, len);
-    }else
-    {
-      // SCSI output
-    }
+    memcpy(buffer, response, resplen);
   }
 
-  return len;
+  return resplen;
 }
 
-/*------------------------------------------------------------------*/
-/* Tinyusb Flash READ10 & WRITE10
- *------------------------------------------------------------------*/
+// Callback invoked when received READ10 command.
+// Copy disk's data to buffer (up to bufsize) and return number of copied bytes.
 int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
   (void) lun;
@@ -145,6 +147,8 @@ int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buf
   return count;
 }
 
+// Callback invoked when received WRITE10 command.
+// Process data in buffer to disk's storage and return number of written bytes
 int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
   (void) lun;
