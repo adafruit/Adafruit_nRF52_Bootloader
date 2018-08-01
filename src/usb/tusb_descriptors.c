@@ -75,5 +75,10 @@ tud_desc_set_t tud_desc_set =
     .device     = NULL,
     .config     = NULL,
     .string_arr = (uint8_t const **) string_desc_arr,
-    .hid_report = NULL
+    .hid_report =
+    {
+        .generic       = NULL,
+        .boot_keyboard = NULL,
+        .boot_mouse    = NULL
+    }
 };
