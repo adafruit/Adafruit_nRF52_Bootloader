@@ -16,7 +16,7 @@ SDK11_PATH      = ../lib/sdk11/components
 SRC_PATH        = .
 TUSB_PATH       = ../lib/tinyusb/src
 
-SD_NAME         = s140
+
 SD_VER1         = 6
 SD_VER2         = 0
 SD_VER3         = 0
@@ -32,7 +32,7 @@ OUTPUT_FILENAME = $(BOARD)_bootloader
 BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 
 BETA_DIR        = ../bin/$(BOARD)/beta
-RELEASE_DIR     = ../bin/$(BOARD)/$(SD_VERSION)
+RELEASE_DIR     = ../bin/$(BOARD)/$(SD_VERSION_FULL)
 
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION_FULL)"
@@ -52,11 +52,14 @@ endif
 BUILD = _build-$(BOARD)
 
 NRF52840_BOARDLIST = pca10056 feather52840
+IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST)) 
 
-ifneq ($(findstring $(BOARD),$(NRF52840_BOARDLIST)),)
+ifneq ($(IS_NRF52840),)
 #nrf52840 board
+SD_NAME = s140
 else
 #nrf52832 board
+SD_NAME = s132
 endif
 
 
