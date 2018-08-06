@@ -24,8 +24,8 @@ SD_VER4         = 0
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
 SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
 
-SD_PATH         = ../lib/softdevice/$(SD_VERSION)
-SD_HEX          = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
+SD_PATH         = ../lib/softdevice/$(SD_NAME)/$(SD_VERSION)
+SD_HEX          = $(SD_PATH)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
 LINKER_SCRIPT   = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 
 OUTPUT_FILENAME = $(BOARD)_bootloader
@@ -52,13 +52,15 @@ endif
 BUILD = _build-$(BOARD)
 
 NRF52840_BOARDLIST = pca10056 feather52840
-IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST)) 
+IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
 
 ifneq ($(IS_NRF52840),)
 #nrf52840 board
+$(info nRF52840)
 SD_NAME = s140
 else
 #nrf52832 board
+$(info nRF52832)
 SD_NAME = s132
 endif
 
@@ -198,8 +200,8 @@ INC_PATHS += -I$(SDK_PATH)/toolchain
 
 
 INC_PATHS += -I$(SD_PATH)/common
-INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers
-INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers/nrf52
+INC_PATHS += -I$(SD_PATH)/headers
+INC_PATHS += -I$(SD_PATH)/headers/nrf52
 
 #******************************************************************************
 # Compiler Flags

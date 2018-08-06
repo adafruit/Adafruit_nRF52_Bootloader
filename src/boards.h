@@ -20,6 +20,8 @@
   #include "boards/feather52840.h"
 #elif defined BOARD_PCA10056
   #include "boards/pca10056.h"
+#elif defined BOARD_FEATHER52832
+  #include "boards/feather52832.h"
 #else
   #error No boards defined
 #endif
