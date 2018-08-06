@@ -15,6 +15,7 @@ SDK11_PATH      = ../lib/sdk11/components
 
 SRC_PATH        = .
 TUSB_PATH       = ../lib/tinyusb/src
+NRFX_PATH				= ../lib/nrfx
 
 
 SD_VER1         = 6
@@ -26,7 +27,7 @@ SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
 
 SD_PATH         = ../lib/softdevice/$(SD_NAME)/$(SD_VERSION)
 SD_HEX          = $(SD_PATH)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
-LINKER_SCRIPT   = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
+LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_$(SD_VERSION).ld
 
 OUTPUT_FILENAME = $(BOARD)_bootloader
 BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
@@ -108,10 +109,6 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/usb.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
@@ -144,6 +141,15 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
+
+ifneq ($(IS_NRF52840),)
+
+C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/usb.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
+
+
 C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
 
 # Tinyusb stack
@@ -157,6 +163,14 @@ C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/custom/custom_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
+else
+
+C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52.c
+
+
+endif
+
+
 #******************************************************************************
 # Assembly Files
 #******************************************************************************
@@ -165,44 +179,48 @@ ASM_SOURCE_FILES  = $(SDK_PATH)/toolchain/gcc/gcc_startup_nrf52840.S
 #******************************************************************************
 # INCLUDE PATH
 #******************************************************************************
-INC_PATHS += -I$(SRC_PATH)/
-INC_PATHS += -I$(SRC_PATH)/usb
-INC_PATHS += -I$(TUSB_PATH)/
+IPATH += $(SRC_PATH)/
+IPATH += $(SRC_PATH)/usb
+IPATH += $(TUSB_PATH)/
 
-INC_PATHS += -I$(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
-INC_PATHS += -I$(SDK11_PATH)/libraries/bootloader_dfu
-INC_PATHS += -I$(SDK11_PATH)/drivers_nrf/pstorage
-INC_PATHS += -I$(SDK11_PATH)/ble/common
-INC_PATHS += -I$(SDK11_PATH)/ble/ble_services/ble_dfu
-INC_PATHS += -I$(SDK11_PATH)/ble/ble_services/ble_dis
-INC_PATHS += -I$(SDK11_PATH)/libraries/util
+IPATH += $(NRFX_PATH)/mdk
 
-INC_PATHS += -I$(SDK_PATH)/libraries/timer
-INC_PATHS += -I$(SDK_PATH)/libraries/scheduler
-INC_PATHS += -I$(SDK_PATH)/libraries/crc16
-INC_PATHS += -I$(SDK_PATH)/libraries/util
-INC_PATHS += -I$(SDK_PATH)/libraries/hci/config
-INC_PATHS += -I$(SDK_PATH)/libraries/uart
-INC_PATHS += -I$(SDK_PATH)/libraries/hci
+IPATH += $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
+IPATH += $(SDK11_PATH)/libraries/bootloader_dfu
+IPATH += $(SDK11_PATH)/drivers_nrf/pstorage
+IPATH += $(SDK11_PATH)/ble/common
+IPATH += $(SDK11_PATH)/ble/ble_services/ble_dfu
+IPATH += $(SDK11_PATH)/ble/ble_services/ble_dis
+IPATH += $(SDK11_PATH)/libraries/util
 
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/common
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/hal
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/config
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/delay
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/uart
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/power
-INC_PATHS += -I$(SDK_PATH)/drivers_nrf/usbd
+IPATH += $(SDK_PATH)/libraries/timer
+IPATH += $(SDK_PATH)/libraries/scheduler
+IPATH += $(SDK_PATH)/libraries/crc16
+IPATH += $(SDK_PATH)/libraries/util
+IPATH += $(SDK_PATH)/libraries/hci/config
+IPATH += $(SDK_PATH)/libraries/uart
+IPATH += $(SDK_PATH)/libraries/hci
 
-INC_PATHS += -I$(SDK_PATH)/device
+IPATH += $(SDK_PATH)/drivers_nrf/common
+IPATH += $(SDK_PATH)/drivers_nrf/hal
+IPATH += $(SDK_PATH)/drivers_nrf/config
+IPATH += $(SDK_PATH)/drivers_nrf/delay
+IPATH += $(SDK_PATH)/drivers_nrf/uart
+IPATH += $(SDK_PATH)/drivers_nrf/power
+IPATH += $(SDK_PATH)/drivers_nrf/usbd
 
-INC_PATHS += -I$(SDK_PATH)/toolchain/cmsis/include
-INC_PATHS += -I$(SDK_PATH)/toolchain/gcc
-INC_PATHS += -I$(SDK_PATH)/toolchain
+IPATH += $(SDK_PATH)/device
+
+IPATH += $(SDK_PATH)/toolchain/cmsis/include
+IPATH += $(SDK_PATH)/toolchain/gcc
+IPATH += $(SDK_PATH)/toolchain
 
 
-INC_PATHS += -I$(SD_PATH)/common
-INC_PATHS += -I$(SD_PATH)/headers
-INC_PATHS += -I$(SD_PATH)/headers/nrf52
+IPATH += $(SD_PATH)/headers
+IPATH += $(SD_PATH)/headers/nrf52
+
+
+INC_PATHS = $(addprefix -I,$(IPATH))
 
 #******************************************************************************
 # Compiler Flags
@@ -221,9 +239,8 @@ CFLAGS += -fno-builtin --short-enums
 
 # Defined Symbol (MACROS)
 CFLAGS += -DBOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
-CFLAGS += -DNRF52840_XXAA
+
 CFLAGS += -D__HEAP_SIZE=0
-CFLAGS += -DS140
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 CFLAGS += -DBLE_STACK_SUPPORT_REQD
 CFLAGS += -DBSP_DEFINES_ONLY
@@ -235,6 +252,18 @@ CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 
+ifneq ($(IS_NRF52840),)
+
+CFLAGS += -DNRF52840_XXAA
+CFLAGS += -DS140
+
+else
+
+CFLAGS += -DNRF52
+CFLAGS += -DS132
+
+endif
+
 
 #******************************************************************************
 # Linker Flags
@@ -243,7 +272,7 @@ CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 
 # keep every function in separate section. This will allow linker to dump unused functions
 LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUTPUT_FILENAME).map
-LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/ -T$(LINKER_SCRIPT)
+LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/ -T$(LD_FILE)
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 

@@ -64,7 +64,7 @@
 
 
 void usb_init(void);
-void usb_teardown();
+void usb_teardown(void);
 
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
@@ -76,6 +76,12 @@ enum {
     NRFX_POWER_USB_EVT_REMOVED,  /**< USB power removed from the connector. */
     NRFX_POWER_USB_EVT_READY     /**< USB power regulator ready. */
 };
+
+#else
+
+#define usb_init()
+#define usb_teardown()
+
 #endif
 
 
@@ -118,7 +124,12 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 // Adafruit for factory reset
 #define APPDATA_ADDR_START                  (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
+
+#ifdef NRF52840_XXAA
 STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
+#else
+STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
+#endif
 
 
 void adafruit_factory_reset(void);
@@ -466,7 +477,8 @@ void adafruit_factory_reset(void)
 //--------------------------------------------------------------------+
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-  verify_breakpoint();
+  volatile uint32_t* ARM_CM_DHCSR =  ((volatile uint32_t*) 0xE000EDF0UL); /* Cortex M CoreDebug->DHCSR */
+  if ( (*ARM_CM_DHCSR) & 1UL ) __asm("BKPT #0\n"); /* Only halt mcu if debugger is attached */
   NVIC_SystemReset();
 }
 
@@ -513,12 +525,14 @@ uint32_t proc_soc(void)
   {
     pstorage_sys_event_handler(soc_evt);
 
+#ifdef NRF52840_XXAA
     /*------------- usb power event handler -------------*/
     int32_t usbevt = (soc_evt == NRF_EVT_POWER_USB_DETECTED   ) ? NRFX_POWER_USB_EVT_DETECTED:
                      (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY   :
                      (soc_evt == NRF_EVT_POWER_USB_REMOVED    ) ? NRFX_POWER_USB_EVT_REMOVED : -1;
 
     if ( usbevt >= 0) tusb_hal_nrf_power_event(usbevt);
+#endif
   }
 
   return err;
