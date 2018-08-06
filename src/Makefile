@@ -1,40 +1,41 @@
 #******************************************************************************
 # CONFIGURE (no spaces!)
-# - VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION: e.g 5.0.0 or 5.1.0 (usually
-# is the same to the SoftDevice if possible)
+
 #
-# - SDK_PATH   : path to SDK directory
-# - SRC_PATH   : path to src folder
+# - SDK_PATH : path to SDK directory
+# - SRC_PATH : path to src folder
 #
-# - SD_NAME    : e.g s132, s140
-# - SD_VERSION : e.g 5.1.0
-# - SD_HEX     : path to bootloader hex binary
+# - SD_NAME  : e.g s132, s140
+# - SD_VER1, SD_VER2, SD_VER3: SoftDevice version e.g 6.0.0
+# - SD_VER4  : is build number for bootloader
+# - SD_HEX   : to bootloader hex binary
 #******************************************************************************
-VERSION_SINGLEBANK = 1
+SDK_PATH        = ../lib/sdk/components
+SDK11_PATH      = ../lib/sdk11/components
 
-VERSION_MAJOR    = 6
-VERSION_MINOR    = 0
-VERSION_REVISION = 0
+SRC_PATH        = .
+TUSB_PATH       = ../lib/tinyusb/src
 
-SDK_PATH         = ../lib/sdk/components
-SDK11_PATH       = ../lib/sdk11/components
+SD_NAME         = s140
+SD_VER1         = 6
+SD_VER2         = 0
+SD_VER3         = 0
+SD_VER4         = 0
+SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
+SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
 
-SRC_PATH         = .
-TUSB_PATH		     = ../lib/tinyusb/src
+SD_PATH         = ../lib/softdevice/$(SD_VERSION)
+SD_HEX          = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
+LINKER_SCRIPT   = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 
-SD_NAME          = s140
-SD_VERSION       = 6.0.0
+OUTPUT_FILENAME = $(BOARD)_bootloader
+BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 
-MK_DIS_FIRMWARE  = "$(subst s,S,$(SD_NAME)) $(SD_VERSION), $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)"
+BETA_DIR        = ../bin/$(BOARD)/beta
+RELEASE_DIR     = ../bin/$(BOARD)/$(SD_VERSION)
 
-SD_PATH          = ../lib/softdevice/$(SD_VERSION)
-SD_HEX           = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
-LINKER_SCRIPT    = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 
-BOOT_SD_NAME = $(OUTPUT_FILENAME)_$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)
-
-BETA_DIR = ../bin/$(BOARD)/beta
-RELEASE_DIR = ../bin/$(BOARD)/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
+MK_DIS_FIRMWARE = "$(subst s,S,$(SD_NAME)) $(SD_VERSION_FULL)"
 
 # Select the board to build for.
 ifeq ($(BOARD),)
@@ -204,7 +205,7 @@ CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin --short-enums 
 
 # Defined Symbol (MACROS)
-CFLAGS += -DBOOTLOADER_VERSION=0x0$(VERSION_MAJOR)0$(VERSION_MINOR)0$(VERSION_REVISION)0$(VERSION_SINGLEBANK)UL
+CFLAGS += -DBOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
 CFLAGS += -DNRF52840_XXAA
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DS140
@@ -252,18 +253,7 @@ ASMFLAGS += -DSWI_DISABLE0
 ASMFLAGS += -DSOFTDEVICE_PRESENT
 ASMFLAGS += -DFLOAT_ABI_HARD
 
-#******************************************************************************
-# BUILD TARGETS
-# - BOARD
-# - V
-#******************************************************************************
 
-ifeq ("$(V)","1")
-$(info CFLAGS   $(CFLAGS))
-$(info )
-$(info LDFLAGS  $(LDFLAGS))
-$(info )
-endif
 
 C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
 C_PATHS = $(call remduplicates, $(dir $(C_SOURCE_FILES) ) )
@@ -278,17 +268,20 @@ vpath %.S $(ASM_PATHS)
 
 OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
 
+#******************************************************************************
+# BUILD TARGETS
+#******************************************************************************
 
+ifeq ("$(V)","1")
+$(info CFLAGS   $(CFLAGS))
+$(info )
+$(info LDFLAGS  $(LDFLAGS))
+$(info )
+endif
 
-
-OUTPUT_FILENAME = $(BOARD)_bootloader
-
+.phony: all clean size flash sd
 
 all: $(BUILD)/$(OUTPUT_FILENAME).out size
-
-
-######## FLASH tagert #######	
-.phony: flash sd
 
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
@@ -300,8 +293,6 @@ sd:
 
 
 ## Create build directories
-.phony: $(BUILD) clean size
-
 $(BUILD):
 	@$(MK) $@
 
