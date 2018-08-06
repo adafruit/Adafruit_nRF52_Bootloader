@@ -35,7 +35,7 @@ BETA_DIR        = ../bin/$(BOARD)/beta
 RELEASE_DIR     = ../bin/$(BOARD)/$(SD_VERSION)
 
 
-MK_DIS_FIRMWARE = "$(subst s,S,$(SD_NAME)) $(SD_VERSION_FULL)"
+MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION_FULL)"
 
 # Select the board to build for.
 ifeq ($(BOARD),)
@@ -50,6 +50,15 @@ else
 endif
 
 BUILD = _build-$(BOARD)
+
+NRF52840_BOARDLIST = pca10056 feather52840
+
+ifneq ($(findstring $(BOARD),$(NRF52840_BOARDLIST)),)
+#nrf52840 board
+else
+#nrf52832 board
+endif
+
 
 #******************************************************************************
 # Tool configure
