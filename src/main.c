@@ -62,6 +62,10 @@
 #include "tusb.h"
 #include "usb/msc_uf2.h"
 
+
+void usb_init(void);
+void usb_teardown();
+
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
@@ -218,50 +222,7 @@ void board_init(void)
   app_timer_init();
 }
 
-void boad_usb_init(void)
-{
-  // USB power may already be ready at this time -> no event generated
-  // We need to invoke the handler based on the status initially
-  uint32_t usb_reg;
 
-#ifdef SOFTDEVICE_PRESENT
-  uint8_t sd_en = false;
-  (void) sd_softdevice_is_enabled(&sd_en);
-
-  if ( sd_en ) {
-    sd_power_usbdetected_enable(true);
-    sd_power_usbpwrrdy_enable(true);
-    sd_power_usbremoved_enable(true);
-
-    sd_power_usbregstatus_get(&usb_reg);
-  }else
-#else
-  {
-    // Power module init
-    const nrfx_power_config_t pwr_cfg = { 0 };
-    nrfx_power_init(&pwr_cfg);
-
-    // Register tusb function as USB power handler
-    const nrfx_power_usbevt_config_t config = { .handler = (nrfx_power_usb_event_handler_t) tusb_hal_nrf_power_event };
-    nrfx_power_usbevt_init(&config);
-
-    nrfx_power_usbevt_enable();
-
-    usb_reg = NRF_POWER->USBREGSTATUS;
-  }
-#endif
-
-  if ( usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk ) {
-    tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_DETECTED);
-  }
-
-  if ( usb_reg & POWER_USBREGSTATUS_OUTPUTRDY_Msk ) {
-    tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
-  }
-
-  // Init tusb stack
-  tusb_init();
-}
 
 /**@brief Function for initializing the BLE stack.
  *
@@ -362,7 +323,6 @@ int main(void)
   // This check ensures that the defined fields in the bootloader corresponds with actual
   // setting in the chip.
   APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
-  APP_ERROR_CHECK_BOOL(NRF_FICR->CODEPAGESIZE == CODE_PAGE_SIZE);
 
   board_init();
 
@@ -387,7 +347,7 @@ int main(void)
     app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
   }
 
-  boad_usb_init();
+  usb_init();
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
@@ -425,28 +385,7 @@ int main(void)
     NRF_RTC1->TASKS_STOP  = 1;
     NRF_RTC1->TASKS_CLEAR = 1;
 
-    // Stop USB
-    if ( NRF_USBD->ENABLE )
-    {
-      // Abort all transfers
-
-      // Disable pull up
-      nrf_usbd_pullup_disable();
-
-      // Disable Interrupt
-      NVIC_DisableIRQ(USBD_IRQn);
-
-      // disable all interrupt
-      NRF_USBD->INTENCLR = NRF_USBD->INTEN;
-
-      nrf_usbd_disable();
-      sd_clock_hfclk_release();
-
-      sd_power_usbdetected_enable(false);
-      sd_power_usbpwrrdy_enable(false);
-      sd_power_usbremoved_enable(false);
-    }
-
+    usb_teardown();
 
     // Select a bank region to use as application region.
     // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
@@ -534,19 +473,6 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
   app_error_handler(0xDEADBEEF, line_num, p_file_name);
-}
-
-//--------------------------------------------------------------------+
-// tinyusb callbacks
-//--------------------------------------------------------------------+
-void tud_mount_cb(void)
-{
-
-}
-
-void tud_umount_cb(void)
-{
-
 }
 
 uint32_t tusb_hal_millis(void)

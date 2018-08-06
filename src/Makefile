@@ -109,6 +109,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/usb.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
 
