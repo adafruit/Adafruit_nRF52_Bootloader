@@ -50,24 +50,6 @@
 void read_block(uint32_t block_no, uint8_t *data);
 int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *state*/);
 
-/*------------------------------------------------------------------*/
-/* API
- *------------------------------------------------------------------*/
-void msc_uf2_init(void)
-{
-
-}
-
-void msc_uf2_mount(void)
-{
-
-}
-
-void msc_uf2_umount(void)
-{
-
-}
-
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+

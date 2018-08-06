@@ -57,10 +57,22 @@
 #include "nrf_delay.h"
 #include "pstorage.h"
 
+#ifdef NRF52840_XXAA
 #include "nrf_usbd.h"
-
 #include "tusb.h"
 #include "usb/msc_uf2.h"
+
+/* tinyusb function that handles power event (detected, ready, removed)
+ * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
+extern void tusb_hal_nrf_power_event(uint32_t event);
+
+// TODO fully move to nrfx
+enum {
+    NRFX_POWER_USB_EVT_DETECTED, /**< USB power detected on the connector (plugged in). */
+    NRFX_POWER_USB_EVT_REMOVED,  /**< USB power removed from the connector. */
+    NRFX_POWER_USB_EVT_READY     /**< USB power regulator ready. */
+};
+#endif
 
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]
@@ -192,6 +204,65 @@ void blinky_ota_disconneted(void)
 }
 
 
+void board_init(void)
+{
+  button_pin_init(BOOTLOADER_BUTTON);
+  button_pin_init(FRESET_BUTTON);
+  nrf_delay_us(100); // wait for the pin state is stable
+
+  led_pin_init(LED_RED);
+  led_pin_init(LED_BLUE);
+
+  // Init scheduler and timer (use scheduler)
+  APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
+  app_timer_init();
+}
+
+void boad_usb_init(void)
+{
+  // USB power may already be ready at this time -> no event generated
+  // We need to invoke the handler based on the status initially
+  uint32_t usb_reg;
+
+#ifdef SOFTDEVICE_PRESENT
+  uint8_t sd_en = false;
+  (void) sd_softdevice_is_enabled(&sd_en);
+
+  if ( sd_en ) {
+    sd_power_usbdetected_enable(true);
+    sd_power_usbpwrrdy_enable(true);
+    sd_power_usbremoved_enable(true);
+
+    sd_power_usbregstatus_get(&usb_reg);
+  }else
+#else
+  {
+    // Power module init
+    const nrfx_power_config_t pwr_cfg = { 0 };
+    nrfx_power_init(&pwr_cfg);
+
+    // Register tusb function as USB power handler
+    const nrfx_power_usbevt_config_t config = { .handler = (nrfx_power_usb_event_handler_t) tusb_hal_nrf_power_event };
+    nrfx_power_usbevt_init(&config);
+
+    nrfx_power_usbevt_enable();
+
+    usb_reg = NRF_POWER->USBREGSTATUS;
+  }
+#endif
+
+  if ( usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk ) {
+    tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_DETECTED);
+  }
+
+  if ( usb_reg & POWER_USBREGSTATUS_OUTPUTRDY_Msk ) {
+    tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
+  }
+
+  // Init tusb stack
+  tusb_init();
+}
+
 /**@brief Function for initializing the BLE stack.
  *
  * @details Initializes the SoftDevice and the BLE event interrupt.
@@ -293,27 +364,13 @@ int main(void)
   APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
   APP_ERROR_CHECK_BOOL(NRF_FICR->CODEPAGESIZE == CODE_PAGE_SIZE);
 
-  /* Initialize GPIOs
-   * For metro52 LED_BLUE is muxed with FRESET */
-  button_pin_init(BOOTLOADER_BUTTON);
-  button_pin_init(FRESET_BUTTON);
-  nrf_delay_us(100); // wait for the pin state is stable
-
-  led_pin_init(LED_RED);
-  led_pin_init(LED_BLUE); // on metro52 will override FRESET
-
-  // Init scheduler and timer (use scheduler)
-  APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-  app_timer_init();
+  board_init();
 
   /* Initialize a blinky timer to show that we're in bootloader */
   (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
 
   // Init bootloader
   (void) bootloader_init();
-
-  // Init msc flash, must be after bootloader_init(), before SD init
-  msc_uf2_init();
 
   if (bootloader_dfu_sd_in_progress())
   {
@@ -330,8 +387,7 @@ int main(void)
     app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
   }
 
-  // Init usb stack
-  tusb_init();
+  boad_usb_init();
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
@@ -485,12 +541,12 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 //--------------------------------------------------------------------+
 void tud_mount_cb(void)
 {
-  msc_uf2_mount();
+
 }
 
 void tud_umount_cb(void)
 {
-  msc_uf2_umount();
+
 }
 
 uint32_t tusb_hal_millis(void)
@@ -532,14 +588,6 @@ uint32_t proc_soc(void)
     pstorage_sys_event_handler(soc_evt);
 
     /*------------- usb power event handler -------------*/
-    extern void tusb_hal_nrf_power_event(uint32_t evt);
-    enum // TODO remove when migrating to SDK15
-    {
-      NRFX_POWER_USB_EVT_DETECTED = 0,
-      NRFX_POWER_USB_EVT_REMOVED,
-      NRFX_POWER_USB_EVT_READY
-    };
-
     int32_t usbevt = (soc_evt == NRF_EVT_POWER_USB_DETECTED   ) ? NRFX_POWER_USB_EVT_DETECTED:
                      (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY   :
                      (soc_evt == NRF_EVT_POWER_USB_REMOVED    ) ? NRFX_POWER_USB_EVT_REMOVED : -1;

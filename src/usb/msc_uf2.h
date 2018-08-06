@@ -57,14 +57,6 @@
 
 VERIFY_STATIC( MSC_UF2_FLASH_ADDR_START+MSC_UF2_FLASH_SIZE == BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED, );
 
-/*------------------------------------------------------------------*/
-/* Note ATTR_WEAK is used when CFG_TUD_MSC = 0
- *------------------------------------------------------------------*/
-
-ATTR_WEAK void msc_uf2_init(void);
-ATTR_WEAK void msc_uf2_mount(void);
-ATTR_WEAK void msc_uf2_umount(void);
-
 
 #ifdef __cplusplus
  }
