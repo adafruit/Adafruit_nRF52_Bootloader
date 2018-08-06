@@ -31,7 +31,24 @@ SD_PATH          = ../lib/softdevice/$(SD_VERSION)
 SD_HEX           = $(SD_PATH)/$(SD_NAME)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
 LINKER_SCRIPT    = $(SRC_PATH)/$(SD_NAME)_$(SD_VERSION).ld
 
-BOOTLOADER_SD_SUFFIX = $(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)
+BOOT_SD_NAME = $(OUTPUT_FILENAME)_$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)_$(SD_NAME)
+
+BETA_DIR = ../bin/$(BOARD)/beta
+RELEASE_DIR = ../bin/$(BOARD)/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
+
+# Select the board to build for.
+ifeq ($(BOARD),)
+  $(info You must provide a BOARD parameter with 'BOARD=')
+  $(info Possible values are:)
+  $(info $(sort $(subst .h,,$(subst boards/,,$(wildcard boards/*)))))
+  $(error BOARD not defined)
+else
+  ifeq ($(wildcard boards/$(BOARD).h),)
+    $(error Invalid BOARD specified)
+  endif
+endif
+
+BUILD = _build-$(BOARD)
 
 #******************************************************************************
 # Tool configure
@@ -48,10 +65,10 @@ endif
 MK := mkdir
 RM := rm -rf
 
-ifeq ("$(VERBOSE)","1")
-NO_ECHO := 
+ifeq ("$(V)","2")
+QUIET := 
 else
-NO_ECHO := @
+QUIET := @
 endif
 
 GNU_PREFIX = arm-none-eabi
@@ -171,25 +188,22 @@ INC_PATHS += -I$(SD_PATH)/common
 INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers
 INC_PATHS += -I$(SD_PATH)/$(SD_NAME)/headers/nrf52
 
-
-OBJECT_DIRECTORY = _build
-LISTING_DIRECTORY = $(OBJECT_DIRECTORY)
-OUTPUT_BINARY_DIRECTORY = $(OBJECT_DIRECTORY)
-
-# Sorting removes duplicates
-BUILD_DIRECTORIES := $(sort $(OBJECT_DIRECTORY) $(OUTPUT_BINARY_DIRECTORY) $(LISTING_DIRECTORY))
-
 #******************************************************************************
 # Compiler Flags
 # - Additional compiler flags
 #******************************************************************************
 
 #flags common to all targets
-#CFLAGS += -DENABLE_SWO
+CFLAGS += -mcpu=cortex-m4
+CFLAGS += -mthumb -mabi=aapcs --std=gnu99
+CFLAGS += -Wall -Werror -Os -g3
+CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
-#*************************
+# keep every function in separate section. This will allow linker to dump unused functions
+CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
+CFLAGS += -fno-builtin --short-enums 
+
 # Defined Symbol (MACROS)
-#*************************
 CFLAGS += -DBOOTLOADER_VERSION=0x0$(VERSION_MAJOR)0$(VERSION_MINOR)0$(VERSION_REVISION)0$(VERSION_SINGLEBANK)UL
 CFLAGS += -DNRF52840_XXAA
 CFLAGS += -D__HEAP_SIZE=0
@@ -201,17 +215,10 @@ CFLAGS += -DSWI_DISABLE0
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DFLOAT_ABI_HARD
 CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
-
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
-CFLAGS += -mcpu=cortex-m4
-CFLAGS += -mthumb -mabi=aapcs --std=gnu99
-CFLAGS += -Wall -Werror -Os -g3
-CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 
-# keep every function in separate section. This will allow linker to dump unused functions
-CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-CFLAGS += -fno-builtin --short-enums 
 
 #******************************************************************************
 # Linker Flags
@@ -219,7 +226,7 @@ CFLAGS += -fno-builtin --short-enums
 #******************************************************************************
 
 # keep every function in separate section. This will allow linker to dump unused functions
-LDFLAGS += -Xlinker -Map=$(LISTING_DIRECTORY)/$(OUTPUT_FILENAME).map
+LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUTPUT_FILENAME).map
 LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/ -T$(LINKER_SCRIPT)
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
@@ -243,138 +250,114 @@ ASMFLAGS += -DBLE_STACK_SUPPORT_REQD
 ASMFLAGS += -DBSP_DEFINES_ONLY
 ASMFLAGS += -DSWI_DISABLE0
 ASMFLAGS += -DSOFTDEVICE_PRESENT
-
 ASMFLAGS += -DFLOAT_ABI_HARD
-
-MAKEFILE_NAME := $(MAKEFILE_LIST)
-MAKEFILE_DIR := $(dir $(MAKEFILE_NAME) ) 
 
 #******************************************************************************
 # BUILD TARGETS
+# - BOARD
+# - V
 #******************************************************************************
 
-ifeq ("$(VERBOSE)","1")
+ifeq ("$(V)","1")
 $(info CFLAGS   $(CFLAGS))
 $(info )
 $(info LDFLAGS  $(LDFLAGS))
 $(info )
 endif
 
-#default target - first one defined
-default: all
-
-#building all targets
-all:
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
-	@echo Making feather52840 board
-	@echo ----------------------
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e feather52840	
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e clean
-	@echo Making pca10056 board
-	@echo --------------------
-	@$(MAKE) -s -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e pca10056
-
-#target for printing all targets
-help:
-	@echo following targets are available:
-	@echo - feather52840       : build for Feather nRF52840
-	@echo - flash_feather52840 : flash Feather nRF52840
-	@echo - pca10056           : build for pca10056 DK
-	@echo - flash_pca10056     : flash pca10056 DK
-	@echo - flash_sd           : flash SoftDevice only
-
 C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
 C_PATHS = $(call remduplicates, $(dir $(C_SOURCE_FILES) ) )
-C_OBJECTS = $(addprefix $(OBJECT_DIRECTORY)/, $(C_SOURCE_FILE_NAMES:.c=.o) )
+C_OBJECTS = $(addprefix $(BUILD)/, $(C_SOURCE_FILE_NAMES:.c=.o) )
 
 ASM_SOURCE_FILE_NAMES = $(notdir $(ASM_SOURCE_FILES))
 ASM_PATHS = $(call remduplicates, $(dir $(ASM_SOURCE_FILES) ))
-ASM_OBJECTS = $(addprefix $(OBJECT_DIRECTORY)/, $(ASM_SOURCE_FILE_NAMES:.S=.o) )
+ASM_OBJECTS = $(addprefix $(BUILD)/, $(ASM_SOURCE_FILE_NAMES:.S=.o) )
 
 vpath %.c $(C_PATHS)
 vpath %.S $(ASM_PATHS)
 
 OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
 
-export OUTPUT_FILENAME
-export FINAL_BIN_DIR
-BOOTLOADER_WITH_SD_NAME := $(OUTPUT_FILENAME)_$(BOOTLOADER_SD_SUFFIX)
 
-# Target for Feather nrf52 board
-feather52840: OUTPUT_FILENAME := feather52840_bootloader
-feather52840: FINAL_BIN_DIR := ../bin/feather52840/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
-feather52840: CFLAGS += -DBOARD_FEATHER52840
-feather52840: $(BUILD_DIRECTORIES) $(OBJECTS)
-	@echo Linking target: $(OUTPUT_FILENAME).out
-	$(NO_ECHO)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
-	$(NO_ECHO)$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
 
-# Target for Metro nrf52 board
-pca10056: OUTPUT_FILENAME := pca10056_bootloader
-pca10056: FINAL_BIN_DIR := ../bin/pca10056/$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_REVISION)
-pca10056: CFLAGS += -DBOARD_PCA10056
-pca10056: $(BUILD_DIRECTORIES) $(OBJECTS)
-	@echo Linking target: $(OUTPUT_FILENAME).out
-	$(NO_ECHO)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
-	$(NO_ECHO)$(MAKE) -f $(MAKEFILE_NAME) -C $(MAKEFILE_DIR) -e finalize
+
+OUTPUT_FILENAME = $(BOARD)_bootloader
+
+
+all: $(BUILD)/$(OUTPUT_FILENAME).out size
+
+
+######## FLASH tagert #######	
+.phony: flash sd
+
+flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+	@echo Flashing: $<
+	nrfjprog --program $< --sectoranduicrerase -f nrf52 --reset
+	
+sd:
+	@echo Flashing: $(SD_HEX)
+	nrfjprog --program $(SD_HEX) -f nrf52 --chiperase  --reset	
+
 
 ## Create build directories
-$(BUILD_DIRECTORIES):
+.phony: $(BUILD) clean size
+
+$(BUILD):
 	@$(MK) $@
 
+clean:
+	@$(RM) $(BUILD)
+	
 # Create objects from C SRC files
-$(OBJECT_DIRECTORY)/%.o: %.c
-	@echo Compiling file: $(notdir $<)
-	$(NO_ECHO)$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
+$(BUILD)/%.o: %.c
+	@echo CC $(notdir $<)
+	$(QUIET)$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Assemble files
-$(OBJECT_DIRECTORY)/%.o: %.S
-	@echo Assembly file: $(notdir $<)
-	$(NO_ECHO)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
+$(BUILD)/%.o: %.S
+	@echo AS $(notdir $<)
+	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 	
 # Link
-$(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out: $(BUILD_DIRECTORIES) $(OBJECTS)
-	@echo Linking target: $(OUTPUT_FILENAME).out
-	$(NO_ECHO)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
+$(BUILD)/$(OUTPUT_FILENAME).out: $(BUILD) $(OBJECTS)
+	@echo LD $(OUTPUT_FILENAME).out
+	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(BUILD)/$(OUTPUT_FILENAME).out
 
-finalize: genhex genbin genpkg echosize
+size: $(BUILD)/$(OUTPUT_FILENAME).out
+	-@echo ''
+	$(QUIET)$(SIZE) $<
+	-@echo ''
+
+
+.phony: genhex genpkg beta release
 
 ## Create binary .hex file from the .out file
-genhex: 
-	@echo Preparing: $(OUTPUT_FILENAME).hex $(BOOTLOADER_WITH_SD_NAME).hex
-	$(NO_ECHO)$(OBJCOPY) -O ihex $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
-	@mergehex -q -m $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex $(SD_HEX) -o $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
-	@mkdir -p $(FINAL_BIN_DIR)
-	@cp $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex $(FINAL_BIN_DIR)/
+genhex: $(BUILD)/$(OUTPUT_FILENAME).hex
 
-## Create .bin file
-genbin:
-	@echo Preparing: $(BOOTLOADER_WITH_SD_NAME).bin
-	$(NO_ECHO)$(OBJCOPY) -j .text -j .data -j .bss -O binary $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out $(FINAL_BIN_DIR)/$(BOOTLOADER_WITH_SD_NAME).bin
+$(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
+	@echo CR $(OUTPUT_FILENAME).hex
+	@echo CR $(BOOT_SD_NAME).hex
+	$(QUIET)$(OBJCOPY) -O ihex $< $@
+	@mergehex -q -m $@ $(SD_HEX) -o $(BUILD)/$(BOOT_SD_NAME).hex
 
-## Create pkg file for bootloader only and bootloader+SD combo to use with DFU
-genpkg:
-	@echo Preparing: $(BOOTLOADER_WITH_SD_NAME).zip
-	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision 0xADAF --bootloader $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex --softdevice $(SD_HEX) $(FINAL_BIN_DIR)/$(BOOTLOADER_WITH_SD_NAME).zip 
+## Create pkg file for bootloader+SD combo to use with DFU
+genpkg: $(BUILD)/$(BOOT_SD_NAME).zip
 
-echosize:
-	-@echo ''
-	$(NO_ECHO)$(SIZE) $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
-	-@echo ''
+$(BUILD)/$(BOOT_SD_NAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
+	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision 0xADAF --bootloader $< --softdevice $(SD_HEX) $@ 
 
-clean:
-	@$(RM) $(BUILD_DIRECTORIES)
+# Create SD+bootloader combo with hex & dfu package at beta folder
+beta: genhex genpkg
+	@echo CR $(BETA_DIR)/$(BOOT_SD_NAME).hex
+	@echo CR $(BETA_DIR)/$(BOOT_SD_NAME).zip
+	@mkdir -p $(BETA_DIR)
+	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(BETA_DIR)/$(BOOT_SD_NAME).hex
+	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(BETA_DIR)/$(BOOT_SD_NAME).zip
 
-flash_feather52840: BOOTLOADER_WITH_SD_NAME := feather52840_bootloader_$(BOOTLOADER_SD_SUFFIX)
-flash_feather52840: feather52840
-	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
-	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset
-
-flash_pca10056: BOOTLOADER_WITH_SD_NAME := pca10056_bootloader_$(BOOTLOADER_SD_SUFFIX)
-flash_pca10056: pca10056
-	@echo Flashing: $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex
-	nrfjprog --program $(OUTPUT_BINARY_DIRECTORY)/$(BOOTLOADER_WITH_SD_NAME).hex -f nrf52 --chiperase --reset
+release: genhex genpkg
+	@echo CR $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
+	@echo CR $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
+	@mkdir -p $(RELEASE_DIR)
+	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
+	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
 	
-flash_sd:
-	@echo Flashing: $(SD_HEX)
-	nrfjprog --program $(SD_HEX) -f nrf52 --chiperase --reset

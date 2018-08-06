@@ -17,11 +17,11 @@
 #include "nrf_gpio.h"
 
 #if defined BOARD_FEATHER52840
-#include "feather52840.h"
+  #include "boards/feather52840.h"
 #elif defined BOARD_PCA10056
-#include "pca10056.h"
+  #include "boards/pca10056.h"
 #else
-#error No boards defined
+  #error No boards defined
 #endif
 
 // Make sure we have at least two buttons (DFU + FRESET since DFU+FRST=OTA)
