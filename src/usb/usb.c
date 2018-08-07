@@ -34,6 +34,9 @@
 */
 /**************************************************************************/
 
+#include "nrfx.h"
+#include "nrfx_power.h"
+
 #ifdef SOFTDEVICE_PRESENT
 #include "nrf_sdm.h"
 #include "nrf_soc.h"
@@ -41,13 +44,6 @@
 
 #include "nrf_usbd.h"
 #include "tusb.h"
-
-// TODO fully move to nrfx
-enum {
-    NRFX_POWER_USB_EVT_DETECTED, /**< USB power detected on the connector (plugged in). */
-    NRFX_POWER_USB_EVT_REMOVED,  /**< USB power removed from the connector. */
-    NRFX_POWER_USB_EVT_READY     /**< USB power regulator ready. */
-};
 
 //--------------------------------------------------------------------+
 // MACRO TYPEDEF CONSTANT ENUM DECLARATION
@@ -78,7 +74,6 @@ void usb_init(void)
   }else
 #endif
   {
-#if 0 // TODO enable
     // Power module init
     const nrfx_power_config_t pwr_cfg = { 0 };
     nrfx_power_init(&pwr_cfg);
@@ -90,7 +85,6 @@ void usb_init(void)
     nrfx_power_usbevt_enable();
 
     usb_reg = NRF_POWER->USBREGSTATUS;
-#endif
   }
 
   if ( usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk ) {

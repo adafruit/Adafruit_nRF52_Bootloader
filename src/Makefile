@@ -113,6 +113,10 @@ endif
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 
+# nrfx
+
+C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
+
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
@@ -189,15 +193,16 @@ endif
 #******************************************************************************
 
 # src
-IPATH += $(SRC_PATH)/
+IPATH += $(SRC_PATH)
 IPATH += $(SRC_PATH)/cmsis/include
 IPATH += $(SRC_PATH)/usb
-IPATH += $(TUSB_PATH)/
+IPATH += $(TUSB_PATH)
 
 # nrfx
 IPATH += $(NRFX_PATH)
 IPATH += $(NRFX_PATH)/mdk
 IPATH += $(NRFX_PATH)/hal
+IPATH += $(NRFX_PATH)/drivers/include
 
 IPATH += $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
 IPATH += $(SDK11_PATH)/libraries/bootloader_dfu
@@ -221,8 +226,6 @@ IPATH += $(SDK_PATH)/libraries/hci
 IPATH += $(SDK_PATH)/drivers_nrf/delay
 #IPATH += $(SDK_PATH)/drivers_nrf/uart
 #IPATH += $(SDK_PATH)/drivers_nrf/power
-#IPATH += $(SDK_PATH)/drivers_nrf/usbd
-#IPATH += $(SDK_PATH)/device
 
 # Softdevice
 IPATH += $(SD_PATH)/headers

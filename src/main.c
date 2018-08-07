@@ -31,12 +31,15 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stddef.h>
+#include "nrfx.h"
+#include "nrfx_power.h"
 
 #include "nordic_common.h"
 #include "sdk_common.h"
 #include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
+
 
 #include "nrf.h"
 #include "nrf_soc.h"
@@ -68,13 +71,6 @@ void usb_teardown(void);
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
-
-// TODO fully move to nrfx
-enum {
-    NRFX_POWER_USB_EVT_DETECTED, /**< USB power detected on the connector (plugged in). */
-    NRFX_POWER_USB_EVT_REMOVED,  /**< USB power removed from the connector. */
-    NRFX_POWER_USB_EVT_READY     /**< USB power regulator ready. */
-};
 
 #else
 
