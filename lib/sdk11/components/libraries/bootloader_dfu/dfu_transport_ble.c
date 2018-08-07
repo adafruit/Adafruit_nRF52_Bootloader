@@ -14,7 +14,7 @@
 #include "dfu.h"
 #include <dfu_types.h>
 #include <stddef.h>
-#include "boards.h"
+#include "boards/boards.h"
 #include "nrf.h"
 #include "nrf_sdm.h"
 #include "nrf_gpio.h"
