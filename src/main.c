@@ -54,7 +54,6 @@
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
 #include "nrf_wdt.h"
-#include "nrf_delay.h"
 #include "pstorage.h"
 
 #ifdef NRF52840_XXAA
@@ -223,7 +222,7 @@ void board_init(void)
 {
   button_pin_init(BOOTLOADER_BUTTON);
   button_pin_init(FRESET_BUTTON);
-  nrf_delay_us(100); // wait for the pin state is stable
+  NRFX_DELAY_US(100); // wait for the pin state is stable
 
   led_pin_init(LED_RED);
   led_pin_init(LED_BLUE);
