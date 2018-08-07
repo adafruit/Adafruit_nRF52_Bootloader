@@ -95,9 +95,6 @@ void usb_teardown(void);
 #define BOOTLOADER_BUTTON                   BUTTON_1                         // Button used to enter SW update mode.
 #define FRESET_BUTTON                       BUTTON_2                         // Button used in addition to DFU button, to force OTA DFU
 
-#define APP_TIMER_PRESCALER                 0                                /**< Value of the RTC1 PRESCALER register. */
-#define APP_TIMER_OP_QUEUE_SIZE             4                                /**< Size of timer operation queues. */
-
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
@@ -127,10 +124,8 @@ void adafruit_factory_reset(void);
 volatile bool _freset_erased_complete = false;
 
 // Adafruit for Blink pattern
-bool isBlinkFast = false;
+bool _fast_blink = false;
 bool _ota_connected = false;
-
-APP_TIMER_DEF( blinky_timer_id );
 
 // true if ble, false if serial
 bool _ota_update = false;
@@ -147,7 +142,7 @@ bool is_ota(void) { return _ota_update; }
  * - Factory Reset  : LED Status blink 2x fast
  * - Fatal Error    : LED Status & Conn blink one after another
  */
-static void blinky_handler(void * p_context)
+static void blinky_handler(void)
 {
   static uint8_t state = 0;
   static uint32_t count = 0;
@@ -155,7 +150,7 @@ static void blinky_handler(void * p_context)
   count++;
 
   // if not uploading then blink slow (interval/2)
-  if ( !isBlinkFast && count%2 ) return;
+  if ( !_fast_blink && count%2 ) return;
 
   state = 1-state;
 
@@ -167,16 +162,21 @@ static void blinky_handler(void * p_context)
     led_control(LED_BLUE, state);
   }
 
-  // Feed all Watchdog just in case application enable it (WDT last through a soft reboot to bootloader)
+  // Feed all Watchdog just in case application enable it (WDT last through a hump from application to bootloader)
   if ( nrf_wdt_started() )
   {
     for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(i);
   }
 }
 
+void SysTick_Handler(void)
+{
+  blinky_handler();
+}
+
 void blinky_fast_set(bool isFast)
 {
-  isBlinkFast = isFast;
+  _fast_blink = isFast;
 }
 
 void board_init(void)
@@ -191,17 +191,39 @@ void board_init(void)
   led_off(LED_RED);
   led_off(LED_BLUE);
 
-  // Init scheduler and timer (use scheduler)
+  // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
+
+  // Init timer (RTC1)
   app_timer_init();
+
+  // Configure Systick for led blinky
+  extern uint32_t SystemCoreClock;
+  SysTick_Config(SystemCoreClock/(1000/LED_BLINK_INTERVAL));
+}
+
+void board_teardown(void)
+{
+  // Disable systick, turn off LEDs
+  SysTick->CTRL = 0;
+
+  led_off(LED_BLUE);
+  led_off(LED_RED);
+
+  // Stop RTC1 used by app_timer
+  NVIC_DisableIRQ(RTC1_IRQn);
+  NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
+  NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
+  NRF_RTC1->TASKS_STOP  = 1;
+  NRF_RTC1->TASKS_CLEAR = 1;
+
+  // disable usb
+  usb_teardown();
 }
 
 
-
-/**@brief Function for initializing the BLE stack.
- *
- * @details Initializes the SoftDevice and the BLE event interrupt.
- *
+/**
+ * Initializes the SoftDevice and the BLE event interrupt.
  * @param[in] init_softdevice  true if SoftDevice should be initialized. The SoftDevice must only
  *                             be initialized if a chip reset has occured. Soft reset from
  *                             application must not reinitialize the SoftDevice.
@@ -273,9 +295,6 @@ static uint32_t ble_stack_init(bool init_softdevice)
 }
 
 
-/**
- * @brief Function for bootloader main entry.
- */
 int main(void)
 {
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
@@ -299,26 +318,17 @@ int main(void)
   APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
 
   board_init();
-
-  /* Initialize a blinky timer to show that we're in bootloader */
-  (void) app_timer_create(&blinky_timer_id, APP_TIMER_MODE_REPEATED, blinky_handler);
-
-  // Init bootloader
-  (void) bootloader_init();
+  bootloader_init();
 
   if (bootloader_dfu_sd_in_progress())
   {
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
-
     ble_stack_init(!sd_inited);
-    app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
-
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
   }
   else
   {
     ble_stack_init(!sd_inited);
-    app_timer_start(blinky_timer_id, APP_TIMER_TICKS(LED_BLINK_INTERVAL), NULL);
   }
 
   usb_init();
@@ -341,7 +351,7 @@ int main(void)
     /* Adafruit Modification
      * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
      * to support auto programming from Arduino IDE */
-    (void) bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
+    bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
   }
 #endif
 
@@ -350,23 +360,11 @@ int main(void)
 
   if (is_freset) adafruit_factory_reset();
 
-  /*------------- Hardware reset and jump to application -------------*/
-  app_timer_stop(blinky_timer_id);
-
-  led_off(LED_BLUE);
-  led_off(LED_RED);
+  /*------------- Reset used hardware and jump to application -------------*/
+  board_teardown();
 
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
   {
-    // Stop RTC1
-    NVIC_DisableIRQ(RTC1_IRQn);
-    NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
-    NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
-    NRF_RTC1->TASKS_STOP  = 1;
-    NRF_RTC1->TASKS_CLEAR = 1;
-
-    usb_teardown();
-
     // Select a bank region to use as application region.
     // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
     bootloader_app_start(DFU_BANK_0_REGION_START);
@@ -376,12 +374,11 @@ int main(void)
 }
 
 
-/*------------------------------------------------------------------*/
-/* FACTORY RESET
- *------------------------------------------------------------------*/
-/**
- * Pstorage callback, fired after erased  Application Data
- */
+//--------------------------------------------------------------------+
+// FACTORY RESET
+//--------------------------------------------------------------------+
+
+// Pstorage callback, fired after erased  Application Data
 static void appdata_pstorage_cb(pstorage_handle_t * p_handle, uint8_t op_code, uint32_t result,
                                 uint8_t  * p_data, uint32_t  data_len)
 {
@@ -416,9 +413,7 @@ void freset_erase_and_wait(pstorage_handle_t* hdl, uint32_t addr, uint32_t size)
   }
 }
 
-/**
- * Perform factory reset to erase Application + Data
- */
+// Perform factory reset to erase Application + Data
 void adafruit_factory_reset(void)
 {
   // Blink fast RED and turn on BLUE when erasing
@@ -465,9 +460,7 @@ uint32_t tusb_hal_millis(void)
 /* SoftDevice Event handler
  *------------------------------------------------------------------*/
 
-/*
- * Process BLE event from SD
- */
+// Process BLE event from SD
 uint32_t proc_ble(void)
 {
   __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
@@ -504,9 +497,7 @@ uint32_t proc_ble(void)
   return err;
 }
 
-/*
- * process SOC event from SD
- */
+// process SOC event from SD
 uint32_t proc_soc(void)
 {
   uint32_t soc_evt;
