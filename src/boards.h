@@ -36,7 +36,10 @@
 
 #define bit(b) (1UL << (b))
 
-void led_control(uint32_t pin, bool state);
+static inline void led_control(uint32_t pin, bool state)
+{
+  nrf_gpio_pin_write(pin, state ? LED_STATE_ON : (1-LED_STATE_ON));
+}
 
 static inline void led_on(uint32_t pin)
 {

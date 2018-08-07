@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stddef.h>
+
 #include "nrfx.h"
 #include "nrfx_power.h"
 
@@ -51,6 +52,7 @@
 #include "app_scheduler.h"
 #include "app_timer.h"
 #include "nrf_error.h"
+
 #include "boards.h"
 
 #include "pstorage_platform.h"
@@ -145,17 +147,6 @@ bool button_pressed(uint32_t pin)
   return (nrf_gpio_pin_read(pin) == 0) ? true : false;
 }
 
-static void led_pin_init(uint32_t pin)
-{
-  nrf_gpio_cfg_output(pin);
-  led_off(pin);
-}
-
-void led_control(uint32_t pin, bool state)
-{
-  nrf_gpio_pin_write(pin, state ? LED_STATE_ON : (1-LED_STATE_ON));
-}
-
 
 /*
  * Blinking function, there are a few patterns
@@ -214,8 +205,11 @@ void board_init(void)
   button_pin_init(FRESET_BUTTON);
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
-  led_pin_init(LED_RED);
-  led_pin_init(LED_BLUE);
+  // LED init
+  nrf_gpio_cfg_output(LED_RED);
+  nrf_gpio_cfg_output(LED_BLUE);
+  led_off(LED_RED);
+  led_off(LED_BLUE);
 
   // Init scheduler and timer (use scheduler)
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
