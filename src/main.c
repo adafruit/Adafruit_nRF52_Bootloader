@@ -137,15 +137,6 @@ bool _ota_update = false;
 
 bool is_ota(void) { return _ota_update; }
 
-static void button_pin_init(uint32_t pin)
-{
-  nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
-}
-
-bool button_pressed(uint32_t pin)
-{
-  return (nrf_gpio_pin_read(pin) == 0) ? true : false;
-}
 
 
 /*
@@ -190,8 +181,8 @@ void blinky_fast_set(bool isFast)
 
 void board_init(void)
 {
-  button_pin_init(BOOTLOADER_BUTTON);
-  button_pin_init(FRESET_BUTTON);
+  button_init(BOOTLOADER_BUTTON);
+  button_init(FRESET_BUTTON);
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
   // LED init

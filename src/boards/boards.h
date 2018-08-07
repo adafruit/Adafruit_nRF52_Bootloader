@@ -26,11 +26,9 @@
   #error No boards defined
 #endif
 
-// Make sure we have at least two buttons (DFU + FRESET since DFU+FRST=OTA)
-#if BUTTONS_NUMBER < 2
-#error "At least two buttons required in the BSP (see 'BUTTONS_NUMBER')"
-#endif
-
+//--------------------------------------------------------------------+
+// LED
+//--------------------------------------------------------------------+
 #define LED_RED     LED_1
 #define LED_BLUE    LED_2
 
@@ -50,5 +48,24 @@ static inline void led_off(uint32_t pin)
 {
   led_control(pin, false);
 }
+
+//--------------------------------------------------------------------+
+// BUTTONS
+//--------------------------------------------------------------------+
+// Make sure we have at least two buttons (DFU + FRESET since DFU+FRST=OTA)
+#if BUTTONS_NUMBER < 2
+#error "At least two buttons required in the BSP (see 'BUTTONS_NUMBER')"
+#endif
+
+static inline void button_init(uint32_t pin)
+{
+  nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
+}
+
+static inline bool button_pressed(uint32_t pin)
+{
+  return (nrf_gpio_pin_read(pin) == 0) ? true : false;
+}
+
 
 #endif
