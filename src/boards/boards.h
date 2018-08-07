@@ -49,6 +49,8 @@ static inline void led_off(uint32_t pin)
   led_control(pin, false);
 }
 
+void led_blink_fast(bool enable);
+
 //--------------------------------------------------------------------+
 // BUTTONS
 //--------------------------------------------------------------------+

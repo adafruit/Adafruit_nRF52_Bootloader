@@ -174,9 +174,9 @@ void SysTick_Handler(void)
   blinky_handler();
 }
 
-void blinky_fast_set(bool isFast)
+void led_blink_fast(bool enable)
 {
-  _fast_blink = isFast;
+  _fast_blink = enable;
 }
 
 void board_init(void)
@@ -417,7 +417,7 @@ void freset_erase_and_wait(pstorage_handle_t* hdl, uint32_t addr, uint32_t size)
 void adafruit_factory_reset(void)
 {
   // Blink fast RED and turn on BLUE when erasing
-  blinky_fast_set(true);
+  led_blink_fast(true);
   led_on(LED_BLUE);
 
   static pstorage_handle_t freset_handle = { .block_id = APPDATA_ADDR_START } ;
@@ -432,7 +432,7 @@ void adafruit_factory_reset(void)
   freset_erase_and_wait(&freset_handle, DFU_BANK_0_REGION_START, CODE_PAGE_SIZE);
 
   // back to normal
-  blinky_fast_set(false);
+  led_blink_fast(false);
   led_off(LED_BLUE);
 }
 

@@ -19,6 +19,7 @@
 #include "hci_transport.h"
 #include "app_timer.h"
 #include "app_scheduler.h"
+#include "boards/boards.h"
 
 #define MAX_BUFFERS          4u                                                      /**< Maximum number of buffers that can be received queued without being consumed. */
 
@@ -208,7 +209,6 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
                 packet = &m_data_queue.data_packet[index];
                 if (INVALID_PACKET != packet->packet_type)
                 {
-                    extern void blinky_fast_set(bool isFast);
                     switch (DATA_QUEUE_ELEMENT_GET_PTYPE(index))
                     {
                         case DATA_PACKET:
@@ -227,14 +227,14 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
                             retval = dfu_init_pkt_complete();
                             APP_ERROR_CHECK(retval);
 
-                            blinky_fast_set(true);
+                            led_blink_fast(true);
                             break;
 
                         case STOP_DATA_PACKET:
                             (void)dfu_image_validate();
                             (void)dfu_image_activate();
 
-                            blinky_fast_set(false);
+                            led_blink_fast(false);
 
                             // Break the loop by returning.
                             return;

@@ -2,6 +2,8 @@
 #include "uf2.h"
 #include "nrf_nvmc.h"
 #include <string.h>
+
+#include "boards/boards.h"
 #include "tusb.h"
 
 #include "bootloader_settings.h"
@@ -130,11 +132,6 @@ static WriteState* state = &_wr_state;
 volatile bool _is_flashing = false;
 static pstorage_handle_t _fat_psh = { .module_id = 0, .block_id = USER_FLASH_END } ;
 
-
-// from main.c to signal writing uf2 is on the way
-extern void blinky_fast_set(bool isFast);
-
-
 static uint32_t get_flash_size(void)
 {
   static uint32_t flash_sz = 0;
@@ -258,7 +255,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /** inform bootloader to update setting and reset */
 static void uf2_write_complete(void)
 {
-  blinky_fast_set(false);
+  led_blink_fast(false);
 
   dfu_update_status_t update_status;
 
@@ -307,7 +304,7 @@ void flushFlash() {
         pstorage_module_param_t  fat_psp = { .cb = fat_pstorage_cb};
         pstorage_register(&fat_psp, &_fat_psh);
 
-        blinky_fast_set(true);
+        led_blink_fast(true);
     }
 
     NRF_LOG_DEBUG("Flush at %x", flashAddr);
