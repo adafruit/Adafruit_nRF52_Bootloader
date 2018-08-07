@@ -178,9 +178,9 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 
+IPATH += $(SDK11_PATH)/libraries/util
 IPATH += $(SDK_PATH)/drivers_nrf/common
 IPATH += $(SDK_PATH)/drivers_nrf/uart
-
 endif
 
 
@@ -215,7 +215,7 @@ IPATH += $(SDK11_PATH)/drivers_nrf/pstorage
 IPATH += $(SDK11_PATH)/ble/common
 IPATH += $(SDK11_PATH)/ble/ble_services/ble_dfu
 IPATH += $(SDK11_PATH)/ble/ble_services/ble_dis
-IPATH += $(SDK11_PATH)/libraries/util
+
 
 IPATH += $(SDK_PATH)/libraries/timer
 IPATH += $(SDK_PATH)/libraries/scheduler
