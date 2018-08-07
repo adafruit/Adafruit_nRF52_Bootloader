@@ -86,8 +86,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 ifeq ($(BOARD),)
   $(info You must provide a BOARD parameter with 'BOARD=')
-  $(info Possible values are:)
-  $(info $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*)))))
+  $(info Supported boards are: $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*)))))
   $(error BOARD not defined)
 else
   ifeq ($(wildcard src/boards/$(BOARD).h),)
