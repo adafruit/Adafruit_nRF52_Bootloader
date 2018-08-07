@@ -40,7 +40,6 @@
 #include "bootloader.h"
 #include "bootloader_util.h"
 
-
 #include "nrf.h"
 #include "nrf_soc.h"
 #include "nrf_nvic.h"
@@ -64,13 +63,8 @@
 #include "tusb.h"
 #include "usb/msc_uf2.h"
 
-
 void usb_init(void);
 void usb_teardown(void);
-
-/* tinyusb function that handles power event (detected, ready, removed)
- * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
-extern void tusb_hal_nrf_power_event(uint32_t event);
 
 #else
 
@@ -251,15 +245,15 @@ static uint32_t ble_stack_init(bool init_softdevice)
   // Enable Softdevice
   nrf_clock_lf_cfg_t clock_cfg =
   {
-#if 0
-      .source       = NRF_CLOCK_LF_SRC_RC,
-      .rc_ctiv      = 16,
-      .rc_temp_ctiv = 2,
-      .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
-#else
+#ifdef NRF52840_XXAA // TODO use xtal source for feather52832
       .source       = NRF_CLOCK_LF_SRC_XTAL,
       .rc_ctiv      = 0,
       .rc_temp_ctiv = 0,
+      .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
+#else
+      .source       = NRF_CLOCK_LF_SRC_RC,
+      .rc_ctiv      = 16,
+      .rc_temp_ctiv = 2,
       .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
 #endif
   };
@@ -367,16 +361,22 @@ int main(void)
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
   }
+#ifdef NRF52832_XXAA
+  else
+  {
+    /* Adafruit Modification
+     * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
+     * to support auto programming from Arduino IDE */
+    (void) bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
+  }
+#endif
 
   /*------------- Adafruit Factory reset -------------*/
   bool is_freset = ( !button_pressed(BOOTLOADER_BUTTON) && button_pressed(FRESET_BUTTON) );
 
-  if (is_freset)
-  {
-    adafruit_factory_reset();
-  }
+  if (is_freset) adafruit_factory_reset();
 
-  /*------------- Stop timer and jump to application -------------*/
+  /*------------- Hardware reset and jump to application -------------*/
   app_timer_stop(blinky_timer_id);
 
   led_off(LED_BLUE);
@@ -521,6 +521,7 @@ uint32_t proc_soc(void)
     pstorage_sys_event_handler(soc_evt);
 
 #ifdef NRF52840_XXAA
+    extern void tusb_hal_nrf_power_event(uint32_t event);
     /*------------- usb power event handler -------------*/
     int32_t usbevt = (soc_evt == NRF_EVT_POWER_USB_DETECTED   ) ? NRFX_POWER_USB_EVT_DETECTED:
                      (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY   :

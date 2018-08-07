@@ -141,10 +141,7 @@ static void wait_for_events(void)
         }
 
         // Forced startup dfu mode timeout without any received packet
-        if (_terminate_startup_dfu)
-        {
-          return;
-        }
+        if (_terminate_startup_dfu) return;
     }
 }
 

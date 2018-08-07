@@ -43,6 +43,13 @@ MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION_FULL)"
 #******************************************************************************
 NRFUTIL = nrfutil
 
+
+ifneq ($(JLINK),)
+NRFJPROG = nrfjprog -s $(JLINK)
+else
+NRFJPROG = nrfjprog 
+endif
+
 ifeq ($(OS),Windows_NT)
 PROGFILES = C:/Program Files (x86)
 GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/6 2017-q2-update
@@ -355,11 +362,11 @@ all: $(BUILD)/$(OUTPUT_FILENAME).out size
 
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
-	nrfjprog --program $< --sectoranduicrerase -f nrf52 --reset
+	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 	
 sd:
 	@echo Flashing: $(SD_HEX)
-	nrfjprog --program $(SD_HEX) -f nrf52 --chiperase  --reset	
+	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset	
 
 
 ## Create build directories
