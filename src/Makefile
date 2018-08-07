@@ -38,34 +38,6 @@ RELEASE_DIR     = ../bin/$(BOARD)/$(SD_VERSION_FULL)
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION_FULL)"
 
-# Select the board to build for.
-ifeq ($(BOARD),)
-  $(info You must provide a BOARD parameter with 'BOARD=')
-  $(info Possible values are:)
-  $(info $(sort $(subst .h,,$(subst boards/,,$(wildcard boards/*)))))
-  $(error BOARD not defined)
-else
-  ifeq ($(wildcard boards/$(BOARD).h),)
-    $(error Invalid BOARD specified)
-  endif
-endif
-
-BUILD = _build-$(BOARD)
-
-NRF52840_BOARDLIST = pca10056 feather52840
-IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
-
-ifneq ($(IS_NRF52840),)
-#nrf52840 board
-$(info nRF52840)
-SD_NAME = s140
-else
-#nrf52832 board
-$(info nRF52832)
-SD_NAME = s132
-endif
-
-
 #******************************************************************************
 # Tool configure
 #******************************************************************************
@@ -102,11 +74,42 @@ SIZE    := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-size'
 #function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
 
+#*********************************
+# Select the board to build
+#*********************************
+ifeq ($(BOARD),)
+  $(info You must provide a BOARD parameter with 'BOARD=')
+  $(info Possible values are:)
+  $(info $(sort $(subst .h,,$(subst boards/,,$(wildcard boards/*)))))
+  $(error BOARD not defined)
+else
+  ifeq ($(wildcard boards/$(BOARD).h),)
+    $(error Invalid BOARD specified)
+  endif
+endif
+
+BUILD = _build-$(BOARD)
+
+NRF52840_BOARDLIST = pca10056 feather52840
+IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
+
+ifneq ($(IS_NRF52840),)
+#nrf52840 board
+$(info nRF52840)
+SD_NAME = s140
+else
+#nrf52832 board
+$(info nRF52832)
+SD_NAME = s132
+endif
+
+
 
 #******************************************************************************
 # SOURCE FILES
 #******************************************************************************
 
+# src
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 
@@ -138,7 +141,7 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 #C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
 #C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
+#C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
 
@@ -150,7 +153,7 @@ C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
 
 
-C_SOURCE_FILES += $(SDK_PATH)/toolchain/system_nrf52840.c
+C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52840.c
 
 # Tinyusb stack
 C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
@@ -174,16 +177,26 @@ endif
 #******************************************************************************
 # Assembly Files
 #******************************************************************************
-ASM_SOURCE_FILES  = $(SDK_PATH)/toolchain/gcc/gcc_startup_nrf52840.S
+ifneq ($(IS_NRF52840),)
+ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52840.S
+else
+#ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52.S
+endif
 
 #******************************************************************************
 # INCLUDE PATH
 #******************************************************************************
+
+# src
 IPATH += $(SRC_PATH)/
+IPATH += $(SRC_PATH)/cmsis/include
 IPATH += $(SRC_PATH)/usb
 IPATH += $(TUSB_PATH)/
 
+# nrfx
+IPATH += $(NRFX_PATH)
 IPATH += $(NRFX_PATH)/mdk
+IPATH += $(NRFX_PATH)/hal
 
 IPATH += $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
 IPATH += $(SDK11_PATH)/libraries/bootloader_dfu
@@ -201,21 +214,16 @@ IPATH += $(SDK_PATH)/libraries/hci/config
 IPATH += $(SDK_PATH)/libraries/uart
 IPATH += $(SDK_PATH)/libraries/hci
 
-IPATH += $(SDK_PATH)/drivers_nrf/common
-IPATH += $(SDK_PATH)/drivers_nrf/hal
-IPATH += $(SDK_PATH)/drivers_nrf/config
+#IPATH += $(SDK_PATH)/drivers_nrf/common
+#IPATH += $(SDK_PATH)/drivers_nrf/hal
+#IPATH += $(SDK_PATH)/drivers_nrf/config
 IPATH += $(SDK_PATH)/drivers_nrf/delay
-IPATH += $(SDK_PATH)/drivers_nrf/uart
-IPATH += $(SDK_PATH)/drivers_nrf/power
-IPATH += $(SDK_PATH)/drivers_nrf/usbd
-
+#IPATH += $(SDK_PATH)/drivers_nrf/uart
+#IPATH += $(SDK_PATH)/drivers_nrf/power
+#IPATH += $(SDK_PATH)/drivers_nrf/usbd
 IPATH += $(SDK_PATH)/device
 
-IPATH += $(SDK_PATH)/toolchain/cmsis/include
-IPATH += $(SDK_PATH)/toolchain/gcc
-IPATH += $(SDK_PATH)/toolchain
-
-
+# Softdevice
 IPATH += $(SD_PATH)/headers
 IPATH += $(SD_PATH)/headers/nrf52
 
