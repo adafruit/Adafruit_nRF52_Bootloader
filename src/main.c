@@ -128,7 +128,7 @@ volatile bool _freset_erased_complete = false;
 
 // Adafruit for Blink pattern
 bool isBlinkFast = false;
-bool isOTAConnected = false;
+bool _ota_connected = false;
 
 APP_TIMER_DEF( blinky_timer_id );
 
@@ -171,7 +171,7 @@ static void blinky_handler(void * p_context)
   led_control(LED_RED, state);
 
   // Blink LED BLUE if OTA mode and not connected
-  if (is_ota() && !isOTAConnected)
+  if (is_ota() && !_ota_connected)
   {
     led_control(LED_BLUE, state);
   }
@@ -187,17 +187,6 @@ void blinky_fast_set(bool isFast)
 {
   isBlinkFast = isFast;
 }
-
-void blinky_ota_connected(void)
-{
-  isOTAConnected = true;
-}
-
-void blinky_ota_disconneted(void)
-{
-  isOTAConnected = false;
-}
-
 
 void board_init(void)
 {
@@ -484,6 +473,10 @@ uint32_t tusb_hal_millis(void)
 /*------------------------------------------------------------------*/
 /* SoftDevice Event handler
  *------------------------------------------------------------------*/
+
+/*
+ * Process BLE event from SD
+ */
 uint32_t proc_ble(void)
 {
   __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
@@ -495,16 +488,34 @@ uint32_t proc_ble(void)
   // Handle valid event, ignore error
   if( NRF_SUCCESS == err)
   {
+    ble_evt_t* evt = (ble_evt_t*) ev_buf;
+
+    switch (evt->header.evt_id)
+    {
+      case BLE_GAP_EVT_CONNECTED:
+        _ota_connected = true;
+        led_on(LED_BLUE);
+      break;
+
+      case BLE_GAP_EVT_DISCONNECTED:
+        _ota_connected = false;
+        led_off(LED_BLUE);
+      break;
+
+      default: break;
+    }
+
     // from dfu_transport_ble
     extern void ble_evt_dispatch(ble_evt_t * p_ble_evt);
-
-    ble_evt_t* evt = (ble_evt_t*) ev_buf;
     ble_evt_dispatch(evt);
   }
 
   return err;
 }
 
+/*
+ * process SOC event from SD
+ */
 uint32_t proc_soc(void)
 {
   uint32_t soc_evt;

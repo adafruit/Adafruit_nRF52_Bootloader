@@ -115,10 +115,7 @@ static ble_gap_id_key_t    const * m_gap_ids[1];
 
 // Adafruit
 static uint8_t _adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;
-
 extern void blinky_fast_set(bool isFast);
-extern void blinky_ota_connected(void);
-extern void blinky_ota_disconneted(void);
 
 /**@brief     Function updating Service Changed CCCD and indicate a service change to peer.
  *
@@ -739,9 +736,6 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            blinky_ota_connected();
-            led_on(LED_BLUE);
-
             m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
             m_is_advertising = false;
             break;
@@ -752,10 +746,8 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
                 uint16_t sys_attr_len = 128;
 
                 m_direct_adv_cnt = APP_DIRECTED_ADV_TIMEOUT;
-                blinky_ota_disconneted();
-                blinky_fast_set(false);
 
-                led_off(LED_BLUE);
+                blinky_fast_set(false);
 
                 err_code = sd_ble_gatts_sys_attr_get(m_conn_handle, 
                                                      sys_attr,
