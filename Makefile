@@ -119,6 +119,7 @@ C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 
 # nrfx
 C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
+C_SOURCE_FILES += $(NRFX_PATH)/hal/nrf_nvmc.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
@@ -145,7 +146,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
 
 ifneq ($(IS_NRF52840),)
@@ -224,12 +224,7 @@ IPATH += $(SDK_PATH)/libraries/util
 IPATH += $(SDK_PATH)/libraries/hci/config
 IPATH += $(SDK_PATH)/libraries/uart
 IPATH += $(SDK_PATH)/libraries/hci
-
-
-#IPATH += $(SDK_PATH)/drivers_nrf/hal
-#IPATH += $(SDK_PATH)/drivers_nrf/config
 IPATH += $(SDK_PATH)/drivers_nrf/delay
-#IPATH += $(SDK_PATH)/drivers_nrf/power
 
 # Softdevice
 IPATH += $(SD_PATH)/headers
