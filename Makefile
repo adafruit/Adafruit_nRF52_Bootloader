@@ -10,12 +10,12 @@
 # - SD_VER4  : is build number for bootloader
 # - SD_HEX   : to bootloader hex binary
 #******************************************************************************
-SDK_PATH        = ../lib/sdk/components
-SDK11_PATH      = ../lib/sdk11/components
+SDK_PATH        = lib/sdk/components
+SDK11_PATH      = lib/sdk11/components
 
-SRC_PATH        = .
-TUSB_PATH       = ../lib/tinyusb/src
-NRFX_PATH				= ../lib/nrfx
+SRC_PATH        = src
+TUSB_PATH       = lib/tinyusb/src
+NRFX_PATH				= lib/nrfx
 
 
 SD_VER1         = 6
@@ -25,15 +25,15 @@ SD_VER4         = 0
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
 SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
 
-SD_PATH         = ../lib/softdevice/$(SD_NAME)/$(SD_VERSION)
+SD_PATH         = lib/softdevice/$(SD_NAME)/$(SD_VERSION)
 SD_HEX          = $(SD_PATH)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
 LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
 OUTPUT_FILENAME = $(BOARD)_bootloader
 BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 
-BETA_DIR        = ../bin/$(BOARD)/beta
-RELEASE_DIR     = ../bin/$(BOARD)/$(SD_VERSION_FULL)
+BETA_DIR        = bin/$(BOARD)/beta
+RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
 
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION_FULL)"
@@ -87,10 +87,10 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 ifeq ($(BOARD),)
   $(info You must provide a BOARD parameter with 'BOARD=')
   $(info Possible values are:)
-  $(info $(sort $(subst .h,,$(subst boards/,,$(wildcard boards/*)))))
+  $(info $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*)))))
   $(error BOARD not defined)
 else
-  ifeq ($(wildcard boards/$(BOARD).h),)
+  ifeq ($(wildcard src/boards/$(BOARD).h),)
     $(error Invalid BOARD specified)
   endif
 endif
