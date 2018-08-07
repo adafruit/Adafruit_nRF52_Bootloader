@@ -27,7 +27,7 @@ SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
 
 SD_PATH         = ../lib/softdevice/$(SD_NAME)/$(SD_VERSION)
 SD_HEX          = $(SD_PATH)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
-LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_$(SD_VERSION).ld
+LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
 OUTPUT_FILENAME = $(BOARD)_bootloader
 BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
