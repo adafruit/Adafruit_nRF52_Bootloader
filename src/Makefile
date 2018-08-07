@@ -260,7 +260,7 @@ CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin --short-enums 
 
 # Defined Symbol (MACROS)
-CFLAGS += -DBOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
+CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
 
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
