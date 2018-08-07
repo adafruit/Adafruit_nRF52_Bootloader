@@ -92,8 +92,8 @@ void usb_teardown(void);
 #define BOOTLOADER_DFU_OTA_FULLRESET_MAGIC  0xA8
 #define BOOTLOADER_DFU_SERIAL_MAGIC         0x4e
 
-#define BOOTLOADER_BUTTON                   BUTTON_1                         // Button used to enter SW update mode.
-#define FRESET_BUTTON                       BUTTON_2                         // Button used in addition to DFU button, to force OTA DFU
+#define BUTTON_DFU                          BUTTON_1                         // Button used to enter SW update mode.
+#define BUTTON_FRESET                       BUTTON_2                         // Button used in addition to DFU button, to force OTA DFU
 
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
@@ -181,8 +181,8 @@ void led_blink_fast(bool enable)
 
 void board_init(void)
 {
-  button_init(BOOTLOADER_BUTTON);
-  button_init(FRESET_BUTTON);
+  button_init(BUTTON_DFU);
+  button_init(BUTTON_FRESET);
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
   // LED init
@@ -335,12 +335,12 @@ int main(void)
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
-  dfu_start  = dfu_start || button_pressed(BOOTLOADER_BUTTON);
+  dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
 
   // DFU + FRESET are pressed --> OTA
-  _ota_update = _ota_update  || ( button_pressed(BOOTLOADER_BUTTON) && button_pressed(FRESET_BUTTON) ) ;
+  _ota_update = _ota_update  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
 
-  if (dfu_start || (!bootloader_app_is_valid(DFU_BANK_0_REGION_START)))
+  if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
@@ -356,11 +356,12 @@ int main(void)
 #endif
 
   /*------------- Adafruit Factory reset -------------*/
-  bool is_freset = ( !button_pressed(BOOTLOADER_BUTTON) && button_pressed(FRESET_BUTTON) );
+  if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
+  {
+    adafruit_factory_reset();
+  }
 
-  if (is_freset) adafruit_factory_reset();
-
-  /*------------- Reset used hardware and jump to application -------------*/
+  /*------------- Reset used prph and jump to application -------------*/
   board_teardown();
 
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
