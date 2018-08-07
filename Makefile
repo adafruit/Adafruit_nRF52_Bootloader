@@ -1,7 +1,5 @@
 #******************************************************************************
-# CONFIGURE (no spaces!)
-
-#
+# CONFIGURE
 # - SDK_PATH : path to SDK directory
 # - SRC_PATH : path to src folder
 #
@@ -120,7 +118,6 @@ C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 
 # nrfx
-
 C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
 
 # SDK 11 files
@@ -147,8 +144,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_mem_pool.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
-
-
 
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
@@ -329,8 +324,6 @@ ASMFLAGS += -DS132
 endif
 
 
-
-
 C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
 C_PATHS = $(call remduplicates, $(dir $(C_SOURCE_FILES) ) )
 C_OBJECTS = $(addprefix $(BUILD)/, $(C_SOURCE_FILE_NAMES:.c=.o) )
@@ -427,4 +420,3 @@ release: genhex genpkg
 	@mkdir -p $(RELEASE_DIR)
 	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
 	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
-	
