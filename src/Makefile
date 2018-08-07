@@ -147,12 +147,13 @@ C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
 ifneq ($(IS_NRF52840),)
 
+# src
 C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/usb.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
 
-
+# nrfx
 C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52840.c
 
 # Tinyusb stack
@@ -221,7 +222,7 @@ IPATH += $(SDK_PATH)/drivers_nrf/delay
 #IPATH += $(SDK_PATH)/drivers_nrf/uart
 #IPATH += $(SDK_PATH)/drivers_nrf/power
 #IPATH += $(SDK_PATH)/drivers_nrf/usbd
-IPATH += $(SDK_PATH)/device
+#IPATH += $(SDK_PATH)/device
 
 # Softdevice
 IPATH += $(SD_PATH)/headers
@@ -280,7 +281,7 @@ endif
 
 # keep every function in separate section. This will allow linker to dump unused functions
 LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUTPUT_FILENAME).map
-LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/ -T$(LD_FILE)
+LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/linker -T$(LD_FILE)
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
@@ -295,15 +296,26 @@ LDFLAGS += --specs=nano.specs -lc -lnosys
 #
 #******************************************************************************
 ASMFLAGS += -x assembler-with-cpp
-ASMFLAGS += -DNRF52840_XXAA
 ASMFLAGS += -D__HEAP_SIZE=0
-ASMFLAGS += -DS140
 ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
 ASMFLAGS += -DBLE_STACK_SUPPORT_REQD
 ASMFLAGS += -DBSP_DEFINES_ONLY
 ASMFLAGS += -DSWI_DISABLE0
 ASMFLAGS += -DSOFTDEVICE_PRESENT
 ASMFLAGS += -DFLOAT_ABI_HARD
+
+ifneq ($(IS_NRF52840),)
+
+ASMFLAGS += -DNRF52840_XXAA
+ASMFLAGS += -DS140
+
+else
+
+ASMFLAGS += -DNRF52
+ASMFLAGS += -DS132
+
+endif
+
 
 
 
