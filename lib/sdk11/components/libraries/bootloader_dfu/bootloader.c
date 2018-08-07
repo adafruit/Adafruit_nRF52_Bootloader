@@ -25,11 +25,13 @@
 #include "crc16.h"
 #include "pstorage.h"
 #include "app_scheduler.h"
-#include "nrf_delay.h"
 
+#include "nrfx.h"
 #include "app_timer.h"
 
+#ifdef NRF52840_XXAA
 #include "tusb.h"
+#endif
 
 #define APP_TIMER_PRESCALER    0
 
@@ -125,11 +127,10 @@ static void wait_for_events(void)
         // Event received. Process it from the scheduler.
         app_sched_execute();
 
-        // USB stack
+#ifdef NRF52840_XXAA
         tusb_task();
-
-        // Send out cdc's data
         tud_cdc_write_flush();
+#endif
 
         if ((m_update_status == BOOTLOADER_COMPLETE) ||
             (m_update_status == BOOTLOADER_TIMEOUT)  ||
@@ -415,7 +416,7 @@ uint32_t bootloader_dfu_sd_update_continue(void)
 
     // Ensure that flash operations are not executed within the first 100 ms seconds to allow
     // a debugger to be attached.
-    nrf_delay_ms(100);
+    NRFX_DELAY_MS(100);
 
     err_code = dfu_sd_image_swap();
     APP_ERROR_CHECK(err_code);

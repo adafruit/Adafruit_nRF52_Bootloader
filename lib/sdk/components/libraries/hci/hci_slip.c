@@ -44,7 +44,9 @@
 #include "app_uart.h"
 #include "nrf_error.h"
 
+#ifdef NRF52840_XXAA
 #include "tusb.h"
+#endif
 
 #define APP_SLIP_END        0xC0                            /**< SLIP code for identifying the beginning and end of a packet frame.. */
 #define APP_SLIP_ESC        0xDB                            /**< SLIP escape code. This code is used to specify that the following character is specially encoded. */
@@ -119,14 +121,21 @@ static uint32_t send_tx_byte_end(void);
  */
 uint32_t (*send_tx_byte) (void) = send_tx_byte_default;
 
-static uint32_t usb_uart_put(char ch)
+#ifdef NRF52840_XXAA
+
+static uint32_t serial_put(char ch)
 {
   return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
 }
+#else
+
+#define serial_put    app_uart_put  
+
+#endif
 
 static uint32_t send_tx_byte_end(void)
 {
-    uint32_t err_code = usb_uart_put(APP_SLIP_END);
+    uint32_t err_code = serial_put(APP_SLIP_END);
 
     if ((err_code == NRF_SUCCESS) && (m_tx_buffer_index == 0))
     {
@@ -140,7 +149,7 @@ static uint32_t send_tx_byte_end(void)
 
 static uint32_t send_tx_byte_default(void)
 {
-    uint32_t err_code = usb_uart_put(mp_tx_buffer[m_tx_buffer_index]);
+    uint32_t err_code = serial_put(mp_tx_buffer[m_tx_buffer_index]);
 
     if (err_code == NRF_SUCCESS)
     {
@@ -158,11 +167,11 @@ static uint32_t send_tx_byte_encoded(void)
     switch (mp_tx_buffer[m_tx_buffer_index])
     {
         case APP_SLIP_END:
-            err_code = usb_uart_put(APP_SLIP_ESC_END);
+            err_code = serial_put(APP_SLIP_ESC_END);
             break;
 
         case APP_SLIP_ESC:
-            err_code = usb_uart_put(APP_SLIP_ESC_ESC);
+            err_code = serial_put(APP_SLIP_ESC_ESC);
             break;
 
         default:
@@ -182,7 +191,7 @@ static uint32_t send_tx_byte_encoded(void)
 
 static uint32_t send_tx_byte_esc(void)
 {
-    uint32_t err_code = usb_uart_put(APP_SLIP_ESC);
+    uint32_t err_code = serial_put(APP_SLIP_ESC);
 
     if (err_code == NRF_SUCCESS)
     {
@@ -339,7 +348,25 @@ static bool rx_buffer_overflowed(void)
     return false;
 }
 
-#if 0
+#ifdef NRF52840_XXAA
+
+static uint32_t slip_uart_open(void)
+{
+  m_current_state = SLIP_READY;
+  return NRF_SUCCESS;
+}
+
+void tud_cdc_rx_cb(uint8_t port)
+{
+  while ( tud_cdc_available() && !rx_buffer_overflowed() )
+  {
+    int8_t ch = tud_cdc_read_char();
+    handle_rx_byte((uint8_t) ch);
+  }
+}
+
+#else
+
 /** @brief Function for handling the UART module event. It parses events from the UART when
  *         bytes are received/transmitted.
  *
@@ -371,7 +398,7 @@ static uint32_t slip_uart_open(void)
         HCI_UART_TX_PIN,
         HCI_UART_RTS_PIN,
         HCI_UART_CTS_PIN,
-        (app_uart_flow_control_t)HCI_UART_FLOW_CONTROL,
+        HCI_UART_FLOW_CONTROL,
         false,
         HCI_UART_BAUDRATE
     };
@@ -386,22 +413,6 @@ static uint32_t slip_uart_open(void)
         m_current_state = SLIP_READY;
     }
     return err_code;
-}
-#else
-
-static uint32_t slip_uart_open(void)
-{
-  m_current_state = SLIP_READY;
-  return NRF_SUCCESS;
-}
-
-void tud_cdc_rx_cb(uint8_t port)
-{
-  while ( tud_cdc_available() && !rx_buffer_overflowed() )
-  {
-    int8_t ch = tud_cdc_read_char();
-    handle_rx_byte((uint8_t) ch);
-  }
 }
 
 #endif
@@ -433,11 +444,11 @@ uint32_t hci_slip_open()
 uint32_t hci_slip_close()
 {
     m_current_state   = SLIP_OFF;
-#if 0
+#ifdef NRF52840_XXAA
+    return NRF_SUCCESS;
+#else
     uint32_t err_code = app_uart_close();
     return err_code;
-#else
-    return NRF_SUCCESS;
 #endif
 
 }

@@ -142,10 +142,8 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-#C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
-#C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 
-#C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
+
 C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/hal/nrf_nvmc.c
 
 
@@ -175,6 +173,12 @@ else
 
 C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52.c
 
+C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
+C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
+C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
+
+IPATH += $(SDK_PATH)/drivers_nrf/common
+IPATH += $(SDK_PATH)/drivers_nrf/uart
 
 endif
 
@@ -185,7 +189,7 @@ endif
 ifneq ($(IS_NRF52840),)
 ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52840.S
 else
-#ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52.S
+ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52.S
 endif
 
 #******************************************************************************
@@ -220,11 +224,10 @@ IPATH += $(SDK_PATH)/libraries/hci/config
 IPATH += $(SDK_PATH)/libraries/uart
 IPATH += $(SDK_PATH)/libraries/hci
 
-#IPATH += $(SDK_PATH)/drivers_nrf/common
+
 #IPATH += $(SDK_PATH)/drivers_nrf/hal
 #IPATH += $(SDK_PATH)/drivers_nrf/config
 IPATH += $(SDK_PATH)/drivers_nrf/delay
-#IPATH += $(SDK_PATH)/drivers_nrf/uart
 #IPATH += $(SDK_PATH)/drivers_nrf/power
 
 # Softdevice
