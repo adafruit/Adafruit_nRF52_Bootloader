@@ -98,12 +98,8 @@ NRF52840_BOARDLIST = pca10056 feather52840
 IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
 
 ifneq ($(IS_NRF52840),)
-#nrf52840 board
-$(info nRF52840)
 SD_NAME = s140
 else
-#nrf52832 board
-$(info nRF52832)
 SD_NAME = s132
 endif
 
