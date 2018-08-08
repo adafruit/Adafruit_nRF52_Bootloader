@@ -354,8 +354,16 @@
               Name="Feather52840 Size++"
               build_exclude_from_build="Yes" />
           </file>
-          <file file_name="../../lib/nrfx/mdk/ses_startup_nrf52840.s" />
-          <file file_name="../../lib/nrfx/mdk/ses_startup_nrf_common.s" />
+          <file file_name="../../lib/nrfx/mdk/ses_startup_nrf52840.s">
+            <configuration
+              Name="Feather52840 Size++"
+              build_exclude_from_build="No" />
+          </file>
+          <file file_name="../../lib/nrfx/mdk/ses_startup_nrf_common.s">
+            <configuration
+              Name="Feather52840 Size++"
+              build_exclude_from_build="No" />
+          </file>
           <file file_name="../../lib/nrfx/mdk/startup_config.h" />
           <file file_name="../../lib/nrfx/mdk/system_nrf52.c">
             <configuration
@@ -380,6 +388,9 @@
       Name="Debug Size++"
       build_treat_warnings_as_errors="Yes"
       c_preprocessor_definitions="DEBUG_SIZE_EXPAND" />
+    <configuration
+      Name="Feather52840 Size++"
+      linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
   </project>
   <configuration
     Name="Debug"
