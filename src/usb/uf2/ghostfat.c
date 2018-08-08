@@ -155,24 +155,6 @@ static uint32_t get_flash_size(void)
   return flash_sz;
 }
 
-#if 0
-void uf2_timer(void *p_context) {
-    UNUSED_PARAMETER(p_context);
-    if (hadWrite) {
-        flushFlash();
-        s_dfu_settings.bank_0.bank_code = NRF_DFU_BANK_VALID_APP;
-        int32_t start = SD_MAGIC_OK() ? MAIN_APPLICATION_START_ADDR : MBR_SIZE;
-        int32_t sz = s_dfu_settings.bank_0.image_size - start;
-        if (sz > 0)
-            s_dfu_settings.bank_0.image_size = sz;
-        nrf_dfu_settings_write(NULL);
-    }
-    NVIC_SystemReset();
-}
-
-void uf2_timer_start(int ms);
-#endif
-
 void padded_memcpy(char *dst, const char *src, int len) {
     for (int i = 0; i < len; ++i) {
         if (*src)
@@ -375,8 +357,6 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
     // flash_write cause a flush to write previous cached data, this write data is not consumed yet
     if ( _is_flashing ) return 0;
 
-//    bool isSet = false;
-
     if (state && bl->numBlocks) {
         if (state->numBlocks != bl->numBlocks) {
             if (bl->numBlocks >= MAX_BLOCKS || state->numBlocks)
@@ -396,8 +376,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
                 // wait a little bit before resetting, to avoid Windows transmit error
                 // https://github.com/Microsoft/uf2-samd21/issues/11
                 if (!quiet) {
-                    // uf2_timer_start(30);
-                    // isSet = true;
+
                 }
 
                 // flush last blocks
@@ -405,15 +384,13 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
 
                 // no flashing due to last blocks is the same to contents on the flash already
                 // complete the write
-                if (!_is_flashing) uf2_write_complete();
+                if (!_is_flashing) {
+                  uf2_write_complete();
+                }
             }
         }
         NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
     }
-
-//    if (!isSet && !quiet) {
-//        // uf2_timer_start(500);
-//    }
 
     return 512;
 }

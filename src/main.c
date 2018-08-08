@@ -307,7 +307,7 @@ uint32_t softdev_teardown(void)
 int main(void)
 {
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
-  bool sd_inited = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC);
+  bool const sd_inited = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC);
 
   // Start Bootloader in BLE OTA mode
   _ota_update = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC) ||
@@ -322,8 +322,7 @@ int main(void)
   // Save bootloader version to pre-defined register, retrieved by application
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
 
-  // This check ensures that the defined fields in the bootloader corresponds with actual
-  // setting in the chip.
+  // This check ensures that the defined fields in the bootloader corresponds with actual setting in the chip.
   APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
 
   board_init();
