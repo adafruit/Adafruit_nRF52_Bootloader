@@ -94,8 +94,8 @@ $ export PATH=$PATH:/Users/Kevin/Downloads/nRF5x-Command-Line-Tools_9_7_2_OSX/nr
 ## Option 2: Build using Segger Embeded Studio
 
 For better debugging you can also use [SES](https://www.segger.com/products/development-tools/embedded-studio/).
-The project file is located at `src/segger/nrf52840_bootloader.emProject`.
+The project file is located at `src/segger/Adafruit_nRF52_Bootloader.emProject`.
 
 > **Note**: SES only flashes the bootloader when you click download, you need to
-flash Softdevice beforehand if you haven't done so ( use `make flash_sd`
+flash Softdevice beforehand if you haven't done so ( use `make BOARD=feather52840 sd`
 mentioned above )
