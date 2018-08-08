@@ -94,11 +94,6 @@
         <file file_name="../boards/pca10056.h" />
       </folder>
     </folder>
-    <configuration
-      Name="Debug"
-      gcc_optimization_level="Debug"
-      link_use_linker_script_file="No"
-      linker_section_placement_file="flash_placement.xml" />
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration
       Name="Release Single"
@@ -353,6 +348,9 @@
             <configuration
               Name="Feather52840 Size++"
               build_exclude_from_build="Yes" />
+            <configuration
+              Name="Feather52840"
+              build_exclude_from_build="Yes" />
           </file>
           <file file_name="../../lib/nrfx/mdk/ses_startup_nrf52840.s">
             <configuration
@@ -369,6 +367,9 @@
             <configuration
               Name="Feather52840 Size++"
               build_exclude_from_build="Yes" />
+            <configuration
+              Name="Feather52840"
+              build_exclude_from_build="Yes" />
           </file>
           <file file_name="../../lib/nrfx/mdk/system_nrf52.h" />
           <file file_name="../../lib/nrfx/mdk/system_nrf52840.c" />
@@ -384,18 +385,9 @@
         </folder>
       </folder>
     </folder>
-    <configuration
-      Name="Debug Size++"
-      build_treat_warnings_as_errors="Yes"
-      c_preprocessor_definitions="DEBUG_SIZE_EXPAND" />
-    <configuration
-      Name="Feather52840 Size++"
-      linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
   </project>
   <configuration
-    Name="Debug"
-    c_preprocessor_definitions="DEBUG"
-    gcc_debugging_level="Level 3"
-    gcc_optimization_level="None" />
-  <configuration Name="Feather52840 Size++" />
+      Name="Feather52840"
+      build_treat_warnings_as_errors="Yes"
+      c_preprocessor_definitions="DEBUG_SIZE_EXPAND" /> 
 </solution>

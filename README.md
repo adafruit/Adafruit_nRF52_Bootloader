@@ -50,6 +50,10 @@ To flash SoftDevice (with full chip erase)
 
 	$ make BOARD=feather52840 sd
 
+To full erase chip
+
+	$ make BOARD=feather52840 erase
+
 For the list of supported boards, try to type make without `BOARD=`
 
 	$ make

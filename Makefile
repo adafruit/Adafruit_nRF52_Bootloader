@@ -339,10 +339,11 @@ $(info LDFLAGS  $(LDFLAGS))
 $(info )
 endif
 
-.phony: all clean size flash sd
+.phony: all clean size flash sd erase
 
 all: $(BUILD)/$(OUTPUT_FILENAME).out size
 
+#********* Flash target *******************
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
@@ -351,6 +352,9 @@ sd:
 	@echo Flashing: $(SD_HEX)
 	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset	
 
+erase:
+	@echo Erasing chip
+	$(NRFJPROG) --eraseall -f nrf52
 
 ## Create build directories
 $(BUILD):
