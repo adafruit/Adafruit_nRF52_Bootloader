@@ -297,6 +297,11 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
         return -1;
     }
 
+    // only accept block with same family id
+    if ( UF2_FAMILY_ID && !((bl->flags & UF2_FLAG_FAMILYID) && (bl->familyID == UF2_FAMILY_ID)) ) {
+      return -1;
+    }
+
     if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
         bl->targetAddr < USER_FLASH_START || bl->targetAddr + bl->payloadSize > USER_FLASH_END) {
 #if USE_DBG_MSC

@@ -51,6 +51,7 @@ extern bool sdRunning;
 
 // If set, the block is "comment" and should not be flashed to the device
 #define UF2_FLAG_NOFLASH 0x00000001
+#define UF2_FLAG_FAMILYID 0x00002000
 
 #define MAX_BLOCKS (FLASH_SIZE / 256 + 100)
 typedef struct {
@@ -68,7 +69,7 @@ typedef struct {
     uint32_t payloadSize;
     uint32_t blockNo;
     uint32_t numBlocks;
-    uint32_t reserved;
+    uint32_t familyID;
 
     // raw data;
     uint8_t data[476];
