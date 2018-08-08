@@ -8,25 +8,29 @@
 # - SD_VER4  : is build number for bootloader
 # - SD_HEX   : to bootloader hex binary
 #******************************************************************************
+SRC_PATH        = src
+
 SDK_PATH        = lib/sdk/components
 SDK11_PATH      = lib/sdk11/components
+SD_PATH     		= lib/softdevice/$(SD_FILENAME)
 
-SRC_PATH        = src
 TUSB_PATH       = lib/tinyusb/src
 NRFX_PATH				= lib/nrfx
 
-
 SD_VER1         = 6
-SD_VER2         = 0
+SD_VER2         = 1
 SD_VER3         = 0
 SD_VER4         = 0
+
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
 SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
+SD_FILENAME		  = $(SD_NAME)_nrf52_$(SD_VERSION)
 
-SD_PATH         = lib/softdevice/$(SD_NAME)/$(SD_VERSION)
-SD_HEX          = $(SD_PATH)/hex/$(SD_NAME)_nrf52_$(SD_VERSION)_softdevice.hex
+
+SD_API_PATH     = $(SD_PATH)/$(SD_FILENAME)_API
+SD_HEX          = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
+
 LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
-
 OUTPUT_FILENAME = $(BOARD)_bootloader
 BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 
@@ -223,8 +227,8 @@ IPATH += $(SDK_PATH)/libraries/hci
 IPATH += $(SDK_PATH)/drivers_nrf/delay
 
 # Softdevice
-IPATH += $(SD_PATH)/headers
-IPATH += $(SD_PATH)/headers/nrf52
+IPATH += $(SD_API_PATH)/include
+IPATH += $(SD_API_PATH)/include/nrf52
 
 
 INC_PATHS = $(addprefix -I,$(IPATH))
