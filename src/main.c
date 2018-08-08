@@ -196,7 +196,7 @@ void board_init(void)
   // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
 
-  // Init timer (RTC1)
+  // Init app timer (use RTC1)
   app_timer_init();
 
   // Configure Systick for led blinky
@@ -230,7 +230,7 @@ void board_teardown(void)
  *                             be initialized if a chip reset has occured. Soft reset (jump ) from
  *                             application must not reinitialize the SoftDevice.
  */
-static uint32_t softdev_init(bool init_softdevice)
+uint32_t softdev_init(bool init_softdevice)
 {
   if (init_softdevice)
   {
@@ -292,16 +292,17 @@ static uint32_t softdev_init(bool init_softdevice)
   APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start) );
 
   // Enable BLE stack.
+  // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
   APP_ERROR_CHECK( sd_ble_enable(&ram_start) );
 
   return NRF_SUCCESS;
 }
 
-uint32_t softdev_teardown(void)
+void softdev_teardown(void)
 {
-  APP_ERROR_CHECK ( sd_softdevice_disable() );
-  return NRF_SUCCESS;
+  sd_softdevice_disable();
 }
+
 
 
 int main(void)
@@ -350,6 +351,9 @@ int main(void)
 
   if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
+    // Enable BLE if in OTA
+//    if ( _ota_update ) softdev_ble_enable();
+
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
   }
