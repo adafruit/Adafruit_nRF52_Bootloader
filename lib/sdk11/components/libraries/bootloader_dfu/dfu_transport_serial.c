@@ -19,7 +19,7 @@
 #include "hci_transport.h"
 #include "app_timer.h"
 #include "app_scheduler.h"
-#include "boards/boards.h"
+#include "boards.h"
 
 #define MAX_BUFFERS          4u                                                      /**< Maximum number of buffers that can be received queued without being consumed. */
 

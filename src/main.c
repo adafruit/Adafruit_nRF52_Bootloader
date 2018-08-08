@@ -53,7 +53,7 @@
 #include "app_timer.h"
 #include "nrf_error.h"
 
-#include "boards/boards.h"
+#include "boards.h"
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"

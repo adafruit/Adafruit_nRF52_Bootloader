@@ -3,7 +3,7 @@
 #include "nrf_nvmc.h"
 #include <string.h>
 
-#include "boards/boards.h"
+#include "boards.h"
 #include "tusb.h"
 
 #include "bootloader_settings.h"
