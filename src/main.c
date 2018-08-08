@@ -60,6 +60,8 @@
 #include "nrf_wdt.h"
 #include "pstorage.h"
 
+#include "nrf_nvmc.h"
+
 #ifdef NRF52840_XXAA
 #include "nrf_usbd.h"
 #include "tusb.h"
@@ -121,7 +123,7 @@ STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 
 
 void adafruit_factory_reset(void);
-volatile bool _freset_erased_complete = false;
+
 
 // Adafruit for Blink pattern
 bool _fast_blink = false;
@@ -225,10 +227,10 @@ void board_teardown(void)
 /**
  * Initializes the SoftDevice and the BLE event interrupt.
  * @param[in] init_softdevice  true if SoftDevice should be initialized. The SoftDevice must only
- *                             be initialized if a chip reset has occured. Soft reset from
+ *                             be initialized if a chip reset has occured. Soft reset (jump ) from
  *                             application must not reinitialize the SoftDevice.
  */
-static uint32_t ble_stack_init(bool init_softdevice)
+static uint32_t softdev_init(bool init_softdevice)
 {
   if (init_softdevice)
   {
@@ -236,6 +238,7 @@ static uint32_t ble_stack_init(bool init_softdevice)
     APP_ERROR_CHECK( sd_mbr_command(&com) );
   }
 
+  // map vector table to bootloader address
   APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
 
   // Enable Softdevice
@@ -294,6 +297,12 @@ static uint32_t ble_stack_init(bool init_softdevice)
   return NRF_SUCCESS;
 }
 
+uint32_t softdev_teardown(void)
+{
+  APP_ERROR_CHECK ( sd_softdevice_disable() );
+  return NRF_SUCCESS;
+}
+
 
 int main(void)
 {
@@ -323,12 +332,12 @@ int main(void)
   if (bootloader_dfu_sd_in_progress())
   {
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
-    ble_stack_init(!sd_inited);
+    softdev_init(!sd_inited);
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
   }
   else
   {
-    ble_stack_init(!sd_inited);
+    softdev_init(!sd_inited);
   }
 
   usb_init();
@@ -355,6 +364,9 @@ int main(void)
   }
 #endif
 
+  // we are all done with DFU, disable soft device
+  softdev_teardown();
+
   /*------------- Adafruit Factory reset -------------*/
   if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
   {
@@ -379,41 +391,6 @@ int main(void)
 // FACTORY RESET
 //--------------------------------------------------------------------+
 
-// Pstorage callback, fired after erased  Application Data
-static void appdata_pstorage_cb(pstorage_handle_t * p_handle, uint8_t op_code, uint32_t result,
-                                uint8_t  * p_data, uint32_t  data_len)
-{
-  if ( op_code == PSTORAGE_CLEAR_OP_CODE)
-  {
-    _freset_erased_complete = true;
-  }
-}
-
-void freset_erase_and_wait(pstorage_handle_t* hdl, uint32_t addr, uint32_t size)
-{
-  _freset_erased_complete = false;
-
-  // set address and start erasing
-  hdl->block_id = addr;
-  pstorage_clear(hdl, size);
-
-  // Time to erase a page is 100 ms max
-  // It is better to force a timeout to prevent lock-up
-  uint32_t timeout_tck = (size/CODE_PAGE_SIZE)*100;
-  timeout_tck = APP_TIMER_TICKS(timeout_tck);
-
-  uint32_t start_tck = app_timer_cnt_get();
-
-  while(!_freset_erased_complete)
-  {
-    sd_app_evt_wait();
-    app_sched_execute();
-
-    uint32_t now_tck = app_timer_cnt_get();
-    if ( (now_tck - start_tck) > timeout_tck ) break;
-  }
-}
-
 // Perform factory reset to erase Application + Data
 void adafruit_factory_reset(void)
 {
@@ -421,16 +398,14 @@ void adafruit_factory_reset(void)
   led_blink_fast(true);
   led_on(LED_BLUE);
 
-  static pstorage_handle_t freset_handle = { .block_id = APPDATA_ADDR_START } ;
-  pstorage_module_param_t  storage_params = { .cb = appdata_pstorage_cb};
-
-  pstorage_register(&storage_params, &freset_handle);
-
-  // clear all App Data
-  freset_erase_and_wait(&freset_handle, APPDATA_ADDR_START, DFU_APP_DATA_RESERVED);
+  // clear all App Data if any
+  if ( DFU_APP_DATA_RESERVED )
+  {
+    nrf_nvmc_page_erase(APPDATA_ADDR_START);
+  }
 
   // Only need to erase the 1st page of Application code to make it invalid
-  freset_erase_and_wait(&freset_handle, DFU_BANK_0_REGION_START, CODE_PAGE_SIZE);
+  nrf_nvmc_page_erase(DFU_BANK_0_REGION_START);
 
   // back to normal
   led_blink_fast(false);
