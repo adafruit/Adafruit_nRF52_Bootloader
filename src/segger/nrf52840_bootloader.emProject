@@ -1,6 +1,6 @@
 <!DOCTYPE CrossStudio_Project_File>
-<solution Name="nrf52840_bootloader" target="8" version="2">
-  <project Name="nrf52840_bootloader">
+<solution Name="Adafruit_nRF52_Bootloader" target="8" version="2">
+  <project Name="Adafruit_nRF52_Bootloader">
     <configuration
       Name="Common"
       Placement="Flash"
@@ -387,7 +387,7 @@
     </folder>
   </project>
   <configuration
-      Name="Feather52840"
-      build_treat_warnings_as_errors="Yes"
-      c_preprocessor_definitions="DEBUG_SIZE_EXPAND" /> 
+    Name="Feather52840"
+    build_treat_warnings_as_errors="Yes"
+    c_preprocessor_definitions="DEBUG_SIZE_EXPAND" />
 </solution>
