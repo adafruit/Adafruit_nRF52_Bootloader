@@ -50,7 +50,15 @@
 // ADAFRUIT
 // All firmware init data must has Device Type ADAFRUIT_DEVICE_TYPE
 // SD + Bootloader upgrade must have ADAFRUIT_SD_UNLOCK_CODE in Device Revision
-#define ADAFRUIT_DEVICE_TYPE                0x0052 // for nrf52
+
+#ifdef NRF52840_XXAA
+  #define ADAFRUIT_DEVICE_TYPE                52840
+#elif defined NRF52832_XXAA
+  #define ADAFRUIT_DEVICE_TYPE                0x0052
+#else
+  #error Unknown MCU
+#endif
+
 #define ADAFRUIT_SD_UNLOCK_CODE             0xADAF
 
 #define DFU_INIT_PACKET_EXT_LENGTH_MIN      2                       //< Minimum length of the extended init packet. The extended init packet may contain a CRC, a HASH, or other data. This value must be changed according to the requirements of the system. The template uses a minimum value of two in order to hold a CRC. */

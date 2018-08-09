@@ -86,25 +86,31 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 # Select the board to build
 #*********************************
-ifeq ($(BOARD),)
-  $(info You must provide a BOARD parameter with 'BOARD=')
-  $(info Supported boards are: $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*)))))
-  $(error BOARD not defined)
-else
-  ifeq ($(wildcard src/boards/$(BOARD).h),)
-    $(error Invalid BOARD specified)
+BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
+
+NRF52840_BOARDLIST = pca10056 feather52840
+IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
+
+ifeq ($(findstring $(MAKECMDGOALS),all-board all-beta all-release),)
+  ifeq ($(BOARD),)
+    $(info You must provide a BOARD parameter with 'BOARD=')
+    $(info Supported boards are: $(BOARD_LIST))
+    $(error BOARD not defined)
+  else
+    ifeq ($(findstring $(BOARD),$(BOARD_LIST)),)
+      $(error Invalid BOARD specified)
+    endif
   endif
 endif
 
 BUILD = _build-$(BOARD)
 
-NRF52840_BOARDLIST = pca10056 feather52840
-IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
-
 ifneq ($(IS_NRF52840),)
 SD_NAME = s140
+DFU_DEV_TYPE = 52840
 else
 SD_NAME = s132
+DFU_DEV_TYPE = 0x0052
 endif
 
 
@@ -344,9 +350,28 @@ endif
 
 .phony: all clean size flash sd erase
 
+# default target to build
 all: $(BUILD)/$(OUTPUT_FILENAME).out size
 
-#********* Flash target *******************
+# TODO auto rule using BOARD_LIST
+# build all the boards
+all-board:
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all
+
+all-beta:
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all beta
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all beta
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all beta
+
+all-release:
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all release
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all release
+	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all release
+
+
+#******************* Flash target *******************
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
@@ -358,6 +383,9 @@ sd:
 erase:
 	@echo Erasing chip
 	$(NRFJPROG) --eraseall -f nrf52
+
+
+#******************* Compile rules *******************
 
 ## Create build directories
 $(BUILD):
@@ -387,6 +415,8 @@ size: $(BUILD)/$(OUTPUT_FILENAME).out
 	-@echo ''
 
 
+#******************* Binary generator *******************
+
 .phony: genhex genpkg beta release
 
 ## Create binary .hex file from the .out file
@@ -402,7 +432,7 @@ $(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
 genpkg: $(BUILD)/$(BOOT_SD_NAME).zip
 
 $(BUILD)/$(BOOT_SD_NAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
-	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision 0xADAF --bootloader $< --softdevice $(SD_HEX) $@ 
+	@$(NRFUTIL) dfu genpkg --dev-type $(DFU_DEV_TYPE) --dev-revision 0xADAF --bootloader $< --softdevice $(SD_HEX) $@ 
 
 # Create SD+bootloader combo with hex & dfu package at beta folder
 beta: genhex genpkg
@@ -412,9 +442,12 @@ beta: genhex genpkg
 	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(BETA_DIR)/$(BOOT_SD_NAME).hex
 	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(BETA_DIR)/$(BOOT_SD_NAME).zip
 
+# Create SD+bootloader combo with hex & dfu package at release folder
 release: genhex genpkg
 	@echo CR $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
 	@echo CR $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
 	@mkdir -p $(RELEASE_DIR)
 	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
 	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
+	
+	
