@@ -47,19 +47,24 @@
 #include "nrf_error.h"
 #include "crc16.h"
 
-// ADAFRUIT
-// All firmware init data must has Device Type ADAFRUIT_DEVICE_TYPE
-// SD + Bootloader upgrade must have ADAFRUIT_SD_UNLOCK_CODE in Device Revision
+/* ADAFRUIT
+ * - All firmware init data must has Device Type ADAFRUIT_DEVICE_TYPE (nrf52832 and nrf52840)
+ * - SD + Bootloader upgrade must have correct Device Revision to make sure bootloader is not flashed
+ * on the wrong device (e.g flah nRF52832's bootloader on nRF52840 board and vice versa)
+ *   - nrf52832 dev-rev is 0xADAF
+ *   - nrf52840 dev-rev is  52840
+ */
+#define ADAFRUIT_DEVICE_TYPE         0x0052
 
 #ifdef NRF52840_XXAA
-  #define ADAFRUIT_DEVICE_TYPE                52840
+  #define ADAFRUIT_DEV_REV           52840
 #elif defined NRF52832_XXAA
-  #define ADAFRUIT_DEVICE_TYPE                0x0052
+  #define ADAFRUIT_DEV_REV           0xADAF
 #else
   #error Unknown MCU
 #endif
 
-#define ADAFRUIT_SD_UNLOCK_CODE             0xADAF
+
 
 #define DFU_INIT_PACKET_EXT_LENGTH_MIN      2                       //< Minimum length of the extended init packet. The extended init packet may contain a CRC, a HASH, or other data. This value must be changed according to the requirements of the system. The template uses a minimum value of two in order to hold a CRC. */
 #define DFU_INIT_PACKET_EXT_LENGTH_MAX      10                      //< Maximum length of the extended init packet. The extended init packet may contain a CRC, a HASH, or other data. This value must be changed according to the requirements of the system. The template uses a maximum value of 10 in order to hold a CRC and any padded data on transport layer without overflow. */
@@ -131,7 +136,7 @@ uint32_t dfu_init_prevalidate(uint8_t * p_init_data, uint32_t init_data_len, uin
     // Adafruit unlock code must match to upgrade SoftDevice and/or Bootloader
     if ( image_type & (DFU_UPDATE_SD | DFU_UPDATE_BL) )
     {
-      if (p_init_packet->device_rev != ADAFRUIT_SD_UNLOCK_CODE)
+      if (p_init_packet->device_rev != ADAFRUIT_DEV_REV)
       {
         return NRF_ERROR_FORBIDDEN;
       }

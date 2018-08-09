@@ -107,10 +107,10 @@ BUILD = _build-$(BOARD)
 
 ifneq ($(IS_NRF52840),)
 SD_NAME = s140
-DFU_DEV_TYPE = 52840
+DFU_DEV_REV = 52840
 else
 SD_NAME = s132
-DFU_DEV_TYPE = 0x0052
+DFU_DEV_REV = 0xADAF
 endif
 
 
@@ -122,6 +122,7 @@ endif
 # src
 C_SOURCE_FILES += $(SRC_PATH)/main.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
+C_SOURCE_FILES += $(SRC_PATH)/dfu_init.c
 
 # nrfx
 C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
@@ -131,7 +132,6 @@ C_SOURCE_FILES += $(NRFX_PATH)/hal/nrf_nvmc.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_init_template.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
@@ -432,7 +432,7 @@ $(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
 genpkg: $(BUILD)/$(BOOT_SD_NAME).zip
 
 $(BUILD)/$(BOOT_SD_NAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
-	@$(NRFUTIL) dfu genpkg --dev-type $(DFU_DEV_TYPE) --dev-revision 0xADAF --bootloader $< --softdevice $(SD_HEX) $@ 
+	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@ 
 
 # Create SD+bootloader combo with hex & dfu package at beta folder
 beta: genhex genpkg

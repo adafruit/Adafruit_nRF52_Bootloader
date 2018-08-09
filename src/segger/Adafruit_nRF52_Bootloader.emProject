@@ -19,13 +19,13 @@
       arm_target_device_name="nRF52840_xxAA"
       arm_target_interface_type="SWD"
       c_preprocessor_definitions="NRF52840_XXAA;__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;BOARD_PCA10056;MK_BOOTLOADER_VERSION=0x06000000;MK_DIS_FIRMWARE=&quot;s140 6.0.0 r0&quot;;S140;CONFIG_GPIO_AS_PINRESET;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD"
-      c_user_include_directories="../;../usb;../cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(sdDir)/headers;$(sdDir)/headers/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
+      c_user_include_directories="../;../usb;../cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(sdDir)/include;$(sdDir)/include/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
       debug_register_definition_file="$(ProjectDir)/nrf52840_Registers.xml"
       debug_target_connection="J-Link"
       gcc_entry_point="Reset_Handler"
       linker_memory_map_file="$(ProjectDir)/nRF52840_xxAA_MemoryMap.xml"
       linker_section_placement_file="$(ProjectDir)/flash_placement.xml"
-      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;sdkDir=../../lib/sdk/components;sdk11Dir=../../lib/sdk11/components;sdDir=../../lib/softdevice/s140/6.0.0;tusbDir=../../lib/tinyusb/src;nrfxDir=../../lib/nrfx"
+      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;sdkDir=../../lib/sdk/components;sdk11Dir=../../lib/sdk11/components;sdDir=../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API;tusbDir=../../lib/tinyusb/src;nrfxDir=../../lib/nrfx"
       project_directory=""
       project_type="Executable"
       target_reset_script="Reset();"
@@ -93,6 +93,7 @@
         <file file_name="../boards/feather52840.h" />
         <file file_name="../boards/pca10056.h" />
       </folder>
+      <file file_name="../dfu_init.c" />
     </folder>
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration
@@ -142,7 +143,6 @@
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_ble_svc.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_ble_svc_internal.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_init.h" />
-              <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_init_template.c" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_transport.h" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_transport_ble.c" />
               <file file_name="../../lib/sdk11/components/libraries/bootloader_dfu/dfu_transport_serial.c" />
@@ -228,29 +228,28 @@
         </folder>
       </folder>
       <folder Name="softdevice">
-        <folder Name="6.0.0">
-          <folder Name="s140">
-            <folder Name="headers">
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_err.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gap.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gatt.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gattc.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_gatts.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_hci.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_l2cap.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_ranges.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/ble_types.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_error.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_error_sdm.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_error_soc.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_nvic.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_sd_def.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_sdm.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_soc.h" />
-              <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf_svc.h" />
+        <folder Name="s140_nrf52_6.1.0">
+          <folder Name="s140_nrf52_6.1.0_API">
+            <folder Name="include">
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_err.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gap.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gatt.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gattc.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gatts.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_hci.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_l2cap.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_ranges.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_types.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_error.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_error_sdm.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_error_soc.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_nvic.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_sdm.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_soc.h" />
+              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_svc.h" />
               <folder Name="nrf52">
-                <file file_name="../../lib/softdevice/6.0.0/s140/headers/nrf52/nrf_mbr.h" />
+                <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf52/nrf_mbr.h" />
               </folder>
             </folder>
           </folder>
