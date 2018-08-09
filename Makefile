@@ -146,8 +146,6 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-
-
 ifneq ($(IS_NRF52840),)
 
 # src
@@ -181,6 +179,7 @@ C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 IPATH += $(SDK11_PATH)/libraries/util
 IPATH += $(SDK_PATH)/drivers_nrf/common
 IPATH += $(SDK_PATH)/drivers_nrf/uart
+
 endif
 
 
