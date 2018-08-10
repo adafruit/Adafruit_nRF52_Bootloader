@@ -72,7 +72,7 @@ void flash_flush(void)
   _fl_addr = NO_CACHE;
 }
 
-void flash_write (uint32_t dst, const uint8_t *src, int len)
+void flash_write (uint32_t dst, const void *src, int len)
 {
   uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
 

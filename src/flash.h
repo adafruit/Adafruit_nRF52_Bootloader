@@ -47,7 +47,7 @@
 #endif
 
 //void flash_erase(uint32_t page_addr);
-void flash_write(uint32_t dst, const uint8_t *src, int len);
+void flash_write(uint32_t dst, const void *src, int len);
 void flash_flush(void);
 
 
