@@ -120,6 +120,7 @@ endif
 
 # src
 C_SOURCE_FILES += $(SRC_PATH)/main.c
+C_SOURCE_FILES += $(SRC_PATH)/flash.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_init.c
 

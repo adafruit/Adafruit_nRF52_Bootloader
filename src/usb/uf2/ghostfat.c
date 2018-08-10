@@ -1,6 +1,6 @@
 
 #include "uf2.h"
-#include "nrf_nvmc.h"
+#include "flash.h"
 #include <string.h>
 
 #include "boards.h"
@@ -115,14 +115,8 @@ static const FAT_BootBlock BootBlock = {
     .FilesystemIdentifier = "FAT16   ",
 };
 
-#define NO_CACHE 0xffffffff
-
 #define NRF_LOG_DEBUG(...)
 #define NRF_LOG_WARNING(...)
-
-uint32_t flashAddr = NO_CACHE;
-uint8_t flashBuf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
-bool firstFlush = true;
 
 static WriteState _wr_state = { 0 };
 static uint32_t get_flash_size(void)
@@ -246,40 +240,6 @@ static void uf2_write_complete(uint32_t numBlocks)
   bootloader_dfu_update_process(update_status);
 }
 
-void flushFlash() {
-    if (flashAddr == NO_CACHE)
-        return;
-
-    if (firstFlush) {
-        firstFlush = false;
-
-        // disable softdevice
-        sd_softdevice_disable();
-
-        led_blink_fast(true);
-    }
-
-    NRF_LOG_DEBUG("Flush at %x", flashAddr);
-    if (memcmp(flashBuf, (void *)flashAddr, FLASH_PAGE_SIZE) != 0) {
-        NRF_LOG_DEBUG("Write flush at %x", flashAddr);
-        nrf_nvmc_page_erase(flashAddr);
-        nrf_nvmc_write_words(flashAddr, (uint32_t *)flashBuf, FLASH_PAGE_SIZE / sizeof(uint32_t));
-    }
-
-    flashAddr = NO_CACHE;
-}
-
-void flash_write(uint32_t dst, const uint8_t *src, int len) {
-    uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
-
-    if (newAddr != flashAddr) {
-        flushFlash();
-        flashAddr = newAddr;
-        memcpy(flashBuf, (void *)newAddr, FLASH_PAGE_SIZE);
-    }
-    memcpy(flashBuf + (dst & (FLASH_PAGE_SIZE - 1)), src, len);
-}
-
 /** Write an block
  *
  * @return number of bytes processed, only 3 following values
@@ -340,7 +300,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
                 }
 
                 // flush last blocks if needed
-                flushFlash();
+                flash_flush();
 
                 uf2_write_complete(state->numBlocks);
             }
