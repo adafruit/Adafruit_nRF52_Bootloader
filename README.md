@@ -1,26 +1,16 @@
 # Adafruit Bluefruit nRF52 Bootloader
 
-This repository contains the bootloader for Adafruit nRF52 series board
+This repository contains the bootloader for Adafruit nRF52 series and other popular boards
 
 - [Bluefruit Feather nRF52832](https://www.adafruit.com/product/3406)
 - Bluefruit Feather nRF52840
+- Nordic nRF52840DK PCA10056
 
-## Features
+This bootloader is meant to use with [adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil), a folk of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil). To install
 
-### nRF52832
+	$ pip3 install --user adafruit-nrfutil
 
-- DFU over Serial and OTA ( Application, Bootloader+SD )
-- DFU auto start to work with Arduino DTR auto-reset
-
-### nRF52840
-
-- DFU over USB CDC and OTA ( Application, Bootloader+SD )
-- DFU using USB Flashing Format a.k.a [UF2](https://github.com/Microsoft/uf2) (Applicatoin only)
-
-
-## Compile
-
-This repository depend on following submodule
+This repository depends on following submodule
 
 - [tinyusb](https://github.com/hathach/tinyusb/tree/develop)
 - [nrfx](https://github.com/NordicSemiconductor/nrfx)
@@ -30,6 +20,31 @@ Get the code with following command:
 	git clone <URL>.git Adafruit_nRF52_Bootloader
     cd Adafruit_nRF52_Bootloader
     git submodule update --init
+
+## Features
+
+- DFU over Serial and OTA ( Application, Bootloader+SD )
+- Self-upgradble via Serial and OTA
+- DFU using USB Flashing Format a.k.a [UF2](https://github.com/Microsoft/uf2) (Applicatoin only)
+- Auto enter DFU briefly on startup for DTR auto-reset trick (832 only)
+
+## Burn & Upgrade
+
+You can burn and/or upgrade bootloader with either jlink or dfu (serial) to a specific pre-built binary version without the hassle to install toolchain and compile the code. This is preferred if you are not developing/customizing the bootloader
+
+To flash version `6.1.0r0` using jlink
+
+	$ make BOARD=feather52840 VERSION=6.1.0r0 flash
+
+To upgrade with dfu serial
+
+	$ make BOARD=feather52840 VERSION=6.1.0r0 dfu-flash
+
+Note: bootloader is downgradable, since the binary release is merged of bootloader and Softdevice, you could freely "upgrade" to any version you like.
+
+## Compile
+
+Please only continue if you are looking to develop bootloader for your own. Having a jlink to **de-brick** your device is a must.
 
 ### Option 1: Build with makefile
 
@@ -46,11 +61,11 @@ To flash bootloader
 
 	$ make BOARD=feather52840 flash
 
-To flash SoftDevice (with full chip erase)
+To flash SoftDevice (chip erase)
 
 	$ make BOARD=feather52840 sd
 
-To full erase chip
+To erase chip
 
 	$ make BOARD=feather52840 erase
 
@@ -91,7 +106,7 @@ variation on the following command:
 $ export PATH=$PATH:/Users/Kevin/Downloads/nRF5x-Command-Line-Tools_9_7_2_OSX/nrfjprog
 ```
 
-## Option 2: Build using Segger Embeded Studio
+### Option 2: Build using Segger Embeded Studio
 
 For better debugging you can also use [SES](https://www.segger.com/products/development-tools/embedded-studio/).
 The project file is located at `src/segger/Adafruit_nRF52_Bootloader.emProject`.
