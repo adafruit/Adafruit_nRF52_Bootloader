@@ -94,6 +94,7 @@
         <file file_name="../boards/pca10056.h" />
       </folder>
       <file file_name="../dfu_init.c" />
+      <file file_name="../flash.c" />
     </folder>
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration
