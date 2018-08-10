@@ -211,6 +211,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->numBlocks = FLASH_SIZE / 256;
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
+                bl->flags = UF2_FLAG_FAMILYID;
+                bl->familyID = UF2_FAMILY_ID;
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
