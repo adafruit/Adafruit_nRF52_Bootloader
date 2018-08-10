@@ -32,9 +32,8 @@ SD_HEX          = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 OUTPUT_FILENAME = $(BOARD)_bootloader
-BOOT_SD_NAME    = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 
-BETA_DIR        = bin/$(BOARD)/beta
+MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
 
 
@@ -91,7 +90,7 @@ BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))
 NRF52840_BOARDLIST = pca10056 feather52840
 IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
 
-ifeq ($(findstring $(MAKECMDGOALS),all-board all-beta all-release),)
+ifeq ($(findstring $(MAKECMDGOALS),all-board all-release),)
   ifeq ($(BOARD),)
     $(info You must provide a BOARD parameter with 'BOARD=')
     $(info Supported boards are: $(BOARD_LIST))
@@ -360,11 +359,6 @@ all-board:
 	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all
 	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all
 
-all-beta:
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all beta
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all beta
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all beta
-
 all-release:
 	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all release
 	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all release
@@ -372,9 +366,40 @@ all-release:
 
 
 #******************* Flash target *******************
+
+check_defined = \
+    $(strip $(foreach 1,$1, \
+    $(call __check_defined,$1,$(strip $(value 2)))))
+__check_defined = \
+    $(if $(value $1),, \
+    $(error Undefined make flag: $1$(if $2, ($2))))
+
+ifeq ($(VERSION),)
+
+# Flash the compiled
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
+    
+dfu-flash: $(BUILD)/$(MERGED_FNAME).zip
+	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
+	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank	
+
+else
+
+VERSION_FPATH = bin/$(BOARD)/$(VERSION)/$(OUTPUT_FILENAME)_$(SD_NAME)_$(VERSION)
+
+# Flash specific version in binary release folder
+flash:
+	@echo Flashing: $(VERSION_FPATH).hex
+	$(NRFJPROG) --program $(VERSION_FPATH).hex --sectoranduicrerase -f nrf52 --reset
+	
+dfu-flash:
+	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
+	$(NRFUTIL) --verbose dfu serial --package $(VERSION_FPATH).zip -p $(SERIAL) -b 115200 --singlebank		
+	
+endif
+
 	
 sd:
 	@echo Flashing: $(SD_HEX)
@@ -383,7 +408,6 @@ sd:
 erase:
 	@echo Erasing chip
 	$(NRFJPROG) --eraseall -f nrf52
-
 
 #******************* Compile rules *******************
 
@@ -416,38 +440,27 @@ size: $(BUILD)/$(OUTPUT_FILENAME).out
 
 
 #******************* Binary generator *******************
-
-.phony: genhex genpkg beta release
+.phony: genhex genpkg release
 
 ## Create binary .hex file from the .out file
 genhex: $(BUILD)/$(OUTPUT_FILENAME).hex
 
 $(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
 	@echo CR $(OUTPUT_FILENAME).hex
-	@echo CR $(BOOT_SD_NAME).hex
+	@echo CR $(MERGED_FNAME).hex
 	$(QUIET)$(OBJCOPY) -O ihex $< $@
-	@mergehex -q -m $@ $(SD_HEX) -o $(BUILD)/$(BOOT_SD_NAME).hex
+	@mergehex -q -m $@ $(SD_HEX) -o $(BUILD)/$(MERGED_FNAME).hex
 
 ## Create pkg file for bootloader+SD combo to use with DFU
-genpkg: $(BUILD)/$(BOOT_SD_NAME).zip
+genpkg: $(BUILD)/$(MERGED_FNAME).zip
 
-$(BUILD)/$(BOOT_SD_NAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@ 
-
-# Create SD+bootloader combo with hex & dfu package at beta folder
-beta: genhex genpkg
-	@echo CR $(BETA_DIR)/$(BOOT_SD_NAME).hex
-	@echo CR $(BETA_DIR)/$(BOOT_SD_NAME).zip
-	@mkdir -p $(BETA_DIR)
-	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(BETA_DIR)/$(BOOT_SD_NAME).hex
-	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(BETA_DIR)/$(BOOT_SD_NAME).zip
 
 # Create SD+bootloader combo with hex & dfu package at release folder
 release: genhex genpkg
-	@echo CR $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
-	@echo CR $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
+	@echo CR $(RELEASE_DIR)/$(MERGED_FNAME).hex
+	@echo CR $(RELEASE_DIR)/$(MERGED_FNAME).zip
 	@mkdir -p $(RELEASE_DIR)
-	@cp $(BUILD)/$(BOOT_SD_NAME).hex $(RELEASE_DIR)/$(BOOT_SD_NAME).hex
-	@cp $(BUILD)/$(BOOT_SD_NAME).zip $(RELEASE_DIR)/$(BOOT_SD_NAME).zip
-	
-	
+	@cp $(BUILD)/$(MERGED_FNAME).hex $(RELEASE_DIR)/$(MERGED_FNAME).hex
+	@cp $(BUILD)/$(MERGED_FNAME).zip $(RELEASE_DIR)/$(MERGED_FNAME).zip
