@@ -164,7 +164,7 @@ static void blinky_handler(void)
     led_control(LED_BLUE, state);
   }
 
-  // Feed all Watchdog just in case application enable it (WDT last through a hump from application to bootloader)
+  // Feed all Watchdog just in case application enable it (WDT last through a jump from application to bootloader)
   if ( nrf_wdt_started() )
   {
     for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(i);
@@ -223,6 +223,11 @@ void board_teardown(void)
   usb_teardown();
 }
 
+void softdev_mbr_init(void)
+{
+  sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
+  sd_mbr_command(&com);
+}
 
 /**
  * Initializes the SoftDevice and the BLE event interrupt.
@@ -232,11 +237,7 @@ void board_teardown(void)
  */
 uint32_t softdev_init(bool init_softdevice)
 {
-  if (init_softdevice)
-  {
-    sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
-    APP_ERROR_CHECK( sd_mbr_command(&com) );
-  }
+  if (init_softdevice) softdev_mbr_init();
 
   // map vector table to bootloader address
   APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
@@ -308,7 +309,7 @@ void softdev_teardown(void)
 int main(void)
 {
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
-  bool const sd_inited = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC);
+  bool sd_inited = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC);
 
   // Start Bootloader in BLE OTA mode
   _ota_update = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC) ||
@@ -333,14 +334,13 @@ int main(void)
   {
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
     softdev_init(!sd_inited);
+    sd_inited = true;
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
   }
   else
   {
-    softdev_init(!sd_inited);
+    // softdev_init();
   }
-
-  usb_init();
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
@@ -352,7 +352,13 @@ int main(void)
   if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
     // Enable BLE if in OTA
-//    if ( _ota_update ) softdev_ble_enable();
+    if ( _ota_update )
+    {
+      softdev_init(!sd_inited);
+      sd_inited = true;
+    }
+
+    usb_init();
 
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
@@ -381,6 +387,9 @@ int main(void)
 
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
   {
+    // MBR must be init before start application
+    if ( !sd_inited ) softdev_mbr_init();
+
     // Select a bank region to use as application region.
     // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
     bootloader_app_start(DFU_BANK_0_REGION_START);
