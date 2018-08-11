@@ -235,10 +235,6 @@ static void uf2_write_complete(uint32_t numBlocks)
   update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
   update_status.app_size    = numBlocks*256;
 
-  // re-enable softdevice
-  extern uint32_t softdev_init(bool init_softdevice);
-  softdev_init(false);
-
   bootloader_dfu_update_process(update_status);
 }
 

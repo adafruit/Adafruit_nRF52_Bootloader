@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include "nrf.h"
+#include "flash.h"
 
 static __INLINE uint16_t pstorage_flash_page_size()
 {
