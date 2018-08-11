@@ -7,7 +7,7 @@
 
     Software License Agreement (BSD License)
 
-    Copyright (c) ${year}, Adafruit Industries (adafruit.com)
+    Copyright (c) 2018, Adafruit Industries (adafruit.com)
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -34,23 +34,25 @@
 */
 /**************************************************************************/
 
-#ifndef _FEATHER52832_H
-#define _FEATHER52832_H
+#ifndef _FEATHER52840_H
+#define _FEATHER52840_H
+
+#define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          17
-#define LED_2          19
+#define LED_1          _PINNUM(1, 2)  // P1.02
+#define LED_2          _PINNUM(1, 10) // P1.10
 #define LED_STATE_ON   1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER 2
-#define BUTTON_1       20
-#define BUTTON_2       22
+#define BUTTON_1       _PINNUM(0, 15)
+#define BUTTON_2       _PINNUM(0, 19)
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
@@ -63,6 +65,6 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MODEL      "Bluefruit Feather nRF52832"
+#define DIS_MODEL      "Bluefruit Feather nRF52840"
 
-#endif // _FEATHER52832_H
+#endif // _FEATHER52840_H

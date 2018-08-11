@@ -87,16 +87,16 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
 
-NRF52840_BOARDLIST = pca10056 feather52840
-IS_NRF52840 = $(findstring $(BOARD),$(NRF52840_BOARDLIST))
+NRF52840_BOARDLIST = pca10056 feather_nrf52840_express
+IS_NRF52840 = $(filter $(BOARD),$(NRF52840_BOARDLIST))
 
-ifeq ($(findstring $(MAKECMDGOALS),all-board all-release),)
+ifeq ($(filter $(MAKECMDGOALS),all-board all-release),)
   ifeq ($(BOARD),)
     $(info You must provide a BOARD parameter with 'BOARD=')
     $(info Supported boards are: $(BOARD_LIST))
     $(error BOARD not defined)
   else
-    ifeq ($(findstring $(BOARD),$(BOARD_LIST)),)
+    ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
       $(error Invalid BOARD specified)
     endif
   endif
@@ -220,7 +220,6 @@ IPATH += $(SDK11_PATH)/drivers_nrf/pstorage
 IPATH += $(SDK11_PATH)/ble/common
 IPATH += $(SDK11_PATH)/ble/ble_services/ble_dfu
 IPATH += $(SDK11_PATH)/ble/ble_services/ble_dis
-
 
 IPATH += $(SDK_PATH)/libraries/timer
 IPATH += $(SDK_PATH)/libraries/scheduler
@@ -354,11 +353,16 @@ endif
 all: $(BUILD)/$(OUTPUT_FILENAME).out size
 
 # TODO auto rule using BOARD_LIST
+_make_board = $(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=$1 $2
+_make_all_board = $(call _make_board,pca10056,clean all)
+
 # build all the boards
 all-board:
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all
+	$(_make_all_board)
+
+#	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all
+#	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all
+#	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all
 
 all-release:
 	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all release

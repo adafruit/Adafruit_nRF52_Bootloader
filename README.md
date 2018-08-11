@@ -3,7 +3,7 @@
 This repository contains the bootloader for Adafruit nRF52 series and other popular boards
 
 - [Bluefruit Feather nRF52832](https://www.adafruit.com/product/3406)
-- Bluefruit Feather nRF52840
+- Bluefruit Feather nRF52840 Express
 - Nordic nRF52840DK PCA10056
 
 This bootloader is meant to use with [adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil), a folk of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil). To install
@@ -34,11 +34,11 @@ You can burn and/or upgrade bootloader with either jlink or dfu (serial) to a sp
 
 To flash version `6.1.0r0` using jlink
 
-	$ make BOARD=feather52840 VERSION=6.1.0r0 flash
+	$ make BOARD=feather_nrf52840_express VERSION=6.1.0r0 flash
 
 To upgrade with dfu serial
 
-	$ make BOARD=feather52840 VERSION=6.1.0r0 dfu-flash
+	$ make BOARD=feather_nrf52840_express VERSION=6.1.0r0 dfu-flash
 
 Note: bootloader is downgradable, since the binary release is merged of bootloader and Softdevice, you could freely "upgrade" to any version you like.
 
@@ -55,25 +55,25 @@ Prerequisite
 
 To build
 
-	$ make BOARD=feather52840 all
+	$ make BOARD=feather_nrf52840_express all
 
 To flash bootloader
 
-	$ make BOARD=feather52840 flash
+	$ make BOARD=feather_nrf52840_express flash
 
 To flash SoftDevice (chip erase)
 
-	$ make BOARD=feather52840 sd
+	$ make BOARD=feather_nrf52840_express sd
 
 To erase chip
 
-	$ make BOARD=feather52840 erase
+	$ make BOARD=feather_nrf52840_express erase
 
 For the list of supported boards, try to type make without `BOARD=`
 
 	$ make
 	You must provide a BOARD parameter with 'BOARD='
-	Supported boards are: feather52832 feather52840 pca10056
+	Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
 	Makefile:90: *** BOARD not defined.  Stop
 
 ### Common makefile problems
@@ -82,7 +82,7 @@ For the list of supported boards, try to type make without `BOARD=`
 
 If you get the following error ...
 
-    $ make BOARD=feather52840 all
+    $ make BOARD=feather_nrf52840_express all
     Compiling file: main.c
     /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
     make: *** [_build/main.o] Error 127
@@ -112,5 +112,5 @@ For better debugging you can also use [SES](https://www.segger.com/products/deve
 The project file is located at `src/segger/Adafruit_nRF52_Bootloader.emProject`.
 
 > **Note**: SES only flashes the bootloader when you click download, you need to
-flash Softdevice beforehand if you haven't done so ( use `make BOARD=feather52840 sd`
+flash Softdevice beforehand if you haven't done so ( use `make BOARD=feather_nrf52840_express sd`
 mentioned above )

@@ -16,12 +16,12 @@
 #include <stdint.h>
 #include "nrf_gpio.h"
 
-#if defined BOARD_FEATHER52840
-  #include "boards/feather52840.h"
+#if defined BOARD_FEATHER_NRF52840_EXPRESS
+  #include "boards/feather_nrf52840_express.h"
+#elif defined BOARD_FEATHER_NRF52832
+  #include "boards/feather_nrf52832.h"
 #elif defined BOARD_PCA10056
   #include "boards/pca10056.h"
-#elif defined BOARD_FEATHER52832
-  #include "boards/feather52832.h"
 #else
   #error No boards defined
 #endif
