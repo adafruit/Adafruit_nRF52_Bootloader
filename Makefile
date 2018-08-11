@@ -352,23 +352,21 @@ endif
 # default target to build
 all: $(BUILD)/$(OUTPUT_FILENAME).out size
 
-# TODO auto rule using BOARD_LIST
-_make_board = $(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=$1 $2
-_make_all_board = $(call _make_board,pca10056,clean all)
+# Rule using BOARD_LIST, nl is newline
+define nl
+
+
+endef
+
+_make_board = $(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=$1 $2 $(nl)
+_make_all_board = $(foreach b,$(BOARD_LIST), $(call _make_board,$b,$1))
 
 # build all the boards
 all-board:
-	$(_make_all_board)
-
-#	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all
-#	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all
-#	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all
+	$(call _make_all_board,clean all)
 
 all-release:
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52832 clean all release
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=feather52840 clean all release
-	$(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=pca10056 clean all release
-
+	$(call _make_all_board,clean all release)
 
 #******************* Flash target *******************
 
