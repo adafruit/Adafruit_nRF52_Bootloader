@@ -1,5 +1,5 @@
 #define UF2_VERSION        "1.00"
-#define PRODUCT_NAME       "Adafruit Bluefruit nRF52"
+#define PRODUCT_NAME       "Adafruit Bluefruit nRF52840"
 #define BOARD_ID           "NRF52-Bluefruit-v0"
 #define INDEX_URL          "https://www.adafruit.com/product/0000"
 #define BOOTLOADER_ID      MK_DIS_FIRMWARE

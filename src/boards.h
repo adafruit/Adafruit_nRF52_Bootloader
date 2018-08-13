@@ -70,4 +70,7 @@ static inline bool button_pressed(uint32_t pin)
 }
 
 
+
+bool is_ota(void);
+
 #endif

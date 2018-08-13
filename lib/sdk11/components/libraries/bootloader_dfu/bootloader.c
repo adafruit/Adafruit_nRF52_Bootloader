@@ -29,6 +29,8 @@
 #include "nrfx.h"
 #include "app_timer.h"
 
+#include "boards.h"
+
 #ifdef NRF52840_XXAA
 #include "tusb.h"
 #endif
@@ -57,9 +59,6 @@ typedef enum
 
 static pstorage_handle_t        m_bootsettings_handle;  /**< Pstorage handle to use for registration and identifying the bootloader module on subsequent calls to the pstorage module for load and store of bootloader setting in flash. */
 static bootloader_status_t      m_update_status;        /**< Current update status for the bootloader module to ensure correct behaviour when updating settings and when update completes. */
-
-// Adafruit modification for dual transports and forced startup DFU
-extern bool is_ota(void);
 
 APP_TIMER_DEF( _forced_startup_dfu_timer );
 volatile bool forced_startup_dfu_packet_received = false;
@@ -182,10 +181,7 @@ bool bootloader_app_is_valid(uint32_t app_addr)
 
 static void bootloader_settings_save(bootloader_settings_t * p_settings)
 {
-  uint8_t sd_en = false;
-  sd_softdevice_is_enabled(&sd_en);
-
-  if ( sd_en )
+  if ( is_ota() )
   {
     uint32_t err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
     APP_ERROR_CHECK(err_code);

@@ -25,6 +25,8 @@
 #include "dfu_init.h"
 #include "sdk_common.h"
 
+#include "boards.h"
+
 static dfu_state_t                  m_dfu_state;                /**< Current DFU state. */
 static uint32_t                     m_image_size;               /**< Size of the image that will be transmitted. */
 
@@ -136,10 +138,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
   // for new SoftDevice.
   m_dfu_state = DFU_STATE_PREPARING;
 
-  uint8_t sd_en = false;
-  sd_softdevice_is_enabled(&sd_en);
-
-  if ( sd_en )
+  if ( is_ota() )
   {
     uint32_t err_code;
     err_code    = pstorage_clear(&m_storage_handle_app, m_image_size);
@@ -421,10 +420,7 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
             p_data = (uint32_t *)p_packet->params.data_packet.p_data_packet;
 
-            uint8_t sd_en = false;
-            sd_softdevice_is_enabled(&sd_en);
-
-            if ( sd_en )
+            if ( is_ota() )
             {
               err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
               VERIFY_SUCCESS(err_code);
@@ -445,7 +441,7 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-              if (!sd_en) flash_flush();
+              if ( !is_ota() ) flash_flush();
 
               // The entire image has been received. Return NRF_SUCCESS.
               err_code = NRF_SUCCESS;

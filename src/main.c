@@ -299,13 +299,6 @@ uint32_t softdev_init(bool init_softdevice)
   return NRF_SUCCESS;
 }
 
-void softdev_teardown(void)
-{
-  sd_softdevice_disable();
-}
-
-
-
 int main(void)
 {
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
@@ -330,16 +323,11 @@ int main(void)
   board_init();
   bootloader_init();
 
+  // When updating SoftDevice, bootloader will reset before swapping SD
   if (bootloader_dfu_sd_in_progress())
   {
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
-    softdev_init(!sd_inited);
-    sd_inited = true;
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
-  }
-  else
-  {
-    // softdev_init();
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
@@ -362,6 +350,8 @@ int main(void)
 
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
+
+    if ( _ota_update ) sd_softdevice_disable();
   }
 #ifdef NRF52832_XXAA
   else
@@ -372,9 +362,6 @@ int main(void)
     bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
   }
 #endif
-
-  // we are all done with DFU, disable soft device
-  softdev_teardown();
 
   /*------------- Adafruit Factory reset -------------*/
   if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
