@@ -34,6 +34,7 @@
 
 #include "nrfx.h"
 #include "nrfx_power.h"
+#include "nrfx_pwm.h"
 
 #include "nordic_common.h"
 #include "sdk_common.h"
@@ -124,9 +125,14 @@ STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 
 void adafruit_factory_reset(void);
 
-
-// Adafruit for Blink pattern
-bool _fast_blink = false;
+/*
+ * Blinking patterns:
+ * - DFU Serial     : LED Status blink
+ * - DFU OTA        : LED Status & Conn blink at the same time
+ * - DFU Flashing   : LED Status blink 2x fast
+ * - Factory Reset  : LED Status blink 2x fast
+ * - Fatal Error    : LED Status & Conn blink one after another
+ */
 bool _ota_connected = false;
 
 // true if ble, false if serial
@@ -134,55 +140,68 @@ bool _ota_update = false;
 
 bool is_ota(void) { return _ota_update; }
 
-
-
-/*
- * Blinking function, there are a few patterns
- * - DFU Serial     : LED Status blink
- * - DFU OTA        : LED Status & Conn blink at the same time
- * - DFU Flashing   : LED Status blink 2x fast
- * - Factory Reset  : LED Status blink 2x fast
- * - Fatal Error    : LED Status & Conn blink one after another
- */
-static void blinky_handler(void)
-{
-  static uint8_t state = 0;
-  static uint32_t count = 0;
-
-  count++;
-
-  // if not uploading then blink slow (interval/2)
-  if ( !_fast_blink && count%2 ) return;
-
-  state = 1-state;
-
-  led_control(LED_RED, state);
-
-  // Blink LED BLUE if OTA mode and not connected
-  if (is_ota() && !_ota_connected)
-  {
-    led_control(LED_BLUE, state);
-  }
-
-  // Feed all Watchdog just in case application enable it (WDT last through a jump from application to bootloader)
-  if ( nrf_wdt_started() )
-  {
-    for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(i);
-  }
-}
-
-void SysTick_Handler(void)
-{
-  blinky_handler();
-}
+#define PWM_MAXCOUNT      25000
+uint16_t _pwm_red_seq0 [NRF_PWM_CHANNEL_COUNT] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
+uint16_t _pwm_blue_seq0[NRF_PWM_CHANNEL_COUNT] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
 
 void led_blink_fast(bool enable)
 {
-  _fast_blink = enable;
+  if ( enable )
+  {
+    NRF_PWM0->MODE = PWM_MODE_UPDOWN_Up;
+  }else
+  {
+    NRF_PWM0->MODE = PWM_MODE_UPDOWN_UpAndDown;
+  }
+}
+
+/* use PWM for blinky to prevent inconsistency due to MCU blocking in flash operation
+ * clock = 125khz --> resolution = 8us
+ * top value = 25000 -> period = 200 ms (fast blink) --> up and down mode = 400 ms ( slow blink )
+ */
+void led_pwm_init(NRF_PWM_Type* pwm, uint32_t led_pin)
+{
+  pwm->MODE            = PWM_MODE_UPDOWN_UpAndDown;
+  pwm->COUNTERTOP      = PWM_MAXCOUNT;
+  pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_128;
+  pwm->DECODER         = PWM_DECODER_LOAD_Individual;
+  pwm->LOOP            = 0;
+
+  pwm->SEQ[0].PTR      = (uint32_t) (led_pin == LED_RED ? _pwm_red_seq0 : _pwm_blue_seq0);
+  pwm->SEQ[0].CNT      = NRF_PWM_CHANNEL_COUNT; // default mode is Individual --> count must be 4
+  pwm->SEQ[0].REFRESH  = 0;
+  pwm->SEQ[0].ENDDELAY = 0;
+
+  pwm->PSEL.OUT[0] = led_pin;
+
+  pwm->ENABLE = 1;
+  pwm->TASKS_SEQSTART[0] = 1;
+}
+
+void led_pwm_teardown(NRF_PWM_Type* pwm)
+{
+  pwm->TASKS_SEQSTART[0] = 0;
+  pwm->ENABLE            = 0;
+
+  pwm->PSEL.OUT[0] = 0xFFFFFFFF;
+
+  pwm->MODE        = 0;
+  pwm->COUNTERTOP  = 0x3FF;
+  pwm->PRESCALER   = 0;
+  pwm->DECODER     = 0;
+  pwm->LOOP        = 0;
+  pwm->SEQ[0].PTR  = 0;
+  pwm->SEQ[0].CNT  = 0;
 }
 
 void board_init(void)
 {
+  // stop WDT if started by application, when jumping from application using BLE DFU
+  if ( NRF_WDT->RUNSTATUS )
+  {
+    NRF_WDT->TASKS_START = 0;
+  }
+
   button_init(BUTTON_DFU);
   button_init(BUTTON_FRESET);
   NRFX_DELAY_US(100); // wait for the pin state is stable
@@ -193,21 +212,19 @@ void board_init(void)
   led_off(LED_RED);
   led_off(LED_BLUE);
 
+  // use PMW0 for LED RED
+  led_pwm_init(NRF_PWM0, LED_RED);
+
   // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-
-  // Init app timer (use RTC1)
-  app_timer_init();
-
-  // Configure Systick for led blinky
-  extern uint32_t SystemCoreClock;
-  SysTick_Config(SystemCoreClock/(1000/LED_BLINK_INTERVAL));
 }
 
 void board_teardown(void)
 {
-  // Disable systick, turn off LEDs
-  SysTick->CTRL = 0;
+  // Disable and reset PWM for LED
+  led_pwm_teardown(NRF_PWM0);
+
+  if ( is_ota() ) led_pwm_teardown(NRF_PWM1);
 
   led_off(LED_BLUE);
   led_off(LED_RED);
@@ -235,7 +252,7 @@ void softdev_mbr_init(void)
  *                             be initialized if a chip reset has occured. Soft reset (jump ) from
  *                             application must not reinitialize the SoftDevice.
  */
-uint32_t softdev_init(bool init_softdevice)
+static uint32_t softdev_init(bool init_softdevice)
 {
   if (init_softdevice) softdev_mbr_init();
 
@@ -339,14 +356,25 @@ int main(void)
 
   if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
-    // Enable BLE if in OTA
     if ( _ota_update )
     {
+      // Enable BLE if in OTA
+      led_pwm_init(NRF_PWM1, LED_BLUE);
+
       softdev_init(!sd_inited);
       sd_inited = true;
-    }
 
-    usb_init();
+      // Init app timer (use RTC1)
+      app_timer_init();
+    }
+    else
+    {
+      // Init app timer (use RTC1)
+      app_timer_init();
+
+      // otherwise USB for Serial & UF2
+      usb_init();
+    }
 
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
@@ -453,12 +481,12 @@ uint32_t proc_ble(void)
     {
       case BLE_GAP_EVT_CONNECTED:
         _ota_connected = true;
-        led_on(LED_BLUE);
+        _pwm_blue_seq0[0] = PWM_MAXCOUNT;
       break;
 
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
-        led_off(LED_BLUE);
+        _pwm_blue_seq0[0] = PWM_MAXCOUNT/2;
       break;
 
       default: break;

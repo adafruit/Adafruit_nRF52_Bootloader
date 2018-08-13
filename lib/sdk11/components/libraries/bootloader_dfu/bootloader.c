@@ -117,31 +117,35 @@ static void forced_startup_dfu_timer_handler(void * p_context)
  */
 static void wait_for_events(void)
 {
-    for (;;)
-    {
-        // Wait in low power state for any events.
-//        uint32_t err_code = sd_app_evt_wait();
-//        APP_ERROR_CHECK(err_code);
+  for ( ;; )
+  {
+    // Wait in low power state for any events.
+//    uint32_t err_code = sd_app_evt_wait();
+//    APP_ERROR_CHECK(err_code);
 
-        // Event received. Process it from the scheduler.
-        app_sched_execute();
+    // Event received. Process it from the scheduler.
+    app_sched_execute();
 
 #ifdef NRF52840_XXAA
-        tusb_task();
-        tud_cdc_write_flush();
+    // usb is not enabled in OTA
+    if ( !is_ota() )
+    {
+      tusb_task();
+      tud_cdc_write_flush();
+    }
 #endif
 
-        if ((m_update_status == BOOTLOADER_COMPLETE) ||
-            (m_update_status == BOOTLOADER_TIMEOUT)  ||
-            (m_update_status == BOOTLOADER_RESET))
-        {
-            // When update has completed or a timeout/reset occured we will return.
-            return;
-        }
-
-        // Forced startup dfu mode timeout without any received packet
-        if (_terminate_startup_dfu) return;
+    if ((m_update_status == BOOTLOADER_COMPLETE) ||
+        (m_update_status == BOOTLOADER_TIMEOUT) ||
+        (m_update_status == BOOTLOADER_RESET) )
+    {
+      // When update has completed or a timeout/reset occured we will return.
+      return;
     }
+
+    // Forced startup dfu mode timeout without any received packet
+    if ( _terminate_startup_dfu ) return;
+  }
 }
 
 
