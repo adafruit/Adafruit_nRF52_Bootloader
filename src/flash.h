@@ -49,7 +49,7 @@
 //void flash_erase(uint32_t page_addr);
 void flash_write(uint32_t dst, const void *src, int len);
 void flash_flush(void);
-
+void flash_erase(uint32_t addr, uint32_t bytes);
 
 #ifdef __cplusplus
  }

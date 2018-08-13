@@ -84,3 +84,14 @@ void flash_write (uint32_t dst, const void *src, int len)
   }
   memcpy(_fl_buf + (dst & (FLASH_PAGE_SIZE - 1)), src, len);
 }
+
+void flash_erase(uint32_t addr, uint32_t bytes)
+{
+  uint32_t page_count = bytes/FLASH_PAGE_SIZE;
+  if ( bytes%FLASH_PAGE_SIZE ) page_count++;
+
+  for(uint32_t i=0; i<page_count; i++)
+  {
+    nrf_nvmc_page_erase(addr + i*FLASH_PAGE_SIZE);
+  }
+}

@@ -122,15 +122,12 @@ static uint32_t send_tx_byte_end(void);
 uint32_t (*send_tx_byte) (void) = send_tx_byte_default;
 
 #ifdef NRF52840_XXAA
-
-static uint32_t serial_put(char ch)
-{
-  return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
-}
+  static uint32_t serial_put(char ch)
+  {
+    return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
+  }
 #else
-
-#define serial_put    app_uart_put  
-
+  #define serial_put    app_uart_put
 #endif
 
 static uint32_t send_tx_byte_end(void)

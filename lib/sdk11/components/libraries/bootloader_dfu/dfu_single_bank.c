@@ -130,15 +130,28 @@ static uint32_t dfu_timer_restart(void)
  */
 static void dfu_prepare_func_app_erase(uint32_t image_size)
 {
+  mp_storage_handle_active = &m_storage_handle_app;
+
+  // Doing a SoftDevice update thus current application must be cleared to ensure enough space
+  // for new SoftDevice.
+  m_dfu_state = DFU_STATE_PREPARING;
+
+  uint8_t sd_en = false;
+  sd_softdevice_is_enabled(&sd_en);
+
+  if ( sd_en )
+  {
     uint32_t err_code;
-
-    mp_storage_handle_active = &m_storage_handle_app;
-
-    // Doing a SoftDevice update thus current application must be cleared to ensure enough space
-    // for new SoftDevice.
-    m_dfu_state = DFU_STATE_PREPARING;
     err_code    = pstorage_clear(&m_storage_handle_app, m_image_size);
     APP_ERROR_CHECK(err_code);
+  }
+  else
+  {
+    flash_erase(DFU_BANK_0_REGION_START, m_image_size);
+
+    // simulate complete call
+    pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
+  }
 }
 
 
@@ -408,11 +421,20 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
             p_data = (uint32_t *)p_packet->params.data_packet.p_data_packet;
 
-            err_code = pstorage_store(mp_storage_handle_active,
-                                          (uint8_t *)p_data,
-                                          data_length,
-                                          m_data_received);
-            VERIFY_SUCCESS(err_code);
+            uint8_t sd_en = false;
+            sd_softdevice_is_enabled(&sd_en);
+
+            if ( sd_en )
+            {
+              err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
+              VERIFY_SUCCESS(err_code);
+            }
+            else
+            {
+              flash_write(DFU_BANK_0_REGION_START+m_data_received, p_data, data_length);
+
+              // Adafruit: transport serial, no need to call pstorage complete
+            }
 
             m_data_received += data_length;
 
@@ -423,8 +445,10 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-                // The entire image has been received. Return NRF_SUCCESS.
-                err_code = NRF_SUCCESS;
+              if (!sd_en) flash_flush();
+
+              // The entire image has been received. Return NRF_SUCCESS.
+              err_code = NRF_SUCCESS;
             }
             break;
 
