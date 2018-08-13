@@ -190,17 +190,15 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
     uint32_t err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
     APP_ERROR_CHECK(err_code);
 
-    err_code = pstorage_store(&m_bootsettings_handle,
-                              (uint8_t *) p_settings,
-                              sizeof(bootloader_settings_t),
-                              0);
+    err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
     APP_ERROR_CHECK(err_code);
   }
   else
   {
     flash_write(BOOTLOADER_SETTINGS_ADDRESS, p_settings, sizeof(bootloader_settings_t));
     flash_flush();
-    m_update_status = BOOTLOADER_COMPLETE;
+
+    pstorage_callback_handler(&m_bootsettings_handle, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_settings, sizeof(bootloader_settings_t));
   }
 }
 
