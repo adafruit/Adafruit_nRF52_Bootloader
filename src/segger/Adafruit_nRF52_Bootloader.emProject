@@ -65,7 +65,6 @@
           <file file_name="../usb/uf2/ghostfat.c" />
         </folder>
         <file file_name="../usb/msc_uf2.c" />
-        <file file_name="../usb/msc_uf2.h" />
         <file file_name="../usb/usb.c" />
       </folder>
       <folder Name="cmsis">

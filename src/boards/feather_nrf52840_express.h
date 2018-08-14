@@ -65,6 +65,7 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MODEL      "Bluefruit Feather nRF52840"
+#define DIS_MANUFACTURER  "Adafruit Industries"
+#define DIS_MODEL         "Bluefruit Feather nRF52840 Express"
 
 #endif // _FEATHER52840_H

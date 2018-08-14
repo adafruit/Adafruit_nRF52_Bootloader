@@ -63,6 +63,7 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MODEL      "Nordic PCA10056"
+#define DIS_MANUFACTURER  "Nordic"
+#define DIS_MODEL         "PCA10056"
 
 #endif // PCA10056_H

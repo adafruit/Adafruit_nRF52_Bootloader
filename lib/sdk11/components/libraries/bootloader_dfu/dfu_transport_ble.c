@@ -10,6 +10,7 @@
  *
  */
 
+#include <stdio.h>
 #include "dfu_transport.h"
 #include "dfu.h"
 #include <dfu_types.h>
@@ -45,9 +46,8 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define DFU_SERVICE_HANDLE                   0x000C                                                  /**< Handle of DFU service when DFU service is first service initialized. */
 #define BLE_HANDLE_MAX                       0xFFFF                                                  /**< Max handle value is BLE. */
 
-#define DEVICE_NAME                          "AdaDFU" // limit of 8 chars                                                /**< Name of device. Will be included in the advertising data. */
-#define DIS_MANUFACTURER                     "Adafruit Industries"
-// DIS_MODEL is defined in boards.h, DIS_FIRMWARE is defined by makefile
+// limit of 8 chars
+#define DEVICE_NAME                          "AdaDFU"                                                /**< Name of device. Will be included in the advertising data. */
 
 #define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
 #define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (15 milliseconds). */
@@ -983,7 +983,18 @@ static void services_init(void)
 
     ascii_to_utf8(&dis_init.manufact_name_str, DIS_MANUFACTURER);
     ascii_to_utf8(&dis_init.model_num_str, DIS_MODEL);
-    ascii_to_utf8(&dis_init.fw_rev_str, MK_DIS_FIRMWARE);
+
+    uint32_t const sd_id      = SD_ID_GET(MBR_SIZE);
+    uint32_t const sd_version = SD_VERSION_GET(MBR_SIZE);
+
+    uint32_t const ver1 = sd_version / 1000000;
+    uint32_t const ver2 = (sd_version % 1000000)/1000;
+    uint32_t const ver3 = sd_version % 1000;
+
+    char fw_str[30+1];
+    sprintf(fw_str, "s%ld %ld.%ld.%ld r%ld", sd_id, ver1, ver2, ver3, MK_BOOTLOADER_VERSION & 0xFFUL);
+
+    ascii_to_utf8(&dis_init.fw_rev_str, fw_str);
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&dis_init.dis_attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&dis_init.dis_attr_md.write_perm);

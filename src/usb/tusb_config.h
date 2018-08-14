@@ -114,7 +114,7 @@
 #define CFG_TUD_MSC_VENDOR          "Adafruit"
 
 // Product name included in Inquiry response, max 16 bytes
-#define CFG_TUD_MSC_PRODUCT         "Feather52840"
+#define CFG_TUD_MSC_PRODUCT         "Feather nRF52840"
 
 // Product revision string included in Inquiry response, max 4 bytes
 #define CFG_TUD_MSC_PRODUCT_REV     "1.0"

@@ -26,11 +26,19 @@
   #error No boards defined
 #endif
 
+#define BUTTON_DFU      BUTTON_1
+#define BUTTON_FRESET   BUTTON_2
+
+#define LED_RED         LED_1
+#define LED_BLUE        LED_2
+
+
+void board_init(void);
+void board_teardown(void);
+
 //--------------------------------------------------------------------+
 // LED
 //--------------------------------------------------------------------+
-#define LED_RED     LED_1
-#define LED_BLUE    LED_2
 
 #define bit(b) (1UL << (b))
 
@@ -48,6 +56,10 @@ static inline void led_off(uint32_t pin)
 {
   led_control(pin, false);
 }
+
+void led_pwm_init(NRF_PWM_Type* pwm, uint32_t led_pin);
+void led_pwm_teardown(NRF_PWM_Type* pwm);
+void led_pwm_solid(uint32_t led_pin, bool solid);
 
 void led_blink_fast(bool enable);
 

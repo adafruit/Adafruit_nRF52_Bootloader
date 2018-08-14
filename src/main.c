@@ -51,14 +51,12 @@
 #include "nrf.h"
 #include "ble_hci.h"
 #include "app_scheduler.h"
-#include "app_timer.h"
 #include "nrf_error.h"
 
 #include "boards.h"
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
-#include "nrf_wdt.h"
 #include "pstorage.h"
 
 #include "nrf_nvmc.h"
@@ -66,7 +64,6 @@
 #ifdef NRF52840_XXAA
 #include "nrf_usbd.h"
 #include "tusb.h"
-#include "usb/msc_uf2.h"
 
 void usb_init(void);
 void usb_teardown(void);
@@ -78,10 +75,16 @@ void usb_teardown(void);
 
 #endif
 
+/*
+ * Blinking patterns:
+ * - DFU Serial     : LED Status blink
+ * - DFU OTA        : LED Status & Conn blink at the same time
+ * - DFU Flashing   : LED Status blink 2x fast
+ * - Factory Reset  : LED Status blink 2x fast
+ * - Fatal Error    : LED Status & Conn blink one after another
+ */
 
 #define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]
-
-#define LED_BLINK_INTERVAL                  100
 #define BOOTLOADER_STARTUP_DFU_INTERVAL     1000
 
 /* Magic that written to NRF_POWER->GPREGRET by application when it wish to go into DFU
@@ -94,12 +97,6 @@ void usb_teardown(void);
 #define BOOTLOADER_DFU_OTA_MAGIC            BOOTLOADER_DFU_START             // 0xB1
 #define BOOTLOADER_DFU_OTA_FULLRESET_MAGIC  0xA8
 #define BOOTLOADER_DFU_SERIAL_MAGIC         0x4e
-
-#define BUTTON_DFU                          BUTTON_1                         // Button used to enter SW update mode.
-#define BUTTON_FRESET                       BUTTON_2                         // Button used in addition to DFU button, to force OTA DFU
-
-#define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
-#define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
 // Helper function
 #define memclr(buffer, size)                memset(buffer, 0, size)
@@ -125,122 +122,13 @@ STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 
 void adafruit_factory_reset(void);
 
-/*
- * Blinking patterns:
- * - DFU Serial     : LED Status blink
- * - DFU OTA        : LED Status & Conn blink at the same time
- * - DFU Flashing   : LED Status blink 2x fast
- * - Factory Reset  : LED Status blink 2x fast
- * - Fatal Error    : LED Status & Conn blink one after another
- */
-bool _ota_connected = false;
-
 // true if ble, false if serial
 bool _ota_update = false;
+bool _ota_connected = false;
 
-bool is_ota(void) { return _ota_update; }
-
-#define PWM_MAXCOUNT      25000
-uint16_t _pwm_red_seq0 [NRF_PWM_CHANNEL_COUNT] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
-uint16_t _pwm_blue_seq0[NRF_PWM_CHANNEL_COUNT] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
-
-void led_blink_fast(bool enable)
+bool is_ota(void)
 {
-  if ( enable )
-  {
-    NRF_PWM0->MODE = PWM_MODE_UPDOWN_Up;
-  }else
-  {
-    NRF_PWM0->MODE = PWM_MODE_UPDOWN_UpAndDown;
-  }
-}
-
-/* use PWM for blinky to prevent inconsistency due to MCU blocking in flash operation
- * clock = 125khz --> resolution = 8us
- * top value = 25000 -> period = 200 ms (fast blink) --> up and down mode = 400 ms ( slow blink )
- */
-void led_pwm_init(NRF_PWM_Type* pwm, uint32_t led_pin)
-{
-  pwm->MODE            = PWM_MODE_UPDOWN_UpAndDown;
-  pwm->COUNTERTOP      = PWM_MAXCOUNT;
-  pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_128;
-  pwm->DECODER         = PWM_DECODER_LOAD_Individual;
-  pwm->LOOP            = 0;
-
-  pwm->SEQ[0].PTR      = (uint32_t) (led_pin == LED_RED ? _pwm_red_seq0 : _pwm_blue_seq0);
-  pwm->SEQ[0].CNT      = NRF_PWM_CHANNEL_COUNT; // default mode is Individual --> count must be 4
-  pwm->SEQ[0].REFRESH  = 0;
-  pwm->SEQ[0].ENDDELAY = 0;
-
-  pwm->PSEL.OUT[0] = led_pin;
-
-  pwm->ENABLE = 1;
-  pwm->TASKS_SEQSTART[0] = 1;
-}
-
-void led_pwm_teardown(NRF_PWM_Type* pwm)
-{
-  pwm->TASKS_SEQSTART[0] = 0;
-  pwm->ENABLE            = 0;
-
-  pwm->PSEL.OUT[0] = 0xFFFFFFFF;
-
-  pwm->MODE        = 0;
-  pwm->COUNTERTOP  = 0x3FF;
-  pwm->PRESCALER   = 0;
-  pwm->DECODER     = 0;
-  pwm->LOOP        = 0;
-  pwm->SEQ[0].PTR  = 0;
-  pwm->SEQ[0].CNT  = 0;
-}
-
-void board_init(void)
-{
-  // stop WDT if started by application, when jumping from application using BLE DFU
-  if ( NRF_WDT->RUNSTATUS )
-  {
-    NRF_WDT->TASKS_START = 0;
-  }
-
-  button_init(BUTTON_DFU);
-  button_init(BUTTON_FRESET);
-  NRFX_DELAY_US(100); // wait for the pin state is stable
-
-  // LED init
-  nrf_gpio_cfg_output(LED_RED);
-  nrf_gpio_cfg_output(LED_BLUE);
-  led_off(LED_RED);
-  led_off(LED_BLUE);
-
-  // use PMW0 for LED RED
-  led_pwm_init(NRF_PWM0, LED_RED);
-
-  // Init scheduler
-  APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-
-  // Init app timer (use RTC1)
-  app_timer_init();
-}
-
-void board_teardown(void)
-{
-  // Disable and reset PWM for LED
-  led_pwm_teardown(NRF_PWM0);
-
-  if ( is_ota() ) led_pwm_teardown(NRF_PWM1);
-
-  led_off(LED_BLUE);
-  led_off(LED_RED);
-
-  // Stop RTC1 used by app_timer
-  NVIC_DisableIRQ(RTC1_IRQn);
-  NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
-  NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
-  NRF_RTC1->TASKS_STOP  = 1;
-  NRF_RTC1->TASKS_CLEAR = 1;
-
-  // disable usb
-  usb_teardown();
+  return _ota_update;
 }
 
 void softdev_mbr_init(void)
@@ -376,7 +264,16 @@ int main(void)
     // Initiate an update of the firmware.
     APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
 
-    if ( _ota_update ) sd_softdevice_disable();
+    if ( _ota_update )
+    {
+      led_pwm_teardown(NRF_PWM1);
+      led_off(LED_BLUE);
+
+      sd_softdevice_disable();
+    }else
+    {
+      usb_teardown();
+    }
   }
 #ifdef NRF52832_XXAA
   else
@@ -388,15 +285,16 @@ int main(void)
   }
 #endif
 
-  /*------------- Adafruit Factory reset -------------*/
+  // Adafruit Factory reset
   if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
   {
     adafruit_factory_reset();
   }
 
-  /*------------- Reset used prph and jump to application -------------*/
+  // Reset Board
   board_teardown();
 
+  // Jump to application if valid
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
   {
     // MBR must be init before start application
@@ -410,10 +308,6 @@ int main(void)
   NVIC_SystemReset();
 }
 
-
-//--------------------------------------------------------------------+
-// FACTORY RESET
-//--------------------------------------------------------------------+
 
 // Perform factory reset to erase Application + Data
 void adafruit_factory_reset(void)
@@ -451,11 +345,6 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
   app_error_handler(0xDEADBEEF, line_num, p_file_name);
 }
 
-uint32_t tusb_hal_millis(void)
-{
-  return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
-}
-
 /*------------------------------------------------------------------*/
 /* SoftDevice Event handler
  *------------------------------------------------------------------*/
@@ -478,12 +367,12 @@ uint32_t proc_ble(void)
     {
       case BLE_GAP_EVT_CONNECTED:
         _ota_connected = true;
-        _pwm_blue_seq0[0] = PWM_MAXCOUNT;
+        led_pwm_solid(LED_BLUE, true); // LED on
       break;
 
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
-        _pwm_blue_seq0[0] = PWM_MAXCOUNT/2;
+        led_pwm_solid(LED_BLUE, false); // LED Blink
       break;
 
       default: break;
