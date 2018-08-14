@@ -657,18 +657,20 @@ static void advertising_start(void)
     uint8_t adv_buf[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
     ble_gap_adv_data_t gap_adv =
     {
-        .adv_data = { .p_data = adv_buf, .len = 0}
+        .adv_data = { .p_data = adv_buf, .len = 0 }
     };
 
     uint8_t  adv_flag = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
     ble_gap_adv_params_t m_adv_params =
     {
-        .properties.type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED,
-        .p_peer_addr     = NULL,
-        .filter_policy   = BLE_GAP_ADV_FP_ANY,
-        .interval        = APP_ADV_INTERVAL,
-        .duration        = APP_ADV_TIMEOUT,
-        .primary_phy     = BLE_GAP_PHY_1MBPS,
+        .properties    = { .type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED },
+        .p_peer_addr   = NULL,
+        .interval      = APP_ADV_INTERVAL,
+        .duration      = APP_ADV_TIMEOUT,
+        .max_adv_evts  = 0,
+        .channel_mask  = { 0, 0, 0, 0, 0 }, // 40 channel, set 1 to disable
+        .filter_policy = BLE_GAP_ADV_FP_ANY,
+        .primary_phy   = BLE_GAP_PHY_AUTO,
     };
 
     if (m_ble_peer_data_valid)
@@ -700,6 +702,8 @@ static void advertising_start(void)
     advertising_init(&gap_adv.adv_data, adv_flag);
 
     APP_ERROR_CHECK( sd_ble_gap_adv_set_configure(&_adv_handle, &gap_adv, &m_adv_params) );
+    // maximum power for nrf52832, nrf52840 max power is +8
+    APP_ERROR_CHECK( sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, _adv_handle, 4) );
     APP_ERROR_CHECK( sd_ble_gap_adv_start(_adv_handle, BLE_CONN_CFG_HIGH_BANDWIDTH) );
 
     m_is_advertising = true;
@@ -923,10 +927,7 @@ static void gap_params_init(void)
     ble_gap_conn_sec_mode_t sec_mode;
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
-
-    err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
+    err_code = sd_ble_gap_device_name_set(&sec_mode, (const uint8_t *)DEVICE_NAME, strlen(DEVICE_NAME));
     APP_ERROR_CHECK(err_code);
 
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -1055,9 +1056,7 @@ uint32_t dfu_transport_ble_update_start(void)
     gap_params_init();
     services_init();
     sec_params_init();
-
     advertising_start();
-    sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, _adv_handle, 4); // maximum power
 
     return NRF_SUCCESS;
 }
