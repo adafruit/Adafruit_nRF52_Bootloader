@@ -217,6 +217,9 @@ void board_init(void)
 
   // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
+
+  // Init app timer (use RTC1)
+  app_timer_init();
 }
 
 void board_teardown(void)
@@ -363,15 +366,9 @@ int main(void)
 
       softdev_init(!sd_inited);
       sd_inited = true;
-
-      // Init app timer (use RTC1)
-      app_timer_init();
     }
     else
     {
-      // Init app timer (use RTC1)
-      app_timer_init();
-
       // otherwise USB for Serial & UF2
       usb_init();
     }
