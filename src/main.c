@@ -153,7 +153,7 @@ static uint32_t softdev_init(bool init_softdevice)
   // Enable Softdevice
   nrf_clock_lf_cfg_t clock_cfg =
   {
-#ifdef NRF52840_XXAA // TODO use xtal source for feather52832
+#if defined(NRF52840_XXAA) // TODO use xtal source for feather52832
       .source       = NRF_CLOCK_LF_SRC_XTAL,
       .rc_ctiv      = 0,
       .rc_temp_ctiv = 0,
@@ -173,10 +173,12 @@ static uint32_t softdev_init(bool init_softdevice)
   extern uint32_t  __data_start__[]; // defined in linker
   uint32_t ram_start = (uint32_t) __data_start__;
 
+#if 0
   ble_cfg_t blecfg;
 
   // Configure the maximum number of connections.
   varclr(&blecfg);
+  blecfg.gap_cfg.role_count_cfg.adv_set_count = 1;
   blecfg.gap_cfg.role_count_cfg.periph_role_count  = 1;
   blecfg.gap_cfg.role_count_cfg.central_role_count = 0;
   blecfg.gap_cfg.role_count_cfg.central_sec_count  = 0;
@@ -199,10 +201,18 @@ static uint32_t softdev_init(bool init_softdevice)
   blecfg.conn_cfg.params.gap_conn_cfg.conn_count   = 1;
   blecfg.conn_cfg.params.gap_conn_cfg.event_length = BLEGAP_EVENT_LENGTH;
   APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start) );
+#endif
 
   // Enable BLE stack.
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
   APP_ERROR_CHECK( sd_ble_enable(&ram_start) );
+
+#if 0
+  ble_opt_t  opt;
+  varclr(&opt);
+  opt.common_opt.conn_evt_ext.enable = 1; // enable Data Length Extension
+  APP_ERROR_CHECK( sd_ble_opt_set(BLE_COMMON_OPT_CONN_EVT_EXT, &opt) );
+#endif
 
   return NRF_SUCCESS;
 }
@@ -215,6 +225,8 @@ int main(void)
   // Start Bootloader in BLE OTA mode
   _ota_update = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC) ||
                 (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_FULLRESET_MAGIC);
+
+  _ota_update = 1; // force OTA for testing
 
   // start bootloader either serial or ble
   bool dfu_start = _ota_update || (NRF_POWER->GPREGRET == BOOTLOADER_DFU_SERIAL_MAGIC);
@@ -342,7 +354,7 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
-  app_error_handler(0xDEADBEEF, line_num, p_file_name);
+  app_error_fault_handler(0xDEADBEEF, 0, 0);
 }
 
 /*------------------------------------------------------------------*/
