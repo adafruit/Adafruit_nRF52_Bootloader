@@ -6,6 +6,6 @@
   <MemorySegment name="MBR_PARAMS_PAGE" start="0x000FE000" size="0x1000" access="ReadOnly" />
   <MemorySegment name="UICR_BOOTLOADER" start="0x10001014" size="0x04" access="ReadOnly" />
   <MemorySegment name="UICR_MBR_PARAM_PAGE" start="0x10001018" size="0x04" access="ReadOnly" />
-  <MemorySegment name="RAM" start="0x20004000" size="0x3C000" access="Read/Write" />
+  <MemorySegment name="RAM" start="0x20008000" size="0x38000" access="Read/Write" />
   <MemorySegment name="NOINIT" start="0x20007F80" size="0x80" access="Read/Write" />
 </root>

@@ -94,6 +94,7 @@
       </folder>
       <file file_name="../dfu_init.c" />
       <file file_name="../flash.c" />
+      <file file_name="../boards.c" />
     </folder>
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration
