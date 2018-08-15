@@ -33,6 +33,7 @@
 #include <stddef.h>
 
 #include "nrfx.h"
+#include "nrf_clock.h"
 #include "nrfx_power.h"
 #include "nrfx_pwm.h"
 
@@ -84,19 +85,21 @@ void usb_teardown(void);
  * - Fatal Error    : LED Status & Conn blink one after another
  */
 
-#define BOOTLOADER_VERSION_REGISTER         NRF_TIMER2->CC[0]
-#define BOOTLOADER_STARTUP_DFU_INTERVAL     1000
-
 /* Magic that written to NRF_POWER->GPREGRET by application when it wish to go into DFU
  * - BOOTLOADER_DFU_OTA_MAGIC used by BLEDfu service : SD is already init
  * - BOOTLOADER_DFU_OTA_FULLRESET_MAGIC entered by soft reset : SD is not init
  * - BOOTLOADER_DFU_SERIAL_MAGIC entered by soft reset : SD is not init
  *
- * Note: for BOOTLOADER_DFU_OTA_MAGIC Softdevice should not initialized. In other case SD must be initialized
+ * Note: for DFU_MAGIC_OTA_APPJUM Softdevice must not initialized.
+ * since it is already in application. In all other case of OTA SD must be initialized
  */
-#define BOOTLOADER_DFU_OTA_MAGIC            BOOTLOADER_DFU_START             // 0xB1
-#define BOOTLOADER_DFU_OTA_FULLRESET_MAGIC  0xA8
-#define BOOTLOADER_DFU_SERIAL_MAGIC         0x4e
+#define DFU_MAGIC_OTA_APPJUM            BOOTLOADER_DFU_START             // 0xB1
+#define DFU_MAGIC_OTA_RESET             0xA8
+#define DFU_MAGIC_SERIAL_ONLY_RESET     0x4e
+#define DFU_MAGIC_UF2_SERIAL_RESET      0x57
+
+#define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
+#define DFU_SERIAL_STARTUP_INTERVAL     1000
 
 // Helper function
 #define memclr(buffer, size)                memset(buffer, 0, size)
@@ -123,12 +126,12 @@ STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 void adafruit_factory_reset(void);
 
 // true if ble, false if serial
-bool _ota_update = false;
+bool _ota_dfu = false;
 bool _ota_connected = false;
 
 bool is_ota(void)
 {
-  return _ota_update;
+  return _ota_dfu;
 }
 
 void softdev_mbr_init(void)
@@ -173,7 +176,6 @@ static uint32_t softdev_init(bool init_softdevice)
   extern uint32_t  __data_start__[]; // defined in linker
   uint32_t ram_start = (uint32_t) __data_start__;
 
-#if 0
   ble_cfg_t blecfg;
 
   // Configure the maximum number of connections.
@@ -201,7 +203,6 @@ static uint32_t softdev_init(bool init_softdevice)
   blecfg.conn_cfg.params.gap_conn_cfg.conn_count   = 1;
   blecfg.conn_cfg.params.gap_conn_cfg.event_length = BLEGAP_EVENT_LENGTH;
   APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start) );
-#endif
 
   // Enable BLE stack.
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
@@ -220,16 +221,16 @@ static uint32_t softdev_init(bool init_softdevice)
 int main(void)
 {
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
-  bool sd_inited = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC);
+  bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);
 
   // Start Bootloader in BLE OTA mode
-  _ota_update = (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_MAGIC) ||
-                (NRF_POWER->GPREGRET == BOOTLOADER_DFU_OTA_FULLRESET_MAGIC);
+  _ota_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM) ||
+             (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_RESET);
 
-  _ota_update = 1; // force OTA for testing
+  //
 
   // start bootloader either serial or ble
-  bool dfu_start = _ota_update || (NRF_POWER->GPREGRET == BOOTLOADER_DFU_SERIAL_MAGIC);
+  bool dfu_start = _ota_dfu || (NRF_POWER->GPREGRET == DFU_MAGIC_SERIAL_ONLY_RESET);
 
   // Clear GPREGRET if it is our values
   if (dfu_start) NRF_POWER->GPREGRET = 0;
@@ -255,11 +256,11 @@ int main(void)
   dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
 
   // DFU + FRESET are pressed --> OTA
-  _ota_update = _ota_update  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
+  _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
 
   if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
-    if ( _ota_update )
+    if ( _ota_dfu )
     {
       // Enable BLE if in OTA
       led_pwm_init(NRF_PWM1, LED_BLUE);
@@ -274,9 +275,9 @@ int main(void)
     }
 
     // Initiate an update of the firmware.
-    APP_ERROR_CHECK( bootloader_dfu_start(_ota_update, 0) );
+    APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0) );
 
-    if ( _ota_update )
+    if ( _ota_dfu )
     {
       led_pwm_teardown(NRF_PWM1);
       led_off(LED_BLUE);
@@ -293,7 +294,7 @@ int main(void)
     /* Adafruit Modification
      * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
      * to support auto programming from Arduino IDE */
-    bootloader_dfu_start(false, BOOTLOADER_STARTUP_DFU_INTERVAL);
+    bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL);
   }
 #endif
 

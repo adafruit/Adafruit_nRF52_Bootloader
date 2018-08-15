@@ -704,8 +704,7 @@ static void advertising_start(void)
     APP_ERROR_CHECK( sd_ble_gap_adv_set_configure(&_adv_handle, &gap_adv, &m_adv_params) );
     // maximum power for nrf52832, nrf52840 max power is +8
     APP_ERROR_CHECK( sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, _adv_handle, 4) );
-//    APP_ERROR_CHECK( sd_ble_gap_adv_start(_adv_handle, BLE_CONN_CFG_HIGH_BANDWIDTH) );
-    APP_ERROR_CHECK( sd_ble_gap_adv_start(_adv_handle, BLE_CONN_CFG_TAG_DEFAULT) );
+    APP_ERROR_CHECK( sd_ble_gap_adv_start(_adv_handle, BLE_CONN_CFG_HIGH_BANDWIDTH) );
 
     m_is_advertising = true;
   }

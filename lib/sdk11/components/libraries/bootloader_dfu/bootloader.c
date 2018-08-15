@@ -387,6 +387,16 @@ void bootloader_app_start(uint32_t app_addr)
 
     interrupts_disable();
 
+#if 0 // may need set forward irq
+    sd_mbr_command_t command =
+    {
+        .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,
+        .params.irq_forward_address_set.address = MBR_SIZE,
+    };
+
+    sd_mbr_command(&command);
+#endif
+
     APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(CODE_REGION_1_START) );
 
     bootloader_util_app_start(CODE_REGION_1_START);
