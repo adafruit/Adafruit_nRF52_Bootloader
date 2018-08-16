@@ -68,10 +68,7 @@
 //--------------------------------------------------------------------+
 
 /*------------- Core -------------*/
-#define CFG_TUD_DESC_AUTO           1
-#define CFG_TUD_DESC_VID            0x239A
-#define CFG_TUD_DESC_PID            0x0029
-
+#define CFG_TUD_DESC_AUTO           0
 #define CFG_TUD_ENDOINT0_SIZE       64
 
 //------------- Class enabled -------------//

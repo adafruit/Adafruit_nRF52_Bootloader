@@ -156,7 +156,7 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 ifneq ($(IS_NRF52840),)
 
 # src
-C_SOURCE_FILES += $(SRC_PATH)/usb/tusb_descriptors.c
+C_SOURCE_FILES += $(SRC_PATH)/usb/usb_desc.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/usb.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
 C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
@@ -169,7 +169,6 @@ C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
 C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
 C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
 C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
-C_SOURCE_FILES += $(TUSB_PATH)/device/usbd_auto_desc.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/custom/custom_device.c

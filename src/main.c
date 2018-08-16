@@ -66,7 +66,7 @@
 #include "nrf_usbd.h"
 #include "tusb.h"
 
-void usb_init(void);
+void usb_init(bool cdc_only);
 void usb_teardown(void);
 
 #else
@@ -96,7 +96,7 @@ void usb_teardown(void);
 #define DFU_MAGIC_OTA_APPJUM            BOOTLOADER_DFU_START             // 0xB1
 #define DFU_MAGIC_OTA_RESET             0xA8
 #define DFU_MAGIC_SERIAL_ONLY_RESET     0x4e
-#define DFU_MAGIC_UF2_SERIAL_RESET      0x57
+#define DFU_MAGIC_UF2_RESET             0x57
 
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000
@@ -124,6 +124,7 @@ STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 
 
 void adafruit_factory_reset(void);
+static uint32_t softdev_init(bool init_softdevice);
 
 // true if ble, false if serial
 bool _ota_dfu = false;
@@ -138,6 +139,131 @@ void softdev_mbr_init(void)
 {
   sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
   sd_mbr_command(&com);
+}
+
+int main(void)
+{
+  // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
+  bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);
+
+  // Start Bootloader in BLE OTA mode
+  _ota_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM) || (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_RESET);
+
+  // Serial only mode
+  bool serial_only_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_SERIAL_ONLY_RESET);
+
+  // start either serial, uf2 or ble
+  bool dfu_start = _ota_dfu || serial_only_dfu || (NRF_POWER->GPREGRET == DFU_MAGIC_UF2_RESET);
+
+  // Clear GPREGRET if it is our values
+  if (dfu_start) NRF_POWER->GPREGRET = 0;
+
+  // Save bootloader version to pre-defined register, retrieved by application
+  BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
+
+  // This check ensures that the defined fields in the bootloader corresponds with actual setting in the chip.
+  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
+
+  board_init();
+  bootloader_init();
+
+  // When updating SoftDevice, bootloader will reset before swapping SD
+  if (bootloader_dfu_sd_in_progress())
+  {
+    APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
+    APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
+  }
+
+  /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
+  // DFU button pressed
+  dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
+
+  // DFU + FRESET are pressed --> OTA
+  _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
+
+  if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
+  {
+    if ( _ota_dfu )
+    {
+      // Enable BLE if in OTA
+      led_pwm_init(NRF_PWM1, LED_BLUE);
+
+      softdev_init(!sd_inited);
+      sd_inited = true;
+    }
+    else
+    {
+      // otherwise USB for Serial & UF2
+      usb_init(serial_only_dfu);
+    }
+
+    // Initiate an update of the firmware.
+    APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0) );
+
+    if ( _ota_dfu )
+    {
+      led_pwm_teardown(NRF_PWM1);
+      led_off(LED_BLUE);
+
+      sd_softdevice_disable();
+    }else
+    {
+      usb_teardown();
+    }
+  }
+#ifdef NRF52832_XXAA
+  else
+  {
+    /* Adafruit Modification
+     * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
+     * to support auto programming from Arduino IDE */
+    bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL);
+  }
+#endif
+
+  // Adafruit Factory reset
+  if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
+  {
+    adafruit_factory_reset();
+  }
+
+  // Reset Board
+  board_teardown();
+
+  // Jump to application if valid
+  if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
+  {
+    // MBR must be init before start application
+    if ( !sd_inited ) softdev_mbr_init();
+
+    // Select a bank region to use as application region.
+    // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
+    bootloader_app_start(DFU_BANK_0_REGION_START);
+  }
+
+  NVIC_SystemReset();
+}
+
+
+// Perform factory reset to erase Application + Data
+void adafruit_factory_reset(void)
+{
+  // Blink fast RED and turn on BLUE when erasing
+  led_blink_fast(true);
+  led_on(LED_BLUE);
+
+  // clear all App Data if any
+  if ( DFU_APP_DATA_RESERVED )
+  {
+    nrf_nvmc_page_erase(APPDATA_ADDR_START);
+  }
+
+  // Only need to erase the 1st page of Application code to make it invalid
+  nrf_nvmc_page_erase(DFU_BANK_0_REGION_START);
+
+  // back to normal
+  led_blink_fast(false);
+  led_off(LED_BLUE);
 }
 
 /**
@@ -218,130 +344,6 @@ static uint32_t softdev_init(bool init_softdevice)
   return NRF_SUCCESS;
 }
 
-int main(void)
-{
-  // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
-  bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);
-
-  // Start Bootloader in BLE OTA mode
-  _ota_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM) ||
-             (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_RESET);
-
-  //
-
-  // start bootloader either serial or ble
-  bool dfu_start = _ota_dfu || (NRF_POWER->GPREGRET == DFU_MAGIC_SERIAL_ONLY_RESET);
-
-  // Clear GPREGRET if it is our values
-  if (dfu_start) NRF_POWER->GPREGRET = 0;
-
-  // Save bootloader version to pre-defined register, retrieved by application
-  BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
-
-  // This check ensures that the defined fields in the bootloader corresponds with actual setting in the chip.
-  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
-
-  board_init();
-  bootloader_init();
-
-  // When updating SoftDevice, bootloader will reset before swapping SD
-  if (bootloader_dfu_sd_in_progress())
-  {
-    APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
-    APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
-  }
-
-  /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  // DFU button pressed
-  dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
-
-  // DFU + FRESET are pressed --> OTA
-  _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
-
-  if ( dfu_start || !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
-  {
-    if ( _ota_dfu )
-    {
-      // Enable BLE if in OTA
-      led_pwm_init(NRF_PWM1, LED_BLUE);
-
-      softdev_init(!sd_inited);
-      sd_inited = true;
-    }
-    else
-    {
-      // otherwise USB for Serial & UF2
-      usb_init();
-    }
-
-    // Initiate an update of the firmware.
-    APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0) );
-
-    if ( _ota_dfu )
-    {
-      led_pwm_teardown(NRF_PWM1);
-      led_off(LED_BLUE);
-
-      sd_softdevice_disable();
-    }else
-    {
-      usb_teardown();
-    }
-  }
-#ifdef NRF52832_XXAA
-  else
-  {
-    /* Adafruit Modification
-     * Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
-     * to support auto programming from Arduino IDE */
-    bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL);
-  }
-#endif
-
-  // Adafruit Factory reset
-  if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
-  {
-    adafruit_factory_reset();
-  }
-
-  // Reset Board
-  board_teardown();
-
-  // Jump to application if valid
-  if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
-  {
-    // MBR must be init before start application
-    if ( !sd_inited ) softdev_mbr_init();
-
-    // Select a bank region to use as application region.
-    // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
-    bootloader_app_start(DFU_BANK_0_REGION_START);
-  }
-
-  NVIC_SystemReset();
-}
-
-
-// Perform factory reset to erase Application + Data
-void adafruit_factory_reset(void)
-{
-  // Blink fast RED and turn on BLUE when erasing
-  led_blink_fast(true);
-  led_on(LED_BLUE);
-
-  // clear all App Data if any
-  if ( DFU_APP_DATA_RESERVED )
-  {
-    nrf_nvmc_page_erase(APPDATA_ADDR_START);
-  }
-
-  // Only need to erase the 1st page of Application code to make it invalid
-  nrf_nvmc_page_erase(DFU_BANK_0_REGION_START);
-
-  // back to normal
-  led_blink_fast(false);
-  led_off(LED_BLUE);
-}
 
 //--------------------------------------------------------------------+
 // Error Handler
