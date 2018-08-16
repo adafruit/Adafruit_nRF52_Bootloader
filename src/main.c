@@ -71,7 +71,7 @@ void usb_teardown(void);
 
 #else
 
-#define usb_init()
+#define usb_init(x)
 #define usb_teardown()
 
 #endif
