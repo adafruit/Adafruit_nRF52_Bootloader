@@ -85,9 +85,6 @@ typedef struct ATTR_PACKED
 } usb_desc_cfg_t;
 
 
-extern tusb_desc_device_t usb_desc_dev;
-extern usb_desc_cfg_t     usb_desc_cfg;
-
 #ifdef __cplusplus
  }
 #endif

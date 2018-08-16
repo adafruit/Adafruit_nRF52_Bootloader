@@ -44,10 +44,15 @@
 
 #include "nrf_usbd.h"
 #include "tusb.h"
+#include "usb_desc.h"
 
 //--------------------------------------------------------------------+
 // MACRO TYPEDEF CONSTANT ENUM DECLARATION
 //--------------------------------------------------------------------+
+
+// from usb_desc.c for dynamic descriptor
+extern tusb_desc_device_t usb_desc_dev;
+extern usb_desc_cfg_t     usb_desc_cfg;
 
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
@@ -93,6 +98,16 @@ void usb_init(bool cdc_only)
 
   if ( usb_reg & POWER_USBREGSTATUS_OUTPUTRDY_Msk ) {
     tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
+  }
+
+  if ( cdc_only )
+  {
+    // Change PID to CDC only
+    usb_desc_dev.idProduct = USB_DESC_SERIAL_ONLY_PID;
+
+    // Remove MSC interface = reduce total interface + adjust config desc length
+    usb_desc_cfg.config.bNumInterfaces--;
+    usb_desc_cfg.config.wTotalLength -= sizeof(usb_desc_cfg.msc);
   }
 
   // Init tusb stack

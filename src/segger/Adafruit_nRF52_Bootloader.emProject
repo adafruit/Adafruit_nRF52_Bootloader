@@ -57,8 +57,6 @@
       <file file_name="../sdk_config.h" />
       <folder Name="usb">
         <file file_name="../usb/tusb_config.h" />
-        <file file_name="../usb/tusb_descriptors.c" />
-        <file file_name="../usb/tusb_descriptors.h" />
         <folder Name="uf2">
           <file file_name="../usb/uf2/uf2cfg.h" />
           <file file_name="../usb/uf2/uf2.h" />
@@ -66,6 +64,8 @@
         </folder>
         <file file_name="../usb/msc_uf2.c" />
         <file file_name="../usb/usb.c" />
+        <file file_name="../usb/usb_desc.c" />
+        <file file_name="../usb/usb_desc.h" />
       </folder>
       <folder Name="cmsis">
         <folder Name="include">
@@ -210,7 +210,6 @@
             <file file_name="../../lib/tinyusb/src/device/usbd.c" />
             <file file_name="../../lib/tinyusb/src/device/usbd.h" />
             <file file_name="../../lib/tinyusb/src/device/usbd_pvt.h" />
-            <file file_name="../../lib/tinyusb/src/device/usbd_auto_desc.c" />
           </folder>
           <folder Name="osal">
             <file file_name="../../lib/tinyusb/src/osal/osal.c" />

@@ -135,7 +135,14 @@ static uint32_t get_flash_size(void)
       const bootloader_settings_t * boot_setting;
       bootloader_util_settings_get(&boot_setting);
 
+      // if bank0 size is not valid, happens when flashed with jlink
+      // use maximum application size
+
       flash_sz = boot_setting->bank_0_size;
+      if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
+      {
+        flash_sz = FLASH_SIZE;
+      }
     }
   }
 
