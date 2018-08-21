@@ -390,12 +390,16 @@ dfu-flash: $(BUILD)/$(MERGED_FNAME).zip
 
 else
 
+ifeq ($(VERSION),latest)
+VERSION_FPATH = $(RELEASE_DIR)/$(MERGED_FNAME)
+else
 VERSION_FPATH = bin/$(BOARD)/$(VERSION)/$(OUTPUT_FILENAME)_$(SD_NAME)_$(VERSION)
+endif
 
 # Flash specific version in binary release folder
 flash:
 	@echo Flashing: $(VERSION_FPATH).hex
-	$(NRFJPROG) --program $(VERSION_FPATH).hex --sectoranduicrerase -f nrf52 --reset
+	$(NRFJPROG) --program $(VERSION_FPATH).hex --chiperase -f nrf52 --reset
 	
 dfu-flash:
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
