@@ -6,7 +6,7 @@ This repository contains the bootloader for Adafruit nRF52 series and other popu
 - Bluefruit Feather nRF52840 Express
 - Nordic nRF52840DK PCA10056
 
-This bootloader is meant to use with [adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil), a folk of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil). To install
+[adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil), modified version of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil), is required to perform DFU. Install python3 to your system if it is not installed already and run this command to install adafruit-nrfutil from PyPi:
 
 	$ pip3 install --user adafruit-nrfutil
 

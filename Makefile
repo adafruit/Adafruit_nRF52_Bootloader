@@ -42,7 +42,7 @@ MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION) r$(SD_VER4)"
 #******************************************************************************
 # Tool configure
 #******************************************************************************
-NRFUTIL = nrfutil
+NRFUTIL = adafruit-nrfutil
 
 
 ifneq ($(JLINK),)

@@ -61,6 +61,9 @@ uint16_t _pwm_blue_seq[PWM_CHANNEL_NUM] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
 
 void board_init(void)
 {
+  NRF_CLOCK->LFCLKSRC = (uint32_t)((CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos) & CLOCK_LFCLKSRC_SRC_Msk);
+  NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
+
   // stop WDT if started by application, when jumping from application using BLE DFU
   if ( NRF_WDT->RUNSTATUS )
   {
