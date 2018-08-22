@@ -101,13 +101,6 @@ void usb_teardown(void);
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000
 
-// Helper function
-#define memclr(buffer, size)                memset(buffer, 0, size)
-#define varclr(_var)                        memclr(_var, sizeof(*(_var)))
-#define arrclr(_arr)                        memclr(_arr, sizeof(_arr))
-#define arrcount(_arr)                      ( sizeof(_arr) / sizeof(_arr[0]) )
-
-
 // These value must be the same with one in dfu_transport_ble.c
 #define BLEGAP_EVENT_LENGTH             6
 #define BLEGATT_ATT_MTU_MAX             247

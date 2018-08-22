@@ -654,11 +654,11 @@ static void advertising_start(void)
 {
   if (!m_is_advertising)
   {
-    uint8_t adv_buf[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
-    ble_gap_adv_data_t gap_adv =
-    {
-        .adv_data = { .p_data = adv_buf, .len = 0 }
-    };
+    static uint8_t adv_buf[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
+    static ble_gap_adv_data_t gap_adv;
+
+    varclr(&gap_adv);
+    gap_adv.adv_data.p_data = adv_buf;
 
     uint8_t  adv_flag = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
     ble_gap_adv_params_t m_adv_params =

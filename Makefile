@@ -18,7 +18,7 @@ TUSB_PATH       = lib/tinyusb/src
 NRFX_PATH				= lib/nrfx
 
 SD_VER1         = 6
-SD_VER2         = 0
+SD_VER2         = 1
 SD_VER3         = 0
 SD_VER4         = 0
 
