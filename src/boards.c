@@ -81,7 +81,7 @@ void board_init(void)
   led_off(LED_BLUE);
 
   // use PMW0 for LED RED
-  led_pwm_init(NRF_PWM0, LED_RED);
+  led_pwm_init(LED_RED);
 
   // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
@@ -93,7 +93,7 @@ void board_init(void)
 void board_teardown(void)
 {
   // Disable and reset PWM for LED
-  led_pwm_teardown(NRF_PWM0);
+  led_pwm_teardown(LED_RED);
 
   led_off(LED_BLUE);
   led_off(LED_RED);
@@ -115,8 +115,10 @@ uint32_t tusb_hal_millis(void)
 
 
 
-void led_pwm_init(NRF_PWM_Type* pwm, uint32_t led_pin)
+void led_pwm_init(uint32_t led_pin)
 {
+  NRF_PWM_Type* pwm    = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+
   pwm->MODE            = PWM_MODE_UPDOWN_UpAndDown;
   pwm->COUNTERTOP      = PWM_MAXCOUNT;
   pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_128;
@@ -134,8 +136,10 @@ void led_pwm_init(NRF_PWM_Type* pwm, uint32_t led_pin)
   pwm->TASKS_SEQSTART[0] = 1;
 }
 
-void led_pwm_teardown(NRF_PWM_Type* pwm)
+void led_pwm_teardown(uint32_t led_pin)
 {
+  NRF_PWM_Type* pwm = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+
   pwm->TASKS_SEQSTART[0] = 0;
   pwm->ENABLE            = 0;
 
@@ -150,11 +154,22 @@ void led_pwm_teardown(NRF_PWM_Type* pwm)
   pwm->SEQ[0].CNT  = 0;
 }
 
-void led_pwm_solid(uint32_t led_pin, bool solid)
+void led_pwm_disable(uint32_t led_pin)
 {
-  uint16_t* seq = ((led_pin == LED_RED) ? _pwm_red_seq : _pwm_blue_seq);
-  seq[0] = (solid ? PWM_MAXCOUNT : PWM_MAXCOUNT/2);
+  NRF_PWM_Type* pwm = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+
+  pwm->TASKS_SEQSTART[0] = 0;
+  pwm->ENABLE = 0;
 }
+
+void led_pwm_enable(uint32_t led_pin)
+{
+  NRF_PWM_Type* pwm = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+
+  pwm->ENABLE = 1;
+  pwm->TASKS_SEQSTART[0] = 1;
+}
+
 
 void led_blink_fast(bool enable)
 {

@@ -179,7 +179,7 @@ int main(void)
     if ( _ota_dfu )
     {
       // Enable BLE if in OTA
-      led_pwm_init(NRF_PWM1, LED_BLUE);
+      led_pwm_init(LED_BLUE);
 
       softdev_init(!sd_inited);
       sd_inited = true;
@@ -195,7 +195,7 @@ int main(void)
 
     if ( _ota_dfu )
     {
-      led_pwm_teardown(NRF_PWM1);
+      led_pwm_teardown(LED_BLUE);
       led_off(LED_BLUE);
 
       sd_softdevice_disable();
@@ -375,12 +375,13 @@ uint32_t proc_ble(void)
     {
       case BLE_GAP_EVT_CONNECTED:
         _ota_connected = true;
-        led_pwm_solid(LED_BLUE, true); // LED on
+        led_pwm_disable(LED_BLUE);
+        led_on(LED_BLUE);
       break;
 
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
-        led_pwm_solid(LED_BLUE, false); // LED Blink
+        led_pwm_enable(LED_BLUE); // LED Blink
       break;
 
       default: break;
