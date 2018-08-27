@@ -453,9 +453,15 @@ genhex: $(BUILD)/$(OUTPUT_FILENAME).hex
 
 $(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
 	@echo CR $(OUTPUT_FILENAME).hex
-	@echo CR $(MERGED_FNAME).hex
 	$(QUIET)$(OBJCOPY) -O ihex $< $@
-	@mergehex -q -m $@ $(SD_HEX) -o $(BUILD)/$(MERGED_FNAME).hex
+
+
+# merge bootloader and sd hex together
+combinehex: $(BUILD)/$(MERGED_FNAME).hex
+
+$(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME).hex
+	@echo CR $(MERGED_FNAME).hex
+	@mergehex -q -m $< $(SD_HEX) -o $@
 
 ## Create pkg file for bootloader+SD combo to use with DFU
 genpkg: $(BUILD)/$(MERGED_FNAME).zip
@@ -464,7 +470,7 @@ $(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@ 
 
 # Create SD+bootloader combo with hex & dfu package at release folder
-release: genhex genpkg
+release: combinehex genpkg
 	@echo CR $(RELEASE_DIR)/$(MERGED_FNAME).hex
 	@echo CR $(RELEASE_DIR)/$(MERGED_FNAME).zip
 	@mkdir -p $(RELEASE_DIR)
