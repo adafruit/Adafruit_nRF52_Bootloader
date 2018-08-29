@@ -53,7 +53,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 PROGFILES = C:/Program Files (x86)
-GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/6 2017-q2-update
+GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update
 else
 GNU_INSTALL_ROOT = /usr
 endif
