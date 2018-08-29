@@ -54,11 +54,7 @@
 extern tusb_desc_device_t usb_desc_dev;
 extern usb_desc_cfg_t     usb_desc_cfg;
 
-/* Serial should be different for Application mode, DFU with UF2, and DFU with CDC only therefore
- * - DeviceID     : (Arduino + CircuitPython)
- * - DeviceID + 1 : DFU with UF2
- * - DeviceID + 2 : DFU with CDC only
- */
+// Serial string using unique Device ID
 extern uint16_t           usb_desc_str_serial[1+16];
 
 /* tinyusb function that handles power event (detected, ready, removed)
@@ -107,8 +103,6 @@ void usb_init(bool cdc_only)
     tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
   }
 
-  uint32_t devid_low = NRF_FICR->DEVICEID[0] + 1; // default uf2
-
   if ( cdc_only )
   {
     // Change PID to CDC only
@@ -117,13 +111,11 @@ void usb_init(bool cdc_only)
     // Remove MSC interface = reduce total interface + adjust config desc length
     usb_desc_cfg.config.bNumInterfaces--;
     usb_desc_cfg.config.wTotalLength -= sizeof(usb_desc_cfg.msc);
-
-    devid_low++;
   }
 
   // Create Serial string descriptor
   char tmp_serial[17];
-  sprintf(tmp_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], devid_low);
+  sprintf(tmp_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], NRF_FICR->DEVICEID[0]);
 
   for(uint8_t i=0; i<16; i++)
   {
