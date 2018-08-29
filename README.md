@@ -28,7 +28,19 @@ Get the code with following command:
 - DFU using USB Flashing Format a.k.a [UF2](https://github.com/Microsoft/uf2) (Applicatoin only)
 - Auto enter DFU briefly on startup for DTR auto-reset trick (832 only)
 
-## Burn & Upgrade
+## How to use
+
+There are 2 pins **DFU & FRST** that bootloader will check upon reset/power
+
+- `DFU = Low and FRST = High` Enter DFU with UF2 and CDC support
+- `DFU = Low and FRST = Low` Enter DFU with OTA, can be upgraded with mobile application such as Nordic nrfConnect/Toolbox
+- `DFU = High and FRST = Low` Factory Reset mode, erase firmware application and its data
+- `DFU = High and FRST = High` Goto application code if it is present, otherwise enter DFU with UF2
+- Depending on value of the `GPREGRET` register, Bootloader can enter any of above mode (plus a CDC only mode for Arduino). `GPREGRET` is set by application before performing a softreset.
+
+For the exact pin location, please check your board definition for details
+
+## Burn & Upgrade with pre-built binaries
 
 You can burn and/or upgrade bootloader with either jlink or dfu (serial) to a specific pre-built binary version without the hassle to install toolchain and compile the code. This is preferred if you are not developing/customizing the bootloader
 
@@ -40,11 +52,24 @@ To upgrade with dfu serial
 
 	$ make BOARD=feather_nrf52840_express VERSION=6.1.0r0 dfu-flash
 
+You can run following command for the list of pre-builtin binaries
+
+	$ ls bin/*
+	bin/feather_nrf52832:
+	2.0.1  5.0.0  6.1.0r0
+
+	bin/feather_nrf52840_express:
+	6.1.0r0
+
+	bin/pca10056:
+	6.1.0r0
+
+
 Note: bootloader is downgradable, since the binary release is merged of bootloader and Softdevice, you could freely "upgrade" to any version you like.
 
-## Compile
+## Compile with latest codes
 
-Please only continue if you are looking to develop bootloader for your own. Having a jlink to **de-brick** your device is a must.
+You should only continue if you are looking to develop bootloader for your own. Having a jlink to **de-brick** your device is a must.
 
 ### Option 1: Build with makefile
 
