@@ -14,7 +14,10 @@ MEMORY
   FLASH (rx) : ORIGIN = 0x74000, LENGTH = 0xA000 /* 40 KB */
 
   /** RAM Region for bootloader. */
-  RAM (rwx) :  ORIGIN = 0x20003000, LENGTH = 0x20007F80-0x20003000
+  RAM (rwx) :  ORIGIN = 0x20003000, LENGTH = 0x20007F7C-0x20003000
+
+  /* Location for double reset detection, no init */
+  DBL_RESET (rwx) :  ORIGIN = 0x20007F7C, LENGTH = 0x04
 
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
    *  from application to bootloader when using buttonluss DFU OTA. 
@@ -66,6 +69,11 @@ SECTIONS
   {
     KEEP(*(.uicrMbrParamsPageAddress))
   } > UICR_MBR_PARAM_PAGE
+  
+  .dbl_reset(NOLOAD) :
+  {
+
+  } > DBL_RESET  
 
   /* No init RAM section in bootloader. Used for bond information exchange. */
   .noinit(NOLOAD) :

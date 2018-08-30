@@ -17,10 +17,14 @@ MEMORY
   /* Avoid conflict with NOINIT for OTA bond sharing */
   RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20040000-0x20008000
 
+  /* Location for double reset detection, no init */
+  DBL_RESET (rwx) :  ORIGIN = 0x20007F7C, LENGTH = 0x04
+  
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
    *  from application to bootloader when using buttonluss DFU OTA. 
    */
   NOINIT (rwx) :  ORIGIN = 0x20007F80, LENGTH = 0x80
+  
 
   /** Location of bootloader setting in flash. */
   BOOTLOADER_SETTINGS (rw) : ORIGIN = 0x000FF000, LENGTH = 0x1000
@@ -68,11 +72,17 @@ SECTIONS
     KEEP(*(.uicrMbrParamsPageAddress))
   } > UICR_MBR_PARAM_PAGE
 
+  .dbl_reset(NOLOAD) :
+  {
+
+  } > DBL_RESET
+
   /* No init RAM section in bootloader. Used for bond information exchange. */
   .noinit(NOLOAD) :
   {
 
   } > NOINIT
+
   /* other placements follow here... */
 }
 

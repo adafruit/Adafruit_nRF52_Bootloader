@@ -32,6 +32,7 @@ Get the code with following command:
 
 There are 2 pins **DFU & FRST** that bootloader will check upon reset/power
 
+- `Double Reset` Reset twice within 500 ms will enter DFU with UF2 and CDC support (only works with nRF52840)
 - `DFU = Low and FRST = High` Enter DFU with UF2 and CDC support
 - `DFU = Low and FRST = Low` Enter DFU with OTA, can be upgraded with mobile application such as Nordic nrfConnect/Toolbox
 - `DFU = High and FRST = Low` Factory Reset mode, erase firmware application and its data
