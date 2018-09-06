@@ -48,7 +48,7 @@ NRFUTIL = adafruit-nrfutil
 ifneq ($(JLINK),)
 NRFJPROG = nrfjprog -s $(JLINK)
 else
-NRFJPROG = nrfjprog 
+NRFJPROG = nrfjprog
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -62,7 +62,7 @@ MK := mkdir
 RM := rm -rf
 
 ifeq ("$(V)","2")
-QUIET := 
+QUIET :=
 else
 QUIET := @
 endif
@@ -87,7 +87,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
 
-NRF52840_BOARDLIST = pca10056 feather_nrf52840_express
+NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express
 IS_NRF52840 = $(filter $(BOARD),$(NRF52840_BOARDLIST))
 
 ifeq ($(filter $(MAKECMDGOALS),all-board all-release),)
@@ -250,7 +250,7 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 # keep every function in separate section. This will allow linker to dump unused functions
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-CFLAGS += -fno-builtin --short-enums 
+CFLAGS += -fno-builtin --short-enums
 
 # Defined Symbol (MACROS)
 CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
@@ -383,10 +383,10 @@ ifeq ($(VERSION),)
 flash: $(BUILD)/$(OUTPUT_FILENAME).hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
-    
+
 dfu-flash: $(BUILD)/$(MERGED_FNAME).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank	
+	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank
 
 else
 
@@ -400,16 +400,16 @@ endif
 flash:
 	@echo Flashing: $(VERSION_FPATH).hex
 	$(NRFJPROG) --program $(VERSION_FPATH).hex --chiperase -f nrf52 --reset
-	
+
 dfu-flash:
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $(VERSION_FPATH).zip -p $(SERIAL) -b 115200 --singlebank		
-	
+	$(NRFUTIL) --verbose dfu serial --package $(VERSION_FPATH).zip -p $(SERIAL) -b 115200 --singlebank
+
 endif
-	
+
 sd:
 	@echo Flashing: $(SD_HEX)
-	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset	
+	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset
 
 erase:
 	@echo Erasing chip
@@ -423,7 +423,7 @@ $(BUILD):
 
 clean:
 	@$(RM) $(BUILD)
-	
+
 # Create objects from C SRC files
 $(BUILD)/%.o: %.c
 	@echo CC $(notdir $<)
@@ -433,7 +433,7 @@ $(BUILD)/%.o: %.c
 $(BUILD)/%.o: %.S
 	@echo AS $(notdir $<)
 	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
-	
+
 # Link
 $(BUILD)/$(OUTPUT_FILENAME).out: $(BUILD) $(OBJECTS)
 	@echo LD $(OUTPUT_FILENAME).out
@@ -467,7 +467,7 @@ $(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME).hex
 genpkg: $(BUILD)/$(MERGED_FNAME).zip
 
 $(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
-	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@ 
+	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
 
 # Create SD+bootloader combo with hex & dfu package at release folder
 release: combinehex genpkg

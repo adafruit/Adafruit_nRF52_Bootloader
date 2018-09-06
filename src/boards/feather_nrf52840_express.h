@@ -1,6 +1,6 @@
 /**************************************************************************/
 /*!
-    @file     feather52.h
+    @file     feather_nrf52840_express.h
     @author   hathach
 
     @section LICENSE
