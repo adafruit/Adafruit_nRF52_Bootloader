@@ -22,6 +22,8 @@
   #include "boards/feather_nrf52832.h"
 #elif defined BOARD_PCA10056
   #include "boards/pca10056.h"
+#elif defined BOARD_PCA10059
+  #include "boards/pca10059.h"
 #else
   #error No boards defined
 #endif

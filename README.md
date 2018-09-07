@@ -5,6 +5,7 @@ This is a CDC/DFU/UF2 bootloader for Adafruit nRF52 boards and Nordic developmen
 - [Adafruit Feather nRF52832](https://www.adafruit.com/product/3406)
 - Adafruit Feather nRF52840 Express
 - Nordic nRF52840DK PCA10056
+- Nordic nRF52840DK PCA10059 ("Dongle")
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware.
@@ -57,7 +58,11 @@ There are two pins, `DFU` and `FRST` that bootloader will check upon reset/power
 
 On the Nordic PCA10056 DK board, `DFU` is connected to **Button1**, and `FRST` is connected to **Button2**.
 So holding down **Button1** while clicking **RESET** will put the board into USB bootloader mode, with UF2 and CDC support.
-Holding down **Button2** while clicking **RESE**T will put the board into OTA (over-the-air) bootloader mode.
+Holding down **Button2** while clicking **RESET** will put the board into OTA (over-the-air) bootloader mode.
+
+On the Nordic PCA10059 Dongle board, `DFU` is connected to the white button.
+`FRST` is connected to pin 1.10. Ground it to pull `FRST` low, as if you had pushed an `FRST`  button.
+There is an adjacent ground pad.
 
 For other boards, please check the board definition for details.
 
@@ -91,6 +96,9 @@ bin/feather_nrf52840_express
   6.1.0r0
 
 bin/pca10056:
+  6.1.0r0
+
+bin/pca10059:
   6.1.0r0
 ```
 

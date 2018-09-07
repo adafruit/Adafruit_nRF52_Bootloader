@@ -1,6 +1,6 @@
 /**************************************************************************/
 /*!
-    @file     feather52.h
+    @file     feather_nrf52832.h
     @author   hathach
 
     @section LICENSE

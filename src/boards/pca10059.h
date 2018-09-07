@@ -1,13 +1,13 @@
 /**************************************************************************/
 /*!
-    @file     pca10056.h
+    @file     pca10059.h
     @author   hathach
 
     @section LICENSE
 
     Software License Agreement (BSD License)
 
-    Copyright (c) 2017, Adafruit Industries (adafruit.com)
+    Copyright (c) 2018, Adafruit Industries (adafruit.com)
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -34,36 +34,39 @@
 */
 /**************************************************************************/
 
-#ifndef PCA10056_H
-#define PCA10056_H
+#ifndef PCA10059_H
+#define PCA10059_H
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          13
-#define LED_2          14
+// LED_RED
+#define LED_1          6
+// LED_BLUE
+#define LED_2          12
 #define LED_STATE_ON   0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER 2
-#define BUTTON_1       11
-#define BUTTON_2       12
+
+#define BUTTON_1       (1 << 5 | 6)
+#define BUTTON_2       (1 << 5 | 10)
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER  8
-#define TX_PIN_NUMBER  6
-#define CTS_PIN_NUMBER 7
-#define RTS_PIN_NUMBER 5
+#define RX_PIN_NUMBER  20
+#define TX_PIN_NUMBER  17
+#define CTS_PIN_NUMBER 15
+#define RTS_PIN_NUMBER 13
 #define HWFC           false
 
 // Used as model string in OTA mode
 #define DIS_MANUFACTURER  "Nordic"
-#define DIS_MODEL         "PCA10056"
+#define DIS_MODEL         "PCA10059"
 
-#endif // PCA10056_H
+#endif // PCA10059_H
