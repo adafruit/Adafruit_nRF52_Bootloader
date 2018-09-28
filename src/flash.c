@@ -42,16 +42,16 @@
 
 #define FLASH_PAGE_SIZE    4096
 
-#define NO_CACHE 0xffffffff
+#define FLASH_CACHE_INVALID_ADDR 0xffffffff
 
-static uint32_t _fl_addr = NO_CACHE;
+static uint32_t _fl_addr = FLASH_CACHE_INVALID_ADDR;
 static uint8_t _fl_buf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
 static bool _first_flush = true;
 
 
 void flash_flush(void)
 {
-  if ( _fl_addr == NO_CACHE ) return;
+  if ( _fl_addr == FLASH_CACHE_INVALID_ADDR ) return;
 
   if ( _first_flush )
   {
@@ -69,7 +69,7 @@ void flash_flush(void)
     nrf_nvmc_write_words(_fl_addr, (uint32_t *) _fl_buf, FLASH_PAGE_SIZE / sizeof(uint32_t));
   }
 
-  _fl_addr = NO_CACHE;
+  _fl_addr = FLASH_CACHE_INVALID_ADDR;
 }
 
 void flash_write (uint32_t dst, const void *src, int len)
