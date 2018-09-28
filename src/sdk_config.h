@@ -420,53 +420,6 @@
 #define UART1_CONFIG_USE_EASY_DMA 1
 #endif
 
-// </e>
-
-// </e>
-
-
-// <e> WDT_ENABLED - nrf_drv_wdt - WDT peripheral driver
-//==========================================================
-#ifndef WDT_ENABLED
-#define WDT_ENABLED 0
-#endif
-// <o> WDT_CONFIG_BEHAVIOUR  - WDT behavior in CPU SLEEP or HALT mode
- 
-// <1=> Run in SLEEP, Pause in HALT 
-// <8=> Pause in SLEEP, Run in HALT 
-// <9=> Run in SLEEP and HALT 
-// <0=> Pause in SLEEP and HALT 
-
-#ifndef WDT_CONFIG_BEHAVIOUR
-#define WDT_CONFIG_BEHAVIOUR 1
-#endif
-
-// <o> WDT_CONFIG_RELOAD_VALUE - Reload value  <15-4294967295> 
-
-
-#ifndef WDT_CONFIG_RELOAD_VALUE
-#define WDT_CONFIG_RELOAD_VALUE 2000
-#endif
-
-// <o> WDT_CONFIG_IRQ_PRIORITY  - Interrupt priority
- 
-
-// <i> Priorities 0,2 (nRF51) and 0,1,4,5 (nRF52) are reserved for SoftDevice
-// <0=> 0 (highest) 
-// <1=> 1 
-// <2=> 2 
-// <3=> 3 
-// <4=> 4 
-// <5=> 5 
-// <6=> 6 
-// <7=> 7 
-
-#ifndef WDT_CONFIG_IRQ_PRIORITY
-#define WDT_CONFIG_IRQ_PRIORITY 7
-#endif
-
-// </e>
-
 // </h> 
 //==========================================================
 
@@ -623,46 +576,6 @@
 #ifndef HCI_RX_BUF_QUEUE_SIZE
 #define HCI_RX_BUF_QUEUE_SIZE 4
 #endif
-
-// </e>
-
-// <e> NRF_FSTORAGE_ENABLED - nrf_fstorage - Flash abstraction library
-//==========================================================
-#ifndef NRF_FSTORAGE_ENABLED
-#define NRF_FSTORAGE_ENABLED 1
-#endif
-// <h> nrf_fstorage_sd - Implementation using the SoftDevice.
-
-// <i> Configuration options for the fstorage implementation using the SoftDevice.
-//==========================================================
-// <o> NRF_FSTORAGE_SD_QUEUE_SIZE - Size of the internal queue of operations. 
-// <i> Increase this value if API calls frequently return the error @ref NRF_ERROR_NO_MEM.
-
-#ifndef NRF_FSTORAGE_SD_QUEUE_SIZE
-#define NRF_FSTORAGE_SD_QUEUE_SIZE 8
-#endif
-
-// <o> NRF_FSTORAGE_SD_MAX_RETRIES - Maximum number of attempts at executing an operation when the SoftDevice is busy. 
-// <i> Increase this value if events frequently return the @ref NRF_ERROR_TIMEOUT error.
-// <i> The SoftDevice might fail to schedule flash access due to high BLE activity.
-
-#ifndef NRF_FSTORAGE_SD_MAX_RETRIES
-#define NRF_FSTORAGE_SD_MAX_RETRIES 8
-#endif
-
-// <o> NRF_FSTORAGE_SD_MAX_WRITE_SIZE - Maximum number of bytes to be written to flash in a single operation. 
-// <i> This value must be a multiple of four.
-// <i> Lowering this value can increase the chances of the SoftDevice being able to execute flash operations in between radio activity.
-// <i> This value is bound by the maximum number of bytes that can be written to flash in a single call to @ref sd_flash_write.
-// <i> That is 1024 bytes for nRF51 ICs and 4096 bytes for nRF52 ICs.
-
-#ifndef NRF_FSTORAGE_SD_MAX_WRITE_SIZE
-#define NRF_FSTORAGE_SD_MAX_WRITE_SIZE 20
-#endif
-
-// </h> 
-//==========================================================
-
 
 // <q> NRF_STRERROR_ENABLED  - nrf_strerror - Library for converting error code to string.
 #ifndef NRF_STRERROR_ENABLED

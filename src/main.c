@@ -199,10 +199,8 @@ int main(void)
      */
     bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL);
 #else
-    led_on(LED_RED); // turn on LED to signal user
     // if RST is pressed during this delay --> if will enter dfu
     NRFX_DELAY_MS(DFU_DBL_RESET_DELAY);
-    led_off(LED_RED);
 #endif
   }
 
@@ -373,7 +371,7 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
   NVIC_SystemReset();
 }
 
-void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
+void assert_nrf_callback (uint16_t line_num, uint8_t const * p_file_name)
 {
   app_error_fault_handler(0xDEADBEEF, 0, 0);
 }
