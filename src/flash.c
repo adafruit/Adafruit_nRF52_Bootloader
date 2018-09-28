@@ -46,22 +46,10 @@
 
 static uint32_t _fl_addr = FLASH_CACHE_INVALID_ADDR;
 static uint8_t _fl_buf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
-static bool _first_flush = true;
-
 
 void flash_flush(void)
 {
   if ( _fl_addr == FLASH_CACHE_INVALID_ADDR ) return;
-
-  if ( _first_flush )
-  {
-    _first_flush = false;
-
-    // disable softdevice
-    sd_softdevice_disable();
-
-    led_blink_fast(true);
-  }
 
   if ( memcmp(_fl_buf, (void *) _fl_addr, FLASH_PAGE_SIZE) != 0 )
   {
@@ -72,7 +60,7 @@ void flash_flush(void)
   _fl_addr = FLASH_CACHE_INVALID_ADDR;
 }
 
-void flash_write (uint32_t dst, const void *src, int len)
+void flash_write (uint32_t dst, void const *src, int len)
 {
   uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
 
