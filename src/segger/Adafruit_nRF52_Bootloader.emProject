@@ -18,7 +18,7 @@
       arm_target_debug_interface_type="ADIv5"
       arm_target_device_name="nRF52840_xxAA"
       arm_target_interface_type="SWD"
-      c_preprocessor_definitions="NRF52840_XXAA;__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;BOARD_PCA10056;MK_BOOTLOADER_VERSION=0x06000000;MK_DIS_FIRMWARE=&quot;s140 6.0.0 r0&quot;;S140;CONFIG_GPIO_AS_PINRESET;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD;CFG_TUSB_DEBUG=2"
+      c_preprocessor_definitions="__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;MK_BOOTLOADER_VERSION=0x06010000;CONFIG_GPIO_AS_PINRESET;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD;CFG_TUSB_DEBUG=2"
       c_user_include_directories="../;../usb;../cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(sdDir)/include;$(sdDir)/include/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
       debug_register_definition_file="$(ProjectDir)/nrf52840_Registers.xml"
       debug_target_connection="J-Link"
@@ -50,7 +50,6 @@
     <folder Name="src">
       <file file_name="../boards.h" />
       <file file_name="../dfu_ble_svc.c" />
-      <file file_name="../feather52840.h" />
       <file file_name="../main.c" />
       <file file_name="../metro52.h" />
       <file file_name="../pstorage_platform.h" />
@@ -66,6 +65,7 @@
         <file file_name="../usb/usb.c" />
         <file file_name="../usb/usb_desc.c" />
         <file file_name="../usb/usb_desc.h" />
+        <configuration Name="Feather52832" build_exclude_from_build="Yes" />
       </folder>
       <folder Name="cmsis">
         <folder Name="include">
@@ -88,9 +88,10 @@
         </folder>
       </folder>
       <folder Name="boards">
-        <file file_name="../boards/feather52832.h" />
-        <file file_name="../boards/feather52840.h" />
         <file file_name="../boards/pca10056.h" />
+        <file file_name="../boards/feather_nrf52832.h" />
+        <file file_name="../boards/feather_nrf52840_express.h" />
+        <file file_name="../boards/pca10059.h" />
       </folder>
       <file file_name="../dfu_init.c" />
       <file file_name="../flash.c" />
@@ -226,6 +227,7 @@
             </folder>
           </folder>
         </folder>
+        <configuration Name="Feather52832" build_exclude_from_build="Yes" />
       </folder>
       <folder Name="softdevice">
         <folder Name="s140_nrf52_6.1.0">
@@ -355,6 +357,9 @@
             <configuration
               Name="Feather52840 Size++"
               build_exclude_from_build="No" />
+            <configuration
+              Name="Feather52832"
+              build_exclude_from_build="Yes" />
           </file>
           <file file_name="../../lib/nrfx/mdk/ses_startup_nrf_common.s">
             <configuration
@@ -371,7 +376,11 @@
               build_exclude_from_build="Yes" />
           </file>
           <file file_name="../../lib/nrfx/mdk/system_nrf52.h" />
-          <file file_name="../../lib/nrfx/mdk/system_nrf52840.c" />
+          <file file_name="../../lib/nrfx/mdk/system_nrf52840.c">
+            <configuration
+              Name="Feather52832"
+              build_exclude_from_build="Yes" />
+          </file>
           <file file_name="../../lib/nrfx/mdk/system_nrf52840.h" />
         </folder>
         <folder Name="soc">
@@ -384,9 +393,16 @@
         </folder>
       </folder>
     </folder>
+    <configuration
+      Name="Feather52840"
+      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.0 r0&quot;;S140;BOARD_PCA10056" />
+    <configuration
+      Name="Feather52832"
+      c_preprocessor_definitions="NRF52832_XXAA;MK_DIS_FIRMWARE=&quot;s132 6.1.0 r0&quot;;S132;BOARD_FEATHER_NRF52832" />
   </project>
   <configuration
     Name="Feather52840"
     build_treat_warnings_as_errors="Yes"
     c_preprocessor_definitions="DEBUG_SIZE_EXPAND" />
+  <configuration Name="Feather52832" />
 </solution>
