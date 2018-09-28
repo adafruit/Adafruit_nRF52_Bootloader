@@ -46,6 +46,7 @@
       <file file_name="thumb_crt0.s" />
       <file file_name="flash_placement.xml" />
       <file file_name="nRF52840_xxAA_MemoryMap.xml" />
+      <file file_name="nRF52832_xxAA_MemoryMap.xml" />
     </folder>
     <folder Name="src">
       <file file_name="../boards.h" />
@@ -395,10 +396,12 @@
     </folder>
     <configuration
       Name="Feather52840"
-      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.0 r0&quot;;S140;BOARD_PCA10056" />
+      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.0 r0&quot;;S140;BOARD_PCA10056"
+      linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
     <configuration
       Name="Feather52832"
-      c_preprocessor_definitions="NRF52832_XXAA;MK_DIS_FIRMWARE=&quot;s132 6.1.0 r0&quot;;S132;BOARD_FEATHER_NRF52832" />
+      c_preprocessor_definitions="NRF52832_XXAA;MK_DIS_FIRMWARE=&quot;s132 6.1.0 r0&quot;;S132;BOARD_FEATHER_NRF52832"
+      linker_memory_map_file="nRF52832_xxAA_MemoryMap.xml" />
   </project>
   <configuration
     Name="Feather52840"
