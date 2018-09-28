@@ -1,6 +1,6 @@
 
 #include "uf2.h"
-#include "flash.h"
+#include "flash_nrf5x.h"
 #include <string.h>
 
 #include "boards.h"

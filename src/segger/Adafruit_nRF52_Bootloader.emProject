@@ -95,8 +95,9 @@
         <file file_name="../boards/pca10059.h" />
       </folder>
       <file file_name="../dfu_init.c" />
-      <file file_name="../flash.c" />
       <file file_name="../boards.c" />
+      <file file_name="../flash_nrf5x.h" />
+      <file file_name="../flash_nrf5x.c" />
     </folder>
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration
