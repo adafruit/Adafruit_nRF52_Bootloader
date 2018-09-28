@@ -185,8 +185,8 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
   }
   else
   {
-    flash_write(BOOTLOADER_SETTINGS_ADDRESS, p_settings, sizeof(bootloader_settings_t));
-    flash_flush();
+    flash_nrf5x_write(BOOTLOADER_SETTINGS_ADDRESS, p_settings, sizeof(bootloader_settings_t));
+    flash_nrf5x_flush();
 
     pstorage_callback_handler(&m_bootsettings_handle, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_settings, sizeof(bootloader_settings_t));
   }

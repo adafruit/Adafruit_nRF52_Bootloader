@@ -47,7 +47,7 @@
 static uint32_t _fl_addr = FLASH_CACHE_INVALID_ADDR;
 static uint8_t _fl_buf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
 
-void flash_flush(void)
+void flash_nrf5x_flush(void)
 {
   if ( _fl_addr == FLASH_CACHE_INVALID_ADDR ) return;
 
@@ -64,20 +64,20 @@ void flash_flush(void)
   _fl_addr = FLASH_CACHE_INVALID_ADDR;
 }
 
-void flash_write (uint32_t dst, void const *src, int len)
+void flash_nrf5x_write (uint32_t dst, void const *src, int len)
 {
   uint32_t newAddr = dst & ~(FLASH_PAGE_SIZE - 1);
 
   if ( newAddr != _fl_addr )
   {
-    flash_flush();
+    flash_nrf5x_flush();
     _fl_addr = newAddr;
     memcpy(_fl_buf, (void *) newAddr, FLASH_PAGE_SIZE);
   }
   memcpy(_fl_buf + (dst & (FLASH_PAGE_SIZE - 1)), src, len);
 }
 
-void flash_erase(uint32_t addr, uint32_t bytes)
+void flash_nrf5x_erase(uint32_t addr, uint32_t bytes)
 {
   uint32_t page_count = bytes/FLASH_PAGE_SIZE;
   if ( bytes%FLASH_PAGE_SIZE ) page_count++;

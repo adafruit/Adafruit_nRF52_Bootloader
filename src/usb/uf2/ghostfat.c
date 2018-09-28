@@ -287,7 +287,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
           led_blink_fast(true);
         }
     
-        flash_write(bl->targetAddr, bl->data, bl->payloadSize);
+        flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize);
     }
 
     if (state && bl->numBlocks) {
@@ -307,7 +307,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
             }
             if (state->numWritten >= state->numBlocks) {
                 // flush last blocks
-                flash_flush();
+                flash_nrf5x_flush();
 
                 uf2_write_complete(state->numBlocks);
             }

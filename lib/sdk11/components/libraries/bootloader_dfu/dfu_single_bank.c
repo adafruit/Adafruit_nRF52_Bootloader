@@ -146,7 +146,13 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
   }
   else
   {
-    flash_erase(DFU_BANK_0_REGION_START, m_image_size);
+    uint32_t page_count = m_image_size/CODE_PAGE_SIZE;
+    if ( m_image_size%CODE_PAGE_SIZE ) page_count++;
+
+    for(uint32_t i=0; i<page_count; i++)
+    {
+      nrf_nvmc_page_erase(DFU_BANK_0_REGION_START + i*CODE_PAGE_SIZE);
+    }
 
     // simulate complete call
     pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
@@ -427,9 +433,8 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-              flash_write(DFU_BANK_0_REGION_START+m_data_received, p_data, data_length);
-
-              // Adafruit: transport serial, no need to call pstorage complete
+              flash_nrf5x_write(DFU_BANK_0_REGION_START+m_data_received, p_data, data_length);
+              pstorage_callback_handler(mp_storage_handle_active, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_data, data_length);
             }
 
             m_data_received += data_length;
@@ -441,7 +446,7 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-              if ( !is_ota() ) flash_flush();
+              if ( !is_ota() ) flash_nrf5x_flush();
 
               // The entire image has been received. Return NRF_SUCCESS.
               err_code = NRF_SUCCESS;

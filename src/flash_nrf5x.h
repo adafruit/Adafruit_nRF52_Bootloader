@@ -47,8 +47,8 @@
 #endif
 
 //void flash_erase(uint32_t page_addr);
-void flash_write (uint32_t dst, void const *src, int len);
-void flash_flush(void);
+void flash_nrf5x_write (uint32_t dst, void const *src, int len);
+void flash_nrf5x_flush(void);
 
 #ifdef __cplusplus
  }
