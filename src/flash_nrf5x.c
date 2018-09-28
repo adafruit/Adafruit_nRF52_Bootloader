@@ -53,12 +53,8 @@ void flash_nrf5x_flush(void)
 
   if ( memcmp(_fl_buf, (void *) _fl_addr, FLASH_PAGE_SIZE) != 0 )
   {
-    nrf_nvmc_page_erase(_fl_addr);    // FIXME nrf_nvmc causes timeout upload large file sd_flash_page_erase does not
-//    sd_flash_page_erase(_fl_addr / FLASH_PAGE_SIZE);
-
+    nrf_nvmc_page_erase(_fl_addr);
     nrf_nvmc_write_words(_fl_addr, (uint32_t *) _fl_buf, FLASH_PAGE_SIZE / 4);
-//    sd_flash_write((uint32_t*) _fl_addr, (uint32_t *) _fl_buf, FLASH_PAGE_SIZE/4);
-
   }
 
   _fl_addr = FLASH_CACHE_INVALID_ADDR;
@@ -77,13 +73,3 @@ void flash_nrf5x_write (uint32_t dst, void const *src, int len)
   memcpy(_fl_buf + (dst & (FLASH_PAGE_SIZE - 1)), src, len);
 }
 
-void flash_nrf5x_erase(uint32_t addr, uint32_t bytes)
-{
-  uint32_t page_count = bytes/FLASH_PAGE_SIZE;
-  if ( bytes%FLASH_PAGE_SIZE ) page_count++;
-
-  for(uint32_t i=0; i<page_count; i++)
-  {
-    nrf_nvmc_page_erase(addr + i*FLASH_PAGE_SIZE);
-  }
-}
