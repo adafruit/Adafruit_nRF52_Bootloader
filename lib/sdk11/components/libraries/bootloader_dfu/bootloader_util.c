@@ -65,6 +65,7 @@ isr_abort
     ALIGN
 }
 #elif defined ( __GNUC__ )
+static inline void bootloader_util_reset (uint32_t start_addr) __attribute__ ((optimize("-fomit-frame-pointer")));
 static inline void bootloader_util_reset(uint32_t start_addr)
 {
     __asm volatile(
