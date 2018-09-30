@@ -111,7 +111,7 @@ void usb_teardown(void);
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 // Adafruit for factory reset
-#define APPDATA_ADDR_START                  (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
+#define APPDATA_ADDR_START              (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
 
 #ifdef NRF52840_XXAA
 STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
@@ -180,7 +180,6 @@ int main(void)
 
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
-
 
   bool const valid_app = bootloader_app_is_valid(DFU_BANK_0_REGION_START);
 

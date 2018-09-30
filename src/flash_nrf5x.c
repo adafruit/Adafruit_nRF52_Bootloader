@@ -40,9 +40,8 @@
 
 #include "nrf_sdm.h"
 
-#define FLASH_PAGE_SIZE    4096
-
-#define FLASH_CACHE_INVALID_ADDR 0xffffffff
+#define FLASH_PAGE_SIZE           4096
+#define FLASH_CACHE_INVALID_ADDR  0xffffffff
 
 static uint32_t _fl_addr = FLASH_CACHE_INVALID_ADDR;
 static uint8_t _fl_buf[FLASH_PAGE_SIZE] __attribute__((aligned(4)));
