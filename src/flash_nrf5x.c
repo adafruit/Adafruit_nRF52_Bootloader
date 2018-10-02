@@ -35,10 +35,9 @@
 /**************************************************************************/
 
 #include <string.h>
+#include "nrf_sdm.h"
 #include "flash_nrf5x.h"
 #include "boards.h"
-
-#include "nrf_sdm.h"
 
 #define FLASH_PAGE_SIZE           4096
 #define FLASH_CACHE_INVALID_ADDR  0xffffffff
@@ -52,7 +51,14 @@ void flash_nrf5x_flush(void)
 
   if ( memcmp(_fl_buf, (void *) _fl_addr, FLASH_PAGE_SIZE) != 0 )
   {
+#ifdef NRF52840_XXAA
+    // - nRF52832 dfu via uart can miss incoming byte when erasing because cpu is blocked for > 2ms.
+    // Since dfu_prepare_func_app_erase() already erase the page for us, we can skip it here.
+    //
+    // - nRF52840 dfu serial/uf2 are USB-based which are DMA and should have no problems. Note MSC uf2
+    // does not erase page in advance like dfu serial
     nrf_nvmc_page_erase(_fl_addr);
+#endif
     nrf_nvmc_write_words(_fl_addr, (uint32_t *) _fl_buf, FLASH_PAGE_SIZE / 4);
   }
 

@@ -141,7 +141,7 @@ static void wait_for_events(void)
 
 bool bootloader_app_is_valid(uint32_t app_addr)
 {
-    const bootloader_settings_t * p_bootloader_settings;
+  bootloader_settings_t const * p_bootloader_settings;
 
     // There exists an application in CODE region 1.
     if (*((uint32_t *)app_addr) == EMPTY_FLASH_MASK)
@@ -185,8 +185,8 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
   }
   else
   {
-    flash_nrf5x_write(BOOTLOADER_SETTINGS_ADDRESS, p_settings, sizeof(bootloader_settings_t));
-    flash_nrf5x_flush();
+    nrf_nvmc_page_erase(BOOTLOADER_SETTINGS_ADDRESS);
+    nrf_nvmc_write_words(BOOTLOADER_SETTINGS_ADDRESS, (uint32_t *) p_settings, sizeof(bootloader_settings_t) / 4);
 
     pstorage_callback_handler(&m_bootsettings_handle, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_settings, sizeof(bootloader_settings_t));
   }
@@ -195,8 +195,8 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
 
 void bootloader_dfu_update_process(dfu_update_status_t update_status)
 {
-    static bootloader_settings_t  settings;
-    const bootloader_settings_t * p_bootloader_settings;
+  __attribute__((aligned(4)))  static bootloader_settings_t settings;
+  bootloader_settings_t const * p_bootloader_settings;
 
     bootloader_util_settings_get(&p_bootloader_settings);
 
@@ -391,7 +391,7 @@ void bootloader_app_start(uint32_t app_addr)
 
 bool bootloader_dfu_sd_in_progress(void)
 {
-    const bootloader_settings_t * p_bootloader_settings;
+  bootloader_settings_t const * p_bootloader_settings;
 
     bootloader_util_settings_get(&p_bootloader_settings);
 
@@ -446,7 +446,7 @@ uint32_t bootloader_dfu_sd_update_finalize(void)
 
 void bootloader_settings_get(bootloader_settings_t * const p_settings)
 {
-    const bootloader_settings_t *  p_bootloader_settings;
+  bootloader_settings_t const * p_bootloader_settings;
 
     bootloader_util_settings_get(&p_bootloader_settings);
 
