@@ -90,10 +90,11 @@ BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))
 NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express
 IS_NRF52840 = $(filter $(BOARD),$(NRF52840_BOARDLIST))
 
-ifeq ($(filter $(MAKECMDGOALS),all-board all-release),)
+ifeq ($(filter $(MAKECMDGOALS),all-board all-release help),)
   ifeq ($(BOARD),)
     $(info You must provide a BOARD parameter with 'BOARD=')
     $(info Supported boards are: $(BOARD_LIST))
+    $(info Run 'make help' for usage)
     $(error BOARD not defined)
   else
     ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
@@ -368,6 +369,19 @@ all-board:
 
 all-release:
 	$(call _make_all_board,clean all release)
+	
+help:
+	@echo To flash a pre-built binary with a specific version to a board
+	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.0r0 flash
+	@echo
+	@echo To compile and build the current code for a board
+	@echo $$ make BOARD=feather_nrf52840_express all
+	@echo
+	@echo To flash current code using jlink
+	@echo $$ make BOARD=feather_nrf52840_express flash
+	@echo
+	@echo To flash current code using existing bootloader dfu
+	@echo $$ make BOARD=feather_nrf52840_express dfu-flash
 
 #******************* Flash target *******************
 
