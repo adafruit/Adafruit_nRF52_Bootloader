@@ -170,8 +170,12 @@ int main(void)
   // When updating SoftDevice, bootloader will reset before swapping SD
   if (bootloader_dfu_sd_in_progress())
   {
+    led_blink_fast(true);
+
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
+
+    led_blink_fast(false);
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/

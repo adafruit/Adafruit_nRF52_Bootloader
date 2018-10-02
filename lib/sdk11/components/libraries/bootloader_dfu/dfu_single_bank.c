@@ -433,7 +433,7 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-              flash_nrf5x_write(DFU_BANK_0_REGION_START+m_data_received, p_data, data_length);
+              flash_nrf5x_write(DFU_BANK_0_REGION_START + m_data_received, p_data, data_length, false);
               pstorage_callback_handler(mp_storage_handle_active, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_data, data_length);
             }
 
@@ -446,7 +446,7 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-              if ( !is_ota() ) flash_nrf5x_flush();
+              if ( !is_ota() ) flash_nrf5x_flush(false);
 
               // The entire image has been received. Return NRF_SUCCESS.
               err_code = NRF_SUCCESS;

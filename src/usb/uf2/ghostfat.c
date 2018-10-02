@@ -51,8 +51,8 @@ typedef struct {
 STATIC_ASSERT(sizeof(DirEntry) == 32);
 
 struct TextFile {
-    const char name[11];
-    const char *content;
+  char const name[11];
+  char const *content;
 };
 
 #define NUM_FAT_BLOCKS UF2_NUM_BLOCKS
@@ -76,7 +76,7 @@ const char indexFile[] = //
     "</body>"
     "</html>\n";
 
-static const struct TextFile info[] = {
+static struct TextFile const info[] = {
     {.name = "INFO_UF2TXT", .content = infoUf2File},
     {.name = "INDEX   HTM", .content = indexFile},
     {.name = "CURRENT UF2"},
@@ -97,7 +97,7 @@ static const struct TextFile info[] = {
 #define START_ROOTDIR      (START_FAT1 + SECTORS_PER_FAT)
 #define START_CLUSTERS     (START_ROOTDIR + ROOT_DIR_SECTORS)
 
-static const FAT_BootBlock BootBlock = {
+static FAT_BootBlock const BootBlock = {
     .JumpInstruction      = {0xeb, 0x3c, 0x90},
     .OEMInfo              = "UF2 UF2 ",
     .SectorSize           = 512,
@@ -133,7 +133,7 @@ static uint32_t get_flash_size(void)
       flash_sz = 256;
     }else
     {
-      const bootloader_settings_t * boot_setting;
+      bootloader_settings_t const * boot_setting;
       bootloader_util_settings_get(&boot_setting);
 
       // if bank0 size is not valid, happens when flashed with jlink
@@ -150,7 +150,8 @@ static uint32_t get_flash_size(void)
   return flash_sz;
 }
 
-void padded_memcpy(char *dst, const char *src, int len) {
+void padded_memcpy (char *dst, char const *src, int len)
+{
     for (int i = 0; i < len; ++i) {
         if (*src)
             *dst = *src++;
@@ -193,11 +194,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
         sectionIdx -= START_ROOTDIR;
         if (sectionIdx == 0) {
             DirEntry *d = (void *)data;
-            padded_memcpy(d->name, (const char *)BootBlock.VolumeLabel, 11);
+            padded_memcpy(d->name, (char const *) BootBlock.VolumeLabel, 11);
             d->attrs = 0x28;
             for (int i = 0; i < NUM_INFO; ++i) {
                 d++;
-                const struct TextFile *inf = &info[i];
+                struct TextFile const *inf = &info[i];
                 d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
                 d->startCluster = i + 2;
                 padded_memcpy(d->name, inf->name, 11);
@@ -287,7 +288,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
           led_blink_fast(true);
         }
     
-        flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize);
+        flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
     }
 
     if (state && bl->numBlocks) {
@@ -307,7 +308,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
             }
             if (state->numWritten >= state->numBlocks) {
                 // flush last blocks
-                flash_nrf5x_flush();
+                flash_nrf5x_flush(true);
 
                 uf2_write_complete(state->numBlocks);
             }
