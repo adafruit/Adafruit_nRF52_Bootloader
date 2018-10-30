@@ -298,20 +298,13 @@ static uint32_t softdev_init(bool init_softdevice)
   // map vector table to bootloader address
   APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
 
-  // Enable Softdevice
+  // Enable Softdevice, Use Internal OSC to compatible with all boards
   nrf_clock_lf_cfg_t clock_cfg =
   {
-#if defined(NRF52840_XXAA) // TODO use xtal source for feather52832
-      .source       = NRF_CLOCK_LF_SRC_XTAL,
-      .rc_ctiv      = 0,
-      .rc_temp_ctiv = 0,
-      .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
-#else
       .source       = NRF_CLOCK_LF_SRC_RC,
       .rc_ctiv      = 16,
       .rc_temp_ctiv = 2,
-      .accuracy     = NRF_CLOCK_LF_ACCURACY_20_PPM
-#endif
+      .accuracy     = NRF_CLOCK_LF_ACCURACY_250_PPM
   };
 
   APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler) );

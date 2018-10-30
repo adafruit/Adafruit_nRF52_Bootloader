@@ -61,7 +61,8 @@ uint16_t _pwm_blue_seq[PWM_CHANNEL_NUM] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
 
 void board_init(void)
 {
-  NRF_CLOCK->LFCLKSRC = (uint32_t)((CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos) & CLOCK_LFCLKSRC_SRC_Msk);
+  // Use Internal OSC to compatible with all boards
+  NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
   // stop WDT if started by application, when jumping from application using BLE DFU
@@ -106,14 +107,15 @@ void board_teardown(void)
   NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
   NRF_RTC1->TASKS_STOP  = 1;
   NRF_RTC1->TASKS_CLEAR = 1;
+
+  // Stop LF clock
+  NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
 }
 
 uint32_t tusb_hal_millis(void)
 {
   return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
 }
-
-
 
 void led_pwm_init(uint32_t led_pin)
 {
