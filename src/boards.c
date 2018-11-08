@@ -61,6 +61,9 @@ uint16_t _pwm_blue_seq[PWM_CHANNEL_NUM] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
 
 void board_init(void)
 {
+  // stop LF clock just in case we jump from application without reset
+  NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
+
   // Use Internal OSC to compatible with all boards
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
