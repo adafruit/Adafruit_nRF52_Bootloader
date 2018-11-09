@@ -19,7 +19,7 @@ NRFX_PATH				= lib/nrfx
 
 SD_VER1         = 6
 SD_VER2         = 1
-SD_VER3         = 0
+SD_VER3         = 1
 SD_VER4         = 0
 
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
