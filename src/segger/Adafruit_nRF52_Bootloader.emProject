@@ -25,7 +25,7 @@
       gcc_entry_point="Reset_Handler"
       linker_memory_map_file="$(ProjectDir)/nRF52840_xxAA_MemoryMap.xml"
       linker_section_placement_file="$(ProjectDir)/flash_placement.xml"
-      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;sdkDir=../../lib/sdk/components;sdk11Dir=../../lib/sdk11/components;sdDir=../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API;tusbDir=../../lib/tinyusb/src;nrfxDir=../../lib/nrfx"
+      macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;sdkDir=../../lib/sdk/components;sdk11Dir=../../lib/sdk11/components;sdDir=../../lib/softdevice/s140_nrf52_6.1.1/s140_nrf52_6.1.1_API;tusbDir=../../lib/tinyusb/src;nrfxDir=../../lib/nrfx"
       project_directory=""
       project_type="Executable"
       target_reset_script="Reset();"
@@ -231,34 +231,6 @@
         </folder>
         <configuration Name="Feather52832" build_exclude_from_build="Yes" />
       </folder>
-      <folder Name="softdevice">
-        <folder Name="s140_nrf52_6.1.0">
-          <folder Name="s140_nrf52_6.1.0_API">
-            <folder Name="include">
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_err.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gap.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gatt.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gattc.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_gatts.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_hci.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_l2cap.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_ranges.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/ble_types.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_error.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_error_sdm.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_error_soc.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_nvic.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_sdm.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_soc.h" />
-              <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf_svc.h" />
-              <folder Name="nrf52">
-                <file file_name="../../lib/softdevice/s140_nrf52_6.1.0/s140_nrf52_6.1.0_API/include/nrf52/nrf_mbr.h" />
-              </folder>
-            </folder>
-          </folder>
-        </folder>
-      </folder>
       <folder Name="nrfx">
         <file file_name="../../lib/nrfx/nrfx.h" />
         <folder Name="drivers">
@@ -397,11 +369,11 @@
     </folder>
     <configuration
       Name="Feather52840"
-      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.0 r0&quot;;S140;BOARD_PCA10056"
+      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.1 r0&quot;;S140;BOARD_PCA10056"
       linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
     <configuration
       Name="Feather52832"
-      c_preprocessor_definitions="NRF52832_XXAA;MK_DIS_FIRMWARE=&quot;s132 6.1.0 r0&quot;;S132;BOARD_FEATHER_NRF52832"
+      c_preprocessor_definitions="NRF52832_XXAA;MK_DIS_FIRMWARE=&quot;s132 6.1.1 r0&quot;;S132;BOARD_FEATHER_NRF52832"
       linker_memory_map_file="nRF52832_xxAA_MemoryMap.xml" />
   </project>
   <configuration

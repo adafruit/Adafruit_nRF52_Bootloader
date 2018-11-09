@@ -72,16 +72,16 @@ You can burn and/or upgrade the bootloader with either a J-link or DFU (serial) 
 without the hassle of installing a toolchain and compiling the code.
 This is preferred if you are not developing/customizing the bootloader.
 
-To flash version `6.1.0r0` using J-Link:
+To flash version `6.1.1r0` using J-Link:
 
 ```
-make BOARD=feather_nrf52840_express VERSION=6.1.0r0 flash
+make BOARD=feather_nrf52840_express VERSION=6.1.1r0 flash
 ```
 
 To upgrade with dfu serial
 
 ```
-make BOARD=feather_nrf52840_express VERSION=6.1.0r0 dfu-flash
+make BOARD=feather_nrf52840_express VERSION=6.1.1r0 dfu-flash
 ```
 
 Pre-builtin binaries are in the `bin` directory:

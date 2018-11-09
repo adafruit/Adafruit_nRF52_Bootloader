@@ -372,10 +372,10 @@ all-release:
 	
 help:
 	@echo To flash (with jlink) a pre-built binary with a specific version to a board
-	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.0r0 flash
+	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.1r0 flash
 	@echo
 	@echo To flash (with dfu) a pre-built binary with a specific version to a board
-	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.0r0 SERIAL=/dev/ttyACM0 dfu0-flash
+	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.1r0 SERIAL=/dev/ttyACM0 dfu0-flash
 	@echo
 	@echo To compile and build the current code for a board
 	@echo $$ make BOARD=feather_nrf52840_express all
