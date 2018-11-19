@@ -68,12 +68,6 @@ void board_init(void)
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
-  // stop WDT if started by application, when jumping from application using BLE DFU
-  if ( NRF_WDT->RUNSTATUS )
-  {
-    NRF_WDT->TASKS_START = 0;
-  }
-
   button_init(BUTTON_DFU);
   button_init(BUTTON_FRESET);
   NRFX_DELAY_US(100); // wait for the pin state is stable
