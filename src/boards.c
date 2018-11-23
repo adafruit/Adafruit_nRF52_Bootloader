@@ -87,7 +87,7 @@ void board_init(void)
   extern void neopixel_init(void);
   neopixel_init();
 
-  uint8_t grb[3] = { 0, 255, 0 };
+  uint8_t grb[3] = { 0, 32, 0 };
   neopixel_write(grb);
 #endif
 
@@ -256,6 +256,11 @@ void neopixel_init(void)
 
 void neopixel_teardown(void)
 {
+  uint8_t grb[3] = { 0, 0, 0 };
+  neopixel_write(grb);
+
+  NRFX_DELAY_US(100);
+
   pwm_teardown(NRF_PWM2);
 }
 
