@@ -46,6 +46,8 @@
 #include "tusb.h"
 #include "usb_desc.h"
 
+#include "boards.h"
+
 //--------------------------------------------------------------------+
 // MACRO TYPEDEF CONSTANT ENUM DECLARATION
 //--------------------------------------------------------------------+
@@ -155,11 +157,17 @@ void usb_teardown(void)
 //--------------------------------------------------------------------+
 void tud_mount_cb(void)
 {
-
+#ifdef LED_NEOPIXEL
+  uint8_t grb[] = { 255, 0, 0 };
+  neopixel_write(grb);
+#endif
 }
 
 void tud_umount_cb(void)
 {
-
+#ifdef LED_NEOPIXEL
+  uint8_t grb[] = { 0, 255, 0 };
+  neopixel_write(grb);
+#endif
 }
 

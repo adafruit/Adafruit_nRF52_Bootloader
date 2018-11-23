@@ -14,6 +14,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include "nrf_gpio.h"
 
 #if defined BOARD_FEATHER_NRF52840_EXPRESS
@@ -70,6 +71,10 @@ void led_pwm_disable(uint32_t led_pin);
 void led_pwm_enable(uint32_t led_pin);
 
 void led_red_blink_fast(bool enable);
+
+#ifdef LED_NEOPIXEL
+  void neopixel_write(uint8_t *pixels);
+#endif
 
 //--------------------------------------------------------------------+
 // BUTTONS
