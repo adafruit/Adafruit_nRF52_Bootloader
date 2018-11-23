@@ -213,6 +213,7 @@
             <file file_name="../../lib/tinyusb/src/device/usbd.c" />
             <file file_name="../../lib/tinyusb/src/device/usbd.h" />
             <file file_name="../../lib/tinyusb/src/device/usbd_pvt.h" />
+            <file file_name="../../lib/tinyusb/src/device/usbd_control.c" />
           </folder>
           <folder Name="osal">
             <file file_name="../../lib/tinyusb/src/osal/osal.c" />

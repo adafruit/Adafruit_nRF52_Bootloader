@@ -87,7 +87,7 @@ void board_init(void)
   extern void neopixel_init(void);
   neopixel_init();
 
-  uint8_t grb[] = { 0, 255, 0 };
+  uint8_t grb[3] = { 0, 255, 0 };
   neopixel_write(grb);
 #endif
 
@@ -148,25 +148,28 @@ void pwm_teardown(NRF_PWM_Type* pwm )
 
 void led_pwm_init(uint32_t led_pin)
 {
-  pwm_teardown ((led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1);
+  NRF_PWM_Type* pwm    = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+
+  pwm->MODE            = PWM_MODE_UPDOWN_UpAndDown;
+  pwm->COUNTERTOP      = PWM_MAXCOUNT;
+  pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_128;
+  pwm->DECODER         = PWM_DECODER_LOAD_Individual;
+  pwm->LOOP            = 0;
+
+  pwm->SEQ[0].PTR      = (uint32_t) (led_pin == LED_RED ? _pwm_red_seq : _pwm_blue_seq);
+  pwm->SEQ[0].CNT      = PWM_CHANNEL_NUM; // default mode is Individual --> count must be 4
+  pwm->SEQ[0].REFRESH  = 0;
+  pwm->SEQ[0].ENDDELAY = 0;
+
+  pwm->PSEL.OUT[0] = led_pin;
+
+  pwm->ENABLE = 1;
+  pwm->TASKS_SEQSTART[0] = 1;
 }
 
 void led_pwm_teardown(uint32_t led_pin)
 {
-  NRF_PWM_Type* pwm = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
-
-  pwm->TASKS_SEQSTART[0] = 0;
-  pwm->ENABLE            = 0;
-
-  pwm->PSEL.OUT[0] = 0xFFFFFFFF;
-
-  pwm->MODE        = 0;
-  pwm->COUNTERTOP  = 0x3FF;
-  pwm->PRESCALER   = 0;
-  pwm->DECODER     = 0;
-  pwm->LOOP        = 0;
-  pwm->SEQ[0].PTR  = 0;
-  pwm->SEQ[0].CNT  = 0;
+  pwm_teardown ((led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1);
 }
 
 void led_pwm_disable(uint32_t led_pin)
@@ -277,7 +280,6 @@ void neopixel_write (uint8_t *pixels)
 
 
   NRF_PWM_Type* pwm = NRF_PWM2;
-
 
   nrf_pwm_seq_ptr_set(pwm, 0, pixels_pattern);
   nrf_pwm_seq_cnt_set(pwm, 0, sizeof(pixels_pattern)/2);

@@ -170,6 +170,7 @@ C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
 C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
 C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
 C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
+C_SOURCE_FILES += $(TUSB_PATH)/device/usbd_control.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/custom/custom_device.c
