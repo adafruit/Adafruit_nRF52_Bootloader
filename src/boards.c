@@ -81,6 +81,11 @@ void board_init(void)
   // use PMW0 for LED RED
   led_pwm_init(LED_RED);
 
+// use neopixel for use enumeration
+#ifdef LED_NEOPIXEL
+
+#endif
+
   // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
 
@@ -170,7 +175,7 @@ void led_pwm_enable(uint32_t led_pin)
 }
 
 
-void led_blink_fast(bool enable)
+void led_red_blink_fast(bool enable)
 {
   if ( enable )
   {

@@ -170,12 +170,12 @@ int main(void)
   // When updating SoftDevice, bootloader will reset before swapping SD
   if (bootloader_dfu_sd_in_progress())
   {
-    led_blink_fast(true);
+    led_red_blink_fast(true);
 
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
 
-    led_blink_fast(false);
+    led_red_blink_fast(false);
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
@@ -268,7 +268,7 @@ int main(void)
 void adafruit_factory_reset(void)
 {
   // Blink fast RED and turn on BLUE when erasing
-  led_blink_fast(true);
+  led_red_blink_fast(true);
   led_on(LED_BLUE);
 
   // clear all App Data if any
@@ -281,7 +281,7 @@ void adafruit_factory_reset(void)
   nrf_nvmc_page_erase(DFU_BANK_0_REGION_START);
 
   // back to normal
-  led_blink_fast(false);
+  led_red_blink_fast(false);
   led_off(LED_BLUE);
 }
 

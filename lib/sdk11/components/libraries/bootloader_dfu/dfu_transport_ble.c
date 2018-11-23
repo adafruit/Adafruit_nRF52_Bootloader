@@ -589,7 +589,7 @@ static void on_dfu_evt(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
             break;
 
         case BLE_DFU_PACKET_WRITE:
-            led_blink_fast(true);
+            led_red_blink_fast(true);
             on_dfu_pkt_write(p_dfu, p_evt);
             break;
 
@@ -750,7 +750,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
                 m_direct_adv_cnt = APP_DIRECTED_ADV_TIMEOUT;
 
-                led_blink_fast(false);
+                led_red_blink_fast(false);
 
                 err_code = sd_ble_gatts_sys_attr_get(m_conn_handle, 
                                                      sys_attr,

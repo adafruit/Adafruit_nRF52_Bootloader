@@ -34,8 +34,6 @@
 #define LED_RED         LED_1
 #define LED_BLUE        LED_2
 
-
-
 // Helper function
 #define memclr(buffer, size)                memset(buffer, 0, size)
 #define varclr(_var)                        memclr(_var, sizeof(*(_var)))
@@ -71,7 +69,7 @@ void led_pwm_teardown(uint32_t led_pin);
 void led_pwm_disable(uint32_t led_pin);
 void led_pwm_enable(uint32_t led_pin);
 
-void led_blink_fast(bool enable);
+void led_red_blink_fast(bool enable);
 
 //--------------------------------------------------------------------+
 // BUTTONS

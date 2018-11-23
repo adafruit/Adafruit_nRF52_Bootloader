@@ -43,8 +43,9 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          _PINNUM(1, 2)  // P1.02
-#define LED_2          _PINNUM(1, 10) // P1.10
+#define LED_1          _PINNUM(1, 15)
+#define LED_2          _PINNUM(1, 10)
+#define LED_NEOPIXEL   16
 #define LED_STATE_ON   1
 
 /*------------------------------------------------------------------*/
