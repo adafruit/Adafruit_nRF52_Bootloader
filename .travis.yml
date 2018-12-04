@@ -24,6 +24,7 @@ before_script:
   - gcc --version
   - arm-none-eabi-gcc --version
   - python3 --version
+  - sudo apt-get install -y python3-pip
   - pip3 install --user adafruit-nrfutil
 
 script:
