@@ -66,12 +66,11 @@
 #define RTS_PIN_NUMBER 5
 #define HWFC           false
 
-#define OUTPUT_500HZ_PIN _PINNUM(0, 05) // A1
-
 // Used as model string in OTA mode
 #define DIS_MANUFACTURER  "Adafruit Industries"
 #define DIS_MODEL         "Bluefruit Feather nRF52840 Express"
 
 #define PRODUCT_NAME      "Adafruit Feather nRF52840 Express"
+#define VOLUME_LABEL      "FTHR840BOOT"
 
 #endif // _FEATHER52840_H

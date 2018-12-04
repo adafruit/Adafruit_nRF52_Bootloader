@@ -1,7 +1,5 @@
 #include "boards.h"
 
-#define UF2_VERSION        "1.00"
-
 #ifndef PRODUCT_NAME
   #define PRODUCT_NAME     DIS_MODEL
 #endif

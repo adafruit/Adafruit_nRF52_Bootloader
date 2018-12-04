@@ -211,7 +211,7 @@ int main(void)
 
   led_state(STATE_BOOTLOADER_STARTED);
 
-  if ( dfu_start || !valid_app  || true)
+  if ( dfu_start || !valid_app )
   {
     if ( _ota_dfu )
     {

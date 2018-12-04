@@ -31,7 +31,6 @@ SD_API_PATH     = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX          = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
-OUTPUT_FILENAME = $(BOARD)_bootloader
 
 MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
@@ -39,6 +38,10 @@ RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION) r$(SD_VER4)"
 
+GIT_VERSION = $(shell git describe --dirty --always --tags)
+GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
+
+OUTPUT_FILENAME = $(BOARD)_bootloader-$(GIT_VERSION)
 #******************************************************************************
 # Tool configure
 #******************************************************************************
@@ -264,6 +267,8 @@ CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DFLOAT_ABI_HARD
 CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
+
+CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION) r$(SD_VER4)"'
 
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 

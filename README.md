@@ -1,11 +1,14 @@
 # Adafruit Bluefruit nRF52 Bootloader
 
-This is a CDC/DFU/UF2 bootloader for Adafruit nRF52 boards and Nordic development boards.
+This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 
 - [Adafruit Feather nRF52832](https://www.adafruit.com/product/3406)
 - Adafruit Feather nRF52840 Express
 - Nordic nRF52840DK PCA10056
 - Nordic nRF52840DK PCA10059 ("Dongle")
+- Particle Argon
+- Particle Boron
+- Particle Xenon
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware.
@@ -84,24 +87,7 @@ To upgrade with dfu serial
 make BOARD=feather_nrf52840_express VERSION=6.1.1r0 dfu-flash
 ```
 
-Pre-builtin binaries are in the `bin` directory:
-
-```
-bin/feather_nrf52832/
-  2.0.1
-  5.0.0
-  6.1.0r0
-
-bin/feather_nrf52840_express
-  6.1.0r0
-
-bin/pca10056:
-  6.1.0r0
-
-bin/pca10059:
-  6.1.0r0
-```
-
+Pre-builtin binaries are available on GitHub releases.
 
 Note: The bootloader can be downgraded. Since the binary release is a merged version of
 of both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to any version you like.

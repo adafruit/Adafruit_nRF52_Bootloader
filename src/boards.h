@@ -47,7 +47,7 @@
 // The secondary LED, when available, is usually blue.
 #define LED_SECONDARY 1
 
-// The internal
+// Internal status colors are masked by this brightness setting.
 #ifndef BOARD_RGB_BRIGHTNESS
 #define BOARD_RGB_BRIGHTNESS 0x101010
 #endif
@@ -83,10 +83,6 @@ void led_pwm_disable(uint32_t led_index);
 void led_pwm_enable(uint32_t led_index);
 void led_state(uint32_t state);
 void led_tick(void);
-
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
-  void neopixel_write(uint8_t *pixels);
-#endif
 
 //--------------------------------------------------------------------+
 // BUTTONS

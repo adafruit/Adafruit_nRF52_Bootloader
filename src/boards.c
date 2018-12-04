@@ -45,12 +45,11 @@
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
-//------------- IMPLEMENTATION -------------//
-#ifdef OUTPUT_500HZ_PIN
-void init_clock_pwm(uint32_t pin);
-void clock_pwm_teardown(void);
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
+  void neopixel_write(uint8_t *pixels);
 #endif
 
+//------------- IMPLEMENTATION -------------//
 void board_init(void)
 {
   // stop LF clock just in case we jump from application without reset
@@ -240,16 +239,25 @@ void led_state(uint32_t state)
         default:
         break;
     }
+    uint8_t* final_color = NULL;
     new_rgb_color &= BOARD_RGB_BRIGHTNESS;
     if (temp_color != 0){
-        neopixel_write((uint8_t*)&temp_color);
+        temp_color &= BOARD_RGB_BRIGHTNESS;
+        final_color = (uint8_t*)&temp_color;
         temp_color_active = true;
     } else if (new_rgb_color != rgb_color) {
-        neopixel_write((uint8_t*)&new_rgb_color);
+        final_color = (uint8_t*)&new_rgb_color;
         rgb_color = new_rgb_color;
     } else if (temp_color_active) {
-        neopixel_write((uint8_t*)&rgb_color);
+        final_color = (uint8_t*)&rgb_color;
     }
+    #if LED_NEOPIXEL || defined(LED_RGB_RED)
+    if (final_color != NULL) {
+        neopixel_write(final_color);
+    }
+    #else
+    (void) final_color;
+    #endif
 }
 
 #if LED_NEOPIXEL
@@ -375,11 +383,5 @@ void neopixel_write (uint8_t *pixels)
   led_pwm_duty_cycle(LED_RGB_RED, pixels[2]);
   led_pwm_duty_cycle(LED_RGB_GREEN, pixels[1]);
   led_pwm_duty_cycle(LED_RGB_BLUE, pixels[0]);
-}
-#endif
-
-#if !LED_NEOPIXEL && !defined(LED_RGB_RED)
-void neopixel_write(uint8_t* pixels) {
-    (void) pixels;
 }
 #endif

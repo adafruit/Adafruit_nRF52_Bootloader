@@ -66,8 +66,6 @@
 #define RTS_PIN_NUMBER 0
 #define HWFC           false
 
-#define OUTPUT_500HZ_PIN _PINNUM(0, 04) // A1
-
 // Used as model string in OTA mode
 #define DIS_MANUFACTURER  "Particle Industries"
 #define DIS_MODEL         "Boron"
