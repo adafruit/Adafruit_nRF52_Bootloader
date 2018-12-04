@@ -45,20 +45,11 @@
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
-/* use PWM for blinky to prevent inconsistency due to MCU blocking in flash operation
- * clock = 125khz --> resolution = 8us
- * top value = 25000 -> period = 200 ms
- * Mode up -> toggle every 100 ms = fast blink
- * Mode up and down = 400 ms = slow blink
- */
-#define PWM_MAXCOUNT      25000
-#define PWM_CHANNEL_NUM   4
-
-
-uint16_t _pwm_red_seq [PWM_CHANNEL_NUM] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
-uint16_t _pwm_blue_seq[PWM_CHANNEL_NUM] = { PWM_MAXCOUNT/2, 0, 0 , 0 };
-
 //------------- IMPLEMENTATION -------------//
+#ifdef OUTPUT_500HZ_PIN
+void init_clock_pwm(uint32_t pin);
+void clock_pwm_teardown(void);
+#endif
 
 void board_init(void)
 {
@@ -73,22 +64,16 @@ void board_init(void)
   button_init(BUTTON_FRESET);
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
-  // LED init
-  nrf_gpio_cfg_output(LED_RED);
-  nrf_gpio_cfg_output(LED_BLUE);
-  led_off(LED_RED);
-  led_off(LED_BLUE);
-
   // use PMW0 for LED RED
-  led_pwm_init(LED_RED);
+  led_pwm_init(LED_PRIMARY, LED_PRIMARY_PIN);
+  #if LEDS_NUMBER > 1
+  led_pwm_init(LED_SECONDARY, LED_SECONDARY_PIN);
+  #endif
 
 // use neopixel for use enumeration
-#ifdef LED_NEOPIXEL
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
   extern void neopixel_init(void);
   neopixel_init();
-
-  uint8_t grb[3] = { 0, 32, 0 };
-  neopixel_write(grb);
 #endif
 
   // Init scheduler
@@ -100,17 +85,13 @@ void board_init(void)
 
 void board_teardown(void)
 {
-  // Disable and reset PWM for LED
-  led_pwm_teardown(LED_RED);
+  // Disable and reset PWM for LEDs
+  led_pwm_teardown();
 
-#ifdef LED_NEOPIXEL
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
   extern void neopixel_teardown(void);
   neopixel_teardown();
 #endif
-
-  led_off(LED_BLUE);
-  led_off(LED_RED);
-
   // Button
 
   // Stop RTC1 used by app_timer
@@ -146,58 +127,129 @@ void pwm_teardown(NRF_PWM_Type* pwm )
   pwm->SEQ[0].CNT  = 0;
 }
 
-void led_pwm_init(uint32_t led_pin)
-{
-  NRF_PWM_Type* pwm    = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+static uint16_t led_duty_cycles[PWM0_CH_NUM];
 
-  pwm->MODE            = PWM_MODE_UPDOWN_UpAndDown;
-  pwm->COUNTERTOP      = PWM_MAXCOUNT;
-  pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_128;
+#if LEDS_NUMBER > PWM0_CH_NUM
+#error "Only " PWM0_CH_NUM " concurrent status LEDs are supported."
+#endif
+
+void led_pwm_init(uint32_t led_index, uint32_t led_pin)
+{
+  NRF_PWM_Type* pwm    = NRF_PWM0;
+
+  nrf_gpio_cfg_output(led_pin);
+  pwm->PSEL.OUT[led_index] = led_pin;
+
+  pwm->ENABLE = 1;
+  pwm->MODE            = PWM_MODE_UPDOWN_Up;
+  pwm->COUNTERTOP      = 0xff;
+  pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_16;
   pwm->DECODER         = PWM_DECODER_LOAD_Individual;
   pwm->LOOP            = 0;
 
-  pwm->SEQ[0].PTR      = (uint32_t) (led_pin == LED_RED ? _pwm_red_seq : _pwm_blue_seq);
-  pwm->SEQ[0].CNT      = PWM_CHANNEL_NUM; // default mode is Individual --> count must be 4
+  pwm->SEQ[0].PTR      = (uint32_t) (led_duty_cycles);
+  pwm->SEQ[0].CNT      = 4; // default mode is Individual --> count must be 4
   pwm->SEQ[0].REFRESH  = 0;
   pwm->SEQ[0].ENDDELAY = 0;
-
-  pwm->PSEL.OUT[0] = led_pin;
-
-  pwm->ENABLE = 1;
+  pwm->LOOP = 0;
   pwm->TASKS_SEQSTART[0] = 1;
 }
 
-void led_pwm_teardown(uint32_t led_pin)
+void led_pwm_teardown(void)
 {
-  pwm_teardown ((led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1);
+  pwm_teardown(NRF_PWM0);
 }
 
-void led_pwm_disable(uint32_t led_pin)
+void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle)
 {
-  NRF_PWM_Type* pwm = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
-
-  pwm->TASKS_SEQSTART[0] = 0;
-  pwm->ENABLE = 0;
+  led_duty_cycles[led_index] = duty_cycle;
+  nrf_pwm_event_clear(NRF_PWM0, NRF_PWM_EVENT_SEQEND0);
+  nrf_pwm_task_trigger(NRF_PWM0, NRF_PWM_TASK_SEQSTART0);
 }
 
-void led_pwm_enable(uint32_t led_pin)
-{
-  NRF_PWM_Type* pwm = (led_pin == LED_RED) ? NRF_PWM0 : NRF_PWM1;
+static uint32_t primary_cycle_length;
+#ifdef LED_SECONDARY_PIN
+static uint32_t secondary_cycle_length;
+#endif
+void led_tick() {
+    uint32_t millis = tusb_hal_millis();
 
-  pwm->ENABLE = 1;
-  pwm->TASKS_SEQSTART[0] = 1;
+    uint32_t cycle = millis % primary_cycle_length;
+    uint32_t half_cycle = primary_cycle_length / 2;
+    if (cycle > half_cycle) {
+        cycle = primary_cycle_length - cycle;
+    }
+    uint16_t duty_cycle = 0x4f * cycle / half_cycle;
+    #if LED_STATE_ON == 1
+    duty_cycle = 0xff - duty_cycle;
+    #endif
+    led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
+
+    #ifdef LED_SECONDARY_PIN
+    cycle = millis % secondary_cycle_length;
+    half_cycle = secondary_cycle_length / 2;
+    if (cycle > half_cycle) {
+        cycle = secondary_cycle_length - cycle;
+    }
+    duty_cycle = 0x8f * cycle / half_cycle;
+    #if LED_STATE_ON == 1
+    duty_cycle = 0xff - duty_cycle;
+    #endif
+    led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
+    #endif
 }
 
-
-void led_red_blink_fast(bool enable)
+static uint32_t rgb_color;
+static bool temp_color_active = false;
+void led_state(uint32_t state)
 {
-  if ( enable )
-  {
-    NRF_PWM0->MODE = PWM_MODE_UPDOWN_Up;
-  }else
-  {
-    NRF_PWM0->MODE = PWM_MODE_UPDOWN_UpAndDown;
-  }
+    uint32_t new_rgb_color = rgb_color;
+    uint32_t temp_color = 0;
+    switch (state) {
+        case STATE_USB_MOUNTED:
+          new_rgb_color = 0x00ff00;
+          primary_cycle_length = 4000;
+          break;
+        case STATE_BOOTLOADER_STARTED:
+        case STATE_USB_UNMOUNTED:
+          new_rgb_color = 0xff0000;
+          primary_cycle_length = 300;
+          break;
+        case STATE_WRITING_STARTED:
+          temp_color = 0xff0000;
+          break;
+        case STATE_WRITING_FINISHED:
+          // Empty means to unset any temp colors.
+          break;
+        case STATE_BLE_CONNECTED:
+          new_rgb_color = 0x0000ff;
+          #ifdef LED_SECONDARY_PIN
+          secondary_cycle_length = 500;
+          #else
+          primary_cycle_length = 500;
+          #endif
+          break;
+        case STATE_BLE_DISCONNECTED:
+          new_rgb_color = 0xff00ff;
+          #ifdef LED_SECONDARY_PIN
+          secondary_cycle_length = 300;
+          #else
+          primary_cycle_length = 300;
+          #endif
+          break;
+        default:
+        break;
+    }
+    new_rgb_color &= BOARD_RGB_BRIGHTNESS;
+    if (temp_color != 0){
+        neopixel_write((uint8_t*)&temp_color);
+        temp_color_active = true;
+    } else if (new_rgb_color != rgb_color) {
+        neopixel_write((uint8_t*)&new_rgb_color);
+        rgb_color = new_rgb_color;
+    } else if (temp_color_active) {
+        neopixel_write((uint8_t*)&rgb_color);
+    }
 }
 
 #if LED_NEOPIXEL
@@ -267,10 +319,11 @@ void neopixel_teardown(void)
 // write 3 bytes color to a built-in neopixel
 void neopixel_write (uint8_t *pixels)
 {
+  uint8_t grb[NEO_NUMBYTE] = {pixels[1], pixels[2], pixels[0]};
   uint16_t pos = 0;    // bit position
   for ( uint16_t n = 0; n < NEO_NUMBYTE; n++ )
   {
-    uint8_t pix = pixels[n];
+    uint8_t pix = grb[n];
 
     for ( uint8_t mask = 0x80; mask > 0; mask >>= 1 )
     {
@@ -280,8 +333,8 @@ void neopixel_write (uint8_t *pixels)
   }
 
   // Zero padding to indicate the end of sequence
-  pixels_pattern[++pos] = 0 | (0x8000);    // Seq end
-  pixels_pattern[++pos] = 0 | (0x8000);    // Seq end
+  pixels_pattern[pos++] = 0 | (0x8000);    // Seq end
+  pixels_pattern[pos++] = 0 | (0x8000);    // Seq end
 
 
   NRF_PWM_Type* pwm = NRF_PWM2;
@@ -293,3 +346,40 @@ void neopixel_write (uint8_t *pixels)
 }
 #endif
 
+#if defined(LED_RGB_RED_PIN) && defined(LED_RGB_GREEN_PIN) && defined(LED_RGB_BLUE_PIN)
+
+#ifdef LED_SECONDARY_PIN
+#error "Cannot use secondary LED at the same time as an RGB status LED."
+#endif
+
+#define LED_RGB_RED   1
+#define LED_RGB_BLUE  2
+#define LED_RGB_GREEN 3
+
+void neopixel_init(void)
+{
+  led_pwm_init(LED_RGB_RED, LED_RGB_RED_PIN);
+  led_pwm_init(LED_RGB_GREEN, LED_RGB_GREEN_PIN);
+  led_pwm_init(LED_RGB_BLUE, LED_RGB_BLUE_PIN);
+}
+
+void neopixel_teardown(void)
+{
+  uint8_t grb[3] = { 0, 0, 0 };
+  neopixel_write(grb);
+}
+
+// write 3 bytes color to a built-in neopixel
+void neopixel_write (uint8_t *pixels)
+{
+  led_pwm_duty_cycle(LED_RGB_RED, pixels[2]);
+  led_pwm_duty_cycle(LED_RGB_GREEN, pixels[1]);
+  led_pwm_duty_cycle(LED_RGB_BLUE, pixels[0]);
+}
+#endif
+
+#if !LED_NEOPIXEL && !defined(LED_RGB_RED)
+void neopixel_write(uint8_t* pixels) {
+    (void) pixels;
+}
+#endif

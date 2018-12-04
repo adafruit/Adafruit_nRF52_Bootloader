@@ -25,15 +25,32 @@
   #include "boards/pca10056.h"
 #elif defined BOARD_PCA10059
   #include "boards/pca10059.h"
+#elif defined BOARD_PARTICLE_ARGON
+#include "boards/particle_argon.h"
+#elif defined BOARD_PARTICLE_BORON
+#include "boards/particle_boron.h"
+#elif defined BOARD_PARTICLE_XENON
+#include "boards/particle_xenon.h"
 #else
   #error No boards defined
 #endif
 
+#ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
+#endif
+#ifndef BUTTON_FRESET
 #define BUTTON_FRESET   BUTTON_2
+#endif
 
-#define LED_RED         LED_1
-#define LED_BLUE        LED_2
+// The primary LED is usually Red but not in all cases.
+#define LED_PRIMARY 0
+// The secondary LED, when available, is usually blue.
+#define LED_SECONDARY 1
+
+// The internal
+#ifndef BOARD_RGB_BRIGHTNESS
+#define BOARD_RGB_BRIGHTNESS 0x101010
+#endif
 
 // Helper function
 #define memclr(buffer, size)                memset(buffer, 0, size)
@@ -50,29 +67,24 @@ void board_teardown(void);
 
 #define bit(b) (1UL << (b))
 
-static inline void led_control(uint32_t pin, bool state)
-{
-  nrf_gpio_pin_write(pin, state ? LED_STATE_ON : (1-LED_STATE_ON));
-}
+#define STATE_BOOTLOADER_STARTED 0
+#define STATE_USB_MOUNTED 1
+#define STATE_USB_UNMOUNTED 2
+#define STATE_FACTORY_RESET_STARTED 3
+#define STATE_FACTORY_RESET_FINISHED 4
+#define STATE_WRITING_STARTED 5
+#define STATE_WRITING_FINISHED 6
+#define STATE_BLE_CONNECTED 7
+#define STATE_BLE_DISCONNECTED 8
 
-static inline void led_on(uint32_t pin)
-{
-  led_control(pin, true);
-}
+void led_pwm_init(uint32_t led_index, uint32_t led_pin);
+void led_pwm_teardown(void);
+void led_pwm_disable(uint32_t led_index);
+void led_pwm_enable(uint32_t led_index);
+void led_state(uint32_t state);
+void led_tick(void);
 
-static inline void led_off(uint32_t pin)
-{
-  led_control(pin, false);
-}
-
-void led_pwm_init(uint32_t led_pin);
-void led_pwm_teardown(uint32_t led_pin);
-void led_pwm_disable(uint32_t led_pin);
-void led_pwm_enable(uint32_t led_pin);
-
-void led_red_blink_fast(bool enable);
-
-#ifdef LED_NEOPIXEL
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
   void neopixel_write(uint8_t *pixels);
 #endif
 

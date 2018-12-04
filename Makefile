@@ -53,9 +53,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 PROGFILES = C:/Program Files (x86)
-GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update
-else
-GNU_INSTALL_ROOT = /usr
+GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update/bin/
 endif
 
 MK := mkdir
@@ -70,14 +68,14 @@ endif
 GNU_PREFIX = arm-none-eabi
 
 # Toolchain commands
-CC      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gcc'
-AS      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-as'
-AR      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ar' -r
-LD      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ld'
-NM      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-nm'
-OBJDUMP := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-objdump'
-OBJCOPY := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-objcopy'
-SIZE    := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-size'
+CC      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-gcc'
+AS      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-as'
+AR      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-ar' -r
+LD      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-ld'
+NM      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-nm'
+OBJDUMP := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objdump'
+OBJCOPY := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objcopy'
+SIZE    := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-size'
 
 #function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
@@ -87,7 +85,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
 
-NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express
+NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express particle_argon particle_boron particle_xenon
 IS_NRF52840 = $(filter $(BOARD),$(NRF52840_BOARDLIST))
 
 ifeq ($(filter $(MAKECMDGOALS),all-board all-release help),)
@@ -370,7 +368,7 @@ all-board:
 
 all-release:
 	$(call _make_all_board,clean all release)
-	
+
 help:
 	@echo To flash (with jlink) a pre-built binary with a specific version to a board
 	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.1r0 flash

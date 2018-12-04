@@ -1,17 +1,27 @@
+#include "boards.h"
+
 #define UF2_VERSION        "1.00"
 
-#ifdef BOARD_PCA10056
+#ifndef PRODUCT_NAME
   #define PRODUCT_NAME     DIS_MODEL
-#else
-  #define PRODUCT_NAME     "Adafruit " DIS_MODEL
 #endif
 
+#ifndef BOARD_ID
 #define BOARD_ID           "NRF52-Bluefruit-v0"
-#define INDEX_URL          "https://www.adafruit.com/product/0000"
+#endif
+
+#ifndef INDEX_URL
+#define INDEX_URL          "https://www.adafruit.com/"
+#endif
+
 #define BOOTLOADER_ID      MK_DIS_FIRMWARE
 
 #define UF2_NUM_BLOCKS     8000   // at least 4,1 MB for FAT16
+
+#ifndef VOLUME_LABEL
 #define VOLUME_LABEL       "NRF52BOOT  "
+#endif
+
 #define FLASH_SIZE         (USER_FLASH_END-USER_FLASH_START) // Max flash size
 
 // Only allow to write application TODO dynamic depending on SD size

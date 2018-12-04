@@ -106,7 +106,7 @@ static uint32_t data_queue_element_free(uint8_t element_index)
     uint32_t  retval;
 
     retval = NRF_ERROR_INVALID_PARAM;
-    
+
     if (MAX_BUFFERS > element_index)
     {
         p_data = (uint8_t *)DATA_QUEUE_ELEMENT_GET_PDATA(element_index);
@@ -137,7 +137,7 @@ static uint32_t data_queue_element_alloc(uint8_t * p_element_index, uint8_t pack
     uint32_t index;
 
     retval = NRF_ERROR_NO_MEM;
-    
+
     if (INVALID_PACKET == packet_type)
     {
         retval = NRF_ERROR_INVALID_PARAM;
@@ -216,7 +216,7 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
                             break;
 
                         case START_PACKET:
-                            packet->params.start_packet = 
+                            packet->params.start_packet =
                                 (dfu_start_packet_t*)packet->params.data_packet.p_data_packet;
                             retval = dfu_start_pkt_handle(packet);
                             APP_ERROR_CHECK(retval);
@@ -227,14 +227,14 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
                             retval = dfu_init_pkt_complete();
                             APP_ERROR_CHECK(retval);
 
-                            led_red_blink_fast(true);
+                            led_state(STATE_WRITING_STARTED);
                             break;
 
                         case STOP_DATA_PACKET:
                             (void)dfu_image_validate();
                             (void)dfu_image_activate();
 
-                            led_red_blink_fast(false);
+                            led_state(STATE_WRITING_FINISHED);
 
                             // Break the loop by returning.
                             return;
@@ -273,7 +273,7 @@ void rpc_transport_event_handler(hci_transport_evt_t event)
             retval = app_sched_event_put(NULL, 0, process_dfu_packet);
         }
     }
-    
+
     if (p_rpc_cmd_buffer != NULL && NRF_SUCCESS != retval)
     {
         // Free the packet that could not be processed.
@@ -308,7 +308,6 @@ uint32_t dfu_transport_serial_close(void)
 {
     // Remove all buffered packets.
     data_queue_flush();
-    
+
     return hci_transport_close();
 }
-

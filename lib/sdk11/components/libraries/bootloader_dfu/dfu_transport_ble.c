@@ -589,7 +589,7 @@ static void on_dfu_evt(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
             break;
 
         case BLE_DFU_PACKET_WRITE:
-            led_red_blink_fast(true);
+            led_state(STATE_WRITING_STARTED);
             on_dfu_pkt_write(p_dfu, p_evt);
             break;
 
@@ -741,6 +741,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GAP_EVT_CONNECTED:
             m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
             m_is_advertising = false;
+            led_state(STATE_BLE_CONNECTED);
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -750,9 +751,9 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
                 m_direct_adv_cnt = APP_DIRECTED_ADV_TIMEOUT;
 
-                led_red_blink_fast(false);
+                led_state(STATE_BLE_DISCONNECTED);
 
-                err_code = sd_ble_gatts_sys_attr_get(m_conn_handle, 
+                err_code = sd_ble_gatts_sys_attr_get(m_conn_handle,
                                                      sys_attr,
                                                      &sys_attr_len,
                                                      BLE_GATTS_SYS_ATTR_FLAG_SYS_SRVCS);

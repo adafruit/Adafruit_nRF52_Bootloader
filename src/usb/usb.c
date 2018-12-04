@@ -157,17 +157,10 @@ void usb_teardown(void)
 //--------------------------------------------------------------------+
 void tud_mount_cb(void)
 {
-#ifdef LED_NEOPIXEL
-  uint8_t grb[3] = { 32, 0, 0 };
-  neopixel_write(grb);
-#endif
+  led_state(STATE_USB_MOUNTED);
 }
 
 void tud_umount_cb(void)
 {
-#ifdef LED_NEOPIXEL
-  uint8_t grb[3] = { 0, 32, 0 };
-  neopixel_write(grb);
-#endif
+  led_state(STATE_USB_UNMOUNTED);
 }
-

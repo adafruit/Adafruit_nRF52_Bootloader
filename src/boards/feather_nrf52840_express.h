@@ -43,9 +43,10 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          _PINNUM(1, 15)
-#define LED_2          _PINNUM(1, 10)
+#define LED_PRIMARY_PIN           _PINNUM(1, 15)
+#define LED_SECONDARY_PIN         _PINNUM(1, 10)
 #define LED_NEOPIXEL   16
+#define BOARD_RGB_BRIGHTNESS 0x040404
 #define LED_STATE_ON   1
 
 /*------------------------------------------------------------------*/
@@ -65,8 +66,12 @@
 #define RTS_PIN_NUMBER 5
 #define HWFC           false
 
+#define OUTPUT_500HZ_PIN _PINNUM(0, 05) // A1
+
 // Used as model string in OTA mode
 #define DIS_MANUFACTURER  "Adafruit Industries"
 #define DIS_MODEL         "Bluefruit Feather nRF52840 Express"
+
+#define PRODUCT_NAME      "Adafruit Feather nRF52840 Express"
 
 #endif // _FEATHER52840_H
