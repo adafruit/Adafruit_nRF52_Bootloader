@@ -19,12 +19,12 @@ deploy:
 
 before_script:
   - (wget https://s3.amazonaws.com/adafruit-circuit-python/gcc-arm-embedded_7-2018q2-1~xenial1_amd64.deb && sudo dpkg -i gcc-arm-embedded*_amd64.deb)
-  - pip3 install --user adafruit-nrfutil
 
   # report some good version numbers to the build
   - gcc --version
   - arm-none-eabi-gcc --version
   - python3 --version
+  - pip3 install --user adafruit-nrfutil
 
 script:
   - python3 tools/build_all.py
