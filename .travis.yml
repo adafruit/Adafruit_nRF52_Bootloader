@@ -3,8 +3,6 @@ dist: xenial
 language: c
 compiler:
   - gcc
-python:
-  - "3.7"
 
 deploy:
   provider: releases
@@ -24,7 +22,7 @@ before_script:
   - gcc --version
   - arm-none-eabi-gcc --version
   - python3 --version
-  - sudo apt-get install -y python3-pip setuptools
+  - sudo apt-get install -y python3-pip
   - pip3 install --user adafruit-nrfutil
 
 script:
