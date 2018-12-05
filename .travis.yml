@@ -17,7 +17,7 @@ deploy:
 
 before_script:
   - (wget https://s3.amazonaws.com/adafruit-circuit-python/gcc-arm-embedded_7-2018q2-1~xenial1_amd64.deb && sudo dpkg -i gcc-arm-embedded*_amd64.deb)
-  - (wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar && tar -x -f cli-tools.tar && mv nRF-Command*/mergehex/mergehex .)
+  - (wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar && tar -x -f cli-tools.tar && ls . && mv nRF-Command*/mergehex/mergehex .)
 
   # report some good version numbers to the build
   - gcc --version
