@@ -402,7 +402,7 @@ __check_defined = \
 ifeq ($(VERSION),)
 
 # Flash the compiled
-flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+flash: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 
@@ -471,7 +471,7 @@ size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 .phony: genhex genpkg release
 
 ## Create binary .hex file from the .out file
-genhex: $(BUILD)/$(OUTPUT_FILENAME).hex
+genhex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 
 $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 	@echo CR $(OUTPUT_FILENAME)-nosd.hex
