@@ -356,7 +356,7 @@ endif
 .phony: all clean size flash sd erase
 
 # default target to build
-all: $(BUILD)/$(OUTPUT_FILENAME).out size
+all: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out size
 
 # Rule using BOARD_LIST, nl is newline
 define nl

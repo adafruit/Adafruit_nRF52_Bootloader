@@ -1,6 +1,6 @@
 /**************************************************************************/
 /*!
-    @file     particle_boron.h
+    @file     particle_xenon.h
     @author   Scott Shawcroft
 
     @section LICENSE
