@@ -49,6 +49,7 @@
  #define LED_RGB_RED_PIN           _PINNUM(0, 13)
  #define LED_RGB_GREEN_PIN         _PINNUM(0, 14)
  #define LED_RGB_BLUE_PIN          _PINNUM(0, 15)
+ #define BOARD_RGB_BRIGHTNESS 0x202020
 
 /*------------------------------------------------------------------*/
 /* BUTTON
