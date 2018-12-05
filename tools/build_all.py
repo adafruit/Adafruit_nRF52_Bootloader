@@ -39,7 +39,7 @@ for board in all_boards:
 
     for entry in os.scandir("_build-{}".format(board)):
         for extension in ["zip", "hex"]:
-            if entry.name.endswith(extension):
+            if entry.name.endswith(extension) and "nosd" not in entry.name:
                 shutil.copy(entry.path, bin_directory)
 
     if travis:

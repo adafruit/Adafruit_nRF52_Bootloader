@@ -251,7 +251,7 @@ void led_state(uint32_t state)
     } else if (temp_color_active) {
         final_color = (uint8_t*)&rgb_color;
     }
-    #if LED_NEOPIXEL || defined(LED_RGB_RED)
+    #if LED_NEOPIXEL || defined(LED_RGB_RED_PIN)
     if (final_color != NULL) {
         neopixel_write(final_color);
     }
@@ -375,6 +375,9 @@ void neopixel_teardown(void)
 {
   uint8_t grb[3] = { 0, 0, 0 };
   neopixel_write(grb);
+  nrf_gpio_cfg_default(LED_RGB_RED_PIN);
+  nrf_gpio_cfg_default(LED_RGB_GREEN_PIN);
+  nrf_gpio_cfg_default(LED_RGB_BLUE_PIN);
 }
 
 // write 3 bytes color to a built-in neopixel

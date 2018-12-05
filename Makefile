@@ -457,11 +457,11 @@ $(BUILD)/%.o: %.S
 	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUTPUT_FILENAME).out: $(BUILD) $(OBJECTS)
-	@echo LD $(OUTPUT_FILENAME).out
-	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(BUILD)/$(OUTPUT_FILENAME).out
+$(BUILD)/$(OUTPUT_FILENAME)-nosd.out: $(BUILD) $(OBJECTS)
+	@echo LD $(OUTPUT_FILENAME)-nosd.out
+	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
 
-size: $(BUILD)/$(OUTPUT_FILENAME).out
+size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 	-@echo ''
 	$(QUIET)$(SIZE) $<
 	-@echo ''
@@ -473,22 +473,22 @@ size: $(BUILD)/$(OUTPUT_FILENAME).out
 ## Create binary .hex file from the .out file
 genhex: $(BUILD)/$(OUTPUT_FILENAME).hex
 
-$(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
-	@echo CR $(OUTPUT_FILENAME).hex
+$(BUILD)/$(OUTPUT_FILENAME)-nosd.hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
+	@echo CR $(OUTPUT_FILENAME)-nosd.hex
 	$(QUIET)$(OBJCOPY) -O ihex $< $@
 
 
 # merge bootloader and sd hex together
 combinehex: $(BUILD)/$(MERGED_FNAME).hex
 
-$(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@echo CR $(MERGED_FNAME).hex
 	@mergehex -q -m $< $(SD_HEX) -o $@
 
 ## Create pkg file for bootloader+SD combo to use with DFU
 genpkg: $(BUILD)/$(MERGED_FNAME).zip
 
-$(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
 
 # Create SD+bootloader combo with hex & dfu package at release folder

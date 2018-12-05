@@ -47,6 +47,12 @@
 // The secondary LED, when available, is usually blue.
 #define LED_SECONDARY 1
 
+// Its more common for LEDs to be sinking to the MCU pin. Setting is only for individual LEDs, not
+// RGB LEDs.
+#ifndef LED_STATE_ON
+#define LED_STATE_ON   0
+#endif
+
 // Internal status colors are masked by this brightness setting.
 #ifndef BOARD_RGB_BRIGHTNESS
 #define BOARD_RGB_BRIGHTNESS 0x101010
