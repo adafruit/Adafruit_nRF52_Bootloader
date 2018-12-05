@@ -43,12 +43,12 @@ for board in all_boards:
                 shutil.copy(entry.path, bin_directory)
 
     if travis:
-        print('travis_fold:start:build-{}-{}\\r'.format(language, board))
+        print('travis_fold:start:build-{}\\r'.format(board))
     print("Build {} took {:.2f}s and {}".format(board, build_duration, success))
     if make_result.returncode != 0:
         print(make_result.stdout.decode("utf-8"))
     if travis:
-        print('travis_fold:end:build-{}-{}\\r'.format(language, board))
+        print('travis_fold:end:build-{}\\r'.format(board))
 
     print()
 
