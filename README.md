@@ -121,7 +121,7 @@ Prerequisites
 To build:
 
 ```
-make BOARD=feather_nrf52840_express all
+make BOARD=feather_nrf52840_express all combinehex
 ```
 
 To flash the bootloader:
@@ -158,7 +158,7 @@ Makefile:90: *** BOARD not defined.  Stop
 If you get the following error ...
 
 ```
-$ make BOARD=feather_nrf52840_express all
+$ make BOARD=feather_nrf52840_express all 
 Compiling file: main.c
 /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
 make: *** [_build/main.o] Error 127
