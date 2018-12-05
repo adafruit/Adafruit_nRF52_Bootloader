@@ -23,7 +23,8 @@ before_script:
   - arm-none-eabi-gcc --version
   - python3 --version
   - python --version
-  - pip install --user adafruit-nrfutil
+  - sudo apt-get install -y python3-pip python3-setuptools
+  - pip3 install --user adafruit-nrfutil
 
 script:
   - python3 tools/build_all.py
