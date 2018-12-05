@@ -44,7 +44,7 @@
  *------------------------------------------------------------------*/
  #define LEDS_NUMBER    1
  #define LED_PRIMARY_PIN           _PINNUM(1, 12)
- #define LED_STATE_ON   0
+ #define LED_STATE_ON   1
 
  #define LED_RGB_RED_PIN           _PINNUM(0, 13)
  #define LED_RGB_GREEN_PIN         _PINNUM(0, 14)
