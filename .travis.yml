@@ -6,8 +6,7 @@ compiler:
 
 deploy:
   provider: releases
-  api_key:
-    secure: "V1vhyc4D4Czy8gM5OakKfdBGJ/YEdfsuOpJcFSmwFCz6RJYPROGXRDI6srU2L2wpvIVU0z+9wJ2VDXuspqzaCNlZST1HPNZxHNDm3BsbJrEHpaQ806T4msMH+QzrI2I++dGtG52xvFXaNDL5C1cEple4q5zDoSlQ1umfD5wDQHTy0KMwIOXRbT0yO4bF5nKAtWhbiRmg4jjd7Io5NYRPo4OR8eDOQJNQSQAjdWEgdoOSK9p76OKJxN127O5cR2EYXDu4NEg1JH3ta+FlVrH9/nvC6sORYaLDOBk+tk6IflggSlUqi+oJakLBMCI5OvIX0duBbsuLPI+5YtvwVSNQbcA1gFu+0hMEeu6Ev1sZTv8uhJchoSDrMSlNKlHeAE1nYJuqIsTybyCxAR9qeViKEIhNn+WC0PijrgcVodXlE2ydh7fhla1ehLt/q+wpEjlq5PCZnhu2RCXhnIqBhmTcTFPsC0C6dkzHivmOAlMjDBtHtStI22EhvGXZAvDsSLvLjMBbAUiFmpC7ORlF+W/w00r75BangRtaj4KHEuEIvdtWUxDxCqqSIFiS4lIh8ajW/O2CgJODWBm7CDi1092jv7M4kIA4IpL4uvt0FJhppUZvyfPdO2YgN1Uv9Dko5Qu5PJp6vF57QJwU3yFsSnU9lQRu54XHlQCjBKnzvTrA56g="
+  api_key: "$GITHUB_TOKEN"
   file:
   - $(ls -d1 bin/*/* | tr "\n" ":")
   skip_cleanup: true
