@@ -5,7 +5,6 @@
 #
 # - SD_NAME  : e.g s132, s140
 # - SD_VER1, SD_VER2, SD_VER3: SoftDevice version e.g 6.0.0
-# - SD_VER4  : is build number for bootloader
 # - SD_HEX   : to bootloader hex binary
 #******************************************************************************
 SRC_PATH        = src
@@ -20,10 +19,9 @@ NRFX_PATH				= lib/nrfx
 SD_VER1         = 6
 SD_VER2         = 1
 SD_VER3         = 1
-SD_VER4         = 0
 
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
-SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
+SD_VERSION_FULL = $(SD_VERSION)
 SD_FILENAME		  = $(SD_NAME)_nrf52_$(SD_VERSION)
 
 
@@ -36,7 +34,7 @@ MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
 
 
-MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION) r$(SD_VER4)"
+MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
 
 GIT_VERSION = $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
@@ -256,7 +254,7 @@ CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin --short-enums -fstack-usage
 
 # Defined Symbol (MACROS)
-CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
+CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)UL
 
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
@@ -268,7 +266,7 @@ CFLAGS += -DFLOAT_ABI_HARD
 CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
-CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION) r$(SD_VER4)"'
+CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
 
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 
