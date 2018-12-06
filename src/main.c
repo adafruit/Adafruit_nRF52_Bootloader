@@ -170,12 +170,12 @@ int main(void)
   // When updating SoftDevice, bootloader will reset before swapping SD
   if (bootloader_dfu_sd_in_progress())
   {
-    led_red_blink_fast(true);
+    led_state(STATE_WRITING_STARTED);
 
     APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
     APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
 
-    led_red_blink_fast(false);
+    led_state(STATE_WRITING_FINISHED);
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
@@ -209,18 +209,19 @@ int main(void)
 
   (*dbl_reset_mem) = 0;
 
+  led_state(STATE_BOOTLOADER_STARTED);
+
   if ( dfu_start || !valid_app )
   {
     if ( _ota_dfu )
     {
-      // Enable BLE if in OTA
-      led_pwm_init(LED_BLUE);
-
+      led_state(STATE_BLE_DISCONNECTED);
       softdev_init(!sd_inited);
       sd_inited = true;
     }
     else
     {
+      led_state(STATE_USB_UNMOUNTED);
       // otherwise USB for Serial & UF2
       usb_init(serial_only_dfu);
     }
@@ -230,9 +231,6 @@ int main(void)
 
     if ( _ota_dfu )
     {
-      led_pwm_teardown(LED_BLUE);
-      led_off(LED_BLUE);
-
       sd_softdevice_disable();
     }else
     {
@@ -267,9 +265,7 @@ int main(void)
 // Perform factory reset to erase Application + Data
 void adafruit_factory_reset(void)
 {
-  // Blink fast RED and turn on BLUE when erasing
-  led_red_blink_fast(true);
-  led_on(LED_BLUE);
+  led_state(STATE_FACTORY_RESET_STARTED);
 
   // clear all App Data if any
   if ( DFU_APP_DATA_RESERVED )
@@ -281,8 +277,7 @@ void adafruit_factory_reset(void)
   nrf_nvmc_page_erase(DFU_BANK_0_REGION_START);
 
   // back to normal
-  led_red_blink_fast(false);
-  led_off(LED_BLUE);
+  led_state(STATE_FACTORY_RESET_FINISHED);
 }
 
 /**
@@ -394,13 +389,12 @@ uint32_t proc_ble(void)
     {
       case BLE_GAP_EVT_CONNECTED:
         _ota_connected = true;
-        led_pwm_disable(LED_BLUE);
-        led_on(LED_BLUE);
+        led_state(STATE_BLE_CONNECTED);
       break;
 
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
-        led_pwm_enable(LED_BLUE); // LED Blink
+        led_state(STATE_BLE_DISCONNECTED);
       break;
 
       default: break;
@@ -455,5 +449,3 @@ void SD_EVT_IRQHandler(void)
   // Use App Scheduler to defer handling code in non-isr context
   app_sched_event_put(NULL, 0, ada_sd_task);
 }
-
-

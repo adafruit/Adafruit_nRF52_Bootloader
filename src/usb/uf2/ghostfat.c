@@ -235,7 +235,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /** uf2 upgrade complete -> inform bootloader to update setting and reset */
 static void uf2_write_complete(uint32_t numBlocks)
 {
-  led_red_blink_fast(false);
+  led_state(STATE_WRITING_FINISHED);
 
   dfu_update_status_t update_status;
 
@@ -285,9 +285,9 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
         static bool first_write = true;
         if ( first_write ) {
           first_write = false;
-          led_red_blink_fast(true);
+          led_state(STATE_WRITING_STARTED);
         }
-    
+
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
     }
 
@@ -318,4 +318,3 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
 
     return 512;
 }
-

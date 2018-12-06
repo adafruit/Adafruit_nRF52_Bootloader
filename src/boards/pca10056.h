@@ -41,8 +41,8 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          13
-#define LED_2          14
+#define LED_PRIMARY_PIN    13
+#define LED_SECONDARY_PIN   14
 #define LED_STATE_ON   0
 
 /*------------------------------------------------------------------*/

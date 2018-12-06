@@ -41,8 +41,8 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER    2
-#define LED_1          17
-#define LED_2          19
+#define LED_PRIMARY_PIN  17 // Red
+#define LED_SECONDARY_PIN 19 // Blue
 #define LED_STATE_ON   1
 
 /*------------------------------------------------------------------*/
@@ -65,5 +65,7 @@
 // Used as model string in OTA mode
 #define DIS_MANUFACTURER  "Adafruit Industries"
 #define DIS_MODEL         "Bluefruit Feather nRF52832"
+
+#define PRODUCT_NAME      "Adafruit Bluefruit Feather nRF52832"
 
 #endif // _FEATHER52832_H

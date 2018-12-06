@@ -5,7 +5,6 @@
 #
 # - SD_NAME  : e.g s132, s140
 # - SD_VER1, SD_VER2, SD_VER3: SoftDevice version e.g 6.0.0
-# - SD_VER4  : is build number for bootloader
 # - SD_HEX   : to bootloader hex binary
 #******************************************************************************
 SRC_PATH        = src
@@ -20,10 +19,9 @@ NRFX_PATH				= lib/nrfx
 SD_VER1         = 6
 SD_VER2         = 1
 SD_VER3         = 1
-SD_VER4         = 0
 
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
-SD_VERSION_FULL = $(SD_VERSION)r$(SD_VER4)
+SD_VERSION_FULL = $(SD_VERSION)
 SD_FILENAME		  = $(SD_NAME)_nrf52_$(SD_VERSION)
 
 
@@ -31,14 +29,17 @@ SD_API_PATH     = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX          = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
-OUTPUT_FILENAME = $(BOARD)_bootloader
 
 MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
 RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
 
 
-MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION) r$(SD_VER4)"
+MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
 
+GIT_VERSION = $(shell git describe --dirty --always --tags)
+GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
+
+OUTPUT_FILENAME = $(BOARD)_bootloader-$(GIT_VERSION)
 #******************************************************************************
 # Tool configure
 #******************************************************************************
@@ -53,9 +54,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 PROGFILES = C:/Program Files (x86)
-GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update
-else
-GNU_INSTALL_ROOT = /usr
+GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update/bin/
 endif
 
 MK := mkdir
@@ -70,14 +69,14 @@ endif
 GNU_PREFIX = arm-none-eabi
 
 # Toolchain commands
-CC      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-gcc'
-AS      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-as'
-AR      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ar' -r
-LD      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-ld'
-NM      := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-nm'
-OBJDUMP := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-objdump'
-OBJCOPY := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-objcopy'
-SIZE    := '$(GNU_INSTALL_ROOT)/bin/$(GNU_PREFIX)-size'
+CC      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-gcc'
+AS      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-as'
+AR      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-ar' -r
+LD      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-ld'
+NM      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-nm'
+OBJDUMP := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objdump'
+OBJCOPY := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objcopy'
+SIZE    := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-size'
 
 #function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
@@ -87,7 +86,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
 
-NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express
+NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express particle_argon particle_boron particle_xenon
 IS_NRF52840 = $(filter $(BOARD),$(NRF52840_BOARDLIST))
 
 ifeq ($(filter $(MAKECMDGOALS),all-board all-release help),)
@@ -255,7 +254,7 @@ CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin --short-enums -fstack-usage
 
 # Defined Symbol (MACROS)
-CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)0$(SD_VER4)UL
+CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)UL
 
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
@@ -266,6 +265,8 @@ CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DFLOAT_ABI_HARD
 CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
+
+CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
 
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 
@@ -353,7 +354,7 @@ endif
 .phony: all clean size flash sd erase
 
 # default target to build
-all: $(BUILD)/$(OUTPUT_FILENAME).out size
+all: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out size
 
 # Rule using BOARD_LIST, nl is newline
 define nl
@@ -370,7 +371,7 @@ all-board:
 
 all-release:
 	$(call _make_all_board,clean all release)
-	
+
 help:
 	@echo To flash (with jlink) a pre-built binary with a specific version to a board
 	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.1r0 flash
@@ -399,7 +400,7 @@ __check_defined = \
 ifeq ($(VERSION),)
 
 # Flash the compiled
-flash: $(BUILD)/$(OUTPUT_FILENAME).hex
+flash: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 
@@ -454,11 +455,11 @@ $(BUILD)/%.o: %.S
 	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUTPUT_FILENAME).out: $(BUILD) $(OBJECTS)
-	@echo LD $(OUTPUT_FILENAME).out
-	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $(BUILD)/$(OUTPUT_FILENAME).out
+$(BUILD)/$(OUTPUT_FILENAME)-nosd.out: $(BUILD) $(OBJECTS)
+	@echo LD $(OUTPUT_FILENAME)-nosd.out
+	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
 
-size: $(BUILD)/$(OUTPUT_FILENAME).out
+size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 	-@echo ''
 	$(QUIET)$(SIZE) $<
 	-@echo ''
@@ -468,24 +469,24 @@ size: $(BUILD)/$(OUTPUT_FILENAME).out
 .phony: genhex genpkg release
 
 ## Create binary .hex file from the .out file
-genhex: $(BUILD)/$(OUTPUT_FILENAME).hex
+genhex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 
-$(BUILD)/$(OUTPUT_FILENAME).hex: $(BUILD)/$(OUTPUT_FILENAME).out
-	@echo CR $(OUTPUT_FILENAME).hex
+$(BUILD)/$(OUTPUT_FILENAME)-nosd.hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
+	@echo CR $(OUTPUT_FILENAME)-nosd.hex
 	$(QUIET)$(OBJCOPY) -O ihex $< $@
 
 
 # merge bootloader and sd hex together
 combinehex: $(BUILD)/$(MERGED_FNAME).hex
 
-$(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@echo CR $(MERGED_FNAME).hex
 	@mergehex -q -m $< $(SD_HEX) -o $@
 
 ## Create pkg file for bootloader+SD combo to use with DFU
 genpkg: $(BUILD)/$(MERGED_FNAME).zip
 
-$(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME).hex
+$(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
 
 # Create SD+bootloader combo with hex & dfu package at release folder

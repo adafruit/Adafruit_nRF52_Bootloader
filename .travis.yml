@@ -1,0 +1,33 @@
+sudo: required
+dist: xenial
+language: c
+compiler:
+  - gcc
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "HGfSIgVPX8O+Wfs3E1l/qI8tJZ6wwEgFg3EO6E1+6eGZolr+LW+ANpMUTqcKy18VzbnSx+AH5Ktu8bw4XuPQRPaAvEIMDEZSbj//WE/nqo+p+SccxUy+mKK6x/gb4aiWUw8gYebeLNvWkU+JVupRqMkUdFOJJRZiIvp1usX+jNU8vTt07INNi90LZ8I/KvDEkvHJ/2nOBKW519rlp5XM0a5j8Bv+9gt5wgfl/hFW42JA4Gmj/nacZtro/3pYJWAZ4ZNLOsupMDPZGFX/Ndb+TqseBAkCLl2bvBZ5gFg4NvtaSRFZW532EXDmdCthUBLUGjw7V3VWq8shgHSi6Iq/5lL9t2jawkJPfp5JdiTPTLkUIZ8BfwwrbHp2qiTOGQHbN8kkfjtcQopjVdaPvavr4oaUN+ju6JNsTNc47FIcKivMi1TV6IUT4byjIWZ7ioV0X7KEdoD5WspjIYVhi1vwOBOLT0CEDMtPwIisZ3QuQGJ5clDMJ82ZU9LBfffzvBkeQNmMCM5L412FN7LP2lVNL5eafuJvFZS9Bpbp9uUhzHsDbbpLnz8TFa5rIMzKQXf1KbLnKZ7LHsieB2NleUE6OUxltNm1PwmWWxZKEZeRYxZSMgzbAOrl/Jl2F7zCU7RWCFRnvC73vVJAXaFJ3/DYBF21ew8NyOgMrRLOeH0s5rg="
+  file:
+  - $(ls -d1 bin/*/* | tr "\n" ":")
+  skip_cleanup: true
+  draft: true
+  on:
+    tags: true
+
+before_script:
+  - (wget https://s3.amazonaws.com/adafruit-circuit-python/gcc-arm-embedded_7-2018q2-1~xenial1_amd64.deb && sudo dpkg -i gcc-arm-embedded*_amd64.deb)
+  - (wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar && tar -xv -f cli-tools.tar && mv mergehex mergehex_all && mv mergehex_all/mergehex .)
+  - export PATH=.:$PATH
+  - mergehex --version
+
+  # report some good version numbers to the build
+  - gcc --version
+  - arm-none-eabi-gcc --version
+  - python3 --version
+  - python --version
+  - sudo apt-get install -y python3-pip python3-setuptools
+  - pip3 install --user adafruit-nrfutil
+
+script:
+  - python3 tools/build_all.py

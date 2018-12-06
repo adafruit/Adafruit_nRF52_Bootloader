@@ -136,6 +136,8 @@ static void wait_for_events(void)
     }
 #endif
 
+    led_tick();
+
     if ((m_update_status == BOOTLOADER_COMPLETE) ||
         (m_update_status == BOOTLOADER_TIMEOUT) ||
         (m_update_status == BOOTLOADER_RESET) )
@@ -221,8 +223,8 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
     else if (update_status.status_code == DFU_UPDATE_SD_COMPLETE)
     {
         settings.bank_0_crc     = update_status.app_crc;
-        settings.bank_0_size    = update_status.sd_size + 
-                                  update_status.bl_size + 
+        settings.bank_0_size    = update_status.sd_size +
+                                  update_status.bl_size +
                                   update_status.app_size;
         settings.bank_0         = BANK_VALID_SD;
         settings.bank_1         = BANK_INVALID_APP;
@@ -326,7 +328,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
     uint32_t err_code;
 
     // Clear swap if banked update is used.
-    err_code = dfu_init(); 
+    err_code = dfu_init();
     VERIFY_SUCCESS(err_code);
 
     if ( ota )
@@ -467,4 +469,3 @@ void bootloader_settings_get(bootloader_settings_t * const p_settings)
     p_settings->app_image_size = p_bootloader_settings->app_image_size;
     p_settings->sd_image_start = p_bootloader_settings->sd_image_start;
 }
-
