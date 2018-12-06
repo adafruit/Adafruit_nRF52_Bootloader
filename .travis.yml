@@ -7,8 +7,8 @@ compiler:
 deploy:
   provider: releases
   api_key: "$GITHUB_TOKEN"
-  file:
-  - $(ls -d1 bin/*/* | tr "\n" ":")
+  file_glob: true
+  file: "$TRAVIS_BUILD_DIR/bin/*/*"
   skip_cleanup: true
   draft: true
   on:
