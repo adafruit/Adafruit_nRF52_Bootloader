@@ -475,7 +475,6 @@ $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 	@echo CR $(OUTPUT_FILENAME)-nosd.hex
 	$(QUIET)$(OBJCOPY) -O ihex $< $@
 
-
 # merge bootloader and sd hex together
 combinehex: $(BUILD)/$(MERGED_FNAME).hex
 
