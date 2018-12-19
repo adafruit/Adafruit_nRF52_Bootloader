@@ -28,7 +28,7 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
 MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
-RELEASE_DIR  = bin/$(BOARD)/$(SD_VERSION)
+RELEASE_DIR  = bin/$(BOARD)
 
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
