@@ -3,7 +3,7 @@
 This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 
 - [Adafruit Feather nRF52832](https://www.adafruit.com/product/3406)
-- Adafruit Feather nRF52840 Express
+- [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062)
 - Nordic nRF52840DK PCA10056
 - Nordic nRF52840DK PCA10059 ("Dongle")
 - Particle Argon

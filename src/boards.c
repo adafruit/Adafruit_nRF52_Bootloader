@@ -291,7 +291,7 @@ void led_state(uint32_t state)
     #endif
 }
 
-#if LED_NEOPIXEL
+#ifdef LED_NEOPIXEL
 
 // WS2812B (rev B) timing is 0.4 and 0.8 us
 #define MAGIC_T0H               6UL | (0x8000) // 0.375us
