@@ -74,20 +74,7 @@ For other boards, please check the board definition for details.
 You can burn and/or upgrade the bootloader with either a J-link or DFU (serial) to a specific pre-built binary version
 without the hassle of installing a toolchain and compiling the code.
 This is preferred if you are not developing/customizing the bootloader.
-
-To flash version `6.1.1r0` using J-Link:
-
-```
-make BOARD=feather_nrf52840_express VERSION=6.1.1r0 flash
-```
-
-To upgrade with dfu serial
-
-```
-make BOARD=feather_nrf52840_express VERSION=6.1.1r0 dfu-flash
-```
-
-Pre-builtin binaries are available on GitHub releases.
+Pre-builtin binaries are available on GitHub [releases](https://github.com/adafruit/Adafruit_nRF52_Bootloader/releases)
 
 Note: The bootloader can be downgraded. Since the binary release is a merged version of
 of both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to any version you like.
