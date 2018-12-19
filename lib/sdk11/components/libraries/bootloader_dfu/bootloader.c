@@ -128,8 +128,9 @@ static void wait_for_events(void)
     app_sched_execute();
 
 #ifdef NRF52840_XXAA
-    // usb is not enabled in OTA
-    if ( !is_ota() )
+    // skip if usb is not inited ( e.g OTA / finializing sd/bootloader )
+    extern bool usb_inited(void);
+    if ( usb_inited() )
     {
       tusb_task();
       tud_cdc_write_flush();
