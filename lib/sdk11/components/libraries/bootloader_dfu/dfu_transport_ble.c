@@ -741,7 +741,6 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GAP_EVT_CONNECTED:
             m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
             m_is_advertising = false;
-            led_state(STATE_BLE_CONNECTED);
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -750,8 +749,6 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
                 uint16_t sys_attr_len = 128;
 
                 m_direct_adv_cnt = APP_DIRECTED_ADV_TIMEOUT;
-
-                led_state(STATE_BLE_DISCONNECTED);
 
                 err_code = sd_ble_gatts_sys_attr_get(m_conn_handle,
                                                      sys_attr,

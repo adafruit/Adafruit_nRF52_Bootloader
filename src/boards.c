@@ -82,6 +82,7 @@ void board_init(void)
   app_timer_init();
 
   // Configure Systick for led blinky
+  NVIC_SetPriority(SysTick_IRQn, 7);
   extern uint32_t SystemCoreClock;
   SysTick_Config(SystemCoreClock/1000);
 }
