@@ -7,28 +7,28 @@
 # - SD_VER1, SD_VER2, SD_VER3: SoftDevice version e.g 6.0.0
 # - SD_HEX   : to bootloader hex binary
 #******************************************************************************
-SRC_PATH        = src
+SRC_PATH     = src
 
-SDK_PATH        = lib/sdk/components
-SDK11_PATH      = lib/sdk11/components
-SD_PATH     		= lib/softdevice/$(SD_FILENAME)
+SDK_PATH     = lib/sdk/components
+SDK11_PATH   = lib/sdk11/components
+SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
-TUSB_PATH       = lib/tinyusb/src
-NRFX_PATH				= lib/nrfx
+TUSB_PATH    = lib/tinyusb/src
+NRFX_PATH    = lib/nrfx
 
-SD_VER1         = 6
-SD_VER2         = 1
-SD_VER3         = 1
+SD_VER1      = 6
+SD_VER2      = 1
+SD_VER3      = 1
 
-SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
-SD_FILENAME		  = $(SD_NAME)_nrf52_$(SD_VERSION)
-SD_API_PATH     = $(SD_PATH)/$(SD_FILENAME)_API
-SD_HEX          = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
+SD_VERSION   = $(SD_VER1).$(SD_VER2).$(SD_VER3)
+SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
+SD_API_PATH  = $(SD_PATH)/$(SD_FILENAME)_API
+SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
-LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
+LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
-MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
-RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION)
+MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
+RELEASE_DIR  = bin/$(BOARD)/$(SD_VERSION)
 
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
