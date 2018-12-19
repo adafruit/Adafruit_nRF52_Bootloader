@@ -71,7 +71,7 @@ void usb_teardown(void);
 
 #else
 
-#define usb_init(x)
+#define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
 #define usb_teardown()
 
 #endif
@@ -167,6 +167,8 @@ int main(void)
   board_init();
   bootloader_init();
 
+  led_state(STATE_BOOTLOADER_STARTED);
+
   // When updating SoftDevice, bootloader will reset before swapping SD
   if (bootloader_dfu_sd_in_progress())
   {
@@ -209,8 +211,6 @@ int main(void)
 
   (*dbl_reset_mem) = 0;
 
-  led_state(STATE_BOOTLOADER_STARTED);
-
   if ( dfu_start || !valid_app )
   {
     if ( _ota_dfu )
@@ -222,7 +222,6 @@ int main(void)
     else
     {
       led_state(STATE_USB_UNMOUNTED);
-      // otherwise USB for Serial & UF2
       usb_init(serial_only_dfu);
     }
 

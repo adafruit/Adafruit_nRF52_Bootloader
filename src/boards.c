@@ -154,6 +154,8 @@ void led_pwm_init(uint32_t led_index, uint32_t led_pin)
   pwm->ENABLE = 0;
 
   nrf_gpio_cfg_output(led_pin);
+  nrf_gpio_pin_write(led_pin, 1 - LED_STATE_ON);
+
   pwm->PSEL.OUT[led_index] = led_pin;
 
   pwm->MODE            = PWM_MODE_UPDOWN_Up;
@@ -170,7 +172,7 @@ void led_pwm_init(uint32_t led_index, uint32_t led_pin)
   pwm->ENABLE = 1;
 
   pwm->EVENTS_SEQEND[0] = 0;
-  pwm->TASKS_SEQSTART[0] = 1;
+//  pwm->TASKS_SEQSTART[0] = 1;
 }
 
 void led_pwm_teardown(void)
@@ -221,32 +223,28 @@ static uint32_t rgb_color;
 static bool temp_color_active = false;
 void led_state(uint32_t state)
 {
-    enum {
-      CYCLE_NORMAL = 4000,
-      CYCLE_WRITING = 100
-    };
     uint32_t new_rgb_color = rgb_color;
     uint32_t temp_color = 0;
     switch (state) {
         case STATE_USB_MOUNTED:
           new_rgb_color = 0x00ff00;
-          primary_cycle_length = CYCLE_NORMAL;
+          primary_cycle_length = 3000;
           break;
 
         case STATE_BOOTLOADER_STARTED:
         case STATE_USB_UNMOUNTED:
           new_rgb_color = 0xff0000;
-          primary_cycle_length = CYCLE_NORMAL;
+          primary_cycle_length = 300;
           break;
 
         case STATE_WRITING_STARTED:
           temp_color = 0xff0000;
-          primary_cycle_length = CYCLE_WRITING;
+          primary_cycle_length = 100;
           break;
 
         case STATE_WRITING_FINISHED:
           // Empty means to unset any temp colors.
-          primary_cycle_length = CYCLE_NORMAL;
+          primary_cycle_length = 3000;
           break;
 
         case STATE_BLE_CONNECTED:

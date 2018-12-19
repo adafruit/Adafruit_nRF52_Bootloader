@@ -108,8 +108,6 @@ static inline bool button_pressed(uint32_t pin)
   return (nrf_gpio_pin_read(pin) == 0) ? true : false;
 }
 
-
-
 bool is_ota(void);
 
 #endif
