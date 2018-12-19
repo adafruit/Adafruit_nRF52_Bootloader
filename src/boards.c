@@ -80,10 +80,17 @@ void board_init(void)
 
   // Init app timer (use RTC1)
   app_timer_init();
+
+  // Configure Systick for led blinky
+  extern uint32_t SystemCoreClock;
+  SysTick_Config(SystemCoreClock/1000);
 }
 
 void board_teardown(void)
 {
+  // Disable systick, turn off LEDs
+  SysTick->CTRL = 0;
+
   // Disable and reset PWM for LEDs
   led_pwm_teardown();
 
@@ -104,11 +111,19 @@ void board_teardown(void)
   NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
 }
 
+static uint32_t _systick_count = 0;
+void SysTick_Handler(void)
+{
+  _systick_count++;
+
+  led_tick();
+}
+
+
 uint32_t tusb_hal_millis(void)
 {
   return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
 }
-
 
 void pwm_teardown(NRF_PWM_Type* pwm )
 {
@@ -126,7 +141,7 @@ void pwm_teardown(NRF_PWM_Type* pwm )
   pwm->SEQ[0].CNT  = 0;
 }
 
-static uint16_t led_duty_cycles[PWM0_CH_NUM];
+static uint16_t led_duty_cycles[PWM0_CH_NUM] = { 0 };
 
 #if LEDS_NUMBER > PWM0_CH_NUM
 #error "Only " PWM0_CH_NUM " concurrent status LEDs are supported."
@@ -136,10 +151,11 @@ void led_pwm_init(uint32_t led_index, uint32_t led_pin)
 {
   NRF_PWM_Type* pwm    = NRF_PWM0;
 
+  pwm->ENABLE = 0;
+
   nrf_gpio_cfg_output(led_pin);
   pwm->PSEL.OUT[led_index] = led_pin;
 
-  pwm->ENABLE = 1;
   pwm->MODE            = PWM_MODE_UPDOWN_Up;
   pwm->COUNTERTOP      = 0xff;
   pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_16;
@@ -150,7 +166,10 @@ void led_pwm_init(uint32_t led_index, uint32_t led_pin)
   pwm->SEQ[0].CNT      = 4; // default mode is Individual --> count must be 4
   pwm->SEQ[0].REFRESH  = 0;
   pwm->SEQ[0].ENDDELAY = 0;
-  pwm->LOOP = 0;
+
+  pwm->ENABLE = 1;
+
+  pwm->EVENTS_SEQEND[0] = 0;
   pwm->TASKS_SEQSTART[0] = 1;
 }
 
@@ -171,7 +190,7 @@ static uint32_t primary_cycle_length;
 static uint32_t secondary_cycle_length;
 #endif
 void led_tick() {
-    uint32_t millis = tusb_hal_millis();
+    uint32_t millis = _systick_count;
 
     uint32_t cycle = millis % primary_cycle_length;
     uint32_t half_cycle = primary_cycle_length / 2;
@@ -202,24 +221,34 @@ static uint32_t rgb_color;
 static bool temp_color_active = false;
 void led_state(uint32_t state)
 {
+    enum {
+      CYCLE_NORMAL = 4000,
+      CYCLE_WRITING = 100
+    };
     uint32_t new_rgb_color = rgb_color;
     uint32_t temp_color = 0;
     switch (state) {
         case STATE_USB_MOUNTED:
           new_rgb_color = 0x00ff00;
-          primary_cycle_length = 4000;
+          primary_cycle_length = CYCLE_NORMAL;
           break;
+
         case STATE_BOOTLOADER_STARTED:
         case STATE_USB_UNMOUNTED:
           new_rgb_color = 0xff0000;
-          primary_cycle_length = 300;
+          primary_cycle_length = CYCLE_NORMAL;
           break;
+
         case STATE_WRITING_STARTED:
           temp_color = 0xff0000;
+          primary_cycle_length = CYCLE_WRITING;
           break;
+
         case STATE_WRITING_FINISHED:
           // Empty means to unset any temp colors.
+          primary_cycle_length = CYCLE_NORMAL;
           break;
+
         case STATE_BLE_CONNECTED:
           new_rgb_color = 0x0000ff;
           #ifdef LED_SECONDARY_PIN
@@ -228,6 +257,7 @@ void led_state(uint32_t state)
           primary_cycle_length = 500;
           #endif
           break;
+
         case STATE_BLE_DISCONNECTED:
           new_rgb_color = 0xff00ff;
           #ifdef LED_SECONDARY_PIN
@@ -236,6 +266,7 @@ void led_state(uint32_t state)
           primary_cycle_length = 300;
           #endif
           break;
+
         default:
         break;
     }

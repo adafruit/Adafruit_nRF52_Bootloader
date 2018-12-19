@@ -136,8 +136,6 @@ static void wait_for_events(void)
     }
 #endif
 
-    led_tick();
-
     if ((m_update_status == BOOTLOADER_COMPLETE) ||
         (m_update_status == BOOTLOADER_TIMEOUT) ||
         (m_update_status == BOOTLOADER_RESET) )

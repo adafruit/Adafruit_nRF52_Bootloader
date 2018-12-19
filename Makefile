@@ -21,17 +21,14 @@ SD_VER2         = 1
 SD_VER3         = 1
 
 SD_VERSION      = $(SD_VER1).$(SD_VER2).$(SD_VER3)
-SD_VERSION_FULL = $(SD_VERSION)
 SD_FILENAME		  = $(SD_NAME)_nrf52_$(SD_VERSION)
-
-
 SD_API_PATH     = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX          = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 LD_FILE   			= $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
-MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION_FULL)
-RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION_FULL)
+MERGED_FNAME   = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
+RELEASE_DIR     = bin/$(BOARD)/$(SD_VERSION)
 
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
@@ -44,7 +41,6 @@ OUTPUT_FILENAME = $(BOARD)_bootloader-$(GIT_VERSION)
 # Tool configure
 #******************************************************************************
 NRFUTIL = adafruit-nrfutil
-
 
 ifneq ($(JLINK),)
 NRFJPROG = nrfjprog -s $(JLINK)
