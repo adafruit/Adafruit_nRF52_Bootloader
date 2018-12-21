@@ -347,9 +347,10 @@ void neopixel_init(void)
 void neopixel_teardown(void)
 {
   uint8_t grb[3] = { 0, 0, 0 };
-  neopixel_write(grb);
 
-  NRFX_DELAY_US(100);
+  NRFX_DELAY_US(100);  // wait for previous write is complete
+  neopixel_write(grb);
+  NRFX_DELAY_US(100);  // wait for this write
 
   pwm_teardown(NRF_PWM2);
 }
