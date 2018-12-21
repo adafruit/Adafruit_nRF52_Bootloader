@@ -26,7 +26,7 @@ $ pip3 install --user adafruit-nrfutil
 
 This repository depends on the following submodules:
 
-- [tinyusb](https://github.com/hathach/tinyusb/tree/develop)
+- [tinyusb](https://github.com/hathach/tinyusb)
 - [nrfx](https://github.com/NordicSemiconductor/nrfx)
 
 Note that `tinyusb` also includes `nrfx` as a submodule, so you need
