@@ -65,8 +65,20 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 
 
 //------------- IMPLEMENTATION -------------//
+static bool _inited = false;
+
+bool usb_inited(void)
+{
+  return _inited;
+}
+
 void usb_init(bool cdc_only)
 {
+  // skipped if already inited
+  if ( _inited ) return;
+
+  _inited = true;
+
   // USB power may already be ready at this time -> no event generated
   // We need to invoke the handler based on the status initially
   uint32_t usb_reg;
