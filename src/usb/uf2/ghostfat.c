@@ -83,7 +83,7 @@ static struct TextFile const info[] = {
 };
 #define NUM_INFO (sizeof(info) / sizeof(info[0]))
 
-#define UF2_SIZE           (get_flash_size() * 2)
+#define UF2_SIZE           (current_flash_size() * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
 #define UF2_FIRST_SECTOR   (NUM_INFO + 1)
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
@@ -120,7 +120,9 @@ static FAT_BootBlock const BootBlock = {
 #define NRF_LOG_WARNING(...)
 
 static WriteState _wr_state = { 0 };
-static uint32_t get_flash_size(void)
+
+// get current.uf2 flash size in bytes, round up to 256 bytes
+static uint32_t current_flash_size(void)
 {
   static uint32_t flash_sz = 0;
 
@@ -136,10 +138,17 @@ static uint32_t get_flash_size(void)
       bootloader_settings_t const * boot_setting;
       bootloader_util_settings_get(&boot_setting);
 
+      flash_sz = boot_setting->bank_0_size;
+
+      // Copy size must be multiple of 256 bytes
+      // else we will got an issue copying current.uf2
+      if (flash_sz & 0xff)
+      {
+        flash_sz = (flash_sz & ~0xff) + 256;
+      }
+
       // if bank0 size is not valid, happens when flashed with jlink
       // use maximum application size
-
-      flash_sz = boot_setting->bank_0_size;
       if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
       {
         flash_sz = FLASH_SIZE;
@@ -217,7 +226,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->magicStart1 = UF2_MAGIC_START1;
                 bl->magicEnd = UF2_MAGIC_END;
                 bl->blockNo = sectionIdx;
-                bl->numBlocks = FLASH_SIZE / 256;
+                bl->numBlocks = current_flash_size() / 256;
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
                 bl->flags = UF2_FLAG_FAMILYID;
