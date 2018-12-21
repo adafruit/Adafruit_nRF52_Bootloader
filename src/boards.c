@@ -348,9 +348,10 @@ void neopixel_teardown(void)
 {
   uint8_t grb[3] = { 0, 0, 0 };
 
-  NRFX_DELAY_US(100);  // wait for previous write is complete
+  NRFX_DELAY_US(50);  // wait for previous write is complete
+
   neopixel_write(grb);
-  NRFX_DELAY_US(100);  // wait for this write
+  NRFX_DELAY_US(50);  // wait for this write
 
   pwm_teardown(NRF_PWM2);
 }
@@ -382,6 +383,10 @@ void neopixel_write (uint8_t *pixels)
   nrf_pwm_seq_cnt_set(pwm, 0, sizeof(pixels_pattern)/2);
   nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
   nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
+
+  // no need to blocking wait for sequence complete
+//  while( !nrf_pwm_event_check(pwm, NRF_PWM_EVENT_SEQEND0) ) {}
+//  nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
 }
 #endif
 
