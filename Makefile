@@ -82,8 +82,8 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
 
-NRF52840_BOARDLIST = pca10056 pca10059 feather_nrf52840_express particle_argon particle_boron particle_xenon
-IS_NRF52840 = $(filter $(BOARD),$(NRF52840_BOARDLIST))
+NRF52832_BOARDLIST = feather_nrf52832
+IS_52832 = $(filter $(BOARD),$(NRF52832_BOARDLIST))
 
 ifeq ($(filter $(MAKECMDGOALS),all-board all-release help),)
   ifeq ($(BOARD),)
@@ -100,12 +100,12 @@ endif
 
 BUILD = _build-$(BOARD)
 
-ifneq ($(IS_NRF52840),)
-SD_NAME = s140
-DFU_DEV_REV = 52840
-else
+ifneq ($(IS_52832),)
 SD_NAME = s132
 DFU_DEV_REV = 0xADAF
+else
+SD_NAME = s140
+DFU_DEV_REV = 52840
 endif
 
 
@@ -149,7 +149,19 @@ C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-ifneq ($(IS_NRF52840),)
+ifneq ($(IS_52832),)
+
+C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52.c
+
+C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
+C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
+C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
+
+IPATH += $(SDK11_PATH)/libraries/util
+IPATH += $(SDK_PATH)/drivers_nrf/common
+IPATH += $(SDK_PATH)/drivers_nrf/uart
+
+else
 
 # src
 C_SOURCE_FILES += $(SRC_PATH)/usb/usb_desc.c
@@ -171,28 +183,16 @@ C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/custom/custom_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
-else
-
-C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52.c
-
-C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
-
-IPATH += $(SDK11_PATH)/libraries/util
-IPATH += $(SDK_PATH)/drivers_nrf/common
-IPATH += $(SDK_PATH)/drivers_nrf/uart
-
 endif
 
 
 #******************************************************************************
 # Assembly Files
 #******************************************************************************
-ifneq ($(IS_NRF52840),)
-ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52840.S
-else
+ifneq ($(IS_52832),)
 ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52.S
+else
+ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_nrf52840.S
 endif
 
 #******************************************************************************
@@ -263,20 +263,15 @@ CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
-
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
 
-ifneq ($(IS_NRF52840),)
-
-CFLAGS += -DNRF52840_XXAA
-CFLAGS += -DS140
-
-else
-
+ifneq ($(IS_52832),)
 CFLAGS += -DNRF52
 CFLAGS += -DNRF52832_XXAA
 CFLAGS += -DS132
-
+else
+CFLAGS += -DNRF52840_XXAA
+CFLAGS += -DS140
 endif
 
 
@@ -310,18 +305,13 @@ ASMFLAGS += -DSWI_DISABLE0
 ASMFLAGS += -DSOFTDEVICE_PRESENT
 ASMFLAGS += -DFLOAT_ABI_HARD
 
-ifneq ($(IS_NRF52840),)
-
-ASMFLAGS += -DNRF52840_XXAA
-ASMFLAGS += -DS140
-
-else
-
+ifneq ($(IS_52832),)
 ASMFLAGS += -DNRF52
 ASMFLAGS += -DS132
-
+else
+ASMFLAGS += -DNRF52840_XXAA
+ASMFLAGS += -DS140
 endif
-
 
 C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
 C_PATHS = $(call remduplicates, $(dir $(C_SOURCE_FILES) ) )
@@ -448,12 +438,12 @@ $(BUILD)/%.o: %.c
 # Assemble files
 $(BUILD)/%.o: %.S
 	@echo AS $(notdir $<)
-	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
+	@$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
 $(BUILD)/$(OUTPUT_FILENAME)-nosd.out: $(BUILD) $(OBJECTS)
 	@echo LD $(OUTPUT_FILENAME)-nosd.out
-	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
+	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
 
 size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 	-@echo ''

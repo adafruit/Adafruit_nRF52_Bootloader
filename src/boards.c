@@ -384,9 +384,9 @@ void neopixel_write (uint8_t *pixels)
   nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
   nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
 
-  // no need to blocking wait for sequence complete
-//  while( !nrf_pwm_event_check(pwm, NRF_PWM_EVENT_SEQEND0) ) {}
-//  nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
+  // blocking wait for sequence complete
+  while( !nrf_pwm_event_check(pwm, NRF_PWM_EVENT_SEQEND0) ) {}
+  nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
 }
 #endif
 
