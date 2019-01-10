@@ -132,6 +132,9 @@ void pwm_teardown(NRF_PWM_Type* pwm )
   pwm->ENABLE            = 0;
 
   pwm->PSEL.OUT[0] = 0xFFFFFFFF;
+  pwm->PSEL.OUT[1] = 0xFFFFFFFF;
+  pwm->PSEL.OUT[2] = 0xFFFFFFFF;
+  pwm->PSEL.OUT[3] = 0xFFFFFFFF;
 
   pwm->MODE        = 0;
   pwm->COUNTERTOP  = 0x3FF;
@@ -301,6 +304,7 @@ void led_state(uint32_t state)
 
 static uint16_t pixels_pattern[NEO_NUMBYTE * 8 + 2];
 
+// use PWM1 for neopixel
 void neopixel_init(void)
 {
   // To support both the SoftDevice + Neopixels we use the EasyDMA
@@ -310,7 +314,7 @@ void neopixel_init(void)
   //              totalMem = numBytes*8*2+(2*2)
   // The two additional bytes at the end are needed to reset the
   // sequence.
-  NRF_PWM_Type* pwm = NRF_PWM2;
+  NRF_PWM_Type* pwm = NRF_PWM1;
 
   // Set the wave mode to count UP
   // Set the PWM to use the 16MHz clock
@@ -353,7 +357,7 @@ void neopixel_teardown(void)
   neopixel_write(grb);
   NRFX_DELAY_US(50);  // wait for this write
 
-  pwm_teardown(NRF_PWM2);
+  pwm_teardown(NRF_PWM1);
 }
 
 // write 3 bytes color to a built-in neopixel
@@ -376,8 +380,7 @@ void neopixel_write (uint8_t *pixels)
   pixels_pattern[pos++] = 0 | (0x8000);    // Seq end
   pixels_pattern[pos++] = 0 | (0x8000);    // Seq end
 
-
-  NRF_PWM_Type* pwm = NRF_PWM2;
+  NRF_PWM_Type* pwm = NRF_PWM1;
 
   nrf_pwm_seq_ptr_set(pwm, 0, pixels_pattern);
   nrf_pwm_seq_cnt_set(pwm, 0, sizeof(pixels_pattern)/2);
