@@ -64,7 +64,7 @@
 #define HCI_MEM_POOL_ENABLED               1
 #define HCI_TX_BUF_SIZE                    600
 #define HCI_RX_BUF_SIZE                    600
-#define HCI_RX_BUF_QUEUE_SIZE              4
+#define HCI_RX_BUF_QUEUE_SIZE              8
 
 //==========================================================
 // <e> UART_ENABLED - nrf_drv_uart - UART/UARTE peripheral driver
