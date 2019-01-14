@@ -56,10 +56,11 @@ endif
 MK := mkdir
 RM := rm -rf
 
+# Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
 ifeq ("$(V)","2")
-QUIET :=
+QUIET =
 else
-QUIET := @
+QUIET = @
 endif
 
 GNU_PREFIX = arm-none-eabi
@@ -335,6 +336,8 @@ $(info CFLAGS   $(CFLAGS))
 $(info )
 $(info LDFLAGS  $(LDFLAGS))
 $(info )
+$(info ASMFLAGS $(ASMFLAGS))
+$(info )
 endif
 
 .phony: all clean size flash sd erase
@@ -438,12 +441,12 @@ $(BUILD)/%.o: %.c
 # Assemble files
 $(BUILD)/%.o: %.S
 	@echo AS $(notdir $<)
-	@$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
+	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
 $(BUILD)/$(OUTPUT_FILENAME)-nosd.out: $(BUILD) $(OBJECTS)
 	@echo LD $(OUTPUT_FILENAME)-nosd.out
-	$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
+	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
 
 size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 	-@echo ''

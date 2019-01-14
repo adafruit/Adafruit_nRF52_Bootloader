@@ -40,32 +40,32 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER    2
-#define LED_PRIMARY_PIN  17 // Red
-#define LED_SECONDARY_PIN 19 // Blue
-#define LED_STATE_ON   1
+#define LEDS_NUMBER        2
+#define LED_PRIMARY_PIN    17 // Red
+#define LED_SECONDARY_PIN  19 // Blue
+#define LED_STATE_ON       1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER 2
-#define BUTTON_1       20
-#define BUTTON_2       22
-#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
+#define BUTTONS_NUMBER     2
+#define BUTTON_1           20
+#define BUTTON_2           22
+#define BUTTON_PULL        NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER  8
-#define TX_PIN_NUMBER  6
-#define CTS_PIN_NUMBER 7
-#define RTS_PIN_NUMBER 5
-#define HWFC           false
+#define RX_PIN_NUMBER      8
+#define TX_PIN_NUMBER      6
+#define CTS_PIN_NUMBER     0
+#define RTS_PIN_NUMBER     0
+#define HWFC               false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER  "Adafruit Industries"
-#define DIS_MODEL         "Bluefruit Feather nRF52832"
+#define DIS_MANUFACTURER   "Adafruit Industries"
+#define DIS_MODEL          "Bluefruit Feather nRF52832"
 
-#define PRODUCT_NAME      "Adafruit Bluefruit Feather nRF52832"
+#define PRODUCT_NAME       "Adafruit Bluefruit Feather nRF52832"
 
 #endif // _FEATHER52832_H
