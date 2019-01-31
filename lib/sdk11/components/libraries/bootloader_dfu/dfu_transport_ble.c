@@ -887,17 +887,9 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
         case BLE_GAP_EVT_PHY_UPDATE_REQUEST:
         {
-//          ble_gap_phys_t* req_phy = &evt->evt.gap_evt.params.phy_update_request.peer_preferred_phys;
-
           // Tell SoftDevice to choose PHY automatically
           ble_gap_phys_t phy = { BLE_GAP_PHY_AUTO, BLE_GAP_PHY_AUTO };
           (void) sd_ble_gap_phy_update(m_conn_handle, &phy);
-        }
-        break;
-
-        case BLE_GAP_EVT_PHY_UPDATE:
-        {
-//          ble_gap_evt_phy_update_t* active_phy = &evt->evt.gap_evt.params.phy_update;
         }
         break;
 
