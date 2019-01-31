@@ -42,21 +42,21 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
- #define LEDS_NUMBER    1
- #define LED_PRIMARY_PIN           _PINNUM(1, 12)
- #define LED_STATE_ON   1
+#define LEDS_NUMBER          1
+#define LED_PRIMARY_PIN      _PINNUM(1, 12)
+#define LED_STATE_ON         1
 
- #define LED_RGB_RED_PIN           _PINNUM(0, 13)
- #define LED_RGB_GREEN_PIN         _PINNUM(0, 14)
- #define LED_RGB_BLUE_PIN          _PINNUM(0, 15)
- #define BOARD_RGB_BRIGHTNESS 0x202020
+#define LED_RGB_RED_PIN      _PINNUM(0, 13)
+#define LED_RGB_GREEN_PIN    _PINNUM(0, 14)
+#define LED_RGB_BLUE_PIN     _PINNUM(0, 15)
+#define BOARD_RGB_BRIGHTNESS 0x202020
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER 2
-#define BUTTON_DFU          _PINNUM(0, 11)
-#define BUTTON_FRESET       _PINNUM(0, 03) // A0
+#define BUTTON_DFU     _PINNUM(0, 11)
+#define BUTTON_FRESET  _PINNUM(0, 03) // A0
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/

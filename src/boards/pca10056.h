@@ -40,30 +40,30 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER    2
-#define LED_PRIMARY_PIN    13
+#define LEDS_NUMBER         2
+#define LED_PRIMARY_PIN     13
 #define LED_SECONDARY_PIN   14
-#define LED_STATE_ON   0
+#define LED_STATE_ON        0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER 2
-#define BUTTON_1       11
-#define BUTTON_2       12
-#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
+#define BUTTONS_NUMBER      2
+#define BUTTON_1            11
+#define BUTTON_2            12
+#define BUTTON_PULL         NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER  8
-#define TX_PIN_NUMBER  6
-#define CTS_PIN_NUMBER 7
-#define RTS_PIN_NUMBER 5
-#define HWFC           false
+#define RX_PIN_NUMBER       8
+#define TX_PIN_NUMBER       6
+#define CTS_PIN_NUMBER      0
+#define RTS_PIN_NUMBER      0
+#define HWFC                false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER  "Nordic"
-#define DIS_MODEL         "PCA10056"
+#define DIS_MANUFACTURER    "Nordic"
+#define DIS_MODEL           "PCA10056"
 
 #endif // PCA10056_H

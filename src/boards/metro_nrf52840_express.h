@@ -1,13 +1,13 @@
 /**************************************************************************/
 /*!
-    @file     pca10059.h
-    @author   hathach
+    @file     metro_nrf52840_express.h
+    @author   hathach (tinyusb.org)
 
     @section LICENSE
 
     Software License Agreement (BSD License)
 
-    Copyright (c) 2018, Adafruit Industries (adafruit.com)
+    Copyright (c) 2019, Adafruit Industries (adafruit.com)
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -34,39 +34,44 @@
 */
 /**************************************************************************/
 
-#ifndef PCA10059_H
-#define PCA10059_H
+#ifndef _METRO_NRF52840_EXPRESS_H_
+#define _METRO_NRF52840_EXPRESS_H_
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER       2
-#define LED_PRIMARY_PIN   6 // Red
-#define LED_SECONDARY_PIN 12 // Blue
-#define LED_STATE_ON      0
+#define LEDS_NUMBER           2
+#define LED_PRIMARY_PIN       _PINNUM(1, 13)
+#define LED_SECONDARY_PIN     _PINNUM(1, 15)
+#define LED_NEOPIXEL          _PINNUM(0, 13)
+#define BOARD_RGB_BRIGHTNESS  0x040404
+#define LED_STATE_ON          1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER 2
-
-#define BUTTON_1       _PINNUM(1, 6)
-#define BUTTON_2       _PINNUM(1, 10)
-#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
+#define BUTTONS_NUMBER        2
+#define BUTTON_1              _PINNUM(1, 0)
+#define BUTTON_2              _PINNUM(2, 2)
+#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER  20
-#define TX_PIN_NUMBER  17
-#define CTS_PIN_NUMBER 15
-#define RTS_PIN_NUMBER 13
-#define HWFC           false
+#define RX_PIN_NUMBER         8
+#define TX_PIN_NUMBER         6
+#define CTS_PIN_NUMBER        0
+#define RTS_PIN_NUMBER        0
+#define HWFC                  false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER  "Nordic"
-#define DIS_MODEL         "PCA10059"
+#define DIS_MANUFACTURER      "Adafruit Industries"
+#define DIS_MODEL             "Bluefruit Metro nRF52840 Express"
 
-#endif // PCA10059_H
+#define PRODUCT_NAME          "Adafruit Metro nRF52840 Express"
+#define VOLUME_LABEL          "METR840BOOT"
+
+
+#endif /* _METRO_NRF52840_EXPRESS_H_ */
