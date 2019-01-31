@@ -17,23 +17,7 @@
 #include <string.h>
 #include "nrf_gpio.h"
 
-#if defined BOARD_FEATHER_NRF52840_EXPRESS
-  #include "boards/feather_nrf52840_express.h"
-#elif defined BOARD_FEATHER_NRF52832
-  #include "boards/feather_nrf52832.h"
-#elif defined BOARD_PCA10056
-  #include "boards/pca10056.h"
-#elif defined BOARD_PCA10059
-  #include "boards/pca10059.h"
-#elif defined BOARD_PARTICLE_ARGON
-#include "boards/particle_argon.h"
-#elif defined BOARD_PARTICLE_BORON
-#include "boards/particle_boron.h"
-#elif defined BOARD_PARTICLE_XENON
-#include "boards/particle_xenon.h"
-#else
-  #error No boards defined
-#endif
+#include BOARD_HEADER_FILE
 
 #ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
@@ -73,15 +57,17 @@ void board_teardown(void);
 
 #define bit(b) (1UL << (b))
 
-#define STATE_BOOTLOADER_STARTED 0
-#define STATE_USB_MOUNTED 1
-#define STATE_USB_UNMOUNTED 2
-#define STATE_FACTORY_RESET_STARTED 3
-#define STATE_FACTORY_RESET_FINISHED 4
-#define STATE_WRITING_STARTED 5
-#define STATE_WRITING_FINISHED 6
-#define STATE_BLE_CONNECTED 7
-#define STATE_BLE_DISCONNECTED 8
+enum {
+  STATE_BOOTLOADER_STARTED = 0,
+  STATE_USB_MOUNTED,
+  STATE_USB_UNMOUNTED,
+  STATE_FACTORY_RESET_STARTED,
+  STATE_FACTORY_RESET_FINISHED,
+  STATE_WRITING_STARTED,
+  STATE_WRITING_FINISHED,
+  STATE_BLE_CONNECTED,
+  STATE_BLE_DISCONNECTED
+};
 
 void led_pwm_init(uint32_t led_index, uint32_t led_pin);
 void led_pwm_teardown(void);
