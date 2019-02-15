@@ -736,6 +736,11 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     uint32_t                              err_code;
     ble_gatts_rw_authorize_reply_params_t auth_reply;
 
+#ifdef CFG_DEBUG
+    extern const char* dbg_ble_event_str(uint16_t evt_id);
+    ADALOG("BLE", dbg_ble_event_str(p_ble_evt->header.evt_id));
+#endif
+
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
@@ -896,6 +901,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
         {
           uint16_t att_mtu = MIN(p_ble_evt->evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu, BLEGATT_ATT_MTU_MAX);
+          ADALOG("GAP", "ATT MTU is changed to %d", att_mtu);
           APP_ERROR_CHECK( sd_ble_gatts_exchange_mtu_reply(m_conn_handle, att_mtu) );
         }
         break;
@@ -1088,3 +1094,109 @@ uint32_t dfu_transport_ble_close()
 
     return NRF_SUCCESS;
 }
+
+#ifdef CFG_DEBUG
+
+typedef struct
+{
+  uint32_t key;
+  void const * data;
+}lookup_entry_t;
+
+typedef struct
+{
+  uint16_t count;
+  lookup_entry_t const* items;
+} lookup_table_t;
+
+void const * lookup_find(lookup_table_t const* p_table, uint32_t key)
+{
+  for(uint16_t i=0; i<p_table->count; i++)
+  {
+    if (p_table->items[i].key == key) return p_table->items[i].data;
+  }
+
+  return NULL;
+}
+
+/*------------------------------------------------------------------*/
+/* BLE Event String
+ *------------------------------------------------------------------*/
+static lookup_entry_t const _strevt_lookup[] =
+{
+    // BLE common: 0x01
+    { .key = BLE_EVT_USER_MEM_REQUEST                , .data= "BLE_EVT_USER_MEM_REQUEST"                },
+    { .key = BLE_EVT_USER_MEM_RELEASE                , .data= "BLE_EVT_USER_MEM_RELEASE"                },
+
+    // BLE Gap: 0x10
+    { .key = BLE_GAP_EVT_CONNECTED                   , .data= "BLE_GAP_EVT_CONNECTED"                   },
+    { .key = BLE_GAP_EVT_DISCONNECTED                , .data= "BLE_GAP_EVT_DISCONNECTED"                },
+    { .key = BLE_GAP_EVT_CONN_PARAM_UPDATE           , .data= "BLE_GAP_EVT_CONN_PARAM_UPDATE"           },
+    { .key = BLE_GAP_EVT_SEC_PARAMS_REQUEST          , .data= "BLE_GAP_EVT_SEC_PARAMS_REQUEST"          },
+    { .key = BLE_GAP_EVT_SEC_INFO_REQUEST            , .data= "BLE_GAP_EVT_SEC_INFO_REQUEST"            },
+    { .key = BLE_GAP_EVT_PASSKEY_DISPLAY             , .data= "BLE_GAP_EVT_PASSKEY_DISPLAY"             },
+    { .key = BLE_GAP_EVT_KEY_PRESSED                 , .data= "BLE_GAP_EVT_KEY_PRESSED"                 },
+    { .key = BLE_GAP_EVT_AUTH_KEY_REQUEST            , .data= "BLE_GAP_EVT_AUTH_KEY_REQUEST"            },
+    { .key = BLE_GAP_EVT_LESC_DHKEY_REQUEST          , .data= "BLE_GAP_EVT_LESC_DHKEY_REQUEST"          },
+    { .key = BLE_GAP_EVT_AUTH_STATUS                 , .data= "BLE_GAP_EVT_AUTH_STATUS"                 },
+    { .key = BLE_GAP_EVT_CONN_SEC_UPDATE             , .data= "BLE_GAP_EVT_CONN_SEC_UPDATE"             },
+    { .key = BLE_GAP_EVT_TIMEOUT                     , .data= "BLE_GAP_EVT_TIMEOUT"                     },
+    { .key = BLE_GAP_EVT_RSSI_CHANGED                , .data= "BLE_GAP_EVT_RSSI_CHANGED"                },
+    { .key = BLE_GAP_EVT_ADV_REPORT                  , .data= "BLE_GAP_EVT_ADV_REPORT"                  },
+    { .key = BLE_GAP_EVT_SEC_REQUEST                 , .data= "BLE_GAP_EVT_SEC_REQUEST"                 },
+    { .key = BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST   , .data= "BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST"   },
+    { .key = BLE_GAP_EVT_SCAN_REQ_REPORT             , .data= "BLE_GAP_EVT_SCAN_REQ_REPORT"             },
+    { .key = BLE_GAP_EVT_PHY_UPDATE_REQUEST          , .data= "BLE_GAP_EVT_PHY_UPDATE_REQUEST"          },
+    { .key = BLE_GAP_EVT_PHY_UPDATE                  , .data= "BLE_GAP_EVT_PHY_UPDATE"                  },
+    { .key = BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST  , .data= "BLE_GAP_EVT_DATA_LENGTH_UPDATE_REQUEST"  },
+    { .key = BLE_GAP_EVT_DATA_LENGTH_UPDATE          , .data= "BLE_GAP_EVT_DATA_LENGTH_UPDATE"          },
+    { .key = BLE_GAP_EVT_QOS_CHANNEL_SURVEY_REPORT   , .data= "BLE_GAP_EVT_QOS_CHANNEL_SURVEY_REPORT"   },
+    { .key = BLE_GAP_EVT_ADV_SET_TERMINATED          , .data= "BLE_GAP_EVT_ADV_SET_TERMINATED"          },
+
+    // BLE Gattc: 0x30
+    { .key = BLE_GATTC_EVT_PRIM_SRVC_DISC_RSP        , .data= "BLE_GATTC_EVT_PRIM_SRVC_DISC_RSP"        },
+    { .key = BLE_GATTC_EVT_REL_DISC_RSP              , .data= "BLE_GATTC_EVT_REL_DISC_RSP"              },
+    { .key = BLE_GATTC_EVT_CHAR_DISC_RSP             , .data= "BLE_GATTC_EVT_CHAR_DISC_RSP"             },
+    { .key = BLE_GATTC_EVT_DESC_DISC_RSP             , .data= "BLE_GATTC_EVT_DESC_DISC_RSP"             },
+    { .key = BLE_GATTC_EVT_ATTR_INFO_DISC_RSP        , .data= "BLE_GATTC_EVT_ATTR_INFO_DISC_RSP"        },
+    { .key = BLE_GATTC_EVT_CHAR_VAL_BY_UUID_READ_RSP , .data= "BLE_GATTC_EVT_CHAR_VAL_BY_UUID_READ_RSP" },
+    { .key = BLE_GATTC_EVT_READ_RSP                  , .data= "BLE_GATTC_EVT_READ_RSP"                  },
+    { .key = BLE_GATTC_EVT_CHAR_VALS_READ_RSP        , .data= "BLE_GATTC_EVT_CHAR_VALS_READ_RSP"        },
+    { .key = BLE_GATTC_EVT_WRITE_RSP                 , .data= "BLE_GATTC_EVT_WRITE_RSP"                 },
+    { .key = BLE_GATTC_EVT_HVX                       , .data= "BLE_GATTC_EVT_HVX"                       },
+    { .key = BLE_GATTC_EVT_EXCHANGE_MTU_RSP          , .data= "BLE_GATTC_EVT_EXCHANGE_MTU_RSP"          },
+    { .key = BLE_GATTC_EVT_TIMEOUT                   , .data= "BLE_GATTC_EVT_TIMEOUT"                   },
+    { .key = BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE     , .data= "BLE_GATTC_EVT_WRITE_CMD_TX_COMPLETE"     },
+
+    // BLE Gatts: 0x50
+    { .key = BLE_GATTS_EVT_WRITE                     , .data= "BLE_GATTS_EVT_WRITE"                     },
+    { .key = BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST      , .data= "BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST"      },
+    { .key = BLE_GATTS_EVT_SYS_ATTR_MISSING          , .data= "BLE_GATTS_EVT_SYS_ATTR_MISSING"          },
+    { .key = BLE_GATTS_EVT_HVC                       , .data= "BLE_GATTS_EVT_HVC"                       },
+    { .key = BLE_GATTS_EVT_SC_CONFIRM                , .data= "BLE_GATTS_EVT_SC_CONFIRM"                },
+    { .key = BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST      , .data= "BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST"      },
+    { .key = BLE_GATTS_EVT_TIMEOUT                   , .data= "BLE_GATTS_EVT_TIMEOUT"                   },
+    { .key = BLE_GATTS_EVT_HVN_TX_COMPLETE           , .data= "BLE_GATTS_EVT_HVN_TX_COMPLETE"           },
+};
+
+lookup_table_t const _strevt_table =
+{
+  .count = arrcount(_strevt_lookup),
+  .items = _strevt_lookup
+};
+
+const char* dbg_ble_event_str(uint16_t evt_id)
+{
+  const char * str = (const char *) lookup_find(&_strevt_table, evt_id);
+  static char unknown_str[7] = {0};
+
+  if ( str == NULL )
+  {
+    sprintf(unknown_str, "0x%04X", evt_id);
+    str = unknown_str;
+  }
+
+  return str;
+}
+
+#endif
