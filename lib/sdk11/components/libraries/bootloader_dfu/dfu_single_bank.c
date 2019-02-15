@@ -154,7 +154,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
       nrf_nvmc_page_erase(DFU_BANK_0_REGION_START + i * CODE_PAGE_SIZE);
     }
 
-    // simulate complete call
+    // invoke complete callback
     pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
   }
 }
