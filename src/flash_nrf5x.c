@@ -53,8 +53,9 @@ void flash_nrf5x_flush (bool need_erase)
   {
     // - nRF52832 dfu via uart can miss incoming byte when erasing because cpu is blocked for > 2ms.
     // Since dfu_prepare_func_app_erase() already erase the page for us, we can skip it here.
-    // - nRF52840 dfu serial/uf2 are USB-based which are DMA and should have no problems. Note MSC uf2
-    // does not erase page in advance like dfu serial
+    // - nRF52840 dfu serial/uf2 are USB-based which are DMA and should have no problems.
+    //
+    // Note: MSC uf2 does not erase page in advance like dfu serial
     if ( need_erase ) nrf_nvmc_page_erase(_fl_addr);
 
     nrf_nvmc_write_words(_fl_addr, (uint32_t *) _fl_buf, FLASH_PAGE_SIZE / 4);
