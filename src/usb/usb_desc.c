@@ -59,19 +59,21 @@ enum {
 };
 
 /*------------- Endpoint Numbering & Size -------------*/
-#define _EP_IN(x)               (0x80 | (x))
-#define _EP_OUT(x)              (x)
+#define _EP_IN(x)          (0x80 | (x))
+#define _EP_OUT(x)         (x)
 
 // CDC
-#define EP_CDC_NOTIF            _EP_IN ( ITF_NUM_CDC+1 )
-#define EP_CDC_NOTIF_SIZE       8
+#define EP_CDC_NOTIF       _EP_IN ( ITF_NUM_CDC+1 )
+#define EP_CDC_NOTIF_SIZE  8
 
-#define EP_CDC_OUT              _EP_OUT( ITF_NUM_CDC+2 )
-#define EP_CDC_IN               _EP_IN ( ITF_NUM_CDC+2 )
+#define EP_CDC_OUT         _EP_OUT( ITF_NUM_CDC+2 )
+#define EP_CDC_IN          _EP_IN ( ITF_NUM_CDC+2 )
 
 // Mass Storage
-#define EP_MSC_OUT              _EP_OUT( ITF_NUM_MSC+1 )
-#define EP_MSC_IN               _EP_IN ( ITF_NUM_MSC+1 )
+#define EP_MSC_OUT         _EP_OUT( ITF_NUM_MSC+1 )
+#define EP_MSC_IN          _EP_IN ( ITF_NUM_MSC+1 )
+
+#define EP_MSC_SIZE        64
 
 //--------------------------------------------------------------------+
 // STRING DESCRIPTORS
@@ -280,7 +282,7 @@ usb_desc_cfg_t usb_desc_cfg =
           .bDescriptorType  = TUSB_DESC_ENDPOINT,
           .bEndpointAddress = EP_MSC_OUT,
           .bmAttributes     = { .xfer = TUSB_XFER_BULK },
-          .wMaxPacketSize   = { .size = CFG_TUD_MSC_EPSIZE},
+          .wMaxPacketSize   = { .size = EP_MSC_SIZE},
           .bInterval        = 1
       },
 
@@ -290,7 +292,7 @@ usb_desc_cfg_t usb_desc_cfg =
           .bDescriptorType  = TUSB_DESC_ENDPOINT,
           .bEndpointAddress = EP_MSC_IN,
           .bmAttributes     = { .xfer = TUSB_XFER_BULK },
-          .wMaxPacketSize   = { .size = CFG_TUD_MSC_EPSIZE},
+          .wMaxPacketSize   = { .size = EP_MSC_SIZE },
           .bInterval        = 1
       }
     }

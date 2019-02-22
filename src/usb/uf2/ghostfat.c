@@ -119,8 +119,6 @@ static FAT_BootBlock const BootBlock = {
 #define NRF_LOG_DEBUG(...)
 #define NRF_LOG_WARNING(...)
 
-static WriteState _wr_state = { 0 };
-
 // get current.uf2 flash size in bytes, round up to 256 bytes
 static uint32_t current_flash_size(void)
 {
@@ -241,21 +239,6 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /* Write UF2
  *------------------------------------------------------------------*/
 
-/** uf2 upgrade complete -> inform bootloader to update setting and reset */
-static void uf2_write_complete(uint32_t numBlocks)
-{
-  led_state(STATE_WRITING_FINISHED);
-
-  dfu_update_status_t update_status;
-
-  memset(&update_status, 0, sizeof(dfu_update_status_t ));
-  update_status.status_code = DFU_UPDATE_APP_COMPLETE;
-  update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
-  update_status.app_size    = numBlocks*256;
-
-  bootloader_dfu_update_process(update_status);
-}
-
 /** Write an block
  *
  * @return number of bytes processed, only 3 following values
@@ -263,9 +246,8 @@ static void uf2_write_complete(uint32_t numBlocks)
  * 512 : write is successful
  *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
  */
-int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *state*/) {
+int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state) {
     UF2_Block *bl = (void *)data;
-    WriteState* state = &_wr_state;
 
      NRF_LOG_DEBUG("Write magic: %x", bl->magicStart0);
 
@@ -318,8 +300,6 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet/*, WriteState *stat
             if (state->numWritten >= state->numBlocks) {
                 // flush last blocks
                 flash_nrf5x_flush(true);
-
-                uf2_write_complete(state->numBlocks);
             }
         }
         NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
