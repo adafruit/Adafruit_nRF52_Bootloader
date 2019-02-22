@@ -63,22 +63,9 @@ extern uint16_t           usb_desc_str_serial[1+16];
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
 
-
 //------------- IMPLEMENTATION -------------//
-static bool _inited = false;
-
-bool usb_inited(void)
-{
-  return _inited;
-}
-
 void usb_init(bool cdc_only)
 {
-  // skipped if already inited
-  if ( _inited ) return;
-
-  _inited = true;
-
   NVIC_SetPriority(USBD_IRQn, 2);
 
   // USB power may already be ready at this time -> no event generated

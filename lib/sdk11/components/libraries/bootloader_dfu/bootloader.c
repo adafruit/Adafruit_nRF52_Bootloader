@@ -130,9 +130,9 @@ static void wait_for_events(void)
 #ifdef NRF52840_XXAA
     // skip if usb is not inited ( e.g OTA / finializing sd/bootloader )
     extern bool usb_inited(void);
-    if ( usb_inited() )
+    if ( tusb_inited() )
     {
-      tusb_task();
+      tud_task();
       tud_cdc_write_flush();
     }
 #endif
