@@ -28,7 +28,6 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
 MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
-RELEASE_DIR  = bin/$(BOARD)
 
 
 MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
@@ -86,7 +85,7 @@ BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))
 NRF52832_BOARDLIST = feather_nrf52832
 IS_52832 = $(filter $(BOARD),$(NRF52832_BOARDLIST))
 
-ifeq ($(filter $(MAKECMDGOALS),all-board all-release help),)
+ifeq ($(filter $(MAKECMDGOALS),all-board help),)
   ifeq ($(BOARD),)
     $(info You must provide a BOARD parameter with 'BOARD=')
     $(info Supported boards are: $(BOARD_LIST))
@@ -360,20 +359,11 @@ _make_all_board = $(foreach b,$(BOARD_LIST), $(call _make_board,$b,$1))
 all-board:
 	$(call _make_all_board,clean all)
 
-all-release:
-	$(call _make_all_board,clean all release)
-
 help:
-	@echo To flash (with jlink) a pre-built binary with a specific version to a board
-	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.1r0 flash
-	@echo
-	@echo To flash (with dfu) a pre-built binary with a specific version to a board
-	@echo $$ make BOARD=feather_nrf52840_express VERSION=6.1.1r0 SERIAL=/dev/ttyACM0 dfu0-flash
-	@echo
 	@echo To compile and build the current code for a board
 	@echo $$ make BOARD=feather_nrf52840_express all
 	@echo
-	@echo To flash current code using jlink
+	@echo To flash current code using Jlink
 	@echo $$ make BOARD=feather_nrf52840_express flash
 	@echo
 	@echo To flash current code using existing bootloader dfu
@@ -388,8 +378,6 @@ __check_defined = \
     $(if $(value $1),, \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
-ifeq ($(VERSION),)
-
 # Flash the compiled
 flash: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@echo Flashing: $<
@@ -397,26 +385,7 @@ flash: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 
 dfu-flash: $(BUILD)/$(MERGED_FNAME).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank
-
-else
-
-ifeq ($(VERSION),latest)
-VERSION_FPATH = $(RELEASE_DIR)/$(MERGED_FNAME)
-else
-VERSION_FPATH = bin/$(BOARD)/$(VERSION)/$(OUTPUT_FILENAME)_$(SD_NAME)_$(VERSION)
-endif
-
-# Flash specific version in binary release folder
-flash:
-	@echo Flashing: $(VERSION_FPATH).hex
-	$(NRFJPROG) --program $(VERSION_FPATH).hex --chiperase -f nrf52 --reset
-
-dfu-flash:
-	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $(VERSION_FPATH).zip -p $(SERIAL) -b 115200 --singlebank
-
-endif
+	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
 sd:
 	@echo Flashing: $(SD_HEX)
@@ -457,7 +426,7 @@ size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 
 
 #******************* Binary generator *******************
-.phony: genhex genpkg release
+.phony: genhex genpkg
 
 ## Create binary .hex file from the .out file
 genhex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
@@ -478,11 +447,3 @@ genpkg: $(BUILD)/$(MERGED_FNAME).zip
 
 $(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
-
-# Create SD+bootloader combo with hex & dfu package at release folder
-release: combinehex genpkg
-	@echo CR $(RELEASE_DIR)/$(MERGED_FNAME).hex
-	@echo CR $(RELEASE_DIR)/$(MERGED_FNAME).zip
-	@mkdir -p $(RELEASE_DIR)
-	@cp $(BUILD)/$(MERGED_FNAME).hex $(RELEASE_DIR)/$(MERGED_FNAME).hex
-	@cp $(BUILD)/$(MERGED_FNAME).zip $(RELEASE_DIR)/$(MERGED_FNAME).zip
