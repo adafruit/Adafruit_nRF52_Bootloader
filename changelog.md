@@ -1,5 +1,10 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.2.8
+
+- Fixed OTA issue with nrfConnect on iOS
+- Increased LED conn cycle when ble connected for easier recognition
+
 ## 0.2.7
 
 - Fixed PWM psel[1] is not reset
