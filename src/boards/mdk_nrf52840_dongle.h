@@ -42,15 +42,15 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-// TODO(gpshead): only an rgb led, not a separate primary one.  0?
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 23)
+#define LEDS_NUMBER           2  // TODO(gpshead): support 0.
+#define LED_PRIMARY_PIN       _PINNUM(0, 23)  // Red
+#define LED_SECONDARY_PIN     _PINNUM(0, 24)  // Blue
 #define LED_STATE_ON          0
 
-#define LED_RGB_RED_PIN       _PINNUM(0, 23)
-#define LED_RGB_GREEN_PIN     _PINNUM(0, 22)
-#define LED_RGB_BLUE_PIN      _PINNUM(0, 24)
-#define BOARD_RGB_BRIGHTNESS  0x202020
+//#define LED_RGB_RED_PIN       _PINNUM(0, 23)
+//#define LED_RGB_GREEN_PIN     _PINNUM(0, 22)
+//#define LED_RGB_BLUE_PIN      _PINNUM(0, 24)
+#define BOARD_RGB_BRIGHTNESS  0x404040
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
@@ -59,17 +59,6 @@
 #define BUTTON_1              _PINNUM(0, 18)  // unusable: RESET
 #define BUTTON_2              _PINNUM(0, 19)  // no connection
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
-
-/*------------------------------------------------------------------*/
-/* UART
- * TODO(gpshead): Does this even make sense to define?
- * No serial pins.  USB ACM/CDC only.
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         8
-#define TX_PIN_NUMBER         6
-#define CTS_PIN_NUMBER        0
-#define RTS_PIN_NUMBER        0
-#define HWFC                  false
 
 // Used as model string in OTA mode
 #define DIS_MANUFACTURER      "MakerDiary"
