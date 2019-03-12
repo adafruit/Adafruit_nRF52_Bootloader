@@ -123,35 +123,37 @@ static FAT_BootBlock const BootBlock = {
 static uint32_t current_flash_size(void)
 {
   static uint32_t flash_sz = 0;
+  uint32_t result = flash_sz; // presumes atomic 32-bit read/write and static result
 
   // only need to compute once
-  if ( flash_sz == 0 )
+  if ( result == 0 )
   {
     // return 1 block of 256 bytes
     if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
     {
-      flash_sz = 256;
+      result = 256;
     }else
     {
       bootloader_settings_t const * boot_setting;
       bootloader_util_settings_get(&boot_setting);
 
-      flash_sz = boot_setting->bank_0_size;
+      result = boot_setting->bank_0_size;
 
       // Copy size must be multiple of 256 bytes
       // else we will got an issue copying current.uf2
-      if (flash_sz & 0xff)
+      if (result & 0xff)
       {
-        flash_sz = (flash_sz & ~0xff) + 256;
+        result = (result & ~0xff) + 256;
       }
 
       // if bank0 size is not valid, happens when flashed with jlink
       // use maximum application size
-      if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
+      if ( (result == 0) || (result == 0xFFFFFFFFUL) )
       {
-        flash_sz = FLASH_SIZE;
+        result = FLASH_SIZE;
       }
     }
+    flash_sz = result; // presumes atomic 32-bit read/write and static result
   }
 
   return flash_sz;
