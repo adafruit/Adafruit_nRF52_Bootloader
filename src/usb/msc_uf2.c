@@ -64,6 +64,7 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
 {
   void const* response = NULL;
   uint16_t resplen = 0;
+  memset(buffer, 0, bufsize);
 
   switch ( scsi_cmd[0] )
   {
@@ -114,6 +115,7 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
 int32_t tud_msc_read10_cb (uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize)
 {
   (void) lun;
+  memset(buffer, 0, bufsize);
 
   // since we return block size each, offset should always be zero
   TU_ASSERT(offset == 0, -1);
