@@ -210,7 +210,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
                 d->startCluster = i + 2;
                 padded_memcpy(d->name, inf->name, 11);
-            }
+			}
 		}
     } else { // else Generate the UF2 file data on-the-fly
         sectionIdx -= START_CLUSTERS;
