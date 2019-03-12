@@ -106,10 +106,11 @@ static FAT_BootBlock const BootBlock = {
     .FATCopies            = 2,
     .RootDirectoryEntries = (ROOT_DIR_SECTORS * 512 / 32),
     .TotalSectors16       = NUM_FAT_BLOCKS - 2,
-    .MediaDescriptor      = 0xF0,
+    .MediaDescriptor      = 0xF8,
     .SectorsPerFAT        = SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
+	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
     .VolumeLabel          = VOLUME_LABEL,
@@ -187,7 +188,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
         if (sectionIdx >= SECTORS_PER_FAT)
             sectionIdx -= SECTORS_PER_FAT;
         if (sectionIdx == 0) {
-            data[0] = 0xf0;
+            data[0] = 0xf8;
             for (int i = 1; i < NUM_INFO * 2 + 4; ++i) {
                 data[i] = 0xff;
             }
@@ -210,7 +211,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 d->startCluster = i + 2;
                 padded_memcpy(d->name, inf->name, 11);
             }
-        }
+		}
     } else {
         sectionIdx -= START_CLUSTERS;
         if (sectionIdx < NUM_INFO - 1) {
