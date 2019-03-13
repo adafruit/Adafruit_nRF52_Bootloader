@@ -97,6 +97,11 @@ static struct TextFile const info[] = {
 #define START_ROOTDIR      (START_FAT1 + SECTORS_PER_FAT)
 #define START_CLUSTERS     (START_ROOTDIR + ROOT_DIR_SECTORS)
 
+// all directory entries must fit in a single sector
+// because otherwise current code overflows buffer
+STATIC_ASSERT(NUM_INFO < (512 / sizeof(DirEntry)));
+
+
 static FAT_BootBlock const BootBlock = {
     .JumpInstruction      = {0xeb, 0x3c, 0x90},
     .OEMInfo              = "UF2 UF2 ",
@@ -198,6 +203,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
         }
     } else if (block_no < START_CLUSTERS) {
+        // Use STATIC_ASSERT() above to ensure only first sector has entries
         sectionIdx -= START_ROOTDIR;
         if (sectionIdx == 0) {
             DirEntry *d = (void *)data;
