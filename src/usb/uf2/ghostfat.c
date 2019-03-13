@@ -110,6 +110,7 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerFAT        = SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
+	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
     .VolumeLabel          = VOLUME_LABEL,
@@ -176,30 +177,30 @@ void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
     uint32_t sectionIdx = block_no;
 
-    if (block_no == 0) {
+    if (block_no == 0) { // Requested boot block
         memcpy(data, &BootBlock, sizeof(BootBlock));
         data[510] = 0x55;
         data[511] = 0xaa;
         // logval("data[0]", data[0]);
-    } else if (block_no < START_ROOTDIR) {
+    } else if (block_no < START_ROOTDIR) {  // Requested FAT table sector
         sectionIdx -= START_FAT0;
         // logval("sidx", sectionIdx);
         if (sectionIdx >= SECTORS_PER_FAT)
-            sectionIdx -= SECTORS_PER_FAT;
+            sectionIdx -= SECTORS_PER_FAT; // second FAT is same as the first...
         if (sectionIdx == 0) {
-            data[0] = 0xf0;
+            data[0] = 0xf8; // first FAT entry must match BPB MediaDescriptor
             for (int i = 1; i < NUM_INFO * 2 + 4; ++i) {
                 data[i] = 0xff;
             }
         }
-        for (int i = 0; i < 256; ++i) {
+        for (int i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
             uint32_t v = sectionIdx * 256 + i;
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
         }
-    } else if (block_no < START_CLUSTERS) {
+    } else if (block_no < START_CLUSTERS) { // Requested root directory sector
         sectionIdx -= START_ROOTDIR;
-        if (sectionIdx == 0) {
+        if (sectionIdx == 0) { // only one sector of directory entries generated
             DirEntry *d = (void *)data;
             padded_memcpy(d->name, (char const *) BootBlock.VolumeLabel, 11);
             d->attrs = 0x28;
@@ -209,9 +210,9 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
                 d->startCluster = i + 2;
                 padded_memcpy(d->name, inf->name, 11);
-            }
-        }
-    } else {
+			}
+		}
+    } else { // else Generate the UF2 file data on-the-fly
         sectionIdx -= START_CLUSTERS;
         if (sectionIdx < NUM_INFO - 1) {
             memcpy(data, info[sectionIdx].content, strlen(info[sectionIdx].content));
