@@ -63,7 +63,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state)
 int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize)
 {
   void const* response = NULL;
-  uint16_t resplen = 0;
+  int32_t resplen = 0;
 
   switch ( scsi_cmd[0] )
   {
@@ -98,7 +98,7 @@ int32_t tud_msc_scsi_cb (uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, 
   }
 
   // return len must not larger than bufsize
-  if ( resplen > bufsize ) resplen = bufsize;
+  if ( resplen > (int32_t)bufsize ) resplen = bufsize;
 
   // copy response to stack's buffer if any
   if ( response && resplen )
