@@ -1,4 +1,6 @@
 
+#include "macros.h"
+
 #include "uf2.h"
 #include "flash_nrf5x.h"
 #include <string.h>

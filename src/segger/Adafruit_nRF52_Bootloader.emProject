@@ -63,6 +63,7 @@
           <file file_name="../usb/uf2/uf2cfg.h" />
           <file file_name="../usb/uf2/uf2.h" />
           <file file_name="../usb/uf2/ghostfat.c" />
+          <file file_name="../usb/uf2/macros.h" />
         </folder>
         <file file_name="../usb/msc_uf2.c" />
         <file file_name="../usb/usb.c" />
