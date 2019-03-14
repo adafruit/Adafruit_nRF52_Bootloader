@@ -177,6 +177,7 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerFAT        = SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
+	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
     .VolumeLabel          = VOLUME_LABEL,
@@ -190,35 +191,37 @@ static FAT_BootBlock const BootBlock = {
 static uint32_t current_flash_size(void)
 {
   static uint32_t flash_sz = 0;
+  uint32_t result = flash_sz; // presumes atomic 32-bit read/write and static result
 
   // only need to compute once
-  if ( flash_sz == 0 )
+  if ( result == 0 )
   {
     // return 1 block of 256 bytes
     if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
     {
-      flash_sz = 256;
+      result = 256;
     }else
     {
       bootloader_settings_t const * boot_setting;
       bootloader_util_settings_get(&boot_setting);
 
-      flash_sz = boot_setting->bank_0_size;
+      result = boot_setting->bank_0_size;
 
       // Copy size must be multiple of 256 bytes
       // else we will got an issue copying current.uf2
-      if (flash_sz & 0xff)
+      if (result & 0xff)
       {
-        flash_sz = (flash_sz & ~0xff) + 256;
+        result = (result & ~0xff) + 256;
       }
 
       // if bank0 size is not valid, happens when flashed with jlink
       // use maximum application size
-      if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
+      if ( (result == 0) || (result == 0xFFFFFFFFUL) )
       {
-        flash_sz = FLASH_SIZE;
+        result = FLASH_SIZE;
       }
     }
+    flash_sz = result; // presumes atomic 32-bit read/write and static result
   }
 
   return flash_sz;
@@ -243,16 +246,16 @@ void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
     uint32_t sectionIdx = block_no;
 
-    if (block_no == 0) {
+    if (block_no == 0) { // Requested boot block
         memcpy(data, &BootBlock, sizeof(BootBlock));
         data[510] = 0x55;
         data[511] = 0xaa;
         // logval("data[0]", data[0]);
-    } else if (block_no < START_ROOTDIR) {
+    } else if (block_no < START_ROOTDIR) {  // Requested FAT table sector
         sectionIdx -= START_FAT0;
         // logval("sidx", sectionIdx);
         if (sectionIdx >= SECTORS_PER_FAT)
-            sectionIdx -= SECTORS_PER_FAT;
+            sectionIdx -= SECTORS_PER_FAT; // second FAT is same as the first...
         if (sectionIdx == 0) {
             data[0] = 0xf0;
             // WARNING -- code presumes only one NULL .content for .UF2 file
@@ -262,7 +265,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 data[i] = 0xff;
             }
         }
-        for (int i = 0; i < 256; ++i) {
+        for (int i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
             uint32_t v = sectionIdx * 256 + i;
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
