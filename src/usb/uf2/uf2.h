@@ -296,3 +296,38 @@ static inline void check_uf2_handover(uint8_t *buffer, uint32_t blocks_remaining
 #endif // ARRAYSIZE2_H
 
 
+#ifndef COMPILE_DATE_H
+#define COMPILE_DATE_H
+
+#define __YEAR_INT__ ((( \
+  (__DATE__ [ 7u] - '0')  * 10u + \
+  (__DATE__ [ 8u] - '0')) * 10u + \
+  (__DATE__ [ 9u] - '0')) * 10u + \
+  (__DATE__ [10u] - '0'))
+
+#define __MONTH_INT__ ( \
+  (__DATE__ [2u] == 'n' && __DATE__ [1u] == 'a') ?  1u  /*Jan*/ \
+: (__DATE__ [2u] == 'b'                        ) ?  2u  /*Feb*/ \
+: (__DATE__ [2u] == 'r' && __DATE__ [1u] == 'a') ?  3u  /*Mar*/ \
+: (__DATE__ [2u] == 'r'                        ) ?  4u  /*Apr*/ \
+: (__DATE__ [2u] == 'y'                        ) ?  5u  /*May*/ \
+: (__DATE__ [2u] == 'n'                        ) ?  6u  /*Jun*/ \
+: (__DATE__ [2u] == 'l'                        ) ?  7u  /*Jul*/ \
+: (__DATE__ [2u] == 'g'                        ) ?  8u  /*Jul*/ \
+: (__DATE__ [2u] == 'p'                        ) ?  9u  /*Jul*/ \
+: (__DATE__ [2u] == 't'                        ) ? 10u  /*Jul*/ \
+: (__DATE__ [2u] == 'v'                        ) ? 11u  /*Jul*/ \
+:                                                  12u  /*Dec*/ )
+
+#define __DAY_INT__ ( \
+   (__DATE__ [4u] == ' ' ? 0u : __DATE__ [4u] - '0') * 10u \
+ + (__DATE__ [5u] - '0')                                   )
+
+#define __DOSDATE__ ( \
+	((__YEAR_INT__  - 1980u) << 9u) | \
+	( __MONTH_INT__          << 5u) | \
+                    ( __DAY_INT__            << 0u) )
+
+
+#endif // COMPILE_DATE_H
+

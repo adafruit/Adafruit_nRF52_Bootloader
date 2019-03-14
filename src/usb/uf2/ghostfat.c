@@ -9,6 +9,8 @@
 #include "bootloader_settings.h"
 #include "bootloader.h"
 
+// #define CREATE_MANY_FILES
+
 
 typedef struct {
     uint8_t JumpInstruction[3];
@@ -48,7 +50,6 @@ typedef struct {
     uint16_t startCluster;
     uint32_t size;
 } __attribute__((packed)) DirEntry;
-
 STATIC_ASSERT(sizeof(DirEntry) == 32);
 
 struct TextFile {
@@ -78,9 +79,56 @@ const char indexFile[] = //
     "</body>"
     "</html>\n";
 
+#ifdef CREATE_MANY_FILES
+const char dataFile00[] = "This is the data for File 00\r\n";
+const char dataFile01[] = "This is the data for File 01\r\n";
+const char dataFile02[] = "This is the data for File 02\r\n";
+const char dataFile03[] = "This is the data for File 03\r\n";
+const char dataFile04[] = "This is the data for File 04\r\n";
+const char dataFile05[] = "This is the data for File 05\r\n";
+const char dataFile06[] = "This is the data for File 06\r\n";
+const char dataFile07[] = "This is the data for File 07\r\n";
+const char dataFile08[] = "This is the data for File 08\r\n";
+const char dataFile09[] = "This is the data for File 09\r\n";
+const char dataFile10[] = "This is the data for File 10\r\n";
+const char dataFile11[] = "This is the data for File 11\r\n";
+const char dataFile12[] = "This is the data for File 12\r\n";
+const char dataFile13[] = "This is the data for File 13\r\n";
+const char dataFile14[] = "This is the data for File 14\r\n";
+const char dataFile15[] = "This is the data for File 15\r\n";
+const char dataFile16[] = "This is the data for File 16\r\n";
+const char dataFile17[] = "This is the data for File 17\r\n";
+const char dataFile18[] = "This is the data for File 18\r\n";
+const char dataFile19[] = "This is the data for File 19\r\n";
+#endif // CREATE_MANY_FILES
+
+// WARNING -- code presumes only one NULL .content for .UF2 file
+//            and requires it be the last element of the array
 static struct TextFile const info[] = {
     {.name = "INFO_UF2TXT", .content = infoUf2File},
     {.name = "INDEX   HTM", .content = indexFile},
+#ifdef CREATE_MANY_FILES
+    {.name = "FILE00  TXT", .content = dataFile00},
+    {.name = "FILE01  TXT", .content = dataFile01},
+    {.name = "FILE02  TXT", .content = dataFile02},
+    {.name = "FILE03  TXT", .content = dataFile03},
+    {.name = "FILE04  TXT", .content = dataFile04},
+    {.name = "FILE05  TXT", .content = dataFile05},
+    {.name = "FILE06  TXT", .content = dataFile06},
+    {.name = "FILE07  TXT", .content = dataFile07},
+    {.name = "FILE08  TXT", .content = dataFile08},
+    {.name = "FILE09  TXT", .content = dataFile09},
+    {.name = "FILE10  TXT", .content = dataFile10},
+    {.name = "FILE11  TXT", .content = dataFile11},
+    {.name = "FILE12  TXT", .content = dataFile12},
+    {.name = "FILE13  TXT", .content = dataFile13},
+    {.name = "FILE14  TXT", .content = dataFile14},
+    {.name = "FILE15  TXT", .content = dataFile15},
+    {.name = "FILE16  TXT", .content = dataFile16},
+    {.name = "FILE17  TXT", .content = dataFile17},
+    {.name = "FILE18  TXT", .content = dataFile18},
+    {.name = "FILE19  TXT", .content = dataFile19},
+#endif
     {.name = "CURRENT UF2"},
 };
 
@@ -110,8 +158,9 @@ STATIC_ASSERT(ARRAY_SIZE2(indexFile) < 512);
 
 // all directory entries must fit in a single sector
 // because otherwise current code overflows buffer
-STATIC_ASSERT(NUM_DIRENTRIES < (512 / sizeof(DirEntry)));
-// STATIC_ASSERT(NUM_DIRENTRIES < (512 / sizeof(DirEntry)) * ROOT_DIR_SECTORS);
+#define DIRENTRIES_PER_SECTOR (512/sizeof(DirEntry))
+
+STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTORS);
 
 
 static FAT_BootBlock const BootBlock = {
@@ -121,7 +170,7 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerCluster    = 1,
     .ReservedSectors      = RESERVED_SECTORS,
     .FATCopies            = 2,
-    .RootDirectoryEntries = (ROOT_DIR_SECTORS * 512 / 32),
+    .RootDirectoryEntries = (ROOT_DIR_SECTORS * DIRENTRIES_PER_SECTOR),
     .TotalSectors16       = NUM_FAT_BLOCKS - 2,
     .MediaDescriptor      = 0xF8,
     .SectorsPerFAT        = SECTORS_PER_FAT,
@@ -205,8 +254,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
             sectionIdx -= SECTORS_PER_FAT;
         if (sectionIdx == 0) {
             data[0] = 0xf0;
+            // WARNING -- code presumes only one NULL .content for .UF2 file
+            //            and all non-NULL .content fit in one sector
+            //            and requires it be the last element of the array
             for (int i = 1; i < NUM_FILES * 2 + 4; ++i) {
-                data[i] = 0xff; // WARNING -- code presumes each non-UF2 file content fits in single sector
+                data[i] = 0xff;
             }
         }
         for (int i = 0; i < 256; ++i) {
@@ -215,20 +267,33 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
         }
     } else if (block_no < START_CLUSTERS) {
-        // Use STATIC_ASSERT() above to ensure only first sector has entries
+
         sectionIdx -= START_ROOTDIR;
-        if (sectionIdx == 0) {
-            DirEntry *d = (void *)data;
+
+        DirEntry *d = (void *)data;
+        int remainingEntries = DIRENTRIES_PER_SECTOR;
+        if (sectionIdx == 0) { // volume label first
+            // volume label is first directory entry
             padded_memcpy(d->name, (char const *) BootBlock.VolumeLabel, 11);
             d->attrs = 0x28;
-            for (int i = 0; i < NUM_FILES; ++i) {
-                d++;
-                struct TextFile const *inf = &info[i];
-                d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
-                d->startCluster = i + 2;
-                padded_memcpy(d->name, inf->name, 11);
-            }
+            remainingEntries--;
         }
+
+        for (int i = DIRENTRIES_PER_SECTOR * sectionIdx;
+             remainingEntries > 0 && i < NUM_FILES;
+             i++, d++) {
+            struct TextFile const * inf = &info[i];
+            // WARNING -- code presumes only one NULL .content for .UF2 file
+            //            and requires it be the last element of the array
+            d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
+            d->startCluster = i + 2;
+            padded_memcpy(d->name, inf->name, 11);
+            // DIR_WrtTime and DIR_WrtDate must be supported
+            d->updateDate     = __DOSDATE__;
+            d->lastAccessDate = __DOSDATE__;
+            d->createDate     = __DOSDATE__;
+        }
+
     } else {
         sectionIdx -= START_CLUSTERS;
         if (sectionIdx < NUM_FILES - 1) {
