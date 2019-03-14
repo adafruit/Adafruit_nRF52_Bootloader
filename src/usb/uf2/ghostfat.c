@@ -9,8 +9,8 @@
 #include "bootloader_settings.h"
 #include "bootloader.h"
 
+// Uncomment the next line to create an additional 20 files in root.
 // #define CREATE_MANY_FILES
-
 
 typedef struct {
     uint8_t JumpInstruction[3];
@@ -67,7 +67,8 @@ const char infoUf2File[] = //
     "Model: " PRODUCT_NAME "\r\n"
     "Board-ID: " BOARD_ID "\r\n"
     "Bootloader: " BOOTLOADER_ID "\r\n"
-    "Date: " __DATE__ "\r\n";
+    "Date: " __DATE__ "\r\n"
+    "Time: " __TIME__ "\r\n";
 
 const char indexFile[] = //
     "<!doctype html>\n"
@@ -276,22 +277,31 @@ void read_block(uint32_t block_no, uint8_t *data) {
             // volume label is first directory entry
             padded_memcpy(d->name, (char const *) BootBlock.VolumeLabel, 11);
             d->attrs = 0x28;
+            d++;
             remainingEntries--;
         }
 
         for (int i = DIRENTRIES_PER_SECTOR * sectionIdx;
              remainingEntries > 0 && i < NUM_FILES;
              i++, d++) {
+
+            // WARNING -- code presumes all but last file take exactly one sector
+            uint16_t startCluster = i + 2;
+
             struct TextFile const * inf = &info[i];
+            padded_memcpy(d->name, inf->name, 11);
+            d->createTimeFine   = __SECONDS_INT__ % 2 * 100;
+            d->createTime       = __DOSTIME__;
+            d->createDate       = __DOSDATE__;
+            d->lastAccessDate   = __DOSDATE__;
+            d->highStartCluster = startCluster >> 8;
+            // DIR_WrtTime and DIR_WrtDate must be supported
+            d->updateTime       = __DOSTIME__;
+            d->updateDate       = __DOSDATE__;
+            d->startCluster     = startCluster & 0xFF;
             // WARNING -- code presumes only one NULL .content for .UF2 file
             //            and requires it be the last element of the array
             d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
-            d->startCluster = i + 2;
-            padded_memcpy(d->name, inf->name, 11);
-            // DIR_WrtTime and DIR_WrtDate must be supported
-            d->updateDate     = __DOSDATE__;
-            d->lastAccessDate = __DOSDATE__;
-            d->createDate     = __DOSDATE__;
         }
 
     } else {

@@ -323,11 +323,30 @@ static inline void check_uf2_handover(uint8_t *buffer, uint32_t blocks_remaining
    (__DATE__ [4u] == ' ' ? 0u : __DATE__ [4u] - '0') * 10u \
  + (__DATE__ [5u] - '0')                                   )
 
+// __TIME__ expands to an eight-character string constant
+// "23:59:01", or (if cannot determine time) "??:??:??" 
+#define __HOUR_INT__ ( \
+   (__TIME__ [0u] == '?' ? 0u : __TIME__ [0u] - '0') * 10u \
+ + (__TIME__ [1u] == '?' ? 0u : __TIME__ [1u] - '0')       )
+
+#define __MINUTE_INT__ ( \
+   (__TIME__ [3u] == '?' ? 0u : __TIME__ [3u] - '0') * 10u \
+ + (__TIME__ [4u] == '?' ? 0u : __TIME__ [4u] - '0')       )
+
+#define __SECONDS_INT__ ( \
+   (__TIME__ [6u] == '?' ? 0u : __TIME__ [6u] - '0') * 10u \
+ + (__TIME__ [7u] == '?' ? 0u : __TIME__ [7u] - '0')       )
+
+
 #define __DOSDATE__ ( \
 	((__YEAR_INT__  - 1980u) << 9u) | \
 	( __MONTH_INT__          << 5u) | \
                     ( __DAY_INT__            << 0u) )
 
+#define __DOSTIME__ ( \
+	( __HOUR_INT__  << 11u) | \
+	( __MONTH_INT__ <<  5u) | \
+                    ( __DAY_INT__   <<  0u) )
 
 #endif // COMPILE_DATE_H
 
