@@ -9,6 +9,7 @@
 #include "bootloader_settings.h"
 #include "bootloader.h"
 
+
 typedef struct {
     uint8_t JumpInstruction[3];
     uint8_t OEMInfo[8];
@@ -59,6 +60,7 @@ struct TextFile {
 
 #define STR0(x) #x
 #define STR(x) STR0(x)
+
 const char infoUf2File[] = //
     "UF2 Bootloader " UF2_VERSION "\r\n"
     "Model: " PRODUCT_NAME "\r\n"
@@ -81,11 +83,20 @@ static struct TextFile const info[] = {
     {.name = "INDEX   HTM", .content = indexFile},
     {.name = "CURRENT UF2"},
 };
-#define NUM_INFO (sizeof(info) / sizeof(info[0]))
+
+// WARNING -- code presumes each non-UF2 file content fits in single sector
+//            Cannot programmatically statically assert .content length
+//            for each element above.
+STATIC_ASSERT(ARRAY_SIZE2(indexFile) < 512);
+
+
+#define NUM_FILES (ARRAY_SIZE2(info))
+#define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
+
 
 #define UF2_SIZE           (current_flash_size() * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
-#define UF2_FIRST_SECTOR   (NUM_INFO + 1)
+#define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
 
 #define RESERVED_SECTORS   1
@@ -99,7 +110,8 @@ static struct TextFile const info[] = {
 
 // all directory entries must fit in a single sector
 // because otherwise current code overflows buffer
-STATIC_ASSERT(NUM_INFO < (512 / sizeof(DirEntry)));
+STATIC_ASSERT(NUM_DIRENTRIES < (512 / sizeof(DirEntry)));
+// STATIC_ASSERT(NUM_DIRENTRIES < (512 / sizeof(DirEntry)) * ROOT_DIR_SECTORS);
 
 
 static FAT_BootBlock const BootBlock = {
@@ -193,8 +205,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
             sectionIdx -= SECTORS_PER_FAT;
         if (sectionIdx == 0) {
             data[0] = 0xf0;
-            for (int i = 1; i < NUM_INFO * 2 + 4; ++i) {
-                data[i] = 0xff;
+            for (int i = 1; i < NUM_FILES * 2 + 4; ++i) {
+                data[i] = 0xff; // WARNING -- code presumes each non-UF2 file content fits in single sector
             }
         }
         for (int i = 0; i < 256; ++i) {
@@ -209,7 +221,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             DirEntry *d = (void *)data;
             padded_memcpy(d->name, (char const *) BootBlock.VolumeLabel, 11);
             d->attrs = 0x28;
-            for (int i = 0; i < NUM_INFO; ++i) {
+            for (int i = 0; i < NUM_FILES; ++i) {
                 d++;
                 struct TextFile const *inf = &info[i];
                 d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
@@ -219,10 +231,10 @@ void read_block(uint32_t block_no, uint8_t *data) {
         }
     } else {
         sectionIdx -= START_CLUSTERS;
-        if (sectionIdx < NUM_INFO - 1) {
+        if (sectionIdx < NUM_FILES - 1) {
             memcpy(data, info[sectionIdx].content, strlen(info[sectionIdx].content));
         } else {
-            sectionIdx -= NUM_INFO - 1;
+            sectionIdx -= NUM_FILES - 1;
             uint32_t addr = USER_FLASH_START + sectionIdx * 256;
             if (addr < USER_FLASH_START+FLASH_SIZE) {
                 UF2_Block *bl = (void *)data;
