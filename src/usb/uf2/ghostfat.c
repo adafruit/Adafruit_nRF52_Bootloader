@@ -210,7 +210,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
         if (sectionIdx >= SECTORS_PER_FAT)
             sectionIdx -= SECTORS_PER_FAT; // second FAT is same as the first...
         if (sectionIdx == 0) {
-            data[0] = 0xf0;
+            data[0] = 0xf8; // first FAT entry must match BPB MediaDescriptor
             // WARNING -- code presumes only one NULL .content for .UF2 file
             //            and all non-NULL .content fit in one sector
             //            and requires it be the last element of the array
@@ -223,7 +223,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
         }
-    } else if (block_no < START_CLUSTERS) {
+    } else if (block_no < START_CLUSTERS) { // Requested root directory sector
 
         sectionIdx -= START_ROOTDIR;
 
