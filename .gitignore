@@ -54,3 +54,5 @@ dkms.conf
 src/segger/Output
 _build-*/
 bin/
+*.emSession
+*.jlink
