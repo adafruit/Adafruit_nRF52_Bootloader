@@ -264,7 +264,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
         sectionIdx -= START_CLUSTERS;
         if (sectionIdx < NUM_FILES - 1) {
             memcpy(data, info[sectionIdx].content, strlen(info[sectionIdx].content));
-        } else {
+        } else { // generate the UF2 file data on-the-fly
             sectionIdx -= NUM_FILES - 1;
             uint32_t addr = USER_FLASH_START + sectionIdx * 256;
             if (addr < USER_FLASH_START+FLASH_SIZE) {
