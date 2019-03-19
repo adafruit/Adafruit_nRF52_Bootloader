@@ -11,9 +11,6 @@
 #include "bootloader_settings.h"
 #include "bootloader.h"
 
-// Uncomment the next line to create an additional 20 files in root.
-// #define CREATE_MANY_FILES
-
 typedef struct {
     uint8_t JumpInstruction[3];
     uint8_t OEMInfo[8];
@@ -69,8 +66,7 @@ const char infoUf2File[] = //
     "Model: " PRODUCT_NAME "\r\n"
     "Board-ID: " BOARD_ID "\r\n"
     "Bootloader: " BOOTLOADER_ID "\r\n"
-    "Date: " __DATE__ "\r\n"
-    "Time: " __TIME__ "\r\n";
+    "Date: " __DATE__ "\r\n";
 
 const char indexFile[] = //
     "<!doctype html>\n"
@@ -82,56 +78,11 @@ const char indexFile[] = //
     "</body>"
     "</html>\n";
 
-#ifdef CREATE_MANY_FILES
-const char dataFile00[] = "This is the data for File 00\r\n";
-const char dataFile01[] = "This is the data for File 01\r\n";
-const char dataFile02[] = "This is the data for File 02\r\n";
-const char dataFile03[] = "This is the data for File 03\r\n";
-const char dataFile04[] = "This is the data for File 04\r\n";
-const char dataFile05[] = "This is the data for File 05\r\n";
-const char dataFile06[] = "This is the data for File 06\r\n";
-const char dataFile07[] = "This is the data for File 07\r\n";
-const char dataFile08[] = "This is the data for File 08\r\n";
-const char dataFile09[] = "This is the data for File 09\r\n";
-const char dataFile10[] = "This is the data for File 10\r\n";
-const char dataFile11[] = "This is the data for File 11\r\n";
-const char dataFile12[] = "This is the data for File 12\r\n";
-const char dataFile13[] = "This is the data for File 13\r\n";
-const char dataFile14[] = "This is the data for File 14\r\n";
-const char dataFile15[] = "This is the data for File 15\r\n";
-const char dataFile16[] = "This is the data for File 16\r\n";
-const char dataFile17[] = "This is the data for File 17\r\n";
-const char dataFile18[] = "This is the data for File 18\r\n";
-const char dataFile19[] = "This is the data for File 19\r\n";
-#endif // CREATE_MANY_FILES
-
 // WARNING -- code presumes only one NULL .content for .UF2 file
 //            and requires it be the last element of the array
 static struct TextFile const info[] = {
     {.name = "INFO_UF2TXT", .content = infoUf2File},
     {.name = "INDEX   HTM", .content = indexFile},
-#ifdef CREATE_MANY_FILES
-    {.name = "FILE00  TXT", .content = dataFile00},
-    {.name = "FILE01  TXT", .content = dataFile01},
-    {.name = "FILE02  TXT", .content = dataFile02},
-    {.name = "FILE03  TXT", .content = dataFile03},
-    {.name = "FILE04  TXT", .content = dataFile04},
-    {.name = "FILE05  TXT", .content = dataFile05},
-    {.name = "FILE06  TXT", .content = dataFile06},
-    {.name = "FILE07  TXT", .content = dataFile07},
-    {.name = "FILE08  TXT", .content = dataFile08},
-    {.name = "FILE09  TXT", .content = dataFile09},
-    {.name = "FILE10  TXT", .content = dataFile10},
-    {.name = "FILE11  TXT", .content = dataFile11},
-    {.name = "FILE12  TXT", .content = dataFile12},
-    {.name = "FILE13  TXT", .content = dataFile13},
-    {.name = "FILE14  TXT", .content = dataFile14},
-    {.name = "FILE15  TXT", .content = dataFile15},
-    {.name = "FILE16  TXT", .content = dataFile16},
-    {.name = "FILE17  TXT", .content = dataFile17},
-    {.name = "FILE18  TXT", .content = dataFile18},
-    {.name = "FILE19  TXT", .content = dataFile19},
-#endif
     {.name = "CURRENT UF2"},
 };
 
