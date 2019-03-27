@@ -251,6 +251,8 @@ CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin --short-enums -fstack-usage
 
 # Defined Symbol (MACROS)
+
+# TODO use GIT_VERSION (numberic format)
 CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)UL
 
 CFLAGS += -D__HEAP_SIZE=0
