@@ -1,5 +1,11 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.2.10
+
+- Fixed various FAT issues, thanks to @henrygab
+- Added MakerDiary MDK nrf52840 USB dongle support, thanks to @gpshead
+- Fixed incorrect button mapping for Feather nRF52840
+
 ## 0.2.9
 
 - Fixed incomplete writes on Windows. Upated tinyusb to handle write10 completion, and use it for finalizing dfu process. Will prevent windows error message pop up. This will also give an extra time for flash writing to complete.
