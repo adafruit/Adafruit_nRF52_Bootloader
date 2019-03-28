@@ -72,7 +72,7 @@ For other boards, please check the board definition for details.
 
 ### Making your own UF2
 
-To create your own UF2 DFU update file simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. Be sure to compile your application to start at 0x26000 (152k). If using a .bin file with the conversion script you must specify this with the -b switch.
+To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. Be sure to compile your application to start at 0x26000 (152k). If using a .bin file with the conversion script you must specify this with the -b switch.
 
 To create a UF2 image from a .bin file:
 ```
