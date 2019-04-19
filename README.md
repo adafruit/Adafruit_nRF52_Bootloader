@@ -10,6 +10,7 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - Particle Boron
 - Particle Xenon
 - MakerDiary MDK nRF52840 USB Dongle
+- [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware.
