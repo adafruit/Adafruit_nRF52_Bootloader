@@ -101,8 +101,6 @@ SD_NAME = s140
 DFU_DEV_REV = 52840
 endif
 
-
-
 #******************************************************************************
 # SOURCE FILES
 #******************************************************************************
@@ -252,8 +250,8 @@ CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)UL
 
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
+CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
 CFLAGS += -DBLE_STACK_SUPPORT_REQD
-CFLAGS += -DBSP_DEFINES_ONLY
 CFLAGS += -DSWI_DISABLE0
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DFLOAT_ABI_HARD
@@ -296,9 +294,7 @@ LDFLAGS += --specs=nano.specs -lc -lnosys
 #******************************************************************************
 ASMFLAGS += -x assembler-with-cpp
 ASMFLAGS += -D__HEAP_SIZE=0
-ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
 ASMFLAGS += -DBLE_STACK_SUPPORT_REQD
-ASMFLAGS += -DBSP_DEFINES_ONLY
 ASMFLAGS += -DSWI_DISABLE0
 ASMFLAGS += -DSOFTDEVICE_PRESENT
 ASMFLAGS += -DFLOAT_ABI_HARD
