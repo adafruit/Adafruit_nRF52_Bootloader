@@ -58,7 +58,7 @@
 #define DIS_MANUFACTURER   "Adafruit Industries"
 #define DIS_MODEL          "Bluefruit Metro nRF52840 Express"
 
-#define PRODUCT_NAME       "Adafruit Metro nRF52840 Express"
+#define UF2_PRODUCT_NAME   "Adafruit Metro nRF52840 Express"
 #define UF2_VOLUME_LABEL   "METR840BOOT"
 #define UF2_BOARD_ID       "nRF52840-Metro-revA"
 

@@ -60,6 +60,7 @@
 #define DIS_MANUFACTURER   "Particle Industries"
 #define DIS_MODEL          "Xenon"
 
+#define UF2_PRODUCT_NAME   "Particle Xenon"
 #define UF2_VOLUME_LABEL   "XENONBOOT  "
 #define UF2_BOARD_ID       "nRF52840-Xenon-v1"
 #define UF2_INDEX_URL      "https://www.particle.io/mesh/"

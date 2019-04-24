@@ -60,6 +60,7 @@
 #define DIS_MANUFACTURER   "Particle Industries"
 #define DIS_MODEL          "Boron"
 
+#define UF2_PRODUCT_NAME   "Particle Boron"
 #define UF2_VOLUME_LABEL   "BORONBOOT  "
 #define UF2_BOARD_ID       "nRF52840-Boron-v1"
 #define UF2_INDEX_URL      "https://www.particle.io/mesh/"

@@ -38,7 +38,7 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER 2
+#define BUTTONS_NUMBER  2
 
 #define BUTTON_1       _PINNUM(1, 6)
 #define BUTTON_2       _PINNUM(1, 10)
@@ -57,6 +57,7 @@
 #define DIS_MANUFACTURER  "Nordic"
 #define DIS_MODEL         "PCA10059"
 
+#define UF2_PRODUCT_NAME  "Nordic nRF52840 Dongle"
 #define UF2_BOARD_ID      "nRF52840-pca10059-v1"
 #define UF2_INDEX_URL     "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-Dongle"
 
