@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _METRO_NRF52840_EXPRESS_H_
-#define _METRO_NRF52840_EXPRESS_H_
+#ifndef _METRO_NRF52840_H_
+#define _METRO_NRF52840_H_
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -62,4 +62,4 @@
 #define VOLUME_LABEL          "METR840BOOT"
 
 
-#endif /* _METRO_NRF52840_EXPRESS_H_ */
+#endif /* _METRO_NRF52840_H_ */

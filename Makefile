@@ -80,22 +80,15 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 # Select the board to build
 #*********************************
-BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
+BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*))))
 
 NRF52832_BOARDLIST = feather_nrf52832
 IS_52832 = $(filter $(BOARD),$(NRF52832_BOARDLIST))
 
-ifeq ($(filter $(MAKECMDGOALS),all-board help),)
-  ifeq ($(BOARD),)
-    $(info You must provide a BOARD parameter with 'BOARD=')
-    $(info Supported boards are: $(BOARD_LIST))
-    $(info Run 'make help' for usage)
-    $(error BOARD not defined)
-  else
-    ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
-      $(error Invalid BOARD specified)
-    endif
-  endif
+ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
+  $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
+  $(info $(BOARD_LIST))
+  $(error Invalid BOARD specified)
 endif
 
 BUILD = _build-$(BOARD)
@@ -267,7 +260,7 @@ CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
-CFLAGS += -DBOARD_HEADER_FILE='"$(BOARD).h"'
+CFLAGS += -DBOARD_HEADER_FILE='"$(BOARD)/board.h"'
 
 ifneq ($(IS_52832),)
 CFLAGS += -DNRF52
@@ -347,29 +340,6 @@ endif
 
 # default target to build
 all: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out size
-
-# Rule using BOARD_LIST, nl is newline
-define nl
-
-
-endef
-
-_make_board = $(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=$1 $2 $(nl)
-_make_all_board = $(foreach b,$(BOARD_LIST), $(call _make_board,$b,$1))
-
-# build all the boards
-all-board:
-	$(call _make_all_board,clean all)
-
-help:
-	@echo To compile and build the current code for a board
-	@echo $$ make BOARD=feather_nrf52840_express all
-	@echo
-	@echo To flash current code using Jlink
-	@echo $$ make BOARD=feather_nrf52840_express flash
-	@echo
-	@echo To flash current code using existing bootloader dfu
-	@echo $$ make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 dfu-flash
 
 #******************* Flash target *******************
 

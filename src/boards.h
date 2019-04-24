@@ -30,6 +30,7 @@
 #include <string.h>
 #include "nrf_gpio.h"
 
+
 #include BOARD_HEADER_FILE
 
 #ifndef BUTTON_DFU
@@ -68,8 +69,6 @@ void board_teardown(void);
 // LED
 //--------------------------------------------------------------------+
 
-#define bit(b) (1UL << (b))
-
 enum {
   STATE_BOOTLOADER_STARTED = 0,
   STATE_USB_MOUNTED,
@@ -97,15 +96,8 @@ void led_tick(void);
 #error "At least two buttons required in the BSP (see 'BUTTONS_NUMBER')"
 #endif
 
-static inline void button_init(uint32_t pin)
-{
-  nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
-}
-
-static inline bool button_pressed(uint32_t pin)
-{
-  return (nrf_gpio_pin_read(pin) == 0) ? true : false;
-}
+void button_init(uint32_t pin);
+bool button_pressed(uint32_t pin);
 
 bool is_ota(void);
 

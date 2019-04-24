@@ -38,6 +38,16 @@
 #endif
 
 //------------- IMPLEMENTATION -------------//
+void button_init(uint32_t pin)
+{
+  nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
+}
+
+bool button_pressed(uint32_t pin)
+{
+  return (nrf_gpio_pin_read(pin) == 0) ? true : false;
+}
+
 void board_init(void)
 {
   // stop LF clock just in case we jump from application without reset
