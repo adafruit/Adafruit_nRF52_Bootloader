@@ -55,8 +55,8 @@
 #define HWFC                  false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER   "Adafruit Industries"
-#define DIS_MODEL          "Bluefruit Metro nRF52840 Express"
+#define BLEDIS_MANUFACTURER   "Adafruit Industries"
+#define BLEDIS_MODEL          "Metro nRF52840 Express"
 
 #define UF2_PRODUCT_NAME   "Adafruit Metro nRF52840 Express"
 #define UF2_VOLUME_LABEL   "METR840BOOT"

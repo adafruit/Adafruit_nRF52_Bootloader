@@ -994,8 +994,8 @@ static void services_init(void)
     ble_dis_init_t dis_init;
     memset(&dis_init, 0, sizeof(dis_init));
 
-    ascii_to_utf8(&dis_init.manufact_name_str, DIS_MANUFACTURER);
-    ascii_to_utf8(&dis_init.model_num_str, DIS_MODEL);
+    ascii_to_utf8(&dis_init.manufact_name_str, BLEDIS_MANUFACTURER);
+    ascii_to_utf8(&dis_init.model_num_str, BLEDIS_MODEL);
 
     uint32_t const sd_id      = SD_ID_GET(MBR_SIZE);
     uint32_t const sd_version = SD_VERSION_GET(MBR_SIZE);

@@ -51,8 +51,8 @@
 #define HWFC                false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER    "Nordic"
-#define DIS_MODEL           "PCA10056"
+#define BLEDIS_MANUFACTURER    "Nordic"
+#define BLEDIS_MODEL           "PCA10056"
 
 #define UF2_PRODUCT_NAME    "Nordic nRF52840 DK"
 #define UF2_BOARD_ID        "nRF52840-pca10056-v1"

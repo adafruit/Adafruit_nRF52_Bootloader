@@ -55,8 +55,8 @@
 #define HWFC                  false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER   "Adafruit Industries"
-#define DIS_MODEL          "Bluefruit Feather nRF52840 Express"
+#define BLEDIS_MANUFACTURER   "Adafruit Industries"
+#define BLEDIS_MODEL          "Feather nRF52840 Express"
 
 #define UF2_PRODUCT_NAME   "Adafruit Feather nRF52840 Express"
 #define UF2_VOLUME_LABEL   "FTHR840BOOT"

@@ -57,8 +57,8 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER   "Particle Industries"
-#define DIS_MODEL          "Xenon"
+#define BLEDIS_MANUFACTURER   "Particle Industries"
+#define BLEDIS_MODEL          "Xenon"
 
 #define UF2_PRODUCT_NAME   "Particle Xenon"
 #define UF2_VOLUME_LABEL   "XENONBOOT  "

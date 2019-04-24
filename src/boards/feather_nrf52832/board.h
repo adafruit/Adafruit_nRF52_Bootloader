@@ -51,8 +51,8 @@
 #define HWFC               false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER   "Adafruit Industries"
-#define DIS_MODEL          "Bluefruit Feather nRF52832"
+#define BLEDIS_MANUFACTURER   "Adafruit Industries"
+#define BLEDIS_MODEL          "Feather nRF52832"
 
 #define UF2_PRODUCT_NAME   "Adafruit Feather nRF52832"
 #define UF2_INDEX_URL      "https://www.adafruit.com/product/3406"
