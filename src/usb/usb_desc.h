@@ -26,15 +26,23 @@
 #define USB_DESC_H_
 
 #include "tusb.h"
+#include "boards.h"
 
 #ifdef __cplusplus
  extern "C" {
 #endif
 
+#ifndef USB_DESC_VID
 #define USB_DESC_VID                0x239A
+#endif
 
+#ifndef USB_DESC_UF2_PID
 #define USB_DESC_UF2_PID            0x0029
+#endif
+
+#ifndef USB_DESC_SERIAL_ONLY_PID
 #define USB_DESC_SERIAL_ONLY_PID    0x002A
+#endif
 
 
 /*------------- Configuration Descriptor -------------*/

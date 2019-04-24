@@ -63,30 +63,33 @@ enum {
 // STRING DESCRIPTORS
 //--------------------------------------------------------------------+
 
+#ifndef USB_STRING_DESCRIPTORS
+#define USB_STRING_DESCRIPTORS {                                                                                 \
+    /* 0: is supported language = English */                                                                        \
+    TUD_DESC_STRCONV(0x0409),                                                                                       \
+                                                                                                                    \
+    /* 1: Manufacturer */                                                                                           \
+    TUD_DESC_STRCONV('A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'),                  \
+                                                                                                                    \
+    /* 2: Product */                                                                                                \
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0', ' ', 'D','F','U'),    \
+                                                                                                                    \
+    /* 3: Serials TODO use chip ID */                                                                               \
+    usb_desc_str_serial,                                                                                            \
+                                                                                                                    \
+    /* 4: CDC Interface */                                                                                          \
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'),                              \
+                                                                                                                    \
+    /* 5: MSC Interface */                                                                                          \
+    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','U','F','2'),                                          \
+}
+#endif
+
 // Serial is 64-bit DeviceID -> 16 chars len
 uint16_t usb_desc_str_serial[1+16] = { TUD_DESC_STR_HEADER(16) };
 
 // array of pointer to string descriptors
-uint16_t const * const string_desc_arr [] =
-{
-    // 0: is supported language = English
-    TUD_DESC_STRCONV(0x0409),
-
-    // 1: Manufacturer
-    TUD_DESC_STRCONV('A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'),
-
-    // 2: Product
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0', ' ', 'D','F','U'),
-
-    // 3: Serials TODO use chip ID
-    usb_desc_str_serial,
-
-    // 4: CDC Interface
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'),
-
-    // 5: MSC Interface
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','U','F','2'),
-};
+uint16_t const * const string_desc_arr [] = USB_STRING_DESCRIPTORS;
 
 //--------------------------------------------------------------------+
 // Device Descriptor
