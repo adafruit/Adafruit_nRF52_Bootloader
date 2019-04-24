@@ -19,7 +19,7 @@
       arm_target_device_name="nRF52840_xxAA"
       arm_target_interface_type="SWD"
       build_treat_warnings_as_errors="Yes"
-      c_preprocessor_definitions="__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;MK_BOOTLOADER_VERSION=0x06010000;CONFIG_GPIO_AS_PINRESET;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD;CFG_TUSB_DEBUG=2;UF2_VERSION=&quot;Segger&quot;"
+      c_preprocessor_definitions="__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;MK_BOOTLOADER_VERSION=0x06010000;CONFIG_GPIO_AS_PINRESET;CONFIG_NFCT_PINS_AS_GPIOS;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD;CFG_TUSB_DEBUG=2;UF2_VERSION=&quot;Segger&quot;;BLEDIS_FW_VERSION=&quot;Segger&quot;"
       c_user_include_directories="../;../usb;../boards;../cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(sdDir)/include;$(sdDir)/include/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
       debug_register_definition_file="$(ProjectDir)/nrf52840_Registers.xml"
       debug_target_connection="J-Link"
@@ -375,17 +375,20 @@
     </folder>
     <configuration
       Name="Feather52840"
-      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.1 r0&quot;;S140;BOARD_FEATHER_NRF52840_EXPRESS;BOARD_HEADER_FILE=&quot;feather_nrf52840_express.h&quot;"
+      c_preprocessor_definitions="NRF52840_XXAA;S140"
+      c_user_include_directories=".;../boards/feather_nrf52840_express"
       gcc_optimization_level="Debug"
       linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
     <configuration
       Name="Feather52832"
-      c_preprocessor_definitions="NRF52832_XXAA;MK_DIS_FIRMWARE=&quot;s132 6.1.1 r0&quot;;S132;BOARD_FEATHER_NRF52832;BOARD_HEADER_FILE=&quot;feather_nrf52832.h&quot;"
+      c_preprocessor_definitions="NRF52832_XXAA;S132"
+      c_user_include_directories=".;../boards/feather_nrf52832"
       gcc_optimization_level="Debug"
       linker_memory_map_file="nRF52832_xxAA_MemoryMap.xml" />
     <configuration
       Name="PCA10056"
-      c_preprocessor_definitions="NRF52840_XXAA;MK_DIS_FIRMWARE=&quot;s140 6.1.1 r0&quot;;S140;BOARD_PCA10056;BOARD_HEADER_FILE=&quot;pca10056.h&quot;"
+      c_preprocessor_definitions="NRF52840_XXAA;S140"
+      c_user_include_directories=".;../boards/pca10056"
       gcc_optimization_level="Debug"
       linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
   </project>

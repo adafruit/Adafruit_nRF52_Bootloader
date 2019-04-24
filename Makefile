@@ -29,9 +29,6 @@ LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
 
 MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
 
-
-MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
-
 GIT_VERSION = $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
 
@@ -225,7 +222,6 @@ IPATH += $(SDK_PATH)/drivers_nrf/delay
 IPATH += $(SD_API_PATH)/include
 IPATH += $(SD_API_PATH)/include/nrf52
 
-
 INC_PATHS = $(addprefix -I,$(IPATH))
 
 #******************************************************************************
@@ -255,10 +251,10 @@ CFLAGS += -DBLE_STACK_SUPPORT_REQD
 CFLAGS += -DSWI_DISABLE0
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DFLOAT_ABI_HARD
-CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
+CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
 ifneq ($(IS_52832),)
 CFLAGS += -DNRF52
