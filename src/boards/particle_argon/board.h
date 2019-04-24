@@ -62,7 +62,7 @@
 
 #define VOLUME_LABEL      "ARGONBOOT  "
 
-#define BOARD_ID "Particle-Argon-v1"
+#define UF2_BOARD_ID "nRF52840-Argon-v1"
 
 #define INDEX_URL "https://www.particle.io/mesh/"
 

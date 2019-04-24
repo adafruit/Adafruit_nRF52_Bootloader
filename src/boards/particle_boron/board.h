@@ -62,7 +62,7 @@
 
 #define VOLUME_LABEL      "BORONBOOT  "
 
-#define BOARD_ID "Particle-Boron-v1"
+#define UF2_BOARD_ID "nRF52840-Boron-v1"
 
 #define INDEX_URL "https://www.particle.io/mesh/"
 

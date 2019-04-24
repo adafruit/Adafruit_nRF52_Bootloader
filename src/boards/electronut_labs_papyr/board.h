@@ -60,7 +60,7 @@
 #define DIS_MANUFACTURER    "Electronut Labs"
 #define DIS_MODEL           "Papyr"
 
-#define BOARD_ID            "Electronut Labs Papyr"
+#define UF2_BOARD_ID            "Electronut Labs Papyr"
 #define INDEX_URL           "https://docs.electronut.in/papyr"
 
 #define USB_DESC_VID        0x239A

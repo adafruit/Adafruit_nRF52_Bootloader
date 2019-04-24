@@ -60,6 +60,7 @@
 
 #define PRODUCT_NAME          "Adafruit Metro nRF52840 Express"
 #define VOLUME_LABEL          "METR840BOOT"
+#define UF2_BOARD_ID "nRF52840-Metro-revA"
 
 
 #endif /* _METRO_NRF52840_H_ */

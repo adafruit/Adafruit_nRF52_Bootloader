@@ -54,4 +54,6 @@
 #define DIS_MANUFACTURER    "Nordic"
 #define DIS_MODEL           "PCA10056"
 
+#define UF2_BOARD_ID           "nRF52840-pca10056-v1"
+
 #endif // PCA10056_H

@@ -60,5 +60,6 @@
 
 #define PRODUCT_NAME          "Adafruit Feather nRF52840 Express"
 #define VOLUME_LABEL          "FTHR840BOOT"
+#define UF2_BOARD_ID "nRF52840-Feather-revD"
 
 #endif // _FEATHER_NRF52840_H

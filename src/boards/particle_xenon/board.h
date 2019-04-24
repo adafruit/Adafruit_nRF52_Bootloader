@@ -62,7 +62,7 @@
 
 #define VOLUME_LABEL      "XENONBOOT  "
 
-#define BOARD_ID "Particle-Xenon-v1"
+#define UF2_BOARD_ID "nRF52840-Xenon-v1"
 
 #define INDEX_URL "https://www.particle.io/mesh/"
 

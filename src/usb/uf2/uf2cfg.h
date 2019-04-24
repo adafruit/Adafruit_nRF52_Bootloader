@@ -4,10 +4,6 @@
   #define PRODUCT_NAME     DIS_MODEL
 #endif
 
-#ifndef BOARD_ID
-#define BOARD_ID           "NRF52-Bluefruit-v0"
-#endif
-
 #ifndef INDEX_URL
 #define INDEX_URL          "https://www.adafruit.com/"
 #endif

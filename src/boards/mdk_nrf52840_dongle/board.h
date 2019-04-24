@@ -55,7 +55,7 @@
 #define PRODUCT_NAME          "MDK nRF52840 USB Dongle"
 #define VOLUME_LABEL          "MDK840DONGL"
 
-#define BOARD_ID "MakerDiary-nRF52840-USB-Dongle"
+#define UF2_BOARD_ID "MakerDiary-nRF52840-USB-Dongle"
 
 #define INDEX_URL "https://wiki.makerdiary.com/nrf52840-mdk-usb-dongle/"
 
