@@ -34,7 +34,7 @@ SOFTWARE.
 #endif
 
 #if __cplusplus >= 199711L
-    #pragma message "using Ivan J. Johnson's ARRAY_SIZE2"
+    // #pragma message "using Ivan J. Johnson's ARRAY_SIZE2"
 
     // Works on older compilers, even Visual C++ 6....
     // Created by Ivan J. Johnson, March 06, 2007
@@ -119,44 +119,9 @@ SOFTWARE.
        static Is_array check_type(const void*, const void*);
     };
 
-#elif __cplusplus >= 201103L ||  /* any compiler claiming C++11 support */ \
-    _MSC_VER >= 1900 ||          /* Visual C++ 2015 or higher           */ \
-    __has_feature(cxx_constexpr) /* CLang versions supporting constexp  */
-
-    #pragma message "C++11 version ARRAY_SIZE2"
-
-    namespace detail
-    {
-        template <typename T, std::size_t N>
-        constexpr std::size_t countof(T const (&)[N]) noexcept
-        {
-            return N;
-        }
-    } // namespace detail
-    #define ARRAY_SIZE2(arr) detail::countof(arr)
-
-#elif _MSC_VER // Visual C++ fallback
-
-    #pragma message "using Microsoft Visual C++ intrinsic ARRAY_SIZE2"
-    #define ARRAY_SIZE2(arr) _countof(arr)
-
-#elif __cplusplus >= 199711L && ( /* C++ 98 trick */ \
-    defined(__INTEL_COMPILER) ||                     \
-    defined(__clang__) ||                            \
-    (defined(__GNUC__) && (                          \
-        (__GNUC__ > 4) ||                            \
-        (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)       \
-    )))
-
-    #pragma message "C++98 version ARRAY_SIZE2"
-
-    template <typename T, std::size_t N>
-    char(&_ArraySizeHelperRequiresArray(T(&)[N]))[N];
-    #define ARRAY_SIZE2(x) sizeof(_ArraySizeHelperRequiresArray(x))
-
 #else
 
-    #pragma message "Using type-unsafe version of ARRAY_SIZE2"
+    // #pragma message "Using type-unsafe version of ARRAY_SIZE2"
     // This is the worst-case scenario macro.
     // While it is valid C, it is NOT typesafe.
     // For example, if the parameter arr is a pointer instead of array,
