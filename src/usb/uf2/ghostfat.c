@@ -89,10 +89,10 @@ static struct TextFile const info[] = {
 // WARNING -- code presumes each non-UF2 file content fits in single sector
 //            Cannot programmatically statically assert .content length
 //            for each element above.
-STATIC_ASSERT(ARRAY_SIZE2(indexFile) < 512);
+STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 
 
-#define NUM_FILES (ARRAY_SIZE2(info))
+#define NUM_FILES (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
 
