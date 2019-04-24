@@ -1,5 +1,4 @@
-
-#include "macros.h"
+#include "compile_date.h"
 
 #include "uf2.h"
 #include "flash_nrf5x.h"
