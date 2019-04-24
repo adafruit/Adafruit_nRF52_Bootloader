@@ -55,5 +55,6 @@
 #define DIS_MODEL          "Bluefruit Feather nRF52832"
 
 #define PRODUCT_NAME       "Adafruit Bluefruit Feather nRF52832"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/3406"
 
 #endif // _FEATHER_NRF52832_H

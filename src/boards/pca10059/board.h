@@ -57,6 +57,7 @@
 #define DIS_MANUFACTURER  "Nordic"
 #define DIS_MODEL         "PCA10059"
 
-#define UF2_BOARD_ID           "nRF52840-pca10059-v1"
+#define UF2_BOARD_ID      "nRF52840-pca10059-v1"
+#define UF2_INDEX_URL     "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-Dongle"
 
 #endif // PCA10059_H

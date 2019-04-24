@@ -57,13 +57,11 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER  "Particle Industries"
-#define DIS_MODEL         "Boron"
+#define DIS_MANUFACTURER   "Particle Industries"
+#define DIS_MODEL          "Boron"
 
-#define VOLUME_LABEL      "BORONBOOT  "
-
-#define UF2_BOARD_ID "nRF52840-Boron-v1"
-
-#define INDEX_URL "https://www.particle.io/mesh/"
+#define UF2_VOLUME_LABEL   "BORONBOOT  "
+#define UF2_BOARD_ID       "nRF52840-Boron-v1"
+#define UF2_INDEX_URL      "https://www.particle.io/mesh/"
 
 #endif // _PARTICLE_BORON_H

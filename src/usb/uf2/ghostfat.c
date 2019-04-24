@@ -71,7 +71,7 @@ const char indexFile[] = //
     "<html>"
     "<body>"
     "<script>\n"
-    "location.replace(\"" INDEX_URL "\");\n"
+    "location.replace(\"" UF2_INDEX_URL "\");\n"
     "</script>"
     "</body>"
     "</html>\n";
@@ -131,7 +131,7 @@ static FAT_BootBlock const BootBlock = {
 	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
-    .VolumeLabel          = VOLUME_LABEL,
+    .VolumeLabel          = UF2_VOLUME_LABEL,
     .FilesystemIdentifier = "FAT16   ",
 };
 

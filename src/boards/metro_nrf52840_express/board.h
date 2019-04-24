@@ -55,12 +55,14 @@
 #define HWFC                  false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER      "Adafruit Industries"
-#define DIS_MODEL             "Bluefruit Metro nRF52840 Express"
+#define DIS_MANUFACTURER   "Adafruit Industries"
+#define DIS_MODEL          "Bluefruit Metro nRF52840 Express"
 
-#define PRODUCT_NAME          "Adafruit Metro nRF52840 Express"
-#define VOLUME_LABEL          "METR840BOOT"
-#define UF2_BOARD_ID "nRF52840-Metro-revA"
+#define PRODUCT_NAME       "Adafruit Metro nRF52840 Express"
+#define UF2_VOLUME_LABEL   "METR840BOOT"
+#define UF2_BOARD_ID       "nRF52840-Metro-revA"
+
+#define UF2_INDEX_URL      "https://www.adafruit.com/"
 
 
 #endif /* _METRO_NRF52840_H_ */

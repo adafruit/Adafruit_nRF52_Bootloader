@@ -49,14 +49,12 @@
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER      "MakerDiary"
-#define DIS_MODEL             "nRF52840 Micro Dev Kit USB Dongle"
+#define DIS_MANUFACTURER   "MakerDiary"
+#define DIS_MODEL          "nRF52840 Micro Dev Kit USB Dongle"
 
-#define PRODUCT_NAME          "MDK nRF52840 USB Dongle"
-#define VOLUME_LABEL          "MDK840DONGL"
-
-#define UF2_BOARD_ID "MakerDiary-nRF52840-USB-Dongle"
-
-#define INDEX_URL "https://wiki.makerdiary.com/nrf52840-mdk-usb-dongle/"
+#define PRODUCT_NAME       "MDK nRF52840 USB Dongle"
+#define UF2_VOLUME_LABEL   "MDK840DONGL"
+#define UF2_BOARD_ID       "MakerDiary-nRF52840-USB-Dongle"
+#define UF2_INDEX_URL      "https://wiki.makerdiary.com/nrf52840-mdk-usb-dongle/"
 
 #endif /* _MDK_NRF52840_DONGLE_H_ */

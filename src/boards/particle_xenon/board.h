@@ -57,13 +57,11 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define DIS_MANUFACTURER  "Particle Industries"
-#define DIS_MODEL         "Xenon"
+#define DIS_MANUFACTURER   "Particle Industries"
+#define DIS_MODEL          "Xenon"
 
-#define VOLUME_LABEL      "XENONBOOT  "
-
-#define UF2_BOARD_ID "nRF52840-Xenon-v1"
-
-#define INDEX_URL "https://www.particle.io/mesh/"
+#define UF2_VOLUME_LABEL   "XENONBOOT  "
+#define UF2_BOARD_ID       "nRF52840-Xenon-v1"
+#define UF2_INDEX_URL      "https://www.particle.io/mesh/"
 
 #endif // _PARTICLE_XENON_H
