@@ -194,6 +194,8 @@ endif
 
 # src
 IPATH += $(SRC_PATH)
+IPATH += $(SRC_PATH)/boards/$(BOARD)
+
 IPATH += $(SRC_PATH)/cmsis/include
 IPATH += $(SRC_PATH)/usb
 IPATH += $(SRC_PATH)/boards
@@ -260,7 +262,6 @@ CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
 CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
-CFLAGS += -DBOARD_HEADER_FILE='"$(BOARD)/board.h"'
 
 ifneq ($(IS_52832),)
 CFLAGS += -DNRF52

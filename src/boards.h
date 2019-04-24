@@ -30,8 +30,7 @@
 #include <string.h>
 #include "nrf_gpio.h"
 
-
-#include BOARD_HEADER_FILE
+#include "board.h"
 
 #ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
