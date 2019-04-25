@@ -4,7 +4,7 @@
 # - SRC_PATH    : path to src folder
 #
 # - SD_NAME     : e.g s132, s140
-# - SD_VERSSION : SoftDevice version e.g 6.0.0
+# - SD_VERSION : SoftDevice version e.g 6.0.0
 # - SD_HEX      : to bootloader hex binary
 #******************************************************************************
 SRC_PATH     = src
