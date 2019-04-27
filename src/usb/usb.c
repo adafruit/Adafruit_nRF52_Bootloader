@@ -97,7 +97,7 @@ void usb_init(bool cdc_only)
   if ( cdc_only )
   {
     // Change PID to CDC only
-    usb_desc_dev.idProduct = USB_DESC_SERIAL_ONLY_PID;
+    usb_desc_dev.idProduct = USB_DESC_CDC_ONLY_PID;
 
     // Remove MSC interface = reduce total interface + adjust config desc length
     usb_desc_cfg.config.bNumInterfaces--;

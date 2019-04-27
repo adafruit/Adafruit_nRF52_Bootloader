@@ -58,11 +58,18 @@
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"
 #define BLEDIS_MODEL          "Metro nRF52840 Express"
 
-#define UF2_PRODUCT_NAME   "Adafruit Metro nRF52840 Express"
-#define UF2_VOLUME_LABEL   "METR840BOOT"
-#define UF2_BOARD_ID       "nRF52840-Metro-revA"
+//--------------------------------------------------------------------+
+// USB
+//--------------------------------------------------------------------+
+#define USB_DESC_VID           0x239A
+#define USB_DESC_UF2_PID       0x003F
+#define USB_DESC_CDC_ONLY_PID  0x0040
 
-#define UF2_INDEX_URL      "https://www.adafruit.com/"
+//------------- UF2 -------------//
+#define UF2_PRODUCT_NAME       "Adafruit Metro nRF52840 Express"
+#define UF2_VOLUME_LABEL       "METR840BOOT"
+#define UF2_BOARD_ID           "nRF52840-Metro-revA"
 
+#define UF2_INDEX_URL          "https://www.adafruit.com/"
 
 #endif /* _METRO_NRF52840_H_ */
