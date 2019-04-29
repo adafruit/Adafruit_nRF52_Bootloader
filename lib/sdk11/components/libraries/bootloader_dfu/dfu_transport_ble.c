@@ -994,20 +994,9 @@ static void services_init(void)
     ble_dis_init_t dis_init;
     memset(&dis_init, 0, sizeof(dis_init));
 
-    ascii_to_utf8(&dis_init.manufact_name_str, DIS_MANUFACTURER);
-    ascii_to_utf8(&dis_init.model_num_str, DIS_MODEL);
-
-    uint32_t const sd_id      = SD_ID_GET(MBR_SIZE);
-    uint32_t const sd_version = SD_VERSION_GET(MBR_SIZE);
-
-    uint32_t const ver1 = sd_version / 1000000;
-    uint32_t const ver2 = (sd_version % 1000000)/1000;
-    uint32_t const ver3 = sd_version % 1000;
-
-    char fw_str[30+1];
-    sprintf(fw_str, "s%ld %ld.%ld.%ld r%ld", sd_id, ver1, ver2, ver3, MK_BOOTLOADER_VERSION & 0xFFUL);
-
-    ascii_to_utf8(&dis_init.fw_rev_str, fw_str);
+    ascii_to_utf8(&dis_init.manufact_name_str, BLEDIS_MANUFACTURER);
+    ascii_to_utf8(&dis_init.model_num_str, BLEDIS_MODEL);
+    ascii_to_utf8(&dis_init.fw_rev_str, BLEDIS_FW_VERSION);
 
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&dis_init.dis_attr_md.read_perm);
     BLE_GAP_CONN_SEC_MODE_SET_NO_ACCESS(&dis_init.dis_attr_md.write_perm);

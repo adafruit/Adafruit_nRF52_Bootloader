@@ -1,11 +1,11 @@
 #******************************************************************************
 # CONFIGURE
-# - SDK_PATH : path to SDK directory
-# - SRC_PATH : path to src folder
+# - SDK_PATH    : path to SDK directory
+# - SRC_PATH    : path to src folder
 #
-# - SD_NAME  : e.g s132, s140
-# - SD_VER1, SD_VER2, SD_VER3: SoftDevice version e.g 6.0.0
-# - SD_HEX   : to bootloader hex binary
+# - SD_NAME     : e.g s132, s140
+# - SD_VERSION : SoftDevice version e.g 6.0.0
+# - SD_HEX      : to bootloader hex binary
 #******************************************************************************
 SRC_PATH     = src
 
@@ -16,26 +16,20 @@ SD_PATH      = lib/softdevice/$(SD_FILENAME)
 TUSB_PATH    = lib/tinyusb/src
 NRFX_PATH    = lib/nrfx
 
-SD_VER1      = 6
-SD_VER2      = 1
-SD_VER3      = 1
-
-SD_VERSION   = $(SD_VER1).$(SD_VER2).$(SD_VER3)
+SD_VERSION   = 6.1.1
 SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_API_PATH  = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
-LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(SD_VER1).ld
+LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
 
 MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
-
-
-MK_DIS_FIRMWARE = "$(SD_NAME) $(SD_VERSION)"
 
 GIT_VERSION = $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
 
 OUTPUT_FILENAME = $(BOARD)_bootloader-$(GIT_VERSION)
+
 #******************************************************************************
 # Tool configure
 #******************************************************************************
@@ -80,22 +74,15 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 # Select the board to build
 #*********************************
-BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*.h))))
+BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*))))
 
 NRF52832_BOARDLIST = feather_nrf52832
 IS_52832 = $(filter $(BOARD),$(NRF52832_BOARDLIST))
 
-ifeq ($(filter $(MAKECMDGOALS),all-board help),)
-  ifeq ($(BOARD),)
-    $(info You must provide a BOARD parameter with 'BOARD=')
-    $(info Supported boards are: $(BOARD_LIST))
-    $(info Run 'make help' for usage)
-    $(error BOARD not defined)
-  else
-    ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
-      $(error Invalid BOARD specified)
-    endif
-  endif
+ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
+  $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
+  $(info $(BOARD_LIST))
+  $(error Invalid BOARD specified)
 endif
 
 BUILD = _build-$(BOARD)
@@ -107,8 +94,6 @@ else
 SD_NAME = s140
 DFU_DEV_REV = 52840
 endif
-
-
 
 #******************************************************************************
 # SOURCE FILES
@@ -201,6 +186,8 @@ endif
 
 # src
 IPATH += $(SRC_PATH)
+IPATH += $(SRC_PATH)/boards/$(BOARD)
+
 IPATH += $(SRC_PATH)/cmsis/include
 IPATH += $(SRC_PATH)/usb
 IPATH += $(SRC_PATH)/boards
@@ -232,7 +219,6 @@ IPATH += $(SDK_PATH)/drivers_nrf/delay
 IPATH += $(SD_API_PATH)/include
 IPATH += $(SD_API_PATH)/include/nrf52
 
-
 INC_PATHS = $(addprefix -I,$(IPATH))
 
 #******************************************************************************
@@ -251,23 +237,20 @@ CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin --short-enums -fstack-usage
 
 # Defined Symbol (MACROS)
-
-# TODO use GIT_VERSION (numberic format)
-CFLAGS += -DMK_BOOTLOADER_VERSION=0x0$(SD_VER1)0$(SD_VER2)0$(SD_VER3)UL
-
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
+CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
 CFLAGS += -DBLE_STACK_SUPPORT_REQD
-CFLAGS += -DBSP_DEFINES_ONLY
 CFLAGS += -DSWI_DISABLE0
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DFLOAT_ABI_HARD
-CFLAGS += -DMK_DIS_FIRMWARE='$(MK_DIS_FIRMWARE)'
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
-CFLAGS += -DBOARD_$(shell echo $(BOARD) | tr '[:lower:]' '[:upper:]')
-CFLAGS += -DBOARD_HEADER_FILE='"$(BOARD).h"'
+CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
+
+_VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
+CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'
 
 ifneq ($(IS_52832),)
 CFLAGS += -DNRF52
@@ -302,9 +285,7 @@ LDFLAGS += --specs=nano.specs -lc -lnosys
 #******************************************************************************
 ASMFLAGS += -x assembler-with-cpp
 ASMFLAGS += -D__HEAP_SIZE=0
-ASMFLAGS += -DCONFIG_GPIO_AS_PINRESET
 ASMFLAGS += -DBLE_STACK_SUPPORT_REQD
-ASMFLAGS += -DBSP_DEFINES_ONLY
 ASMFLAGS += -DSWI_DISABLE0
 ASMFLAGS += -DSOFTDEVICE_PRESENT
 ASMFLAGS += -DFLOAT_ABI_HARD
@@ -347,29 +328,6 @@ endif
 
 # default target to build
 all: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out size
-
-# Rule using BOARD_LIST, nl is newline
-define nl
-
-
-endef
-
-_make_board = $(MAKE) -s -f $(MAKEFILE_LIST) -e BOARD=$1 $2 $(nl)
-_make_all_board = $(foreach b,$(BOARD_LIST), $(call _make_board,$b,$1))
-
-# build all the boards
-all-board:
-	$(call _make_all_board,clean all)
-
-help:
-	@echo To compile and build the current code for a board
-	@echo $$ make BOARD=feather_nrf52840_express all
-	@echo
-	@echo To flash current code using Jlink
-	@echo $$ make BOARD=feather_nrf52840_express flash
-	@echo
-	@echo To flash current code using existing bootloader dfu
-	@echo $$ make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 dfu-flash
 
 #******************* Flash target *******************
 

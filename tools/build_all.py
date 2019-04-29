@@ -17,11 +17,7 @@ exit_status = 0
 
 all_boards = []
 for entry in os.scandir("src/boards"):
-    if not entry.name.endswith(".h"):
-        print("Misplaced file in src/boards: {}\n".format(entry.name))
-        exit_status = 1
-        continue
-    all_boards.append(entry.name[:-2])
+    all_boards.append(entry.name)
 
 #sha, version = build_info.get_version_info()
 

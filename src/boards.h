@@ -1,14 +1,27 @@
-/* Copyright (c) 2014 Nordic Semiconductor. All Rights Reserved.
+/*
+ * The MIT License (MIT)
  *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
+ * Copyright (c) 2018 Ha Thach for Adafruit Industries
  *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
+
 #ifndef BOARDS_H
 #define BOARDS_H
 
@@ -17,7 +30,7 @@
 #include <string.h>
 #include "nrf_gpio.h"
 
-#include BOARD_HEADER_FILE
+#include "board.h"
 
 #ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
@@ -55,8 +68,6 @@ void board_teardown(void);
 // LED
 //--------------------------------------------------------------------+
 
-#define bit(b) (1UL << (b))
-
 enum {
   STATE_BOOTLOADER_STARTED = 0,
   STATE_USB_MOUNTED,
@@ -84,15 +95,8 @@ void led_tick(void);
 #error "At least two buttons required in the BSP (see 'BUTTONS_NUMBER')"
 #endif
 
-static inline void button_init(uint32_t pin)
-{
-  nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
-}
-
-static inline bool button_pressed(uint32_t pin)
-{
-  return (nrf_gpio_pin_read(pin) == 0) ? true : false;
-}
+void button_init(uint32_t pin);
+bool button_pressed(uint32_t pin);
 
 bool is_ota(void);
 

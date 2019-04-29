@@ -4,13 +4,14 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 
 - [Adafruit Feather nRF52832](https://www.adafruit.com/product/3406)
 - [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062)
-- Nordic nRF52840DK PCA10056
-- Nordic nRF52840DK PCA10059 ("Dongle")
+- Adafruit Metro nRF52840 Express
+- [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
+- MakerDiary MDK nRF52840 USB Dongle
+- [Nordic nRF52840DK PCA10056](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-DK)
+- [Nordic nRF52840DK PCA10059 ("Dongle")](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-Dongle)
 - Particle Argon
 - Particle Boron
 - Particle Xenon
-- MakerDiary MDK nRF52840 USB Dongle
-- [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware.

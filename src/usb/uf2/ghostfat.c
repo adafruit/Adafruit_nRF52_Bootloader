@@ -1,5 +1,4 @@
-
-#include "macros.h"
+#include "compile_date.h"
 
 #include "uf2.h"
 #include "flash_nrf5x.h"
@@ -63,9 +62,8 @@ struct TextFile {
 
 const char infoUf2File[] = //
     "UF2 Bootloader " UF2_VERSION "\r\n"
-    "Model: " PRODUCT_NAME "\r\n"
-    "Board-ID: " BOARD_ID "\r\n"
-    "Bootloader: " BOOTLOADER_ID "\r\n"
+    "Model: " UF2_PRODUCT_NAME "\r\n"
+    "Board-ID: " UF2_BOARD_ID "\r\n"
     "Date: " __DATE__ "\r\n";
 
 const char indexFile[] = //
@@ -73,7 +71,7 @@ const char indexFile[] = //
     "<html>"
     "<body>"
     "<script>\n"
-    "location.replace(\"" INDEX_URL "\");\n"
+    "location.replace(\"" UF2_INDEX_URL "\");\n"
     "</script>"
     "</body>"
     "</html>\n";
@@ -89,10 +87,10 @@ static struct TextFile const info[] = {
 // WARNING -- code presumes each non-UF2 file content fits in single sector
 //            Cannot programmatically statically assert .content length
 //            for each element above.
-STATIC_ASSERT(ARRAY_SIZE2(indexFile) < 512);
+STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 
 
-#define NUM_FILES (ARRAY_SIZE2(info))
+#define NUM_FILES (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
 
@@ -133,7 +131,7 @@ static FAT_BootBlock const BootBlock = {
 	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
-    .VolumeLabel          = VOLUME_LABEL,
+    .VolumeLabel          = UF2_VOLUME_LABEL,
     .FilesystemIdentifier = "FAT16   ",
 };
 
