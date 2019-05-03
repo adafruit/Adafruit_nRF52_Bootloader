@@ -1,10 +1,14 @@
 # Adafruit nRF52 Bootloader Changelog
 
-## 0.2.10
+## 0.2.11
 
 - Fixed various FAT issues, thanks to @henrygab
 - Added MakerDiary MDK nrf52840 USB dongle support, thanks to @gpshead
 - Fixed incorrect button mapping for Feather nRF52840
+- NFC pins are forced to GPIO mode by bootloader
+- Added Metro nRF52840 Express VID/PID
+- Enhance board management
+- Added electronut/papyr_support 
 
 ## 0.2.9
 
