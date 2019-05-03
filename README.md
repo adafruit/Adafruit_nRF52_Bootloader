@@ -1,4 +1,6 @@
-# Adafruit Bluefruit nRF52 Bootloader
+# Adafruit nRF52 Bootloader
+
+[![Build Status](https://travis-ci.com/adafruit/Adafruit_nRF52_Bootloader.svg?branch=master)](https://travis-ci.com/adafruit/Adafruit_nRF52_Bootloader)
 
 This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 
