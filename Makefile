@@ -229,12 +229,18 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 #flags common to all targets
 CFLAGS += -mcpu=cortex-m4
 CFLAGS += -mthumb -mabi=aapcs --std=gnu99
-CFLAGS += -Wall -Werror -Os -g3
+CFLAGS += -Wall -Os -g3
 CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 # keep every function in separate section. This will allow linker to dump unused functions
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-CFLAGS += -fno-builtin --short-enums -fstack-usage
+CFLAGS += -fno-builtin --short-enums
+
+ifdef STACK_USAGE
+CFLAGS += -fstack-usage
+else
+CFLAGS += -Werror
+endif
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
