@@ -790,6 +790,9 @@ uint32_t dfu_sd_image_validate(void)
         uint32_t image_end       = bootloader_settings.sd_image_start + 
                                    bootloader_settings.sd_image_size;
 
+        /* ##### FIX START ##### */
+        block_size &= ~(uint32_t)(CODE_PAGE_SIZE - 1); 
+        /* ##### FIX END ##### */       
         uint32_t img_block_start = bootloader_settings.sd_image_start + 2 * block_size;
         uint32_t sd_block_start  = sd_start + 2 * block_size;
 
