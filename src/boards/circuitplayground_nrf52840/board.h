@@ -32,10 +32,11 @@
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
 #define LED_PRIMARY_PIN       _PINNUM(1, 14)
+#define LED_STATE_ON          1
+
 #define LED_NEOPIXEL          _PINNUM(0, 13)
 #define NEOPIXELS_NUMBER      10
 #define BOARD_RGB_BRIGHTNESS  0x040404
-#define LED_STATE_ON          1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
@@ -68,7 +69,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   "Adafruit Circuit Playground nRF52840"
 #define UF2_VOLUME_LABEL   "CPLAYBTBOOT"
-#define UF2_BOARD_ID       "CircuitPlayground-nRF52840-revD"
+#define UF2_BOARD_ID       "nRF52840-CircuitPlayground-revD"
 #define UF2_INDEX_URL      "https://www.adafruit.com/product/4300"
 
 #endif // _FEATHER_NRF52840_H

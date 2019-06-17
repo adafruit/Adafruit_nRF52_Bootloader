@@ -33,9 +33,11 @@
 #define LEDS_NUMBER           2
 #define LED_PRIMARY_PIN       _PINNUM(1, 15)
 #define LED_SECONDARY_PIN     _PINNUM(1, 10)
-#define LED_NEOPIXEL          16
-#define BOARD_RGB_BRIGHTNESS  0x040404
 #define LED_STATE_ON          1
+
+#define LED_NEOPIXEL           _PINNUM(0, 16)
+#define NEOPIXELS_NUMBER      1
+#define BOARD_RGB_BRIGHTNESS  0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
