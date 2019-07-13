@@ -42,14 +42,14 @@
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(1, 01)     // left button
+#define BUTTON_1              _PINNUM(1, 02)     // left button
 #define BUTTON_2              _PINNUM(1, 15)     // right button
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_PULL           NRF_GPIO_PIN_PULLDOWN
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         _PINNUM(0, 29)
+#define RX_PIN_NUMBER         _PINNUM(0, 30)
 #define TX_PIN_NUMBER         _PINNUM(0, 14)
 #define CTS_PIN_NUMBER        0
 #define RTS_PIN_NUMBER        0
@@ -72,4 +72,4 @@
 #define UF2_BOARD_ID       "nRF52840-CircuitPlayground-revD"
 #define UF2_INDEX_URL      "https://www.adafruit.com/product/4300"
 
-#endif // _FEATHER_NRF52840_H
+#endif // _CPLAY_NRF52840_H
