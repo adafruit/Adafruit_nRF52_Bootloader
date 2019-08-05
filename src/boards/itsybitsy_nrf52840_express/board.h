@@ -34,7 +34,7 @@
 #define LED_PRIMARY_PIN       _PINNUM(0, 6)
 #define LED_STATE_ON          1
 
-#define LED_NEOPIXEL           _PINNUM(0, 16)
+#define LED_NEOPIXEL           _PINNUM(0, 8)
 #define NEOPIXELS_NUMBER      1
 #define BOARD_RGB_BRIGHTNESS  0x040404
 
@@ -42,15 +42,15 @@
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(1, 29)  // user switch
+#define BUTTON_1              _PINNUM(0, 29)  // user switch
 #define BUTTON_2              _PINNUM(1, 02)  // D2 breakout
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         _PINNUM(1, 25)
-#define TX_PIN_NUMBER         _PINNUM(1, 24)
+#define RX_PIN_NUMBER         _PINNUM(0, 25)
+#define TX_PIN_NUMBER         _PINNUM(0, 24)
 #define CTS_PIN_NUMBER        0
 #define RTS_PIN_NUMBER        0
 #define HWFC                  false
