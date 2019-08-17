@@ -43,10 +43,10 @@ SOFTWARE.
 : (__DATE__ [2u] == 'y'                        ) ?  5u  /*May*/ \
 : (__DATE__ [2u] == 'n'                        ) ?  6u  /*Jun*/ \
 : (__DATE__ [2u] == 'l'                        ) ?  7u  /*Jul*/ \
-: (__DATE__ [2u] == 'g'                        ) ?  8u  /*Jul*/ \
-: (__DATE__ [2u] == 'p'                        ) ?  9u  /*Jul*/ \
-: (__DATE__ [2u] == 't'                        ) ? 10u  /*Jul*/ \
-: (__DATE__ [2u] == 'v'                        ) ? 11u  /*Jul*/ \
+: (__DATE__ [2u] == 'g'                        ) ?  8u  /*Aug*/ \
+: (__DATE__ [2u] == 'p'                        ) ?  9u  /*Sep*/ \
+: (__DATE__ [2u] == 't'                        ) ? 10u  /*Oct*/ \
+: (__DATE__ [2u] == 'v'                        ) ? 11u  /*Nov*/ \
 :                                                  12u  /*Dec*/ )
 
 #define __DAY_INT__ ( \
@@ -71,12 +71,12 @@ SOFTWARE.
 #define __DOSDATE__ ( \
 	((__YEAR_INT__  - 1980u) << 9u) | \
 	( __MONTH_INT__          << 5u) | \
-                    ( __DAY_INT__            << 0u) )
+	( __DAY_INT__            << 0u) )
 
 #define __DOSTIME__ ( \
-	( __HOUR_INT__  << 11u) | \
-	( __MONTH_INT__ <<  5u) | \
-                    ( __DAY_INT__   <<  0u) )
+	( __HOUR_INT__    << 11u) | \
+	( __MINUTE_INT__  <<  5u) | \
+	( __SECONDS_INT__ <<  0u) )
 
 #endif // COMPILE_DATE_H
 
