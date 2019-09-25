@@ -35,15 +35,9 @@
 #ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
 #endif
+
 #ifndef BUTTON_FRESET
 #define BUTTON_FRESET   BUTTON_2
-#endif
-#ifndef BUTTON_DIR
-#if BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN
-  #define BUTTON_DIR   1
-#elif BUTTON_PULL == NRF_GPIO_PIN_PULLUP
-  #define BUTTON_DIR   0
-#endif
 #endif
 
 // The primary LED is usually Red but not in all cases.
