@@ -1,5 +1,9 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.2.13 - 2019.09.25
+
+- Fixed button pulldown with Adafruit Circuit Playground Bluefruit, PR #77 thanks to @khanning
+
 ## 0.2.12 - 2019.08.22
 
 - Fixed block alignment bug also in dfu_sd_image_validate (single & dual banks), PR #71 thanks to @fanoush
