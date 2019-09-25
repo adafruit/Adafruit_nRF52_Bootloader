@@ -1,5 +1,12 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.2.12 - 2019.08.22
+
+- Fixed block alignment bug also in dfu_sd_image_validate (single & dual banks), PR #71 thanks to @fanoush
+- Added new board: Adafruit Circuit Playground Bluefruit
+- Added new board: Adafruit ItsyBitsy nRF52840 Express (WIP)
+- Fixed bug in __DOSTIME__ macro, PR #75 thanks to @henrygab
+
 ## 0.2.11
 
 - Fixed various FAT issues, thanks to @henrygab
