@@ -42,16 +42,20 @@
 //------------- IMPLEMENTATION -------------//
 void button_init(uint32_t pin)
 {
-  if (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN) {
+  if ( BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN )
+  {
     nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
-  } else {
+  }
+  else
+  {
     nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
   }
 }
 
 bool button_pressed(uint32_t pin)
 {
-  return (nrf_gpio_pin_read(pin) == BUTTON_DIR) ? true : false;
+  uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
+  return nrf_gpio_pin_read(pin) == active_state;
 }
 
 void board_init(void)
