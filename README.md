@@ -97,7 +97,7 @@ This is preferred if you are not developing/customizing the bootloader.
 Pre-builtin binaries are available on GitHub [releases](https://github.com/adafruit/Adafruit_nRF52_Bootloader/releases)
 
 Note: The bootloader can be downgraded. Since the binary release is a merged version of
-of both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to any version you like.
+both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to any version you like.
 
 ## How to compile and build
 
