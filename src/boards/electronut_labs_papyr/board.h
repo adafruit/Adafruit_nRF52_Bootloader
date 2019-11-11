@@ -67,24 +67,4 @@
 #define USB_DESC_VID        0x239A
 #define USB_DESC_UF2_PID    0x003B
 
-#define USB_STRING_DESCRIPTORS {                                                                                    \
-    /* 0: is supported language = English */                                                                        \
-    TUD_DESC_STRCONV(0x0409),                                                                                       \
-                                                                                                                    \
-    /* 1: Manufacturer */                                                                                           \
-    TUD_DESC_STRCONV('E','l','e','c','t','r','o','n','u','t',' ','L','a','b','s'),                                  \
-                                                                                                                    \
-    /* 2: Product */                                                                                                \
-    TUD_DESC_STRCONV('P','a','p','y','r', ' ', 'D','F','U'),                                                        \
-                                                                                                                    \
-    /* 3: Serials TODO use chip ID */                                                                               \
-    usb_desc_str_serial,                                                                                            \
-                                                                                                                    \
-    /* 4: CDC Interface */                                                                                          \
-    TUD_DESC_STRCONV('P','a','p','y','r',' ','S','e','r','i','a','l'),                                              \
-                                                                                                                    \
-    /* 5: MSC Interface */                                                                                          \
-    TUD_DESC_STRCONV('P','a','p','y','r',' ','U','F','2'),                                                          \
-}
-
 #endif // PPAPYR_H

@@ -134,42 +134,19 @@ void usb_desc_init(bool cdc_only)
 // STRING DESCRIPTORS
 //--------------------------------------------------------------------+
 
-#ifndef USB_STRING_DESCRIPTORS
-#define USB_STRING_DESCRIPTORS {                                                                                 \
-    /* 0: is supported language = English */                                                                        \
-    TUD_DESC_STRCONV(0x0409),                                                                                       \
-                                                                                                                    \
-    /* 1: Manufacturer */                                                                                           \
-    TUD_DESC_STRCONV('A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'),                  \
-                                                                                                                    \
-    /* 2: Product */                                                                                                \
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0', ' ', 'D','F','U'),    \
-                                                                                                                    \
-    /* 3: Serials TODO use chip ID */                                                                               \
-    usb_desc_str_serial,                                                                                            \
-                                                                                                                    \
-    /* 4: CDC Interface */                                                                                          \
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'),                              \
-                                                                                                                    \
-    /* 5: MSC Interface */                                                                                          \
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','U','F','2'),                                          \
-}
-#endif
-
-
 // array of pointer to string descriptors
 char const* string_desc_arr [] =
 {
   (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
-  "Adafruit Industries",         // 1: Manufacturer
-  "Bluefruit DFU",               // 2: Product
+  BLEDIS_MANUFACTURER,           // 1: Manufacturer
+  BLEDIS_MODEL,                  // 2: Product
   desc_str_serial,               // 3: Serials, should use chip ID
-  "Bluefruit Serial",            // 4: CDC Interface
-  "Bluefruit UF2",               // 5: MSC Interface
+  "nRF Serial",                  // 4: CDC Interface
+  "nRF UF2",                     // 5: MSC Interface
 };
 
-// up to 32 unicode characters (header make it 33)
-static uint16_t _desc_str[33];
+// up to 64 unicode characters
+static uint16_t _desc_str[64+1];
 
 // Invoked when received GET STRING DESCRIPTOR request
 // Application return pointer to descriptor, whose contents must exist long enough for transfer to complete
