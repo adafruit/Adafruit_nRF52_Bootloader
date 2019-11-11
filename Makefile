@@ -76,9 +76,6 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #*********************************
 BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*))))
 
-NRF52832_BOARDLIST = feather_nrf52832
-IS_52832 = $(filter $(BOARD),$(NRF52832_BOARDLIST))
-
 ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
   $(info $(BOARD_LIST))
