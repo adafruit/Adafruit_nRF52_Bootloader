@@ -108,7 +108,7 @@ C_SOURCE_FILES += $(SRC_PATH)/dfu_init.c
 
 # nrfx
 C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
-C_SOURCE_FILES += $(NRFX_PATH)/hal/nrf_nvmc.c
+C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
 
 # SDK 11 files
 C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
@@ -159,13 +159,11 @@ C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_nrf52840.c
 
 # Tinyusb stack
 C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
-C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/hal_nrf5x.c
 C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
 C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
 C_SOURCE_FILES += $(TUSB_PATH)/device/usbd_control.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
-C_SOURCE_FILES += $(TUSB_PATH)/class/custom/custom_device.c
 C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
 
 endif
@@ -198,6 +196,7 @@ IPATH += $(NRFX_PATH)
 IPATH += $(NRFX_PATH)/mdk
 IPATH += $(NRFX_PATH)/hal
 IPATH += $(NRFX_PATH)/drivers/include
+IPATH += $(NRFX_PATH)/drivers/src
 
 IPATH += $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
 IPATH += $(SDK11_PATH)/libraries/bootloader_dfu

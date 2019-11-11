@@ -65,8 +65,8 @@
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
 #include "pstorage.h"
+#include "nrfx_nvmc.h"
 
-#include "nrf_nvmc.h"
 
 #ifdef NRF52840_XXAA
 #include "nrf_usbd.h"
@@ -275,11 +275,11 @@ void adafruit_factory_reset(void)
   // clear all App Data if any
   if ( DFU_APP_DATA_RESERVED )
   {
-    nrf_nvmc_page_erase(APPDATA_ADDR_START);
+    nrfx_nvmc_page_erase(APPDATA_ADDR_START);
   }
 
   // Only need to erase the 1st page of Application code to make it invalid
-  nrf_nvmc_page_erase(DFU_BANK_0_REGION_START);
+  nrfx_nvmc_page_erase(DFU_BANK_0_REGION_START);
 
   // back to normal
   led_state(STATE_FACTORY_RESET_FINISHED);

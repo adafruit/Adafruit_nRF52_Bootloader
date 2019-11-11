@@ -151,7 +151,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
     for ( uint32_t i = 0; i < page_count; i++ )
     {
-      nrf_nvmc_page_erase(DFU_BANK_0_REGION_START + i * CODE_PAGE_SIZE);
+      nrfx_nvmc_page_erase(DFU_BANK_0_REGION_START + i * CODE_PAGE_SIZE);
     }
 
     // invoke complete callback
