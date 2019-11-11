@@ -119,11 +119,23 @@ __STATIC_INLINE void apply_config(nrf_drv_uart_t const * p_instance, nrf_drv_uar
         nrf_gpio_cfg_input(p_config->pselrxd, NRF_GPIO_PIN_NOPULL);
     }
 
+    nrf_uarte_config_t uarte_cfg =
+    {
+      .hwfc = (nrf_uarte_hwfc_t) p_config->hwfc,
+      .parity = (nrf_uarte_parity_t) p_config->parity
+    };
+
+    nrf_uart_config_t uart_cfg =
+    {
+      .hwfc = (nrf_uart_hwfc_t) p_config->hwfc,
+      .parity = (nrf_uart_parity_t) p_config->parity
+    };
+
     CODE_FOR_UARTE
     (
         nrf_uarte_baudrate_set(p_instance->reg.p_uarte, (nrf_uarte_baudrate_t)p_config->baudrate);
-        nrf_uarte_configure(p_instance->reg.p_uarte, (nrf_uarte_parity_t)p_config->parity,
-                            (nrf_uarte_hwfc_t)p_config->hwfc);
+//        nrf_uarte_configure(p_instance->reg.p_uarte, (nrf_uarte_parity_t)p_config->parity, (nrf_uarte_hwfc_t)p_config->hwfc);
+        nrf_uarte_configure(p_instance->reg.p_uarte, &uarte_cfg);
         nrf_uarte_txrx_pins_set(p_instance->reg.p_uarte, p_config->pseltxd, p_config->pselrxd);
         if (p_config->hwfc == NRF_UART_HWFC_ENABLED)
         {
@@ -142,7 +154,8 @@ __STATIC_INLINE void apply_config(nrf_drv_uart_t const * p_instance, nrf_drv_uar
     CODE_FOR_UART
     (
         nrf_uart_baudrate_set(p_instance->reg.p_uart, p_config->baudrate);
-        nrf_uart_configure(p_instance->reg.p_uart, p_config->parity, p_config->hwfc);
+//        nrf_uart_configure(p_instance->reg.p_uart, p_config->parity, p_config->hwfc);
+        nrf_uart_configure(p_instance->reg.p_uart, &uart_cfg);
         nrf_uart_txrx_pins_set(p_instance->reg.p_uart, p_config->pseltxd, p_config->pselrxd);
         if (p_config->hwfc == NRF_UART_HWFC_ENABLED)
         {
