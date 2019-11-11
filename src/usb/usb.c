@@ -40,9 +40,6 @@
 // MACRO TYPEDEF CONSTANT ENUM DECLARATION
 //--------------------------------------------------------------------+
 
-// Serial string using unique Device ID
-extern char               usb_desc_str_serial[1+16];
-
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
@@ -90,12 +87,9 @@ void usb_init(bool cdc_only)
     tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
   }
 
-  usb_desc_set_mode(cdc_only);
+  usb_desc_init(cdc_only);
 
-  // Create Serial string descriptor
-  sprintf(usb_desc_str_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], NRF_FICR->DEVICEID[0]);
-
-  // Init tusb stack
+  // Init TinyUSB stack
   tusb_init();
 }
 

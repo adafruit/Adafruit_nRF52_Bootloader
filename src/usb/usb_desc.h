@@ -28,7 +28,7 @@
 #include "tusb.h"
 #include "boards.h"
 
-void usb_desc_set_mode(bool cdc_only);
+void usb_desc_init(bool cdc_only);
 
 #ifndef USB_DESC_VID
 #define USB_DESC_VID             0x239A

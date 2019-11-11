@@ -33,7 +33,11 @@ enum {
     ITF_STR_MSC
 };
 
+// CDC + MSC or CDC only mode
 static bool _cdc_only = false;
+
+// Serial is 64-bit DeviceID -> 16 chars len
+static char desc_str_serial[1+16];
 
 //--------------------------------------------------------------------+
 // Device Descriptor
@@ -112,7 +116,7 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 }
 
 // Enumerate as CDC + MSC or CDC only
-void usb_desc_set_mode(bool cdc_only)
+void usb_desc_init(bool cdc_only)
 {
   _cdc_only = cdc_only;
 
@@ -121,6 +125,9 @@ void usb_desc_set_mode(bool cdc_only)
     // Change PID to CDC only
     desc_device.idProduct = USB_DESC_CDC_ONLY_PID;
   }
+
+  // Create Serial string descriptor
+  sprintf(desc_str_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], NRF_FICR->DEVICEID[0]);
 }
 
 //--------------------------------------------------------------------+
@@ -149,8 +156,6 @@ void usb_desc_set_mode(bool cdc_only)
 }
 #endif
 
-// Serial is 64-bit DeviceID -> 16 chars len
-char usb_desc_str_serial[1+16];
 
 // array of pointer to string descriptors
 char const* string_desc_arr [] =
@@ -158,7 +163,7 @@ char const* string_desc_arr [] =
   (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
   "Adafruit Industries",         // 1: Manufacturer
   "Bluefruit DFU",               // 2: Product
-  usb_desc_str_serial,           // 3: Serials, should use chip ID
+  desc_str_serial,               // 3: Serials, should use chip ID
   "Bluefruit Serial",            // 4: CDC Interface
   "Bluefruit UF2",               // 5: MSC Interface
 };
