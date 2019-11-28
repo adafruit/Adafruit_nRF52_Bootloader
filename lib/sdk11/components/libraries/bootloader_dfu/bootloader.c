@@ -32,7 +32,7 @@
 
 #include "boards.h"
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
 #include "tusb.h"
 #endif
 
@@ -40,11 +40,11 @@
 
 #define IRQ_ENABLED            0x01                    /**< Field identifying if an interrupt is enabled. */
 
-/**< Maximum number of interrupts available. */
+/**< Maximum number of interrupts available. (from IRQn_Type) */
 #if defined(NRF52832_XXAA)
-#define MAX_NUMBER_INTERRUPTS  39
-#elif defined(NRF52840_XXAA)
-#define MAX_NUMBER_INTERRUPTS  48
+  #define MAX_NUMBER_INTERRUPTS  39
+#elif defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
+  #define MAX_NUMBER_INTERRUPTS  48
 #endif
 
 /**@brief Enumeration for specifying current bootloader status.
@@ -127,9 +127,8 @@ static void wait_for_events(void)
     // Event received. Process it from the scheduler.
     app_sched_execute();
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
     // skip if usb is not inited ( e.g OTA / finializing sd/bootloader )
-    extern bool usb_inited(void);
     if ( tusb_inited() )
     {
       tud_task();

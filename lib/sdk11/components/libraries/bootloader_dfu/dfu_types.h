@@ -30,22 +30,20 @@
 #include "app_util.h"
 
 #define NRF_UICR_BOOT_START_ADDRESS         (NRF_UICR_BASE + 0x14)      /**< Register where the bootloader start address is stored in the UICR register. */
-
-#if defined(NRF52832_XXAA) || defined(NRF52840_XXAA)
 #define NRF_UICR_MBR_PARAMS_PAGE_ADDRESS    (NRF_UICR_BASE + 0x18)      /**< Register where the mbr params page is stored in the UICR register. (Only in use in nRF52 MBR).*/
-#endif                                                              
 
 #define CODE_REGION_1_START                 SD_SIZE_GET(MBR_SIZE)       /**< This field should correspond to the size of Code Region 0, (which is identical to Start of Code Region 1), found in UICR.CLEN0 register. This value is used for compile safety, as the linker will fail if application expands into bootloader. Runtime, the bootloader will use the value found in UICR.CLEN0. */
 #define SOFTDEVICE_REGION_START             MBR_SIZE                    /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
 #define CODE_PAGE_SIZE                      0x1000                      /**< Size of a flash codepage. Used for size of the reserved flash space in the bootloader region. Will be runtime checked against NRF_UICR->CODEPAGESIZE to ensure the region is correct. */
 
-
-#if defined(NRF52832_XXAA)
+// Flash = 512 KB
+#if defined(NRF52832_XXAA) || defined(NRF52833_XXAA)
 
 #define BOOTLOADER_REGION_START             0x00074000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
 #define BOOTLOADER_SETTINGS_ADDRESS         0x0007F000                  /**< The field specifies the page location of the bootloader settings address. */
 #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x0007E000                  /**< The field specifies the page location of the mbr params page address. */
 
+// Flash = 1024 KB
 #elif  defined(NRF52840_XXAA)
 
 #define BOOTLOADER_REGION_START             0x000F4000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */

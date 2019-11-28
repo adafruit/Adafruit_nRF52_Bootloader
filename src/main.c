@@ -68,7 +68,7 @@
 #include "nrfx_nvmc.h"
 
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
 #include "nrf_usbd.h"
 #include "tusb.h"
 
@@ -120,9 +120,12 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define APPDATA_ADDR_START              (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
 
 #ifdef NRF52840_XXAA
-STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
+  // Flash 1024 KB
+  STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
+
 #else
-STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
+  // Flash 512 KB
+  STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 #endif
 
 
@@ -423,7 +426,7 @@ uint32_t proc_soc(void)
   {
     pstorage_sys_event_handler(soc_evt);
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
     extern void tusb_hal_nrf_power_event(uint32_t event);
     /*------------- usb power event handler -------------*/
     int32_t usbevt = (soc_evt == NRF_EVT_POWER_USB_DETECTED   ) ? NRFX_POWER_USB_EVT_DETECTED:
