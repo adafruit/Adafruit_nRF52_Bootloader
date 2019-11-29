@@ -21,7 +21,7 @@ SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_API_PATH  = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
-LD_FILE      = $(SRC_PATH)/linker/$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
+LD_FILE      = $(SRC_PATH)/linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
 
 MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
 
