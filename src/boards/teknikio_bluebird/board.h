@@ -22,16 +22,16 @@
  * THE SOFTWARE.
  */
 
-#ifndef PCA10059_H
-#define PCA10059_H
+#ifndef TEKNIKIO_BLUEBIRD_H
+#define TEKNIKIO_BLUEBIRD_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER       0
-#define LED_PRIMARY_PIN   _PINNUM(0, 2)//6 // Red
+#define LEDS_NUMBER       0 
+#define LED_PRIMARY_PIN   _PINNUM(0, 2)
 #define LED_SECONDARY_PIN 12 // Blue
 #define LED_STATE_ON      1
 /*------------------------------------------------------------------*/
@@ -58,11 +58,11 @@
 #define HWFC           false
 
 // Used as model string in OTA mode
-#define BLEDIS_MANUFACTURER  "Nordic"
-#define BLEDIS_MODEL         "PCA10059"
+#define BLEDIS_MANUFACTURER  "Teknikio"
+#define BLEDIS_MODEL         "Bleubird"
 
-#define UF2_PRODUCT_NAME  "Nordic nRF52840 Dongle"
+#define UF2_PRODUCT_NAME  "Teknikio Bluebird"
 #define UF2_BOARD_ID      "nRF52840-pca10059-v1"
 #define UF2_INDEX_URL     "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-Dongle"
 
-#endif // PCA10059_H
+#endif
