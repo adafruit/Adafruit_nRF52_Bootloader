@@ -60,7 +60,7 @@
 #define BLEDIS_MODEL         "Bleubird"
 
 #define UF2_PRODUCT_NAME  "Teknikio Bluebird"
-#define UF2_BOARD_ID      "nRF52840-pca10059-v1"
-#define UF2_INDEX_URL     "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-Dongle"
+#define UF2_BOARD_ID      "nRF52840-bluebird-v1"
+#define UF2_INDEX_URL     "https://www.teknikio.com/pages/bluebird"
 
 #endif
