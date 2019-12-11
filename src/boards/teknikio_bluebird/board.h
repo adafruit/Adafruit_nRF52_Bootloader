@@ -53,8 +53,6 @@
  *------------------------------------------------------------------*/
 #define RX_PIN_NUMBER  7
 #define TX_PIN_NUMBER  8
-#define CTS_PIN_NUMBER 15
-#define RTS_PIN_NUMBER 13
 #define HWFC           false
 
 // Used as model string in OTA mode
