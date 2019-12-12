@@ -105,7 +105,7 @@ void usb_teardown(void);
 #define DFU_MAGIC_UF2_RESET             0x57
 
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
-#define DFU_TRPL_RESET_MAGIC            0x5A1AD3      // SALADE
+#define DFU_TRPL_RESET_MAGIC            0xC0FFEE      // COFFEE
 #define DFU_DBL_RESET_DELAY             500
 #define DFU_DBL_RESET_MEM               0x20007F7C
 
@@ -163,8 +163,6 @@ int main(void)
                     (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk)) ||
                     (((*dbl_reset_mem) == DFU_TRPL_RESET_MAGIC) && (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk));
 
-
-
   // Clear GPREGRET if it is our values
   if (dfu_start) NRF_POWER->GPREGRET = 0;
 
@@ -194,12 +192,12 @@ int main(void)
   // DFU button pressed
   dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
 
-  // DFU + FRESET are pressed --> OTA
+  // DFU + FRESET are pressed or 3rd reset --> OTA
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) || ( (*dbl_reset_mem) == DFU_TRPL_RESET_MAGIC );
 
   bool const valid_app = bootloader_app_is_valid(DFU_BANK_0_REGION_START);
 
-  // App mode: register 1st reset and DFU startup (nrf52832)
+  // App mode: register 1st reset, 2nd reset and DFU startup (nrf52832)
   if ( (! (dfu_start || !valid_app)) || ((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) )
   {
     if ((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC)
@@ -212,7 +210,6 @@ int main(void)
       // Register our first reset for double reset detection
       (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
     }
-
 
 #ifdef NRF52832_XXAA
     /* Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
@@ -234,12 +231,10 @@ int main(void)
   {
     if ( _ota_dfu )
     {
-      NRFX_DELAY_MS(25);
-      led_state(STATE_BLE_DISCONNECTED);
       softdev_init(!sd_inited);
       sd_inited = true;
-    }
-    else
+      led_state(STATE_BLE_DISCONNECTED);
+    } else
     {
       led_state(STATE_USB_UNMOUNTED);
       usb_init(serial_only_dfu);
@@ -251,7 +246,7 @@ int main(void)
     if ( _ota_dfu )
     {
       sd_softdevice_disable();
-    }else
+    } else
     {
       usb_teardown();
     }
