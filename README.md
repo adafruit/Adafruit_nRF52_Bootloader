@@ -15,6 +15,7 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - Particle Argon
 - Particle Boron
 - Particle Xenon
+- Teknikio Bluebird (https://www.teknikio.com/pages/bluebird)
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware.
@@ -58,6 +59,7 @@ git submodule update --init --recursive
 There are two pins, `DFU` and `FRST` that bootloader will check upon reset/power:
 
 - `Double Reset` Reset twice within 500 ms will enter DFU with UF2 and CDC support (only works with nRF52840)
+- `Triple Reset` Reset three times within 1000 ms will enter bootloader with OTA, to upgrade with a mobile application such as Nordic nrfConnect/Toolbox (only works with nRF52840)
 - `DFU = LOW` and `FRST = HIGH`: Enter bootloader with UF2 and CDC support
 - `DFU = LOW` and `FRST = LOW`: Enter bootloader with OTA, to upgrade with a mobile application such as Nordic nrfConnect/Toolbox
 - `DFU = HIGH` and `FRST = LOW`: Factory Reset mode: erase firmware application and its data
@@ -77,7 +79,7 @@ For other boards, please check the board definition for details.
 
 ### Making your own UF2
 
-To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000 
+To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000
 
 To create a UF2 image from a .bin file:
 ```
@@ -157,7 +159,7 @@ Makefile:90: *** BOARD not defined.  Stop
 If you get the following error ...
 
 ```
-$ make BOARD=feather_nrf52840_express all 
+$ make BOARD=feather_nrf52840_express all
 Compiling file: main.c
 /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
 make: *** [_build/main.o] Error 127
