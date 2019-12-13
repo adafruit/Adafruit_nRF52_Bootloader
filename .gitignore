@@ -56,3 +56,8 @@ _build-*/
 bin/
 *.emSession
 *.jlink
+
+
+*.DS_Store
+**/*.DS_Store
+*.icloud
