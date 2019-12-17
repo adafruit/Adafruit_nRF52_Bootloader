@@ -32,7 +32,7 @@
 
 #include "boards.h"
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
 #include "tusb.h"
 #endif
 
@@ -40,11 +40,11 @@
 
 #define IRQ_ENABLED            0x01                    /**< Field identifying if an interrupt is enabled. */
 
-/**< Maximum number of interrupts available. */
+/**< Maximum number of interrupts available. (from IRQn_Type) */
 #if defined(NRF52832_XXAA)
-#define MAX_NUMBER_INTERRUPTS  39
-#elif defined(NRF52840_XXAA)
-#define MAX_NUMBER_INTERRUPTS  48
+  #define MAX_NUMBER_INTERRUPTS  39
+#elif defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
+  #define MAX_NUMBER_INTERRUPTS  48
 #endif
 
 /**@brief Enumeration for specifying current bootloader status.
@@ -119,17 +119,16 @@ static void wait_for_events(void)
 
     // Feed all Watchdog just in case application enable it
     // WDT cannot be disabled once started. It even last through soft reset (NVIC Reset)
-    if ( nrf_wdt_started() )
+    if ( nrf_wdt_started(NRF_WDT) )
     {
-      for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(i);
+      for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
     }
 
     // Event received. Process it from the scheduler.
     app_sched_execute();
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
     // skip if usb is not inited ( e.g OTA / finializing sd/bootloader )
-    extern bool usb_inited(void);
     if ( tusb_inited() )
     {
       tud_task();
@@ -194,8 +193,8 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
   }
   else
   {
-    nrf_nvmc_page_erase(BOOTLOADER_SETTINGS_ADDRESS);
-    nrf_nvmc_write_words(BOOTLOADER_SETTINGS_ADDRESS, (uint32_t *) p_settings, sizeof(bootloader_settings_t) / 4);
+    nrfx_nvmc_page_erase(BOOTLOADER_SETTINGS_ADDRESS);
+    nrfx_nvmc_words_write(BOOTLOADER_SETTINGS_ADDRESS, (uint32_t *) p_settings, sizeof(bootloader_settings_t) / 4);
 
     pstorage_callback_handler(&m_bootsettings_handle, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_settings, sizeof(bootloader_settings_t));
   }

@@ -40,13 +40,6 @@
 // MACRO TYPEDEF CONSTANT ENUM DECLARATION
 //--------------------------------------------------------------------+
 
-// from usb_desc.c for dynamic descriptor
-extern tusb_desc_device_t usb_desc_dev;
-extern usb_desc_cfg_t     usb_desc_cfg;
-
-// Serial string using unique Device ID
-extern uint16_t           usb_desc_str_serial[1+16];
-
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
@@ -94,26 +87,9 @@ void usb_init(bool cdc_only)
     tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
   }
 
-  if ( cdc_only )
-  {
-    // Change PID to CDC only
-    usb_desc_dev.idProduct = USB_DESC_CDC_ONLY_PID;
+  usb_desc_init(cdc_only);
 
-    // Remove MSC interface = reduce total interface + adjust config desc length
-    usb_desc_cfg.config.bNumInterfaces--;
-    usb_desc_cfg.config.wTotalLength -= sizeof(usb_desc_cfg.msc);
-  }
-
-  // Create Serial string descriptor
-  char tmp_serial[17];
-  sprintf(tmp_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], NRF_FICR->DEVICEID[0]);
-
-  for(uint8_t i=0; i<16; i++)
-  {
-    usb_desc_str_serial[1+i] = tmp_serial[i];
-  }
-
-  // Init tusb stack
+  // Init TinyUSB stack
   tusb_init();
 }
 
@@ -124,7 +100,7 @@ void usb_teardown(void)
     // Abort all transfers
 
     // Disable pull up
-    nrf_usbd_pullup_disable();
+    nrf_usbd_pullup_disable(NRF_USBD);
 
     // Disable Interrupt
     NVIC_DisableIRQ(USBD_IRQn);
@@ -132,7 +108,7 @@ void usb_teardown(void)
     // disable all interrupt
     NRF_USBD->INTENCLR = NRF_USBD->INTEN;
 
-    nrf_usbd_disable();
+    nrf_usbd_disable(NRF_USBD);
     sd_clock_hfclk_release();
 
     sd_power_usbdetected_enable(false);

@@ -31,7 +31,7 @@ __root    const uint32_t m_uicr_bootloader_start_address @ NRF_UICR_BOOT_START_A
 
 #endif
 
-#if defined(NRF52832_XXAA) || defined(NRF52840_XXAA)
+#if defined(NRF52_SERIES)
 #if defined ( __CC_ARM )
 
 uint8_t m_mbr_params_page[CODE_PAGE_SIZE]   __attribute__((at(BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS))) __attribute__((used));          /**< This variable reserves a codepage for mbr parameters, to ensure the compiler doesn't locate any code or variables at his location. */
@@ -50,7 +50,7 @@ __no_init uint8_t m_mbr_params_page[CODE_PAGE_SIZE]     @ BOOTLOADER_MBR_PARAMS_
 __root    const uint32_t m_uicr_mbr_params_page_address @ NRF_UICR_MBR_PARAMS_PAGE_ADDRESS = BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS;    /**< This variable ensures that the linker script will write the bootloader start address to the UICR register. This value will be written in the HEX file and thus written to UICR when the bootloader is flashed into the chip. */
 
 #endif
-#endif // defined(NRF52832_XXAA) || defined(NRF52840_XXAA)
+#endif // NRF52_SERIES
 
 
 void bootloader_util_settings_get(const bootloader_settings_t ** pp_bootloader_settings)

@@ -28,59 +28,18 @@
 #include "tusb.h"
 #include "boards.h"
 
-#ifdef __cplusplus
- extern "C" {
-#endif
+void usb_desc_init(bool cdc_only);
 
 #ifndef USB_DESC_VID
-#define USB_DESC_VID             0x239A
+#define USB_DESC_VID            0x239A
 #endif
 
 #ifndef USB_DESC_UF2_PID
-#define USB_DESC_UF2_PID         0x0029
+#define USB_DESC_UF2_PID        0x0029
 #endif
 
 #ifndef USB_DESC_CDC_ONLY_PID
-#define USB_DESC_CDC_ONLY_PID    0x002A
-#endif
-
-
-/*------------- Configuration Descriptor -------------*/
-typedef struct ATTR_PACKED
-{
-  tusb_desc_configuration_t           config;
-
-  //------------- CDC -------------//
-  struct ATTR_PACKED
-  {
-    tusb_desc_interface_assoc_t       iad;
-
-    //CDC Control Interface
-    tusb_desc_interface_t             comm_itf;
-    cdc_desc_func_header_t            header;
-    cdc_desc_func_call_management_t   call;
-    cdc_desc_func_acm_t               acm;
-    cdc_desc_func_union_t             union_func;
-    tusb_desc_endpoint_t              ep_notif;
-
-    //CDC Data Interface
-    tusb_desc_interface_t             data_itf;
-    tusb_desc_endpoint_t              ep_out;
-    tusb_desc_endpoint_t              ep_in;
-  }cdc;
-
-  //------------- Mass Storage -------------//
-  struct ATTR_PACKED
-  {
-    tusb_desc_interface_t             itf;
-    tusb_desc_endpoint_t              ep_out;
-    tusb_desc_endpoint_t              ep_in;
-  } msc;
-} usb_desc_cfg_t;
-
-
-#ifdef __cplusplus
- }
+#define USB_DESC_CDC_ONLY_PID   0x002A
 #endif
 
 #endif /* USB_DESC_H_ */

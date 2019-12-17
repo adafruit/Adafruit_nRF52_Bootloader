@@ -58,11 +58,6 @@
 //------------- Class enabled -------------//
 #define CFG_TUD_CDC                 1
 #define CFG_TUD_MSC                 1
-#define CFG_TUD_HID_KEYBOARD        0
-#define CFG_TUD_HID_MOUSE           0
-#define CFG_TUD_HID_GENERIC         0 // not supported yet
-#define CFG_TUD_CUSTOM_CLASS        0
-
 
 /*------------------------------------------------------------------*/
 /* CLASS DRIVER
@@ -72,34 +67,15 @@
 #define CFG_TUD_CDC_RX_BUFSIZE      1024
 #define CFG_TUD_CDC_TX_BUFSIZE      1024
 
-/* TX is sent automatically on every Start of Frame event ~ 1ms.
- * If not enabled, application must call tud_cdc_flush() periodically
- * Note: Enabled this could overflow device task, if it does, define
- * CFG_TUD_TASK_QUEUE_SZ with large value
- */
-#define CFG_TUD_CDC_FLUSH_ON_SOF    0
-
-// Number of supported Logical Unit Number
-#define CFG_TUD_MSC_MAXLUN          1
-
 // Buffer size for each read/write transfer, the more the better
 #define CFG_TUD_MSC_BUFSIZE         (4*1024)
-
-// Vendor name included in Inquiry response, max 8 bytes
-#define CFG_TUD_MSC_VENDOR          "Adafruit"
-
-// Product name included in Inquiry response, max 16 bytes
-#define CFG_TUD_MSC_PRODUCT         "Feather nRF52840"
-
-// Product revision string included in Inquiry response, max 4 bytes
-#define CFG_TUD_MSC_PRODUCT_REV     "1.0"
 
 
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT
 //--------------------------------------------------------------------+
 #define CFG_TUSB_ATTR_USBRAM
-#define CFG_TUSB_MEM_ALIGN          ATTR_ALIGNED(4)
+#define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(4)))
 
 
 #define BREAKPOINT_IGNORE_COUNT(n) \

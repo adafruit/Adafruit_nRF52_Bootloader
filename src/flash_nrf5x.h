@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "nrf_nvmc.h"
+#include "nrfx_nvmc.h"
 
 #ifdef __cplusplus
  extern "C" {

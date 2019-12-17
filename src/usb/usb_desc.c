@@ -24,15 +24,6 @@
 
 #include "usb_desc.h"
 
-
-/*------------- Interface Numbering -------------*/
-enum {
-    ITF_NUM_CDC = 0  ,
-    ITF_NUM_CDC_DATA ,
-    ITF_NUM_MSC      ,
-    ITF_NUM_TOTAL
-};
-
 enum {
     ITF_STR_LANGUAGE = 0 ,
     ITF_STR_MANUFACTURER ,
@@ -42,59 +33,16 @@ enum {
     ITF_STR_MSC
 };
 
-/*------------- Endpoint Numbering & Size -------------*/
-#define _EP_IN(x)          (0x80 | (x))
-#define _EP_OUT(x)         (x)
-
-// CDC
-#define EP_CDC_NOTIF       _EP_IN ( ITF_NUM_CDC+1 )
-#define EP_CDC_NOTIF_SIZE  8
-
-#define EP_CDC_OUT         _EP_OUT( ITF_NUM_CDC+2 )
-#define EP_CDC_IN          _EP_IN ( ITF_NUM_CDC+2 )
-
-// Mass Storage
-#define EP_MSC_OUT         _EP_OUT( ITF_NUM_MSC+1 )
-#define EP_MSC_IN          _EP_IN ( ITF_NUM_MSC+1 )
-
-#define EP_MSC_SIZE        64
-
-//--------------------------------------------------------------------+
-// STRING DESCRIPTORS
-//--------------------------------------------------------------------+
-
-#ifndef USB_STRING_DESCRIPTORS
-#define USB_STRING_DESCRIPTORS {                                                                                 \
-    /* 0: is supported language = English */                                                                        \
-    TUD_DESC_STRCONV(0x0409),                                                                                       \
-                                                                                                                    \
-    /* 1: Manufacturer */                                                                                           \
-    TUD_DESC_STRCONV('A','d','a','f','r','u','i','t',' ','I','n','d','u','s','t','r','i','e','s'),                  \
-                                                                                                                    \
-    /* 2: Product */                                                                                                \
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','n','R','F','5','2','8','4','0', ' ', 'D','F','U'),    \
-                                                                                                                    \
-    /* 3: Serials TODO use chip ID */                                                                               \
-    usb_desc_str_serial,                                                                                            \
-                                                                                                                    \
-    /* 4: CDC Interface */                                                                                          \
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','S','e','r','i','a','l'),                              \
-                                                                                                                    \
-    /* 5: MSC Interface */                                                                                          \
-    TUD_DESC_STRCONV('B','l','u','e','f','r','u','i','t',' ','U','F','2'),                                          \
-}
-#endif
+// CDC + MSC or CDC only mode
+static bool _cdc_only = false;
 
 // Serial is 64-bit DeviceID -> 16 chars len
-uint16_t usb_desc_str_serial[1+16] = { TUD_DESC_STR_HEADER(16) };
-
-// array of pointer to string descriptors
-uint16_t const * const string_desc_arr [] = USB_STRING_DESCRIPTORS;
+static char desc_str_serial[1+16];
 
 //--------------------------------------------------------------------+
 // Device Descriptor
 //--------------------------------------------------------------------+
-tusb_desc_device_t usb_desc_dev =
+tusb_desc_device_t desc_device =
 {
     .bLength            = sizeof(tusb_desc_device_t),
     .bDescriptorType    = TUSB_DESC_DEVICE,
@@ -118,187 +66,117 @@ tusb_desc_device_t usb_desc_dev =
     .bNumConfigurations = 0x01
 };
 
+// Invoked when received GET DEVICE DESCRIPTOR
+// Application return pointer to descriptor
+uint8_t const * tud_descriptor_device_cb(void)
+{
+  return (uint8_t const *) &desc_device;
+}
+
 //--------------------------------------------------------------------+
 // Configuration Descriptor
 //--------------------------------------------------------------------+
-usb_desc_cfg_t usb_desc_cfg =
+
+enum {
+    ITF_NUM_CDC = 0  ,
+    ITF_NUM_CDC_DATA ,
+    ITF_NUM_MSC      ,
+    ITF_NUM_TOTAL
+};
+
+uint8_t const desc_configuration_cdc_msc[] =
 {
-    .config =
-    {
-        .bLength             = sizeof(tusb_desc_configuration_t),
-        .bDescriptorType     = TUSB_DESC_CONFIGURATION,
-        .wTotalLength        = sizeof(usb_desc_cfg_t),
-        .bNumInterfaces      = ITF_NUM_TOTAL,
-        .bConfigurationValue = 1,
-        .iConfiguration      = 0x00,
-        .bmAttributes        = TUSB_DESC_CONFIG_ATT_BUS_POWER,
-        .bMaxPower           = TUSB_DESC_CONFIG_POWER_MA(100)
-    },
+  // Interface count, string index, total length, attribute, power in mA
+  TUD_CONFIG_DESCRIPTOR(ITF_NUM_TOTAL, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
-    // IAD points to CDC Interfaces
-    .cdc =
-    {
-      .iad =
-      {
-          .bLength           = sizeof(tusb_desc_interface_assoc_t),
-          .bDescriptorType   = TUSB_DESC_INTERFACE_ASSOCIATION,
+  // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, ITF_STR_CDC, 0x81, 8, 0x02, 0x82, 64),
 
-          .bFirstInterface   = ITF_NUM_CDC,
-          .bInterfaceCount   = 2,
+  // Interface number, string index, EP Out & EP In address, EP size
+  TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, ITF_STR_MSC, 0x03, 0x83, 64),
+};
 
-          .bFunctionClass    = TUSB_CLASS_CDC,
-          .bFunctionSubClass = CDC_COMM_SUBCLASS_ABSTRACT_CONTROL_MODEL,
-          .bFunctionProtocol = CDC_COMM_PROTOCOL_ATCOMMAND,
-          .iFunction         = 0
-      },
+uint8_t const desc_configuration_cdc_only[] =
+{
+  // Interface count, string index, total length, attribute, power in mA
+  TUD_CONFIG_DESCRIPTOR(ITF_NUM_TOTAL-1, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
-      //------------- CDC Communication Interface -------------//
-      .comm_itf =
-      {
-          .bLength            = sizeof(tusb_desc_interface_t),
-          .bDescriptorType    = TUSB_DESC_INTERFACE,
-          .bInterfaceNumber   = ITF_NUM_CDC,
-          .bAlternateSetting  = 0,
-          .bNumEndpoints      = 1,
-          .bInterfaceClass    = TUSB_CLASS_CDC,
-          .bInterfaceSubClass = CDC_COMM_SUBCLASS_ABSTRACT_CONTROL_MODEL,
-          .bInterfaceProtocol = CDC_COMM_PROTOCOL_ATCOMMAND,
-          .iInterface         = ITF_STR_CDC
-      },
-
-      .header =
-      {
-          .bLength            = sizeof(cdc_desc_func_header_t),
-          .bDescriptorType    = TUSB_DESC_CLASS_SPECIFIC,
-          .bDescriptorSubType = CDC_FUNC_DESC_HEADER,
-          .bcdCDC             = 0x0120
-      },
-
-      .call =
-      {
-          .bLength            = sizeof(cdc_desc_func_call_management_t),
-          .bDescriptorType    = TUSB_DESC_CLASS_SPECIFIC,
-          .bDescriptorSubType = CDC_FUNC_DESC_CALL_MANAGEMENT,
-          .bmCapabilities     = { 0 },
-          .bDataInterface     = ITF_NUM_CDC+1,
-      },
-
-      .acm =
-      {
-          .bLength            = sizeof(cdc_desc_func_acm_t),
-          .bDescriptorType    = TUSB_DESC_CLASS_SPECIFIC,
-          .bDescriptorSubType = CDC_FUNC_DESC_ABSTRACT_CONTROL_MANAGEMENT,
-          .bmCapabilities     = { // 0x02
-              .support_line_request = 1,
-          }
-      },
-
-      .union_func =
-      {
-          .bLength                  = sizeof(cdc_desc_func_union_t), // plus number of
-          .bDescriptorType          = TUSB_DESC_CLASS_SPECIFIC,
-          .bDescriptorSubType       = CDC_FUNC_DESC_UNION,
-          .bControlInterface        = ITF_NUM_CDC,
-          .bSubordinateInterface    = ITF_NUM_CDC+1,
-      },
-
-      .ep_notif =
-      {
-          .bLength          = sizeof(tusb_desc_endpoint_t),
-          .bDescriptorType  = TUSB_DESC_ENDPOINT,
-          .bEndpointAddress = EP_CDC_NOTIF,
-          .bmAttributes     = { .xfer = TUSB_XFER_INTERRUPT },
-          .wMaxPacketSize   = { .size = EP_CDC_NOTIF_SIZE },
-          .bInterval        = 0x10
-      },
-
-      //------------- CDC Data Interface -------------//
-      .data_itf =
-      {
-          .bLength            = sizeof(tusb_desc_interface_t),
-          .bDescriptorType    = TUSB_DESC_INTERFACE,
-          .bInterfaceNumber   = ITF_NUM_CDC+1,
-          .bAlternateSetting  = 0x00,
-          .bNumEndpoints      = 2,
-          .bInterfaceClass    = TUSB_CLASS_CDC_DATA,
-          .bInterfaceSubClass = 0,
-          .bInterfaceProtocol = 0,
-          .iInterface         = 0x00
-      },
-
-      .ep_out =
-      {
-          .bLength          = sizeof(tusb_desc_endpoint_t),
-          .bDescriptorType  = TUSB_DESC_ENDPOINT,
-          .bEndpointAddress = EP_CDC_OUT,
-          .bmAttributes     = { .xfer = TUSB_XFER_BULK },
-          .wMaxPacketSize   = { .size = CFG_TUD_CDC_EPSIZE },
-          .bInterval        = 0
-      },
-
-      .ep_in =
-      {
-          .bLength          = sizeof(tusb_desc_endpoint_t),
-          .bDescriptorType  = TUSB_DESC_ENDPOINT,
-          .bEndpointAddress = EP_CDC_IN,
-          .bmAttributes     = { .xfer = TUSB_XFER_BULK },
-          .wMaxPacketSize   = { .size = CFG_TUD_CDC_EPSIZE },
-          .bInterval        = 0
-      },
-    },
-
-    //------------- Mass Storage-------------//
-    .msc =
-    {
-      .itf =
-      {
-          .bLength            = sizeof(tusb_desc_interface_t),
-          .bDescriptorType    = TUSB_DESC_INTERFACE,
-          .bInterfaceNumber   = ITF_NUM_MSC,
-          .bAlternateSetting  = 0x00,
-          .bNumEndpoints      = 2,
-          .bInterfaceClass    = TUSB_CLASS_MSC,
-          .bInterfaceSubClass = MSC_SUBCLASS_SCSI,
-          .bInterfaceProtocol = MSC_PROTOCOL_BOT,
-          .iInterface         = ITF_STR_MSC
-      },
-
-      .ep_out =
-      {
-          .bLength          = sizeof(tusb_desc_endpoint_t),
-          .bDescriptorType  = TUSB_DESC_ENDPOINT,
-          .bEndpointAddress = EP_MSC_OUT,
-          .bmAttributes     = { .xfer = TUSB_XFER_BULK },
-          .wMaxPacketSize   = { .size = EP_MSC_SIZE},
-          .bInterval        = 1
-      },
-
-      .ep_in =
-      {
-          .bLength          = sizeof(tusb_desc_endpoint_t),
-          .bDescriptorType  = TUSB_DESC_ENDPOINT,
-          .bEndpointAddress = EP_MSC_IN,
-          .bmAttributes     = { .xfer = TUSB_XFER_BULK },
-          .wMaxPacketSize   = { .size = EP_MSC_SIZE },
-          .bInterval        = 1
-      }
-    }
+  // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, ITF_STR_CDC, 0x81, 8, 0x02, 0x82, 64),
 };
 
 
-// tud_desc_set is required by tinyusb stack
-// since CFG_TUD_DESC_AUTO is enabled, we only need to set string_arr 
-tud_desc_set_t tud_desc_set =
+// Invoked when received GET CONFIGURATION DESCRIPTOR
+// Application return pointer to descriptor
+// Descriptor contents must exist long enough for transfer to complete
+uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
-    .device       = &usb_desc_dev,
-    .config       = &usb_desc_cfg,
-    .string_arr   = (uint8_t const **) string_desc_arr,
-    .string_count = sizeof(string_desc_arr)/sizeof(string_desc_arr[0]),
+  (void) index; // for multiple configurations
+  return _cdc_only ? desc_configuration_cdc_only : desc_configuration_cdc_msc;
+}
 
-    .hid_report =
-    {
-        .generic       = NULL,
-        .boot_keyboard = NULL,
-        .boot_mouse    = NULL
-    }
+// Enumerate as CDC + MSC or CDC only
+void usb_desc_init(bool cdc_only)
+{
+  _cdc_only = cdc_only;
+
+  if ( cdc_only )
+  {
+    // Change PID to CDC only
+    desc_device.idProduct = USB_DESC_CDC_ONLY_PID;
+  }
+
+  // Create Serial string descriptor
+  sprintf(desc_str_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], NRF_FICR->DEVICEID[0]);
+}
+
+//--------------------------------------------------------------------+
+// STRING DESCRIPTORS
+//--------------------------------------------------------------------+
+
+// array of pointer to string descriptors
+char const* string_desc_arr [] =
+{
+  (const char[]) { 0x09, 0x04 }, // 0: is supported language is English (0x0409)
+  BLEDIS_MANUFACTURER,           // 1: Manufacturer
+  BLEDIS_MODEL,                  // 2: Product
+  desc_str_serial,               // 3: Serials, should use chip ID
+  "nRF Serial",                  // 4: CDC Interface
+  "nRF UF2",                     // 5: MSC Interface
 };
+
+// up to 64 unicode characters
+static uint16_t _desc_str[64+1];
+
+// Invoked when received GET STRING DESCRIPTOR request
+// Application return pointer to descriptor, whose contents must exist long enough for transfer to complete
+uint16_t const* tud_descriptor_string_cb(uint8_t index)
+{
+  uint8_t chr_count;
+
+  if ( index == 0)
+  {
+    memcpy(&_desc_str[1], string_desc_arr[0], 2);
+    chr_count = 1;
+  }else
+  {
+    if ( !(index < sizeof(string_desc_arr)/sizeof(string_desc_arr[0])) ) return NULL;
+
+    // Convert ASCII string into UTF-16
+    const char* str = string_desc_arr[index];
+
+    // Cap at max char
+    chr_count = strlen(str);
+    if ( chr_count > 31 ) chr_count = 31;
+
+    for(uint8_t i=0; i<chr_count; i++)
+    {
+      _desc_str[1+i] = str[i];
+    }
+  }
+
+  // first byte is length (including header), second byte is string type
+  _desc_str[0] = (TUSB_DESC_STRING << 8 ) | (2*chr_count + 2);
+
+  return _desc_str;
+}

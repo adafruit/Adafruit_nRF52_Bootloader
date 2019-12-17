@@ -44,7 +44,8 @@
 #include "app_uart.h"
 #include "nrf_error.h"
 
-#ifdef NRF52840_XXAA
+// nRF has native usb peripheral
+#ifdef NRF_USBD
 #include "tusb.h"
 #endif
 
@@ -121,13 +122,17 @@ static uint32_t send_tx_byte_end(void);
  */
 uint32_t (*send_tx_byte) (void) = send_tx_byte_default;
 
-#ifdef NRF52840_XXAA
-  static uint32_t serial_put(char ch)
-  {
-    return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
-  }
+#ifdef NRF_USBD
+
+static uint32_t serial_put(char ch)
+{
+  return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
+}
+
 #else
-  #define serial_put    app_uart_put
+
+#define serial_put    app_uart_put
+
 #endif
 
 static uint32_t send_tx_byte_end(void)
@@ -345,7 +350,7 @@ static bool rx_buffer_overflowed(void)
     return false;
 }
 
-#ifdef NRF52840_XXAA
+#ifdef NRF_USBD
 
 static uint32_t slip_uart_open(void)
 {
@@ -441,7 +446,8 @@ uint32_t hci_slip_open()
 uint32_t hci_slip_close()
 {
     m_current_state   = SLIP_OFF;
-#ifdef NRF52840_XXAA
+
+#ifdef NRF_USBD
     return NRF_SUCCESS;
 #else
     uint32_t err_code = app_uart_close();

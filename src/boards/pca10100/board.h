@@ -1,9 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * @author   Tavish Naruka <tavish@electronut.in>
- *
- * Copyright (c) 2018 Adafruit Industries
+ * Copyright (c) 2018 Ha Thach for Adafruit Industries
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef PAPYR_H
-#define PAPYR_H
+#ifndef PCA10100_H
+#define PCA10100_H
 
 /*------------------------------------------------------------------*/
 /* LED
@@ -38,33 +36,26 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-// NOTE: USB UF2 bootloader can be triggered by double pressing RESET
-// App can trigger OTA bootloader by writing DFU_MAGIC_OTA_APPJUM to
-// GPREGRET register if softdevice is not initialized; or by
-// writing DFU_MAGIC_OTA_RESET in case softdevice is initialized.
 #define BUTTONS_NUMBER      2
-#define BUTTON_1            18 // RESET also by default
-#define BUTTON_2            1  // P0.1 not exposed anywhere, FRST n/a
+#define BUTTON_1            11
+#define BUTTON_2            12
 #define BUTTON_PULL         NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER       7
-#define TX_PIN_NUMBER       8
+#define RX_PIN_NUMBER       8
+#define TX_PIN_NUMBER       6
 #define CTS_PIN_NUMBER      0
 #define RTS_PIN_NUMBER      0
 #define HWFC                false
 
 // Used as model string in OTA mode
-#define BLEDIS_MANUFACTURER    "Electronut Labs"
-#define BLEDIS_MODEL           "Papyr"
+#define BLEDIS_MANUFACTURER    "Nordic"
+#define BLEDIS_MODEL           "PCA10100"
 
-#define UF2_PRODUCT_NAME    "Electronut Labs Papyr"
-#define UF2_BOARD_ID        "nRF52840-Papyr-v1"
-#define UF2_INDEX_URL       "https://docs.electronut.in/papyr"
+#define UF2_PRODUCT_NAME    "Nordic nRF52833 DK"
+#define UF2_BOARD_ID        "nRF52833-pca10100-v1"
+#define UF2_INDEX_URL       "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52833-DK"
 
-#define USB_DESC_VID        0x239A
-#define USB_DESC_UF2_PID    0x003B
-
-#endif // PPAPYR_H
+#endif // PCA10100_H
