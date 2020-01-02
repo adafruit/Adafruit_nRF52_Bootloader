@@ -70,6 +70,6 @@
 #define UF2_PRODUCT_NAME   "Adafruit Circuit Playground nRF52840"
 #define UF2_VOLUME_LABEL   "CPLAYBTBOOT"
 #define UF2_BOARD_ID       "nRF52840-CircuitPlayground-revD"
-#define UF2_INDEX_URL      "https://www.adafruit.com/product/4300"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/4333"
 
 #endif // _CPLAY_NRF52840_H
