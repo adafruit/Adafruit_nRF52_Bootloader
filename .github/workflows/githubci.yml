@@ -24,14 +24,9 @@ jobs:
         echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"
       
     - name: Checkout Code
-      uses: actions/checkout@v2
-    
-    - name: Checkout Submodules
-      shell: bash
-      run: |
-        auth_header="$(git config --local --get http.https://github.com/.extraheader)"
-        git submodule sync --recursive
-        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
+      uses: actions/checkout@v1
+      with:
+        submodules: true
     
     - name: Build
       run: make BOARD=pca10056 V=1 all
