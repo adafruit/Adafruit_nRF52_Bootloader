@@ -1,0 +1,37 @@
+name: Build
+
+on: [pull_request, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ['pca10056']
+    steps:
+    - name: Setup Python
+      uses: actions/setup-python@v1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v1.1.0
+      
+    - name: Install Toolchains
+      run: |
+        npm install --global xpm
+        xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@latest
+        echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"
+      
+    - name: Checkout Code
+      uses: actions/checkout@v2
+    
+    - name: Checkout Submodules
+      shell: bash
+      run: |
+        auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+        git submodule sync --recursive
+        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive
+    
+    - name: Build
+      run: python3 tools/build_all.py
+      #run: python3 tools/build_all.py ${{ matrix.example }}
