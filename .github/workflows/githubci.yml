@@ -36,4 +36,4 @@ jobs:
       
     - name: Upload release
       if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
-      run: echo Upload... Bin files
+      run: echo Upload... Bin files to ${{ github.event.release.upload_url }}
