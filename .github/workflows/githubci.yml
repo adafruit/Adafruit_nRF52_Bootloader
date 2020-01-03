@@ -32,5 +32,7 @@ jobs:
         submodules: true
     
     - name: Build
-      run: python3 tools/build_all.py
-      #run: python3 tools/build_all.py ${{ matrix.example }}
+      run: |
+        echo $PATH
+        python3 tools/build_all.py
+        #run: python3 tools/build_all.py ${{ matrix.example }}
