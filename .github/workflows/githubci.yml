@@ -23,7 +23,7 @@ jobs:
         
     - name: Install Toolchains
       run: |
-        pip3 install adafruit-nrfutil uritemplate
+        pip3 install adafruit-nrfutil uritemplate requests
         wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar
         tar -xv -f cli-tools.tar
         echo "::add-path::$GITHUB_WORKSPACE/mergehex"
