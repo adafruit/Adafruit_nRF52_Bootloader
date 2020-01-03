@@ -34,6 +34,11 @@ jobs:
     - name: Build
       run: python3 tools/build_all.py
       
-    - name: Upload release
+    - name: Upload Release Asset
       if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
-      run: echo Upload... Bin files to ${{ github.event.release.upload_url }}
+      working-directory: tools
+      env:
+        UPLOAD_URL: ${{ github.event.release.upload_url }}
+        ADABOT_GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: "[ -z \"$ADABOT_GITHUB_ACCESS_TOKEN\" ] || python3 -u upload_release_files.py"
+      
