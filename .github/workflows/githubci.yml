@@ -1,14 +1,14 @@
 name: Build
 
-on: [pull_request, push]
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        board: ['pca10056']
     steps:
     - name: Setup Python
       uses: actions/setup-python@v1
@@ -32,7 +32,8 @@ jobs:
         echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"
     
     - name: Build
-      run: |
-        echo $PATH
-        python3 tools/build_all.py
-        #run: python3 tools/build_all.py ${{ matrix.example }}
+      run: python3 tools/build_all.py
+      
+    - name: Upload release
+      if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
+      run: echo Upload... Bin files
