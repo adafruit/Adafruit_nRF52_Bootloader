@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Python
+      uses: actions/setup-python@v1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v1.1.0
+      
+    - name: Checkout Code
+      uses: actions/checkout@v1
+      with:
+        submodules: true      
+        
+    - name: Install Toolchains
+      run: |
+        pip3 install adafruit-nrfutil
+        wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar
+        tar -xv -f cli-tools.tar
+        echo "::add-path::$GITHUB_WORKSPACE/mergehex"
+        npm install --global xpm
+        xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@latest
+        echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"
+    
+    - name: Build
+      run: python3 tools/build_all.py
+      
+    - name: Upload release
+      if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
+      run: echo Upload... Bin files
