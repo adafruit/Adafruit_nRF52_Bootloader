@@ -23,7 +23,7 @@ jobs:
         
     - name: Install Toolchains
       run: |
-        pip3 install adafruit-nrfutil
+        pip3 install adafruit-nrfutil uritemplate requests
         wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar
         tar -xv -f cli-tools.tar
         echo "::add-path::$GITHUB_WORKSPACE/mergehex"
@@ -34,6 +34,11 @@ jobs:
     - name: Build
       run: python3 tools/build_all.py
       
-    - name: Upload release
+    - name: Upload Release Asset
       if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
-      run: echo Upload... Bin files
+      working-directory: tools
+      env:
+        UPLOAD_URL: ${{ github.event.release.upload_url }}
+        ADABOT_GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: "[ -z \"$ADABOT_GITHUB_ACCESS_TOKEN\" ] || python3 -u upload_release_files.py"
+      
