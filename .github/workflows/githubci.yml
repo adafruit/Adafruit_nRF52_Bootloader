@@ -16,23 +16,20 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v1.1.0
       
+    - name: Checkout Code
+      uses: actions/checkout@v1
+      with:
+        submodules: true      
+        
     - name: Install Toolchains
       run: |
         pip3 install adafruit-nrfutil
         wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar
         tar -xv -f cli-tools.tar
-        ls
-        ls ./
-        mergehex/mergehex --version
         echo "::add-path::$GITHUB_WORKSPACE/mergehex"
         npm install --global xpm
         xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@latest
         echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"
-      
-    - name: Checkout Code
-      uses: actions/checkout@v1
-      with:
-        submodules: true
     
     - name: Build
       run: |
