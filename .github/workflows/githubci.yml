@@ -21,6 +21,9 @@ jobs:
         pip3 install adafruit-nrfutil
         wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar
         tar -xv -f cli-tools.tar
+        ls
+        ls ./
+        mergehex/mergehex --version
         echo "::add-path::$GITHUB_WORKSPACE/mergehex"
         npm install --global xpm
         xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@latest
