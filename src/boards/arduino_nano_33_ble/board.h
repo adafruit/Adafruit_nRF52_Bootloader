@@ -33,6 +33,7 @@
 #define LEDS_NUMBER           1  // "power" LED
 #define LED_PRIMARY_PIN       _PINNUM(1, 9)
 #define LED_STATE_ON          1
+// P0.13 is the "D13" LED, active high, if we want to use it too.
 
 #define LED_RGB_RED_PIN       _PINNUM(0, 24)
 #define LED_RGB_GREEN_PIN     _PINNUM(0, 16)
@@ -41,7 +42,7 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
+#define BUTTONS_NUMBER        2  // None populated...
 #define BUTTON_1              _PINNUM(1, 11)  // D2 switch
 #define BUTTON_2              _PINNUM(1, 12)  // D3 switch
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
@@ -72,4 +73,4 @@
 #define UF2_BOARD_ID       "nRF52840-Nano-33"
 #define UF2_INDEX_URL      "https://www.arduino.cc/"
 
-#endif // _ITSY_NRF52840_H
+#endif // _ARDUINOBLE33_NRF52840_H
