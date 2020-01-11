@@ -27,6 +27,7 @@ jobs:
           - 'adm_b_nrf52840_1'
           - 'ae_bl652_bo'
           - 'aramcon_badge_2019'
+          - 'aramcon2_badge'
           - 'arcade_feather_nrf52840_express'
           - 'arduino_nano_33_ble'
           - 'bast_ble'
