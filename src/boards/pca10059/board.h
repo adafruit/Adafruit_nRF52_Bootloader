@@ -45,7 +45,7 @@
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
-/* UART
+/* UART (only used by nRF52832)
  *------------------------------------------------------------------*/
 #define RX_PIN_NUMBER  20
 #define TX_PIN_NUMBER  17
