@@ -1,5 +1,15 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.3.0 - 2020.01.13
+
+- Upgrade nrfx to v2 for supporting future nrf mcu such as nrf52833, nrf5340
+- Upgrade TinyUSB
+- New boards support
+  - Arduino ble nano 33
+  - Adafruit CLUE
+  - Raytac MDBT50Q-RX dongle
+- Migrate CI to github Action
+
 ## 0.2.13 - 2019.09.25
 
 - Fixed button pulldown with Adafruit Circuit Playground Bluefruit, PR #77 thanks to @khanning
