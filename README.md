@@ -163,7 +163,13 @@ Compiling file: main.c
 make: *** [_build/main.o] Error 127
 ```
 
-... you may need to edit the `Makefile` and update `GNU_INSTALL_ROOT` to point to the root path of your GCC ARM toolchain.
+... you may need to pass the location of the GCC ARM toolchain binaries to `make` using
+the variable `GNU_INSTALL_ROOT` as below:
+```
+$ make GNU_INSTALL_ROOT=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/ BOARD=feather_nrf52832 all
+```
+
+_Please note that the path needs a trailing path separator (a `/`)_
 
 #### 2. `mergehex: No such file or directory`
 
