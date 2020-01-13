@@ -46,10 +46,10 @@
 /*------------------------------------------------------------------*/
 /* UART (only used by nRF52832) (only used by nRF52832)
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER           20
-#define TX_PIN_NUMBER           17
-#define CTS_PIN_NUMBER          15
-#define RTS_PIN_NUMBER          13
+#define RX_PIN_NUMBER           8
+#define TX_PIN_NUMBER           6
+#define CTS_PIN_NUMBER          0
+#define RTS_PIN_NUMBER          0
 #define HWFC                    false
 
 //--------------------------------------------------------------------+
