@@ -33,8 +33,8 @@ else
   LD_FILE    = linker/$(MCU_SUB_VARIANT).ld
 endif
 
-GIT_VERSION := $(shell git describe --dirty --always --tags)
-GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
+GIT_VERSION = $(shell git describe --dirty --always --tags)
+GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 
 # compiled file name
 OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
@@ -126,6 +126,12 @@ else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   DFU_APP_DATA_RESERVED=10*4096
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
+endif
+ifdef USE_S340 
+#if S340 then adjust SD_NAME, undefine S140 and define S340 
+  SD_NAME = s340
+  MCU_FLAGS = -DNRF52840_XXAA -DS340
+# CFLAGS+ = -US140 -DS340
 endif
 
 #------------------------------------------------------------------------------
