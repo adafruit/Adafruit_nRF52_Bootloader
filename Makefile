@@ -21,7 +21,7 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 LD_FILE      = linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
 
 GIT_VERSION = $(shell git describe --dirty --always --tags)
-GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
+GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 
 # compiled file name
 OUT_FILE = $(BOARD)_bootloader-$(GIT_VERSION)
@@ -82,8 +82,14 @@ else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   SD_NAME = s140
   DFU_DEV_REV = 52840
   CFLAGS += -DNRF52840_XXAA -DS140
+  MCU_FLAGS = -DNRF52840_XXAA -DS140
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
+endif
+ifdef USE_S340 
+#if S340 then adjust SD_NAME and MCU
+  SD_NAME = s340
+  MCU_FLAGS = -DNRF52840_XXAA -DS340
 endif
 
 #------------------------------------------------------------------------------
