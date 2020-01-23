@@ -328,7 +328,12 @@ static uint32_t softdev_init(bool init_softdevice)
       .accuracy     = NRF_CLOCK_LF_ACCURACY_250_PPM
   };
 
+  #ifndef ANT_LICENSE_KEY
   APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler) );
+  #else
+  APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler, ANT_LICENSE_KEY) );
+  #endif
+
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/

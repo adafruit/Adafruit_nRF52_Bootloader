@@ -111,6 +111,11 @@ else ifeq ($(MCU_SUB_VARIANT),nrf52840)
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
+ifdef USE_S340 
+#if S340 then adjust SD_NAME and MCU
+  SD_NAME = s340
+  MCU_FLAGS = -DNRF52840_XXAA -DS340
+endif
 
 #------------------------------------------------------------------------------
 # SOURCE FILES
