@@ -258,9 +258,10 @@ int main(void)
   // Jump to application if valid
   if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
   {
+#ifdef SOFTDEVICE_PRESENT
     // MBR must be init before start application
     if ( !sd_inited ) softdev_mbr_init();
-
+#endif
     // Select a bank region to use as application region.
     // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
     bootloader_app_start(DFU_BANK_0_REGION_START);
