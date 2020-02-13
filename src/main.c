@@ -105,6 +105,7 @@ void usb_teardown(void);
 #define DFU_MAGIC_UF2_RESET             0x57
 
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
+#define DFU_DBL_RESET_APP               0x4ee5677e
 #define DFU_DBL_RESET_DELAY             500
 #define DFU_DBL_RESET_MEM               0x20007F7C
 
@@ -197,9 +198,10 @@ int main(void)
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
 
   bool const valid_app = bootloader_app_is_valid(DFU_BANK_0_REGION_START);
+  bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
   // App mode: register 1st reset and DFU startup (nrf52832)
-  if ( ! (dfu_start || !valid_app) )
+  if ( ! (just_start_app || dfu_start || !valid_app) )
   {
     // Register our first reset for double reset detection
     (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
