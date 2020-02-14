@@ -41,6 +41,9 @@ else
 NRFJPROG = nrfjprog
 endif
 
+# auto-detect BMP on macOS, otherwise have to specify
+BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
+
 ifeq ($(OS),Windows_NT)
 PROGFILES = C:/Program Files (x86)
 GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update/bin/
@@ -67,6 +70,9 @@ NM      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-nm'
 OBJDUMP := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objdump'
 OBJCOPY := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objcopy'
 SIZE    := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-size'
+GDB     := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-gdb'
+
+GDB_BMP = arm-none-eabi-gdb -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
 
 #function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
@@ -340,6 +346,10 @@ sd:
 erase:
 	@echo Erasing chip
 	$(NRFJPROG) --eraseall -f nrf52
+
+gdbflash: $(BUILD)/$(MERGED_FNAME).hex
+	@echo Flashing: $<
+	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
 
 #******************* Compile rules *******************
 
