@@ -351,6 +351,9 @@ gdbflash: $(BUILD)/$(MERGED_FNAME).hex
 	@echo Flashing: $<
 	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
 
+gdb: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
+	$(GDB_BMP) $<
+
 #******************* Compile rules *******************
 
 ## Create build directories
