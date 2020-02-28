@@ -61,6 +61,7 @@
 #include "nrf_error.h"
 
 #include "boards.h"
+#include "uf2/uf2.h"
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
@@ -105,11 +106,16 @@ void usb_teardown(void);
 #define DFU_MAGIC_UF2_RESET             0x57
 
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
+#define DFU_DBL_RESET_APP               0x4ee5677e
 #define DFU_DBL_RESET_DELAY             500
 #define DFU_DBL_RESET_MEM               0x20007F7C
 
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000
+
+// Allow for using reset button essentially to swap between application and bootloader.
+// This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
+#define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(USER_FLASH_START + 0x200)) == 0x87eeb07c)
 
 // These value must be the same with one in dfu_transport_ble.c
 #define BLEGAP_EVENT_LENGTH             6
@@ -197,9 +203,13 @@ int main(void)
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
 
   bool const valid_app = bootloader_app_is_valid(DFU_BANK_0_REGION_START);
+  bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
+
+  if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET())
+    dfu_start = 1;
 
   // App mode: register 1st reset and DFU startup (nrf52832)
-  if ( ! (dfu_start || !valid_app) )
+  if ( ! (just_start_app || dfu_start || !valid_app) )
   {
     // Register our first reset for double reset detection
     (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
@@ -218,7 +228,10 @@ int main(void)
 #endif
   }
 
-  (*dbl_reset_mem) = 0;
+  if (APP_ASKS_FOR_SINGLE_TAP_RESET())
+    (*dbl_reset_mem) = DFU_DBL_RESET_APP;
+  else
+    (*dbl_reset_mem) = 0;
 
   if ( dfu_start || !valid_app )
   {
@@ -260,6 +273,9 @@ int main(void)
   {
     // MBR must be init before start application
     if ( !sd_inited ) softdev_mbr_init();
+
+    // clear in case we kept DFU_DBL_RESET_APP there
+    (*dbl_reset_mem) = 0;
 
     // Select a bank region to use as application region.
     // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
