@@ -1,6 +1,10 @@
-#define DEFINE_BOOTLOADER_CONFIG 1
 #include "boards.h"
 
-#if defined(BOOTLOADER_CONFIG_PRESENT) && BOOTLOADER_CONFIG_PRESENT
-// nothing yet
+#ifdef BOOTLOADER_CONFIG_CF2
+
+__attribute__((used, section(".bootloaderConfig")))
+const uint32_t bootloaderConfig[] = {
+  BOOTLOADER_CONFIG_CF2
+};
+
 #endif
