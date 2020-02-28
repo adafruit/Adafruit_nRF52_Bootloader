@@ -113,6 +113,8 @@ void usb_teardown(void);
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000
 
+// Allow for using reset button essentially to swap between application and bootloader.
+// This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(USER_FLASH_START + 0x200)) == 0x87eeb07c)
 
 // These value must be the same with one in dfu_transport_ble.c
