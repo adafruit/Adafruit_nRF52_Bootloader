@@ -121,7 +121,9 @@ C_SOURCE_FILES += $(SRC_PATH)/boards.c
 C_SOURCE_FILES += $(SRC_PATH)/flash_nrf5x.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
 C_SOURCE_FILES += $(SRC_PATH)/dfu_init.c
-C_SOURCE_FILES += $(SRC_PATH)/pinconfig.c
+
+# all sources files in specific board
+C_SOURCE_FILES += $(wildcard $(SRC_PATH)/boards/$(BOARD)/*.c)
 
 # nrfx
 C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
