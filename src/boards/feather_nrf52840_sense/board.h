@@ -31,7 +31,7 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 15)
+#define LED_PRIMARY_PIN       _PINNUM(1, 9)
 #define LED_SECONDARY_PIN     _PINNUM(1, 10)
 #define LED_STATE_ON          1
 
@@ -71,7 +71,7 @@
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 Sense"
-#define UF2_VOLUME_LABEL      "FTHR840BOOT"
+#define UF2_VOLUME_LABEL      "FTHRSNSBOOT"
 #define UF2_BOARD_ID          "nRF52840-Feather-Sense"
 #define UF2_INDEX_URL         "https://www.adafruit.com/product/4516"
 
