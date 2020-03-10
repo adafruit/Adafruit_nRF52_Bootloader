@@ -115,6 +115,13 @@ void board_teardown(void)
 
   // Stop LF clock
   NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
+
+  // make sure all pins are back in reset state
+  for (int i = 0; i < 32; ++i)
+  {
+    NRF_P0->PIN_CNF[i] = 2;
+    NRF_P1->PIN_CNF[i] = 2;
+  }
 }
 
 static uint32_t _systick_count = 0;
