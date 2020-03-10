@@ -120,7 +120,9 @@ void board_teardown(void)
   for (int i = 0; i < 32; ++i)
   {
     NRF_P0->PIN_CNF[i] = 2;
+#ifdef NRF_P1
     NRF_P1->PIN_CNF[i] = 2;
+#endif
   }
 }
 
