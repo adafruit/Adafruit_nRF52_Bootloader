@@ -57,7 +57,7 @@
 
 // Used as model string in OTA mode
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "Clue nRF52840"
+#define BLEDIS_MODEL          "CLUE nRF52840"
 
 //--------------------------------------------------------------------+
 // USB
@@ -67,9 +67,9 @@
 #define USB_DESC_CDC_ONLY_PID  0x0071
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "Adafruit Clue nRF52840"
+#define UF2_PRODUCT_NAME   "Adafruit CLUE nRF52840"
 #define UF2_VOLUME_LABEL   "CLUEBOOT"
-#define UF2_BOARD_ID       "nRF52840-Clue-revA"
-#define UF2_INDEX_URL      "https://www.adafruit.com/"
+#define UF2_BOARD_ID       "nRF52840-CLUE-revA"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/4500"
 
 #endif // _CLUE_NRF52840_H

@@ -104,7 +104,6 @@ void board_teardown(void)
 #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
   neopixel_teardown();
 #endif
-  // Button
 
   // Stop RTC1 used by app_timer
   NVIC_DisableIRQ(RTC1_IRQn);
@@ -117,12 +116,10 @@ void board_teardown(void)
   NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
 
   // make sure all pins are back in reset state
-  for (int i = 0; i < 32; ++i)
+  // NUMBER_OF_PINS is defined in nrf_gpio.h
+  for (int i = 0; i < NUMBER_OF_PINS; ++i)
   {
-    NRF_P0->PIN_CNF[i] = 2;
-#ifdef NRF_P1
-    NRF_P1->PIN_CNF[i] = 2;
-#endif
+    nrf_gpio_cfg_default(i);
   }
 }
 

@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include "nrf.h"
 #include "nrf_gpio.h"
 
 #include "board.h"
