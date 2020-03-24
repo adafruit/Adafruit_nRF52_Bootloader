@@ -22,12 +22,14 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 # linker by MCU and SoftDevice eg. nrf52840_s140_v6.ld
 LD_FILE      = linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
 
-MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
-
 GIT_VERSION = $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
 
-OUTPUT_FILENAME = $(BOARD)_bootloader-$(GIT_VERSION)
+# compiled file name
+OUT_FILE = $(BOARD)_bootloader-$(GIT_VERSION)
+
+# merged file = compiled + sd
+MERGED_FILE = $(OUT_FILE)_$(SD_NAME)_$(SD_VERSION)
 
 #******************************************************************************
 # Tool configure
@@ -250,7 +252,7 @@ CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)
 #******************************************************************************
 
 # keep every function in separate section. This will allow linker to dump unused functions
-LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUTPUT_FILENAME).map
+LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUT_FILE).map
 LDFLAGS += -mthumb -mabi=aapcs -Llinker -T$(LD_FILE)
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
@@ -306,7 +308,7 @@ endif
 .phony: all clean size flash sd erase
 
 # default target to build
-all: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out size
+all: $(BUILD)/$(OUT_FILE)-nosd.out size
 
 #******************* Flash target *******************
 
@@ -318,11 +320,11 @@ __check_defined = \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
 # Flash the compiled
-flash: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
+flash: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo Flashing: $<
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 
-dfu-flash: $(BUILD)/$(MERGED_FNAME).zip
+dfu-flash: $(BUILD)/$(MERGED_FILE).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
 	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
@@ -334,11 +336,11 @@ erase:
 	@echo Erasing chip
 	$(NRFJPROG) --eraseall -f nrf52
 
-gdbflash: $(BUILD)/$(MERGED_FNAME).hex
+gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<
 	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
 
-gdb: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
+gdb: $(BUILD)/$(OUT_FILE)-nosd.out
 	$(GDB_BMP) $<
 
 #******************* Compile rules *******************
@@ -361,11 +363,11 @@ $(BUILD)/%.o: %.S
 	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUTPUT_FILENAME)-nosd.out: $(BUILD) $(OBJECTS)
-	@echo LD $(OUTPUT_FILENAME)-nosd.out
+$(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
+	@echo LD $(OUT_FILE)-nosd.out
 	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
 
-size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
+size: $(BUILD)/$(OUT_FILE)-nosd.out
 	-@echo ''
 	$(QUIET)$(SIZE) $<
 	-@echo ''
@@ -375,21 +377,21 @@ size: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
 .phony: genhex genpkg
 
 ## Create binary .hex file from the .out file
-genhex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
+genhex: $(BUILD)/$(OUT_FILE)-nosd.hex
 
-$(BUILD)/$(OUTPUT_FILENAME)-nosd.hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.out
-	@echo CR $(OUTPUT_FILENAME)-nosd.hex
+$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
+	@echo CR $(OUT_FILE)-nosd.hex
 	$(QUIET)$(OBJCOPY) -O ihex $< $@
 
 # merge bootloader and sd hex together
-combinehex: $(BUILD)/$(MERGED_FNAME).hex
+combinehex: $(BUILD)/$(MERGED_FILE).hex
 
-$(BUILD)/$(MERGED_FNAME).hex: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
-	@echo CR $(MERGED_FNAME).hex
+$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE)-nosd.hex
+	@echo CR $(MERGED_FILE).hex
 	@mergehex -q -m $< $(SD_HEX) -o $@
 
 ## Create pkg file for bootloader+SD combo to use with DFU
-genpkg: $(BUILD)/$(MERGED_FNAME).zip
+genpkg: $(BUILD)/$(MERGED_FILE).zip
 
-$(BUILD)/$(MERGED_FNAME).zip: $(BUILD)/$(OUTPUT_FILENAME)-nosd.hex
+$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
