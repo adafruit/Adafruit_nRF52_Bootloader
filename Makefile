@@ -207,15 +207,30 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 # - Additional compiler flags
 #******************************************************************************
 
-#flags common to all targets
-CFLAGS += -mcpu=cortex-m4
-CFLAGS += -mthumb -mabi=aapcs --std=gnu99
-CFLAGS += -Wall -Werror -Os -g3
-CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+# Debugging/Optimization
+ifeq ($(DEBUG), 1)
+	CFLAGS += -Og -ggdb
+else
+	CFLAGS += -Os
+endif
 
-# keep every function in separate section. This will allow linker to dump unused functions
-CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-CFLAGS += -fno-builtin -fshort-enums -fstack-usage
+#flags common to all targets
+CFLAGS += \
+	-mthumb \
+	-mabi=aapcs \
+	-mcpu=cortex-m4 \
+	-mfloat-abi=hard \
+	-mfpu=fpv4-sp-d16 \
+	-ffunction-sections \
+	-fdata-sections \
+	-fno-builtin \
+	-fshort-enums \
+	-fstack-usage \
+	-fno-strict-aliasing \
+	-Wall \
+	-Werror
+
+CFLAGS += -Wno-error=unused-parameter
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
