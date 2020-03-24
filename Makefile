@@ -38,28 +38,20 @@ MERGED_FILE = $(OUT_FILE)_$(SD_NAME)_$(SD_VERSION)
 # Toolchain commands
 # Should be added to your PATH
 CROSS_COMPILE = arm-none-eabi-
-CC      := $(CROSS_COMPILE)gcc
-AS      := $(CROSS_COMPILE)as
-AR      := $(CROSS_COMPILE)ar -r
-LD      := $(CROSS_COMPILE)ld
-NM      := $(CROSS_COMPILE)nm
-OBJDUMP := $(CROSS_COMPILE)objdump
-OBJCOPY := $(CROSS_COMPILE)objcopy
-SIZE    := $(CROSS_COMPILE)size
-GDB     := $(CROSS_COMPILE)gdb
+CC      = $(CROSS_COMPILE)gcc
+AS      = $(CROSS_COMPILE)as
+AR      = $(CROSS_COMPILE)ar -r
+NM      = $(CROSS_COMPILE)nm
+OBJDUMP = $(CROSS_COMPILE)objdump
+OBJCOPY = $(CROSS_COMPILE)objcopy
+SIZE    = $(CROSS_COMPILE)size
+GDB     = $(CROSS_COMPILE)gdb
 
 NRFUTIL = adafruit-nrfutil
 NRFJPROG = nrfjprog
 
-MK := mkdir -p
-RM := rm -rf
-
-# Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
-ifeq ("$(V)","2")
-	QUIET =
-else
-	QUIET = @
-endif
+MK = mkdir -p
+RM = rm -rf
 
 # auto-detect BMP on macOS, otherwise have to specify
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
@@ -226,7 +218,7 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
 # keep every function in separate section. This will allow linker to dump unused functions
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
-CFLAGS += -fno-builtin --short-enums -fstack-usage
+CFLAGS += -fno-builtin -fshort-enums -fstack-usage
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
@@ -248,17 +240,13 @@ CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)
 #
 #******************************************************************************
 
-# keep every function in separate section. This will allow linker to dump unused functions
-LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUT_FILE).map
-LDFLAGS += -mthumb -mabi=aapcs -Llinker -T$(LD_FILE)
-LDFLAGS += -mcpu=cortex-m4
-LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+LDFLAGS += \
+	$(CFLAGS) \
+	-Wl,-L,linker -Wl,-T,$(LD_FILE) \
+	-Wl,-Map=$@.map -Wl,-cref -Wl,-gc-sections \
+	-specs=nosys.specs -specs=nano.specs
 
-# let linker to dump unused sections
-LDFLAGS += -Wl,--gc-sections
-
-# use newlib in nano version
-LDFLAGS += --specs=nano.specs -lc -lnosys
+LIBS += -lm -lc
 
 #******************************************************************************
 # Assembler flags
@@ -290,6 +278,7 @@ OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
 # BUILD TARGETS
 #******************************************************************************
 
+# Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
 ifeq ("$(V)","1")
 $(info CFLAGS   $(CFLAGS))
 $(info )
@@ -297,6 +286,12 @@ $(info LDFLAGS  $(LDFLAGS))
 $(info )
 $(info ASMFLAGS $(ASMFLAGS))
 $(info )
+endif
+
+ifeq ("$(V)","2")
+	QUIET =
+else
+	QUIET = @
 endif
 
 .phony: all clean size flash sd erase
@@ -359,7 +354,7 @@ $(BUILD)/%.o: %.S
 # Link
 $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
 	@echo LD $(OUT_FILE)-nosd.out
-	$(QUIET)$(CC) $(LDFLAGS) $(OBJECTS) $(LIBS) -lm -o $@
+	$(QUIET)$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 
 size: $(BUILD)/$(OUT_FILE)-nosd.out
 	-@echo ''
