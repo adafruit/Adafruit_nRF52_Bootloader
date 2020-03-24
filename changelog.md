@@ -1,5 +1,9 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.3.2 - 2020.03.12
+
+- Make sure all pins are in reset state when jumping to app mode.
+
 ## 0.3.1 - 2020.03.05
 - Correct LED1 for Feather Sense and change volume name to FTHRSNSBOOT.
 
