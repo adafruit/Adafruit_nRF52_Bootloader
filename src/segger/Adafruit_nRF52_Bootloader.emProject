@@ -20,7 +20,7 @@
       arm_target_interface_type="SWD"
       build_treat_warnings_as_errors="Yes"
       c_preprocessor_definitions="__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;MK_BOOTLOADER_VERSION=0x00020A;CONFIG_GPIO_AS_PINRESET;CONFIG_NFCT_PINS_AS_GPIOS;BLE_STACK_SUPPORT_REQD;SWI_DISABLE0;SOFTDEVICE_PRESENT;FLOAT_ABI_HARD;CFG_TUSB_DEBUG=2;UF2_VERSION=&quot;Segger&quot;;BLEDIS_FW_VERSION=&quot;Segger&quot;"
-      c_user_include_directories="../;../usb;../boards;../cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(sdDir)/include;$(sdDir)/include/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
+      c_user_include_directories="../;../usb;../boards;../cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(nrfxDir)/drivers/src;$(sdDir)/include;$(sdDir)/include/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
       debug_register_definition_file="$(ProjectDir)/nrf52840_Registers.xml"
       debug_target_connection="J-Link"
       gcc_enable_all_warnings="No"
@@ -191,10 +191,6 @@
               <file file_name="../../lib/tinyusb/src/class/msc/msc_device.c" />
               <file file_name="../../lib/tinyusb/src/class/msc/msc_device.h" />
             </folder>
-            <folder Name="custom">
-              <file file_name="../../lib/tinyusb/src/class/custom/custom_device.c" />
-              <file file_name="../../lib/tinyusb/src/class/custom/custom_device.h" />
-            </folder>
           </folder>
           <folder Name="common">
             <file file_name="../../lib/tinyusb/src/common/binary.h" />
@@ -219,16 +215,13 @@
             <file file_name="../../lib/tinyusb/src/device/usbd_control.c" />
           </folder>
           <folder Name="osal">
-            <file file_name="../../lib/tinyusb/src/osal/osal.c" />
             <file file_name="../../lib/tinyusb/src/osal/osal.h" />
-            <file file_name="../../lib/tinyusb/src/osal/osal_freeRTOS.h" />
             <file file_name="../../lib/tinyusb/src/osal/osal_none.h" />
           </folder>
           <folder Name="portable">
             <folder Name="nordic">
               <folder Name="nrf5x">
                 <file file_name="../../lib/tinyusb/src/portable/nordic/nrf5x/dcd_nrf5x.c" />
-                <file file_name="../../lib/tinyusb/src/portable/nordic/nrf5x/hal_nrf5x.c" />
               </folder>
             </folder>
           </folder>
@@ -273,6 +266,7 @@
           </folder>
           <folder Name="src">
             <file file_name="../../lib/nrfx/drivers/src/nrfx_power.c" />
+            <file file_name="../../lib/nrfx/drivers/src/nrfx_nvmc.c" />
           </folder>
         </folder>
         <folder Name="hal">
@@ -280,14 +274,12 @@
           <file file_name="../../lib/nrfx/hal/nrf_ccm.h" />
           <file file_name="../../lib/nrfx/hal/nrf_clock.h" />
           <file file_name="../../lib/nrfx/hal/nrf_comp.h" />
-          <file file_name="../../lib/nrfx/hal/nrf_ecb.c" />
           <file file_name="../../lib/nrfx/hal/nrf_ecb.h" />
           <file file_name="../../lib/nrfx/hal/nrf_egu.h" />
           <file file_name="../../lib/nrfx/hal/nrf_gpio.h" />
           <file file_name="../../lib/nrfx/hal/nrf_gpiote.h" />
           <file file_name="../../lib/nrfx/hal/nrf_i2s.h" />
           <file file_name="../../lib/nrfx/hal/nrf_lpcomp.h" />
-          <file file_name="../../lib/nrfx/hal/nrf_nvmc.c" />
           <file file_name="../../lib/nrfx/hal/nrf_nvmc.h" />
           <file file_name="../../lib/nrfx/hal/nrf_pdm.h" />
           <file file_name="../../lib/nrfx/hal/nrf_power.h" />
