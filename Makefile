@@ -228,7 +228,8 @@ CFLAGS += \
 	-fstack-usage \
 	-fno-strict-aliasing \
 	-Wall \
-	-Werror
+	-Werror \
+	-Wfatal-errors \
 
 CFLAGS += -Wno-error=unused-parameter
 

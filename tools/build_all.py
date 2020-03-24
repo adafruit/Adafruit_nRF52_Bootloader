@@ -37,9 +37,18 @@ for board in all_boards:
     make_result = subprocess.run("make -j 4 BOARD={} combinehex genpkg".format(board), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     build_duration = time.monotonic() - start_time
 
+    flash_size = "-"
+    sram_size = "-"
+
     if make_result.returncode == 0:
         success = "\033[32msucceeded\033[0m"
         success_count += 1
+        
+        out_file = glob.glob('_build/build-{}/*.out'.format(board))[0]
+        size_output = subprocess.run('size {}'.format(out_file), shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+        size_list = size_output.split('\n')[1].split('\t')
+        flash_size = int(size_list[0])
+        sram_size = int(size_list[1]) + int(size_list[2])
     else:
         exit_status = make_result.returncode
         success = "\033[31mfailed\033[0m   "
@@ -49,12 +58,6 @@ for board in all_boards:
         for extension in ["zip", "hex"]:
             if entry.name.endswith(extension) and "nosd" not in entry.name:
                 shutil.copy(entry.path, bin_directory)
-
-    out_file = glob.glob('_build/build-{}/*.out'.format(board))[0]
-    size_output = subprocess.run('size {}'.format(out_file), shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
-    size_list = size_output.split('\n')[1].split('\t')
-    flash_size = int(size_list[0])
-    sram_size = int(size_list[1]) + int(size_list[2])
 
     print(build_format.format(board, success, "{:.2f}s".format(build_duration), flash_size, sram_size))
 
