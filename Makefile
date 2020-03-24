@@ -49,7 +49,7 @@ GDB     := $(CROSS_COMPILE)gdb
 NRFUTIL = adafruit-nrfutil
 NRFJPROG = nrfjprog
 
-MK := mkdir
+MK := mkdir -p
 RM := rm -rf
 
 # Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
@@ -75,7 +75,7 @@ ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
 endif
 
 # Build directory
-BUILD = _build-$(BOARD)
+BUILD = _build/build-$(BOARD)
 
 # Board specific
 -include src/boards/$(BOARD)/board.mk

@@ -5,8 +5,8 @@ import sys
 import subprocess
 import time
 
-subprocess.run("rm -rf _build*", shell=True)
-subprocess.run("rm -rf bin/*", shell=True)
+subprocess.run("rm -rf _build/", shell=True)
+subprocess.run("rm -rf bin/", shell=True)
 
 success_count = 0
 fail_count = 0
@@ -45,12 +45,12 @@ for board in all_boards:
         success = "\033[31mfailed\033[0m   "
         fail_count += 1
 
-    for entry in os.scandir("_build-{}".format(board)):
+    for entry in os.scandir("_build/build-{}".format(board)):
         for extension in ["zip", "hex"]:
             if entry.name.endswith(extension) and "nosd" not in entry.name:
                 shutil.copy(entry.path, bin_directory)
 
-    out_file = glob.glob('_build-{}/*.out'.format(board))[0]
+    out_file = glob.glob('_build/build-{}/*.out'.format(board))[0]
     size_output = subprocess.run('size {}'.format(out_file), shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
     size_list = size_output.split('\n')[1].split('\t')
     flash_size = int(size_list[0])
