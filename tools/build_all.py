@@ -1,5 +1,6 @@
 import os
 import shutil
+import glob
 import sys
 import subprocess
 import time
@@ -7,27 +8,25 @@ import time
 subprocess.run("rm -rf _build*", shell=True)
 subprocess.run("rm -rf bin/*", shell=True)
 
-travis = False
-if "TRAVIS" in os.environ and os.environ["TRAVIS"] == "true":
-    travis = True
-
 success_count = 0
 fail_count = 0
 exit_status = 0
 
-build_format = '| {:30} | {:9} '
-build_separator = '-' * 54
+build_format = '| {:32} | {:9} | {:5} | {:6} | {:6} |'
+build_separator = '-' * 74
 
+# All supported boards
 all_boards = []
 for entry in os.scandir("src/boards"):
     all_boards.append(entry.name)
+all_boards.sort()
 
 #sha, version = build_info.get_version_info()
 
 total_time = time.monotonic()
 
 print(build_separator)
-print((build_format + '| {:5} |').format('Board', 'Result', 'Time'))
+print(build_format.format('Board', 'Result', 'Time', 'Flash', 'SRAM'))
 print(build_separator)
 
 for board in all_boards:
@@ -51,15 +50,16 @@ for board in all_boards:
             if entry.name.endswith(extension) and "nosd" not in entry.name:
                 shutil.copy(entry.path, bin_directory)
 
-    if travis:
-        print('travis_fold:start:build-{}\\r'.format(board))
+    out_file = glob.glob('_build-{}/*.out'.format(board))[0]
+    size_output = subprocess.run('size {}'.format(out_file), shell=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
+    size_list = size_output.split('\n')[1].split('\t')
+    flash_size = int(size_list[0])
+    sram_size = int(size_list[1]) + int(size_list[2])
 
-    print((build_format + '| {:.2f}s |').format(board, success, build_duration))
+    print(build_format.format(board, success, "{:.2f}s".format(build_duration), flash_size, sram_size))
 
     if make_result.returncode != 0:
         print(make_result.stdout.decode("utf-8"))
-    if travis:
-        print('travis_fold:end:build-{}\\r'.format(board))
 
 # Build Summary
 total_time = time.monotonic() - total_time

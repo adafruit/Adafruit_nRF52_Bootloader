@@ -33,54 +33,41 @@ OUTPUT_FILENAME = $(BOARD)_bootloader-$(GIT_VERSION)
 #******************************************************************************
 # Tool configure
 #******************************************************************************
+
+# Toolchain commands
+# Should be added to your PATH
+CROSS_COMPILE = arm-none-eabi-
+CC      := $(CROSS_COMPILE)gcc
+AS      := $(CROSS_COMPILE)as
+AR      := $(CROSS_COMPILE)ar -r
+LD      := $(CROSS_COMPILE)ld
+NM      := $(CROSS_COMPILE)nm
+OBJDUMP := $(CROSS_COMPILE)objdump
+OBJCOPY := $(CROSS_COMPILE)objcopy
+SIZE    := $(CROSS_COMPILE)size
+GDB     := $(CROSS_COMPILE)gdb
+
 NRFUTIL = adafruit-nrfutil
-
-ifneq ($(JLINK),)
-NRFJPROG = nrfjprog -s $(JLINK)
-else
 NRFJPROG = nrfjprog
-endif
-
-# auto-detect BMP on macOS, otherwise have to specify
-BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
-
-ifeq ($(OS),Windows_NT)
-PROGFILES = C:/Program Files (x86)
-GNU_INSTALL_ROOT = $(PROGFILES)/GNU Tools ARM Embedded/7 2018-q2-update/bin/
-endif
 
 MK := mkdir
 RM := rm -rf
 
 # Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
 ifeq ("$(V)","2")
-QUIET =
+	QUIET =
 else
-QUIET = @
+	QUIET = @
 endif
 
-GNU_PREFIX = arm-none-eabi
-
-# Toolchain commands
-CC      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-gcc'
-AS      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-as'
-AR      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-ar' -r
-LD      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-ld'
-NM      := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-nm'
-OBJDUMP := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objdump'
-OBJCOPY := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-objcopy'
-SIZE    := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-size'
-GDB     := '$(GNU_INSTALL_ROOT)$(GNU_PREFIX)-gdb'
-
-GDB_BMP = arm-none-eabi-gdb -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
-
-#function for removing duplicates in a list
-remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
+# auto-detect BMP on macOS, otherwise have to specify
+BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
+GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
 
 #*********************************
 # Select the board to build
 #*********************************
-BOARD_LIST = $(sort $(subst .h,,$(subst src/boards/,,$(wildcard src/boards/*))))
+BOARD_LIST = $(sort $(subst src/boards/,,$(wildcard src/boards/*)))
 
 ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
@@ -116,49 +103,49 @@ endif
 #******************************************************************************
 
 # src
-C_SOURCE_FILES += $(SRC_PATH)/main.c
-C_SOURCE_FILES += $(SRC_PATH)/boards.c
-C_SOURCE_FILES += $(SRC_PATH)/flash_nrf5x.c
-C_SOURCE_FILES += $(SRC_PATH)/dfu_ble_svc.c
-C_SOURCE_FILES += $(SRC_PATH)/dfu_init.c
+C_SRC += $(SRC_PATH)/boards.c
+C_SRC += $(SRC_PATH)/dfu_ble_svc.c
+C_SRC += $(SRC_PATH)/dfu_init.c
+C_SRC += $(SRC_PATH)/flash_nrf5x.c
+C_SRC += $(SRC_PATH)/main.c
 
 # all sources files in specific board
-C_SOURCE_FILES += $(wildcard $(SRC_PATH)/boards/$(BOARD)/*.c)
+C_SRC += $(wildcard $(SRC_PATH)/boards/$(BOARD)/*.c)
 
 # nrfx
-C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_power.c
-C_SOURCE_FILES += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
-C_SOURCE_FILES += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
+C_SRC += $(NRFX_PATH)/drivers/src/nrfx_power.c
+C_SRC += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
+C_SRC += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
 
 # SDK 11 files
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
-C_SOURCE_FILES += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
 
-C_SOURCE_FILES += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c
+C_SRC += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c
 
-C_SOURCE_FILES += $(SDK11_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
-C_SOURCE_FILES += $(SDK11_PATH)/ble/ble_services/ble_dis/ble_dis.c
+C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
+C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dis/ble_dis.c
 
 # Latest SDK files
-C_SOURCE_FILES += $(SDK_PATH)/libraries/timer/app_timer.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_error.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/util/app_util_platform.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/crc16/crc16.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_mem_pool.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_slip.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/hci/hci_transport.c
-C_SOURCE_FILES += $(SDK_PATH)/libraries/util/nrf_assert.c
+C_SRC += $(SDK_PATH)/libraries/timer/app_timer.c
+C_SRC += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
+C_SRC += $(SDK_PATH)/libraries/util/app_error.c
+C_SRC += $(SDK_PATH)/libraries/util/app_util_platform.c
+C_SRC += $(SDK_PATH)/libraries/crc16/crc16.c
+C_SRC += $(SDK_PATH)/libraries/hci/hci_mem_pool.c
+C_SRC += $(SDK_PATH)/libraries/hci/hci_slip.c
+C_SRC += $(SDK_PATH)/libraries/hci/hci_transport.c
+C_SRC += $(SDK_PATH)/libraries/util/nrf_assert.c
 
 # UART or USB Serial
 ifeq ($(MCU_SUB_VARIANT),nrf52)
-C_SOURCE_FILES += $(SDK_PATH)/libraries/uart/app_uart.c
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
-C_SOURCE_FILES += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
+C_SRC += $(SDK_PATH)/libraries/uart/app_uart.c
+C_SRC += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
+C_SRC += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 
 IPATH += $(SDK11_PATH)/libraries/util
 IPATH += $(SDK_PATH)/drivers_nrf/common
@@ -166,19 +153,19 @@ IPATH += $(SDK_PATH)/drivers_nrf/uart
 
 else
 # src
-C_SOURCE_FILES += $(SRC_PATH)/usb/usb_desc.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/usb.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/msc_uf2.c
-C_SOURCE_FILES += $(SRC_PATH)/usb/uf2/ghostfat.c
+C_SRC += $(SRC_PATH)/usb/usb_desc.c
+C_SRC += $(SRC_PATH)/usb/usb.c
+C_SRC += $(SRC_PATH)/usb/msc_uf2.c
+C_SRC += $(SRC_PATH)/usb/uf2/ghostfat.c
 
 # TinyUSB stack
-C_SOURCE_FILES += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
-C_SOURCE_FILES += $(TUSB_PATH)/common/tusb_fifo.c
-C_SOURCE_FILES += $(TUSB_PATH)/device/usbd.c
-C_SOURCE_FILES += $(TUSB_PATH)/device/usbd_control.c
-C_SOURCE_FILES += $(TUSB_PATH)/class/cdc/cdc_device.c
-C_SOURCE_FILES += $(TUSB_PATH)/class/msc/msc_device.c
-C_SOURCE_FILES += $(TUSB_PATH)/tusb.c
+C_SRC += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
+C_SRC += $(TUSB_PATH)/common/tusb_fifo.c
+C_SRC += $(TUSB_PATH)/device/usbd.c
+C_SRC += $(TUSB_PATH)/device/usbd_control.c
+C_SRC += $(TUSB_PATH)/class/cdc/cdc_device.c
+C_SRC += $(TUSB_PATH)/class/msc/msc_device.c
+C_SRC += $(TUSB_PATH)/tusb.c
 
 endif
 
@@ -186,7 +173,7 @@ endif
 #******************************************************************************
 # Assembly Files
 #******************************************************************************
-ASM_SOURCE_FILES  = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
+ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
 
 #******************************************************************************
 # INCLUDE PATH
@@ -292,12 +279,16 @@ ASMFLAGS += -DSOFTDEVICE_PRESENT
 ASMFLAGS += -DFLOAT_ABI_HARD
 ASMFLAGS += $(MCU_FLAGS)
 
-C_SOURCE_FILE_NAMES = $(notdir $(C_SOURCE_FILES))
-C_PATHS = $(call remduplicates, $(dir $(C_SOURCE_FILES) ) )
+
+#function for removing duplicates in a list
+remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
+
+C_SOURCE_FILE_NAMES = $(notdir $(C_SRC))
+C_PATHS = $(call remduplicates, $(dir $(C_SRC) ) )
 C_OBJECTS = $(addprefix $(BUILD)/, $(C_SOURCE_FILE_NAMES:.c=.o) )
 
-ASM_SOURCE_FILE_NAMES = $(notdir $(ASM_SOURCE_FILES))
-ASM_PATHS = $(call remduplicates, $(dir $(ASM_SOURCE_FILES) ))
+ASM_SOURCE_FILE_NAMES = $(notdir $(ASM_SRC))
+ASM_PATHS = $(call remduplicates, $(dir $(ASM_SRC) ))
 ASM_OBJECTS = $(addprefix $(BUILD)/, $(ASM_SOURCE_FILE_NAMES:.S=.o) )
 
 vpath %.c $(C_PATHS)
