@@ -1,13 +1,11 @@
 #******************************************************************************
 # CONFIGURE
 # - SDK_PATH    : path to SDK directory
-# - SRC_PATH    : path to src folder
 #
 # - SD_NAME     : e.g s132, s140
 # - SD_VERSION : SoftDevice version e.g 6.0.0
 # - SD_HEX      : to bootloader hex binary
 #******************************************************************************
-SRC_PATH     = src
 
 SDK_PATH     = lib/sdk/components
 SDK11_PATH   = lib/sdk11/components
@@ -21,7 +19,8 @@ SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_API_PATH  = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
-LD_FILE      = $(SRC_PATH)/linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
+# linker by MCU and SoftDevice eg. nrf52840_s140_v6.ld
+LD_FILE      = linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
 
 MERGED_FNAME = $(OUTPUT_FILENAME)_$(SD_NAME)_$(SD_VERSION)
 
@@ -102,22 +101,18 @@ endif
 # SOURCE FILES
 #******************************************************************************
 
-# src
-C_SRC += $(SRC_PATH)/boards.c
-C_SRC += $(SRC_PATH)/dfu_ble_svc.c
-C_SRC += $(SRC_PATH)/dfu_init.c
-C_SRC += $(SRC_PATH)/flash_nrf5x.c
-C_SRC += $(SRC_PATH)/main.c
+# all files in src
+C_SRC += $(wildcard src/*.c)
 
 # all sources files in specific board
-C_SRC += $(wildcard $(SRC_PATH)/boards/$(BOARD)/*.c)
+C_SRC += $(wildcard src/boards/$(BOARD)/*.c)
 
 # nrfx
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_power.c
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
 C_SRC += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
 
-# SDK 11 files
+# SDK 11 files: serial + OTA DFU
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
@@ -130,7 +125,7 @@ C_SRC += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c
 C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
 C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dis/ble_dis.c
 
-# Latest SDK files
+# Latest SDK files: peripheral drivers
 C_SRC += $(SDK_PATH)/libraries/timer/app_timer.c
 C_SRC += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
 C_SRC += $(SDK_PATH)/libraries/util/app_error.c
@@ -152,11 +147,10 @@ IPATH += $(SDK_PATH)/drivers_nrf/common
 IPATH += $(SDK_PATH)/drivers_nrf/uart
 
 else
-# src
-C_SRC += $(SRC_PATH)/usb/usb_desc.c
-C_SRC += $(SRC_PATH)/usb/usb.c
-C_SRC += $(SRC_PATH)/usb/msc_uf2.c
-C_SRC += $(SRC_PATH)/usb/uf2/ghostfat.c
+
+# USB Application ( MSC + UF2 )
+C_SRC += $(wildcard src/usb/*.c)
+C_SRC += $(wildcard src/usb/uf2/*.c)
 
 # TinyUSB stack
 C_SRC += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
@@ -180,12 +174,12 @@ ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
 #******************************************************************************
 
 # src
-IPATH += $(SRC_PATH)
-IPATH += $(SRC_PATH)/boards/$(BOARD)
+IPATH += src
+IPATH += src/boards/$(BOARD)
 
-IPATH += $(SRC_PATH)/cmsis/include
-IPATH += $(SRC_PATH)/usb
-IPATH += $(SRC_PATH)/boards
+IPATH += src/cmsis/include
+IPATH += src/usb
+IPATH += src/boards
 IPATH += $(TUSB_PATH)
 
 # nrfx
@@ -257,7 +251,7 @@ CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)
 
 # keep every function in separate section. This will allow linker to dump unused functions
 LDFLAGS += -Xlinker -Map=$(BUILD)/$(OUTPUT_FILENAME).map
-LDFLAGS += -mthumb -mabi=aapcs -L$(SRC_PATH)/linker -T$(LD_FILE)
+LDFLAGS += -mthumb -mabi=aapcs -Llinker -T$(LD_FILE)
 LDFLAGS += -mcpu=cortex-m4
 LDFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 
