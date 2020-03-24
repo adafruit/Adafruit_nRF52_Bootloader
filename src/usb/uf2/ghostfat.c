@@ -128,7 +128,7 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerFAT        = SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
-	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
+    .PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
     .VolumeLabel          = UF2_VOLUME_LABEL,
@@ -172,6 +172,7 @@ static uint32_t current_flash_size(void)
         result = FLASH_SIZE;
       }
     }
+
     flash_sz = result; // presumes atomic 32-bit read/write and static result
   }
 
@@ -180,13 +181,14 @@ static uint32_t current_flash_size(void)
 
 void padded_memcpy (char *dst, char const *src, int len)
 {
-    for (int i = 0; i < len; ++i) {
-        if (*src)
-            *dst = *src++;
-        else
-            *dst = ' ';
-        dst++;
-    }
+  for ( int i = 0; i < len; ++i )
+  {
+    if ( *src )
+      *dst = *src++;
+    else
+      *dst = ' ';
+    dst++;
+  }
 }
 
 
