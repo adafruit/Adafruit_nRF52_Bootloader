@@ -302,12 +302,6 @@ $(info ASFLAGS $(ASFLAGS))
 $(info )
 endif
 
-ifeq ("$(V)","2")
-	QUIET =
-else
-	QUIET = @
-endif
-
 .phony: all clean size flash sd erase
 
 # default target to build
@@ -358,21 +352,21 @@ clean:
 # Create objects from C SRC files
 $(BUILD)/%.o: %.c
 	@echo CC $(notdir $<)
-	$(QUIET)$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
+	@$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Assemble files
 $(BUILD)/%.o: %.S
 	@echo AS $(notdir $<)
-	$(QUIET)$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
+	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
 $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
 	@echo LD $(OUT_FILE)-nosd.out
-	$(QUIET)$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
+	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 
 size: $(BUILD)/$(OUT_FILE)-nosd.out
 	-@echo ''
-	$(QUIET)$(SIZE) $<
+	@$(SIZE) $<
 	-@echo ''
 
 
@@ -384,7 +378,7 @@ genhex: $(BUILD)/$(OUT_FILE)-nosd.hex
 
 $(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
 	@echo CR $(OUT_FILE)-nosd.hex
-	$(QUIET)$(OBJCOPY) -O ihex $< $@
+	@$(OBJCOPY) -O ihex $< $@
 
 # merge bootloader and sd hex together
 combinehex: $(BUILD)/$(MERGED_FILE).hex
