@@ -305,7 +305,7 @@ $(info ASFLAGS $(ASFLAGS))
 $(info )
 endif
 
-.PHONY: all clean flash dfu-flash sd erase gdbflash gdb
+.PHONY: all clean flash dfu-flash sd gdbflash gdb
 
 # default target to build
 all: $(BUILD)/$(OUT_FILE)-nosd.out $(BUILD)/$(MERGED_FILE).hex
@@ -331,10 +331,6 @@ dfu-flash: $(BUILD)/$(MERGED_FILE).zip
 sd:
 	@echo Flashing: $(SD_HEX)
 	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset
-
-erase:
-	@echo Erasing chip
-	$(NRFJPROG) --eraseall -f nrf52
 
 gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<
@@ -369,7 +365,7 @@ $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
 	@$(SIZE) $@
 
 #------------------- Binary generator -------------------
-.PHONY: genhex genpkg combinehex
+.PHONY: genhex genpkg
 
 ## Create binary .hex file from the .out file
 genhex: $(BUILD)/$(OUT_FILE)-nosd.hex
@@ -379,8 +375,6 @@ $(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
 	@$(OBJCOPY) -O ihex $< $@
 
 # merge bootloader and sd hex together
-combinehex: $(BUILD)/$(MERGED_FILE).hex
-
 $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo CR $(MERGED_FILE).hex
 	@mergehex -q -m $< $(SD_HEX) -o $@
