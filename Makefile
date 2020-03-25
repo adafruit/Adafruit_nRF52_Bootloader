@@ -151,7 +151,6 @@ C_SRC += $(TUSB_PATH)/tusb.c
 
 endif
 
-
 #------------------------------------------------------------------------------
 # Assembly Files
 #------------------------------------------------------------------------------
@@ -255,7 +254,6 @@ CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
 CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'
-
 
 #------------------------------------------------------------------------------
 # Linker Flags
@@ -365,11 +363,8 @@ $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
 	@$(SIZE) $@
 
 #------------------- Binary generator -------------------
-.PHONY: genhex genpkg
 
 ## Create binary .hex file from the .out file
-genhex: $(BUILD)/$(OUT_FILE)-nosd.hex
-
 $(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
 	@echo CR $(OUT_FILE)-nosd.hex
 	@$(OBJCOPY) -O ihex $< $@
@@ -379,7 +374,8 @@ $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo CR $(MERGED_FILE).hex
 	@mergehex -q -m $< $(SD_HEX) -o $@
 
-## Create pkg file for bootloader+SD combo to use with DFU
+## Create pkg zip file for bootloader+SD combo to use with DFU Serial
+.PHONY: genpkg
 genpkg: $(BUILD)/$(MERGED_FILE).zip
 
 $(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE)-nosd.hex
