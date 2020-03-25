@@ -305,7 +305,7 @@ $(info ASFLAGS $(ASFLAGS))
 $(info )
 endif
 
-.phony: all clean size flash sd erase
+.PHONY: all clean size flash dfu-flash sd erase gdbflash gdb
 
 # default target to build
 all: $(BUILD)/$(OUT_FILE)-nosd.out size
@@ -373,7 +373,7 @@ size: $(BUILD)/$(OUT_FILE)-nosd.out
 	-@echo ''
 
 #------------------- Binary generator -------------------
-.phony: genhex genpkg
+.PHONY: genhex genpkg combinehex
 
 ## Create binary .hex file from the .out file
 genhex: $(BUILD)/$(OUT_FILE)-nosd.hex
