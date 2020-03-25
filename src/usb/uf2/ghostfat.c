@@ -214,11 +214,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
             // WARNING -- code presumes only one NULL .content for .UF2 file
             //            and all non-NULL .content fit in one sector
             //            and requires it be the last element of the array
-            for (int i = 1; i < NUM_FILES * 2 + 4; ++i) {
+            for (uint32_t i = 1; i < NUM_FILES * 2 + 4; ++i) {
                 data[i] = 0xff;
             }
         }
-        for (int i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
+        for (uint32_t i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
             uint32_t v = sectionIdx * 256 + i;
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
@@ -237,7 +237,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             remainingEntries--;
         }
 
-        for (int i = DIRENTRIES_PER_SECTOR * sectionIdx;
+        for (uint32_t i = DIRENTRIES_PER_SECTOR * sectionIdx;
              remainingEntries > 0 && i < NUM_FILES;
              i++, d++) {
 

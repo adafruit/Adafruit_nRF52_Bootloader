@@ -230,8 +230,13 @@ CFLAGS += \
 	-Wall \
 	-Werror \
 	-Wfatal-errors \
+	-Wextra
 
-CFLAGS += -Wno-error=unused-parameter
+# Suppress warning caused by SDK
+CFLAGS += -Wno-error=unused-parameter -Wno-error=expansion-to-defined
+
+# TinyUSB tusb_hal_nrf_power_event
+CFLAGS += -Wno-error=cast-function-type
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
