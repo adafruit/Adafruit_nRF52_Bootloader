@@ -9,14 +9,12 @@
 
 SDK_PATH     = lib/sdk/components
 SDK11_PATH   = lib/sdk11/components
-SD_PATH      = lib/softdevice/$(SD_FILENAME)
-
 TUSB_PATH    = lib/tinyusb/src
 NRFX_PATH    = lib/nrfx
+SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
 SD_VERSION   = 6.1.1
 SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
-SD_API_PATH  = $(SD_PATH)/$(SD_FILENAME)_API
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 # linker by MCU and SoftDevice eg. nrf52840_s140_v6.ld
@@ -195,8 +193,8 @@ IPATH += $(SDK_PATH)/libraries/hci
 IPATH += $(SDK_PATH)/drivers_nrf/delay
 
 # Softdevice
-IPATH += $(SD_API_PATH)/include
-IPATH += $(SD_API_PATH)/include/nrf52
+IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include
+IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
 
 INC_PATHS = $(addprefix -I,$(IPATH))
 
