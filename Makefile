@@ -52,9 +52,9 @@ RM = rm -rf
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
 GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
 
-#*********************************
+#---------------------------------
 # Select the board to build
-#*********************************
+#---------------------------------
 BOARD_LIST = $(sort $(subst src/boards/,,$(wildcard src/boards/*)))
 
 ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
@@ -125,6 +125,7 @@ C_SRC += $(SDK_PATH)/libraries/util/nrf_assert.c
 
 # UART or USB Serial
 ifeq ($(MCU_SUB_VARIANT),nrf52)
+
 C_SRC += $(SDK_PATH)/libraries/uart/app_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
@@ -223,15 +224,24 @@ CFLAGS += \
 	-fstack-usage \
 	-fno-strict-aliasing \
 	-Wall \
+	-Wextra \
 	-Werror \
 	-Wfatal-errors \
-	-Wextra
+	-Werror-implicit-function-declaration \
+	-Wfloat-equal \
+	-Wundef \
+	-Wshadow \
+	-Wwrite-strings \
+	-Wsign-compare \
+	-Wmissing-format-attribute \
+	-Wno-endif-labels \
+	-Wunreachable-code	
 
 # Suppress warning caused by SDK
-CFLAGS += -Wno-error=unused-parameter -Wno-error=expansion-to-defined
+CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
 
 # TinyUSB tusb_hal_nrf_power_event
-CFLAGS += -Wno-error=cast-function-type
+CFLAGS += -Wno-cast-function-type
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0

@@ -311,10 +311,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state)
 
     if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
         bl->targetAddr < USER_FLASH_START || bl->targetAddr + bl->payloadSize > USER_FLASH_END) {
-#if USE_DBG_MSC
-        if (!quiet)
-            logval("invalid target addr", bl->targetAddr);
-#endif
+
         NRF_LOG_WARNING("Skip block at %x", bl->targetAddr);
         // this happens when we're trying to re-flash CURRENT.UF2 file previously
         // copied from a device; we still want to count these blocks to reset properly
