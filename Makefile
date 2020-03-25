@@ -35,7 +35,7 @@ MERGED_FILE = $(OUT_FILE)_$(SD_NAME)_$(SD_VERSION)
 
 # Toolchain commands
 # Should be added to your PATH
-CROSS_COMPILE = arm-none-eabi-
+CROSS_COMPILE ?= arm-none-eabi-
 CC      = $(CROSS_COMPILE)gcc
 AS      = $(CROSS_COMPILE)as
 OBJCOPY = $(CROSS_COMPILE)objcopy
@@ -59,7 +59,7 @@ BOARD_LIST = $(sort $(subst src/boards/,,$(wildcard src/boards/*)))
 
 ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
-  $(info $(BOARD_LIST))
+  $(foreach b,$(BOARD_LIST),$(info - $(b)))
   $(error Invalid BOARD specified)
 endif
 
@@ -305,10 +305,10 @@ $(info ASFLAGS $(ASFLAGS))
 $(info )
 endif
 
-.PHONY: all clean size flash dfu-flash sd erase gdbflash gdb
+.PHONY: all clean flash dfu-flash sd erase gdbflash gdb
 
 # default target to build
-all: $(BUILD)/$(OUT_FILE)-nosd.out size
+all: $(BUILD)/$(OUT_FILE)-nosd.out $(BUILD)/$(MERGED_FILE).hex
 
 #------------------- Flash target -------------------
 
@@ -366,11 +366,7 @@ $(BUILD)/%.o: %.S
 $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
 	@echo LD $(OUT_FILE)-nosd.out
 	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
-
-size: $(BUILD)/$(OUT_FILE)-nosd.out
-	-@echo ''
-	@$(SIZE) $<
-	-@echo ''
+	@$(SIZE) $@
 
 #------------------- Binary generator -------------------
 .PHONY: genhex genpkg combinehex
