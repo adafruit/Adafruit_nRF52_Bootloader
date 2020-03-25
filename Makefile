@@ -75,15 +75,15 @@ BUILD = _build/build-$(BOARD)
 ifeq ($(MCU_SUB_VARIANT),nrf52)
   SD_NAME = s132
   DFU_DEV_REV = 0xADAF
-  MCU_FLAGS = -DNRF52 -DNRF52832_XXAA -DS132
+  CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132
 else ifeq ($(MCU_SUB_VARIANT),nrf52833)
   SD_NAME = s140
   DFU_DEV_REV = 52840
-  MCU_FLAGS = -DNRF52833_XXAA -DS140
+  CFLAGS += -DNRF52833_XXAA -DS140
 else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   SD_NAME = s140
   DFU_DEV_REV = 52840
-  MCU_FLAGS = -DNRF52840_XXAA -DS140
+  CFLAGS += -DNRF52840_XXAA -DS140
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
@@ -244,7 +244,6 @@ CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
-CFLAGS += $(MCU_FLAGS)
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
@@ -270,10 +269,7 @@ LIBS += -lm -lc
 # Assembler flags
 #
 #******************************************************************************
-ASMFLAGS += -x assembler-with-cpp
-ASMFLAGS += -D__HEAP_SIZE=0
-ASMFLAGS += -DSOFTDEVICE_PRESENT
-ASMFLAGS += $(MCU_FLAGS)
+ASFLAGS += $(CFLAGS)
 
 
 #function for removing duplicates in a list
@@ -302,7 +298,7 @@ $(info CFLAGS   $(CFLAGS))
 $(info )
 $(info LDFLAGS  $(LDFLAGS))
 $(info )
-$(info ASMFLAGS $(ASMFLAGS))
+$(info ASFLAGS $(ASFLAGS))
 $(info )
 endif
 
@@ -367,7 +363,7 @@ $(BUILD)/%.o: %.c
 # Assemble files
 $(BUILD)/%.o: %.S
 	@echo AS $(notdir $<)
-	$(QUIET)$(CC) $(ASMFLAGS) $(INC_PATHS) -c -o $@ $<
+	$(QUIET)$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
 $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
