@@ -42,16 +42,9 @@
 #define BUTTON_2              _PINNUM(1, 12)  // D3 switch
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         _PINNUM(1, 10)
-#define TX_PIN_NUMBER         _PINNUM(1, 3)
-#define CTS_PIN_NUMBER        0
-#define RTS_PIN_NUMBER        0
-#define HWFC                  false
-
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Arduino"
 #define BLEDIS_MODEL          "Nano 33 BLE"
 

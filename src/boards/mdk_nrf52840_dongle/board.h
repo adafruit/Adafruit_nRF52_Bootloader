@@ -39,6 +39,7 @@
 //#define LED_RGB_GREEN_PIN     _PINNUM(0, 22)
 //#define LED_RGB_BLUE_PIN      _PINNUM(0, 24)
 #define BOARD_RGB_BRIGHTNESS  0x404040
+
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
@@ -48,10 +49,15 @@
 #define BUTTON_2              _PINNUM(0, 19)  // no connection
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "MakerDiary"
 #define BLEDIS_MODEL          "nRF52840 Micro Dev Kit USB Dongle"
 
+//--------------------------------------------------------------------+
+// USB
+//--------------------------------------------------------------------+
 #define UF2_PRODUCT_NAME   "MDK nRF52840 USB Dongle"
 #define UF2_VOLUME_LABEL   "MDK840DONGL"
 #define UF2_BOARD_ID       "nRF52840-Dongle-v1"
