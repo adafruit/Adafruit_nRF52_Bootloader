@@ -44,13 +44,12 @@ SOFTWARE.
 extern bool sdRunning;
 
 // All entries are little endian.
-
-#define UF2_MAGIC_START0 0x0A324655UL // "UF2\n"
-#define UF2_MAGIC_START1 0x9E5D5157UL // Randomly selected
-#define UF2_MAGIC_END 0x0AB16F30UL    // Ditto
+#define UF2_MAGIC_START0  0x0A324655UL // "UF2\n"
+#define UF2_MAGIC_START1  0x9E5D5157UL // Randomly selected
+#define UF2_MAGIC_END     0x0AB16F30UL // Ditto
 
 // If set, the block is "comment" and should not be flashed to the device
-#define UF2_FLAG_NOFLASH 0x00000001
+#define UF2_FLAG_NOFLASH  0x00000001
 #define UF2_FLAG_FAMILYID 0x00002000
 
 #define MAX_BLOCKS (FLASH_SIZE / 256 + 100)

@@ -40,7 +40,6 @@ typedef enum
     DFU_STATE_WAIT_4_ACTIVATE                                                       /**< State for: waiting for dfu_image_activate(). */
 } dfu_state_t;
 
-#define APP_TIMER_PRESCALER         0                                               /**< Value of the RTC1 PRESCALER register. */
 #define DFU_TIMEOUT_INTERVAL        APP_TIMER_TICKS(300000)    /**< DFU timeout interval in units of timer ticks. */
 
 #define IS_UPDATING_SD(START_PKT)   ((START_PKT).dfu_update_mode & DFU_UPDATE_SD)   /**< Macro for determining if a SoftDevice update is ongoing. */

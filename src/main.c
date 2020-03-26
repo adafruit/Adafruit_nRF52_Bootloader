@@ -83,6 +83,10 @@ void usb_teardown(void);
 
 #endif
 
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+
 /*
  * Blinking patterns:
  * - DFU Serial     : LED Status blink
@@ -134,7 +138,9 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
   STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
 #endif
 
-
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 void adafruit_factory_reset(void);
 static uint32_t softdev_init(bool init_softdevice);
 
@@ -155,6 +161,9 @@ void softdev_mbr_init(void)
   sd_mbr_command(&com);
 }
 
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 int main(void)
 {
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC

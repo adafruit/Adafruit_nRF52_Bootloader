@@ -39,7 +39,7 @@
 static WriteState _wr_state = { 0 };
 
 void read_block(uint32_t block_no, uint8_t *data);
-int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state);
+int  write_block(uint32_t block_no, uint8_t *data, WriteState *state);
 
 //--------------------------------------------------------------------+
 // tinyusb callbacks
@@ -145,7 +145,7 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   uint32_t count = 0;
   int wr_ret;
 
-  while ( (count < bufsize) && ((wr_ret = write_block(lba, buffer, false, &_wr_state)) > 0) )
+  while ( (count < bufsize) && ((wr_ret = write_block(lba, buffer, &_wr_state)) > 0) )
   {
     lba++;
     buffer += 512;

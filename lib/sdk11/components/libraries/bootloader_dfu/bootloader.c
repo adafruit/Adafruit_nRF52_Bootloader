@@ -36,10 +36,6 @@
 #include "tusb.h"
 #endif
 
-#define APP_TIMER_PRESCALER    0
-
-#define IRQ_ENABLED            0x01                    /**< Field identifying if an interrupt is enabled. */
-
 /**< Maximum number of interrupts available. (from IRQn_Type) */
 #if defined(NRF52832_XXAA)
   #define MAX_NUMBER_INTERRUPTS  39
@@ -118,7 +114,7 @@ static void wait_for_events(void)
 //    APP_ERROR_CHECK(err_code);
 
     // Feed all Watchdog just in case application enable it
-    // WDT cannot be disabled once started. It even last through soft reset (NVIC Reset)
+    // WDT cannot be disabled once started. It even last through NVIC soft reset
     if ( nrf_wdt_started(NRF_WDT) )
     {
       for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
@@ -362,9 +358,10 @@ static void interrupts_disable(void)
     // Fetch the current interrupt settings.
     interrupt_setting_mask = NVIC->ISER[0];
 
+    // TODO 48 exceed 32 bit, should be ISER[1]
     for (; irq < MAX_NUMBER_INTERRUPTS; irq++)
     {
-        if (interrupt_setting_mask & (IRQ_ENABLED << irq))
+        if (interrupt_setting_mask & (1ul << irq))
         {
             // The interrupt was enabled, and hence disable it.
             NVIC_DisableIRQ((IRQn_Type)irq);

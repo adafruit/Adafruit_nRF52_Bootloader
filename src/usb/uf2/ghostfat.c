@@ -93,7 +93,6 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 #define NUM_FILES (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
-
 #define UF2_SIZE           (current_flash_size() * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
@@ -295,7 +294,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
  * 512 : write is successful
  *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
  */
-int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state) {
+int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
     UF2_Block *bl = (void *)data;
 
      NRF_LOG_DEBUG("Write magic: %x", bl->magicStart0);
@@ -316,7 +315,6 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state)
         // this happens when we're trying to re-flash CURRENT.UF2 file previously
         // copied from a device; we still want to count these blocks to reset properly
     } else {
-        // logval("write block at", bl->targetAddr);
         NRF_LOG_DEBUG("Write block at %x", bl->targetAddr);
 
         static bool first_write = true;
