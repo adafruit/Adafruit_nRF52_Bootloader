@@ -442,7 +442,8 @@ uint32_t bootloader_dfu_sd_update_continue(void)
 
 uint32_t bootloader_dfu_sd_update_finalize(void)
 {
-    dfu_update_status_t update_status = {DFU_UPDATE_SD_SWAPPED, };
+    dfu_update_status_t update_status = { 0 };
+    update_status.status_code = DFU_UPDATE_SD_SWAPPED;
 
     bootloader_dfu_update_process(update_status);
 

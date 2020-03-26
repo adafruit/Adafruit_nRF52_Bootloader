@@ -46,16 +46,9 @@
 #define BUTTON_2              _PINNUM(1, 10)     // right button
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         _PINNUM(0, 09)
-#define TX_PIN_NUMBER         _PINNUM(0, 10)
-#define CTS_PIN_NUMBER        0
-#define RTS_PIN_NUMBER        0
-#define HWFC                  false
-
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"
 #define BLEDIS_MODEL          "CLUE nRF52840"
 

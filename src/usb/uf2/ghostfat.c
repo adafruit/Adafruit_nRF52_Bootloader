@@ -128,7 +128,7 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerFAT        = SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
-	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
+    .PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
     .VolumeLabel          = UF2_VOLUME_LABEL,
@@ -172,6 +172,7 @@ static uint32_t current_flash_size(void)
         result = FLASH_SIZE;
       }
     }
+
     flash_sz = result; // presumes atomic 32-bit read/write and static result
   }
 
@@ -180,13 +181,14 @@ static uint32_t current_flash_size(void)
 
 void padded_memcpy (char *dst, char const *src, int len)
 {
-    for (int i = 0; i < len; ++i) {
-        if (*src)
-            *dst = *src++;
-        else
-            *dst = ' ';
-        dst++;
-    }
+  for ( int i = 0; i < len; ++i )
+  {
+    if ( *src )
+      *dst = *src++;
+    else
+      *dst = ' ';
+    dst++;
+  }
 }
 
 
@@ -212,11 +214,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
             // WARNING -- code presumes only one NULL .content for .UF2 file
             //            and all non-NULL .content fit in one sector
             //            and requires it be the last element of the array
-            for (int i = 1; i < NUM_FILES * 2 + 4; ++i) {
+            for (uint32_t i = 1; i < NUM_FILES * 2 + 4; ++i) {
                 data[i] = 0xff;
             }
         }
-        for (int i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
+        for (uint32_t i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
             uint32_t v = sectionIdx * 256 + i;
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
@@ -235,7 +237,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             remainingEntries--;
         }
 
-        for (int i = DIRENTRIES_PER_SECTOR * sectionIdx;
+        for (uint32_t i = DIRENTRIES_PER_SECTOR * sectionIdx;
              remainingEntries > 0 && i < NUM_FILES;
              i++, d++) {
 
@@ -309,10 +311,7 @@ int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state)
 
     if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
         bl->targetAddr < USER_FLASH_START || bl->targetAddr + bl->payloadSize > USER_FLASH_END) {
-#if USE_DBG_MSC
-        if (!quiet)
-            logval("invalid target addr", bl->targetAddr);
-#endif
+
         NRF_LOG_WARNING("Skip block at %x", bl->targetAddr);
         // this happens when we're trying to re-flash CURRENT.UF2 file previously
         // copied from a device; we still want to count these blocks to reset properly

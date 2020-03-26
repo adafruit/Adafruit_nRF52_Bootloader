@@ -50,22 +50,22 @@ SOFTWARE.
 :                                                  12u  /*Dec*/ )
 
 #define __DAY_INT__ ( \
-   (__DATE__ [4u] == ' ' ? 0u : __DATE__ [4u] - '0') * 10u \
+   (__DATE__ [4u] == ' ' ? 0 : __DATE__ [4u] - '0') * 10u \
  + (__DATE__ [5u] - '0')                                   )
 
 // __TIME__ expands to an eight-character string constant
 // "23:59:01", or (if cannot determine time) "??:??:??" 
 #define __HOUR_INT__ ( \
-   (__TIME__ [0u] == '?' ? 0u : __TIME__ [0u] - '0') * 10u \
- + (__TIME__ [1u] == '?' ? 0u : __TIME__ [1u] - '0')       )
+   (__TIME__ [0u] == '?' ? 0 : __TIME__ [0u] - '0') * 10u \
+ + (__TIME__ [1u] == '?' ? 0 : __TIME__ [1u] - '0')       )
 
 #define __MINUTE_INT__ ( \
-   (__TIME__ [3u] == '?' ? 0u : __TIME__ [3u] - '0') * 10u \
- + (__TIME__ [4u] == '?' ? 0u : __TIME__ [4u] - '0')       )
+   (__TIME__ [3u] == '?' ? 0 : __TIME__ [3u] - '0') * 10u \
+ + (__TIME__ [4u] == '?' ? 0 : __TIME__ [4u] - '0')       )
 
 #define __SECONDS_INT__ ( \
-   (__TIME__ [6u] == '?' ? 0u : __TIME__ [6u] - '0') * 10u \
- + (__TIME__ [7u] == '?' ? 0u : __TIME__ [7u] - '0')       )
+   (__TIME__ [6u] == '?' ? 0 : __TIME__ [6u] - '0') * 10u \
+ + (__TIME__ [7u] == '?' ? 0 : __TIME__ [7u] - '0')       )
 
 
 #define __DOSDATE__ ( \

@@ -78,9 +78,11 @@
 #define UART_DEFAULT_CONFIG_IRQ_PRIORITY   7
 #define UART_EASY_DMA_SUPPORT              1
 #define UART_LEGACY_SUPPORT                1
+#define UART_CONFIG_LOG_ENABLED            0
 
 #define UART0_ENABLED                      1
 #define UART0_CONFIG_USE_EASY_DMA          0
+
 
 //==========================================================
 // <e> APP_UART_ENABLED - app_uart - UART driver
