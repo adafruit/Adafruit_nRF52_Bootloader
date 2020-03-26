@@ -10,6 +10,10 @@
 #include "bootloader_settings.h"
 #include "bootloader.h"
 
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+
 typedef struct {
     uint8_t JumpInstruction[3];
     uint8_t OEMInfo[8];
@@ -54,6 +58,11 @@ struct TextFile {
   char const name[11];
   char const *content;
 };
+
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 
 #define NUM_FAT_BLOCKS UF2_NUM_BLOCKS
 
@@ -134,8 +143,9 @@ static FAT_BootBlock const BootBlock = {
     .FilesystemIdentifier = "FAT16   ",
 };
 
-#define NRF_LOG_DEBUG(...)
-#define NRF_LOG_WARNING(...)
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 
 // get current.uf2 flash size in bytes, round up to 256 bytes
 static uint32_t current_flash_size(void)
@@ -297,8 +307,6 @@ void read_block(uint32_t block_no, uint8_t *data) {
 int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
     UF2_Block *bl = (void *)data;
 
-     NRF_LOG_DEBUG("Write magic: %x", bl->magicStart0);
-
     if (!is_uf2_block(bl)) {
         return -1;
     }
@@ -309,13 +317,13 @@ int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
     }
 
     if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
-        bl->targetAddr < USER_FLASH_START || bl->targetAddr + bl->payloadSize > USER_FLASH_END) {
+        (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) ) {
 
-        NRF_LOG_WARNING("Skip block at %x", bl->targetAddr);
+        //NRF_LOG_WARNING("Skip block at %x", bl->targetAddr);
         // this happens when we're trying to re-flash CURRENT.UF2 file previously
         // copied from a device; we still want to count these blocks to reset properly
     } else {
-        NRF_LOG_DEBUG("Write block at %x", bl->targetAddr);
+        //NRF_LOG_DEBUG("Write block at %x", bl->targetAddr);
 
         static bool first_write = true;
         if ( first_write ) {
@@ -346,7 +354,7 @@ int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
                 flash_nrf5x_flush(true);
             }
         }
-        NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
+        //NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
     }
 
     return 512;

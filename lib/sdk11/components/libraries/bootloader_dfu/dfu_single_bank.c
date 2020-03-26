@@ -140,8 +140,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
   if ( is_ota() )
   {
-    uint32_t err_code;
-    err_code    = pstorage_clear(&m_storage_handle_app, m_image_size);
+    uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
     APP_ERROR_CHECK(err_code);
   }
   else

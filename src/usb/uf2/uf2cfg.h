@@ -12,6 +12,4 @@
 #define USER_FLASH_START   0x26000
 #define USER_FLASH_END     0xAD000 // Fat Fs start here
 
-#define FLASH_PAGE_SIZE    4096
-
 #define UF2_FAMILY_ID      0xADA52840
