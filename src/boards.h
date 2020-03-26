@@ -33,6 +33,10 @@
 
 #include "board.h"
 
+#ifndef UF2_VOLUME_LABEL
+#define UF2_VOLUME_LABEL   "NRF52BOOT  "
+#endif
+
 #ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
 #endif

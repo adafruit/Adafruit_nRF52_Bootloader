@@ -34,6 +34,7 @@
 #include "tusb.h"
 #include "usb_desc.h"
 
+#include "uf2/uf2.h"
 #include "boards.h"
 
 //--------------------------------------------------------------------+
@@ -88,6 +89,8 @@ void usb_init(bool cdc_only)
   }
 
   usb_desc_init(cdc_only);
+
+  uf2_init();
 
   // Init TinyUSB stack
   tusb_init();

@@ -102,7 +102,7 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 #define NUM_FILES (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
-#define UF2_SIZE           (current_flash_size() * 2)
+#define UF2_SIZE           (uf2current_flash_sz * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
@@ -146,46 +146,46 @@ static FAT_BootBlock const BootBlock = {
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
+static uint32_t uf2current_flash_sz = 0;
+
 
 // get current.uf2 flash size in bytes, round up to 256 bytes
 static uint32_t current_flash_size(void)
 {
-  static uint32_t flash_sz = 0;
-  uint32_t result = flash_sz; // presumes atomic 32-bit read/write and static result
+  uint32_t flash_sz = 0;
 
-  // only need to compute once
-  if ( result == 0 )
+  // return 1 block of 256 bytes
+  if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
-    // return 1 block of 256 bytes
-    if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
+    flash_sz = 256;
+  }else
+  {
+    bootloader_settings_t const * boot_setting;
+    bootloader_util_settings_get(&boot_setting);
+
+    flash_sz = boot_setting->bank_0_size;
+
+    // Copy size must be multiple of 256 bytes
+    // else we will got an issue copying current.uf2
+    if (flash_sz & 0xff)
     {
-      result = 256;
-    }else
-    {
-      bootloader_settings_t const * boot_setting;
-      bootloader_util_settings_get(&boot_setting);
-
-      result = boot_setting->bank_0_size;
-
-      // Copy size must be multiple of 256 bytes
-      // else we will got an issue copying current.uf2
-      if (result & 0xff)
-      {
-        result = (result & ~0xff) + 256;
-      }
-
-      // if bank0 size is not valid, happens when flashed with jlink
-      // use maximum application size
-      if ( (result == 0) || (result == 0xFFFFFFFFUL) )
-      {
-        result = FLASH_SIZE;
-      }
+      flash_sz = (flash_sz & ~0xff) + 256;
     }
 
-    flash_sz = result; // presumes atomic 32-bit read/write and static result
+    // if bank0 size is not valid, happens when flashed with jlink
+    // use maximum application size
+    if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
+    {
+      flash_sz = FLASH_SIZE;
+    }
   }
 
   return flash_sz;
+}
+
+void uf2_init(void)
+{
+  uf2current_flash_sz = current_flash_size();
 }
 
 void padded_memcpy (char *dst, char const *src, int len)
@@ -282,7 +282,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->magicStart1 = UF2_MAGIC_START1;
                 bl->magicEnd = UF2_MAGIC_END;
                 bl->blockNo = sectionIdx;
-                bl->numBlocks = current_flash_size() / 256;
+                bl->numBlocks = uf2current_flash_sz / 256;
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
                 bl->flags = UF2_FLAG_FAMILYID;
