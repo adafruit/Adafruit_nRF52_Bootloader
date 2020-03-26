@@ -77,8 +77,8 @@ typedef struct {
 } UF2_Block;
 
 static inline bool is_uf2_block(UF2_Block const *bl) {
-    return bl->magicStart0 == UF2_MAGIC_START0 && bl->magicStart1 == UF2_MAGIC_START1 &&
-           bl->magicEnd == UF2_MAGIC_END;
+    return (bl->magicStart0 == UF2_MAGIC_START0) && (bl->magicStart1 == UF2_MAGIC_START1) &&
+           (bl->magicEnd == UF2_MAGIC_END);
 }
 
 static inline bool in_uf2_bootloader_space(const void *addr) {

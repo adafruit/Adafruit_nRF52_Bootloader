@@ -286,7 +286,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
                 bl->flags = UF2_FLAG_FAMILYID;
-                bl->familyID = UF2_FAMILY_ID;
+                bl->familyID = CFG_UF2_FAMILY_ID;
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
@@ -312,7 +312,7 @@ int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
     }
 
     // only accept block with same family id
-    if ( UF2_FAMILY_ID && !((bl->flags & UF2_FLAG_FAMILYID) && (bl->familyID == UF2_FAMILY_ID)) ) {
+    if ( !((bl->flags & UF2_FLAG_FAMILYID) && (bl->familyID == CFG_UF2_FAMILY_ID)) ) {
       return -1;
     }
 
