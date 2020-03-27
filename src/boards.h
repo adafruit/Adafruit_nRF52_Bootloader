@@ -118,7 +118,6 @@ bool is_ota(void);
 #define PRINTF                printf
 #define PRINT_LOCATION()      printf("%s: %d:\n", __PRETTY_FUNCTION__, __LINE__)
 #define PRINT_MESS(x)         printf("%s: %d: %s \n"   , __FUNCTION__, __LINE__, (char*)(x))
-#define PRTNT_HEAP()          if (CFG_DEBUG == 3) printf("\n%s: %d: Heap free: %d\n", __FUNCTION__, __LINE__, util_heap_get_free_size())
 #define PRINT_STR(x)          printf("%s: %d: " #x " = %s\n"   , __FUNCTION__, __LINE__, (char*)(x) )
 #define PRINT_INT(x)          printf("%s: %d: " #x " = %ld\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
 #define PRINT_HEX(x)          printf("%s: %d: " #x " = 0x%X\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
@@ -143,7 +142,6 @@ bool is_ota(void);
 #define PRINTF(...)
 #define PRINT_LOCATION()
 #define PRINT_MESS(x)
-#define PRTNT_HEAP()
 #define PRINT_STR(x)
 #define PRINT_INT(x)
 #define PRINT_HEX(x)

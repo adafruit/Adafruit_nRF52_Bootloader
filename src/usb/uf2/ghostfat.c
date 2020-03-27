@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include "boards.h"
-#include "tusb.h"
 
 #include "bootloader_settings.h"
 #include "bootloader.h"
@@ -99,8 +98,8 @@ static struct TextFile const info[] = {
 STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 
 
-#define NUM_FILES (ARRAY_SIZE(info))
-#define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
+#define NUM_FILES          (ARRAY_SIZE(info))
+#define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
 #define UF2_SIZE           (uf2current_flash_sz * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
@@ -202,7 +201,7 @@ void padded_memcpy (char *dst, char const *src, int len)
 
 
 /*------------------------------------------------------------------*/
-/* Read
+/* Read CURRENT.UF2
  *------------------------------------------------------------------*/
 void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
@@ -311,19 +310,17 @@ int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
         return -1;
     }
 
+    // PRINTF("Addr = 0x%08X, Family = 0x%08X\n", bl->targetAddr, bl->familyID);
+
     // only accept block with same family id
-    if ( !((bl->flags & UF2_FLAG_FAMILYID) && (bl->familyID == CFG_UF2_FAMILY_ID)) ) {
+    if ( !((bl->familyID == CFG_UF2_FAMILY_ID)) ) {
       return -1;
     }
 
-    if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
-        (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) ) {
+    if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) ) {
 
-        //NRF_LOG_WARNING("Skip block at %x", bl->targetAddr);
-        // this happens when we're trying to re-flash CURRENT.UF2 file previously
-        // copied from a device; we still want to count these blocks to reset properly
     } else {
-        //NRF_LOG_DEBUG("Write block at %x", bl->targetAddr);
+        //PRINTF("Write block at %x", bl->targetAddr);
 
         static bool first_write = true;
         if ( first_write ) {
@@ -354,7 +351,7 @@ int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
                 flash_nrf5x_flush(true);
             }
         }
-        //NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
+        //PRINTF("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
     }
 
     return 512;
