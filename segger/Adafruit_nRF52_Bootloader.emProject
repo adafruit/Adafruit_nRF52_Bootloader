@@ -19,13 +19,16 @@
       arm_target_device_name="nRF52840_xxAA"
       arm_target_interface_type="SWD"
       build_treat_warnings_as_errors="Yes"
-      c_preprocessor_definitions="__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;MK_BOOTLOADER_VERSION=0x00020A;CONFIG_GPIO_AS_PINRESET;CONFIG_NFCT_PINS_AS_GPIOS;SOFTDEVICE_PRESENT;CFG_TUSB_DEBUG=2;UF2_VERSION=&quot;Segger&quot;;BLEDIS_FW_VERSION=&quot;Segger&quot;"
+      c_preprocessor_definitions="__nRF_FAMILY;ARM_MATH_CM4;FLASH_PLACEMENT=1;NO_VTOR_CONFIG;MK_BOOTLOADER_VERSION=0x00020A;CONFIG_GPIO_AS_PINRESET;CONFIG_NFCT_PINS_AS_GPIOS;SOFTDEVICE_PRESENT;UF2_VERSION=&quot;Segger&quot;;BLEDIS_FW_VERSION=&quot;Segger&quot;;DFU_APP_DATA_RESERVED=7*4096;CFG_DEBUG"
       c_user_include_directories=".;../src/;../src/usb;../src/boards;../src/cmsis/include;$(tusbDir);$(nrfxDir);$(nrfxDir)/mdk;$(nrfxDir)/hal;$(nrfxDir)/drivers/include;$(nrfxDir)/drivers/src;$(sdDir)/include;$(sdDir)/include/nrf52;$(sdk11Dir)/drivers_nrf/pstorage;$(sdk11Dir)/ble/common/;$(sdk11Dir)/ble/ble_services/ble_dfu;$(sdk11Dir)/ble/ble_services/ble_dis;$(sdk11Dir)/libraries/bootloader_dfu;$(sdk11Dir)/libraries/bootloader_dfu/hci_transport;$(sdk11Dir)/libraries/util;$(sdkDir)/toolchain/cmsis/include;$(sdkDir)/device;$(sdkDir)/toolchain;$(sdkDir)/drivers_nrf/hal;$(sdkDir)/drivers_nrf/systick;$(sdkDir)/drivers_nrf/uart;$(sdkDir)/drivers_nrf/usbd;$(sdkDir)/drivers_nrf/common;$(sdkDir)/drivers_nrf/delay;$(sdkDir)/drivers_nrf/power;$(sdkDir)/drivers_nrf/clock;$(sdkDir)/libraries/util;$(sdkDir)/libraries/timer;$(sdkDir)/libraries/scheduler;$(sdkDir)/libraries/crc16;$(sdkDir)/libraries/util;$(sdkDir)/libraries/hci/config;$(sdkDir)/libraries/uart;$(sdkDir)/libraries/hci;$(sdkDir)/external/fprintf;$(sdkDir)/libraries/strerror;$(sdkDir)/libraries/atomic;$(sdkDir)/libraries/balloc;$(sdkDir)/libraries/experimental_log/src;$(sdkDir)/libraries/experimental_log;$(sdkDir)/libraries/experimental_section_vars;$(sdkDir)/libraries/experimental_memobj"
+      debug_initial_breakpoint_set_option="Never"
       debug_register_definition_file="$(ProjectDir)/nrf52840_Registers.xml"
       debug_target_connection="J-Link"
       gcc_enable_all_warnings="No"
       gcc_entry_point="Reset_Handler"
+      gcc_optimization_level="Debug"
       linker_memory_map_file="$(ProjectDir)/nRF52840_xxAA_MemoryMap.xml"
+      linker_printf_width_precision_supported="Yes"
       linker_section_placement_file="$(ProjectDir)/flash_placement.xml"
       macros="DeviceHeaderFile=$(PackagesDir)/nRF/CMSIS/Device/Include/nrf.h;DeviceLibraryIdentifier=M4lf;DeviceSystemFile=$(PackagesDir)/nRF/CMSIS/Device/Source/system_nrf52840.c;DeviceVectorsFile=$(PackagesDir)/nRF/Source/ses_nrf52840_Vectors.s;DeviceFamily=nRF;Target=nRF52840_xxAA;Placement=Flash;sdkDir=../lib/sdk/components;sdk11Dir=../lib/sdk11/components;sdDir=../lib/softdevice/s140_nrf52_6.1.1/s140_nrf52_6.1.1_API;tusbDir=../lib/tinyusb/src;nrfxDir=../lib/nrfx"
       project_directory=""
@@ -49,58 +52,6 @@
       <file file_name="flash_placement.xml" />
       <file file_name="nRF52840_xxAA_MemoryMap.xml" />
       <file file_name="nRF52832_xxAA_MemoryMap.xml" />
-    </folder>
-    <folder Name="src">
-      <file file_name="../src/boards.h" />
-      <file file_name="../src/dfu_ble_svc.c" />
-      <file file_name="../src/main.c" />
-      <file file_name="../src/metro52.h" />
-      <file file_name="../src/pstorage_platform.h" />
-      <file file_name="../src/sdk_config.h" />
-      <folder Name="usb">
-        <file file_name="../src/usb/tusb_config.h" />
-        <folder Name="uf2">
-          <file file_name="../src/usb/uf2/uf2cfg.h" />
-          <file file_name="../src/usb/uf2/uf2.h" />
-          <file file_name="../src/usb/uf2/ghostfat.c" />
-          <file file_name="../src/usb/uf2/macros.h" />
-        </folder>
-        <file file_name="../src/usb/msc_uf2.c" />
-        <file file_name="../src/usb/usb.c" />
-        <file file_name="../src/usb/usb_desc.c" />
-        <file file_name="../src/usb/usb_desc.h" />
-        <configuration Name="Feather52832" build_exclude_from_build="Yes" />
-      </folder>
-      <folder Name="cmsis">
-        <folder Name="include">
-          <file file_name="../src/cmsis/include/arm_common_tables.h" />
-          <file file_name="../src/cmsis/include/arm_const_structs.h" />
-          <file file_name="../src/cmsis/include/arm_math.h" />
-          <file file_name="../src/cmsis/include/cmsis_armcc.h" />
-          <file file_name="../src/cmsis/include/cmsis_armcc_V6.h" />
-          <file file_name="../src/cmsis/include/cmsis_gcc.h" />
-          <file file_name="../src/cmsis/include/core_cm0.h" />
-          <file file_name="../src/cmsis/include/core_cm0plus.h" />
-          <file file_name="../src/cmsis/include/core_cm3.h" />
-          <file file_name="../src/cmsis/include/core_cm4.h" />
-          <file file_name="../src/cmsis/include/core_cm7.h" />
-          <file file_name="../src/cmsis/include/core_cmFunc.h" />
-          <file file_name="../src/cmsis/include/core_cmInstr.h" />
-          <file file_name="../src/cmsis/include/core_cmSimd.h" />
-          <file file_name="../src/cmsis/include/core_sc000.h" />
-          <file file_name="../src/cmsis/include/core_sc300.h" />
-        </folder>
-      </folder>
-      <folder Name="boards">
-        <file file_name="../src/boards/pca10056.h" />
-        <file file_name="../src/boards/feather_nrf52832.h" />
-        <file file_name="../src/boards/feather_nrf52840_express.h" />
-        <file file_name="../src/boards/pca10059.h" />
-      </folder>
-      <file file_name="../src/dfu_init.c" />
-      <file file_name="../src/boards.c" />
-      <file file_name="../src/flash_nrf5x.h" />
-      <file file_name="../src/flash_nrf5x.c" />
     </folder>
     <configuration Name="Debug Single" gcc_optimization_level="Debug" />
     <configuration
@@ -322,7 +273,6 @@
             <configuration
               Name="Feather52840"
               build_exclude_from_build="Yes" />
-            <configuration Name="PCA10056" build_exclude_from_build="Yes" />
           </file>
           <file file_name="../lib/nrfx/mdk/ses_startup_nrf52840.s">
             <configuration
@@ -345,7 +295,6 @@
             <configuration
               Name="Feather52840"
               build_exclude_from_build="Yes" />
-            <configuration Name="PCA10056" build_exclude_from_build="Yes" />
           </file>
           <file file_name="../lib/nrfx/mdk/system_nrf52.h" />
           <file file_name="../lib/nrfx/mdk/system_nrf52840.c">
@@ -377,14 +326,38 @@
       c_user_include_directories="../src/boards/feather_nrf52832"
       gcc_optimization_level="Debug"
       linker_memory_map_file="nRF52832_xxAA_MemoryMap.xml" />
-    <configuration
-      Name="PCA10056"
-      c_preprocessor_definitions="NRF52840_XXAA;S140"
-      c_user_include_directories="../src/boards/pca10056"
-      gcc_optimization_level="Debug"
-      linker_memory_map_file="nRF52840_xxAA_MemoryMap.xml" />
+    <folder Name="src">
+      <folder Name="boards">
+        <folder Name="feather_nrf52840_express">
+          <file file_name="../src/boards/feather_nrf52840_express/board.h" />
+          <file file_name="../src/boards/feather_nrf52840_express/pinconfig.c" />
+        </folder>
+      </folder>
+      <file file_name="../src/boards.c" />
+      <file file_name="../src/boards.h" />
+      <folder
+        Name="cmsis"
+        exclude=""
+        filter="*.c;*.h"
+        path="../src/cmsis"
+        recurse="Yes" />
+      <file file_name="../src/dfu_ble_svc.c" />
+      <file file_name="../src/dfu_init.c" />
+      <file file_name="../src/flash_nrf5x.c" />
+      <file file_name="../src/flash_nrf5x.h" />
+      <file file_name="../src/main.c" />
+      <file file_name="../src/nrfx_config.h" />
+      <file file_name="../src/nrfx_glue.h" />
+      <file file_name="../src/pstorage_platform.h" />
+      <file file_name="../src/sdk_config.h" />
+      <folder
+        Name="usb"
+        exclude=""
+        filter="*.c;*.h"
+        path="../src/usb"
+        recurse="Yes" />
+    </folder>
   </project>
   <configuration Name="Feather52840" />
   <configuration Name="Feather52832" />
-  <configuration Name="PCA10056" />
 </solution>

@@ -204,9 +204,7 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 
 # Debugging/Optimization
 ifeq ($(DEBUG), 1)
-	CFLAGS += -Og -ggdb
-else
-	CFLAGS += -Os
+	CFLAGS += -ggdb
 endif
 
 #flags common to all targets
@@ -216,6 +214,7 @@ CFLAGS += \
 	-mcpu=cortex-m4 \
 	-mfloat-abi=hard \
 	-mfpu=fpv4-sp-d16 \
+	-Os \
 	-ffunction-sections \
 	-fdata-sections \
 	-fno-builtin \
@@ -306,7 +305,7 @@ endif
 .PHONY: all clean flash dfu-flash sd gdbflash gdb
 
 # default target to build
-all: $(BUILD)/$(OUT_FILE)-nosd.out $(BUILD)/$(MERGED_FILE).hex
+all: $(BUILD)/$(OUT_FILE)-nosd.out $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).uf2
 
 #------------------- Flash target -------------------
 
@@ -319,7 +318,7 @@ __check_defined = \
 
 # Flash the compiled
 flash: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@echo Flashing: $<
+	@echo Flashing: $(notdir $<)
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 
 dfu-flash: $(BUILD)/$(MERGED_FILE).zip
@@ -339,7 +338,7 @@ gdb: $(BUILD)/$(OUT_FILE)-nosd.out
 
 #------------------- Compile rules -------------------
 
-## Create build directories
+# Create build directories
 $(BUILD):
 	@$(MK) $@
 
@@ -358,23 +357,27 @@ $(BUILD)/%.o: %.S
 
 # Link
 $(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
-	@echo LD $(OUT_FILE)-nosd.out
+	@echo LD $(notdir $@)
 	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 	@$(SIZE) $@
 
 #------------------- Binary generator -------------------
 
-## Create binary .hex file from the .out file
+# Create hex file
 $(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
-	@echo CR $(OUT_FILE)-nosd.hex
+	@echo CR $(notdir $@)
 	@$(OBJCOPY) -O ihex $< $@
 
 # merge bootloader and sd hex together
 $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@echo CR $(MERGED_FILE).hex
+	@echo CR $(notdir $@)
 	@mergehex -q -m $< $(SD_HEX) -o $@
 
-## Create pkg zip file for bootloader+SD combo to use with DFU Serial
+$(BUILD)/$(MERGED_FILE).uf2: $(BUILD)/$(MERGED_FILE).hex
+	@echo CR $(notdir $@)
+	python lib/uf2/utils/uf2conv.py -f 0x239A0029 -c -o  $@ $^
+
+# Create pkg zip file for bootloader+SD combo to use with DFU Serial
 .PHONY: genpkg
 genpkg: $(BUILD)/$(MERGED_FILE).zip
 
