@@ -115,6 +115,7 @@ bool is_ota(void);
 
 #include <stdio.h>
 
+#define PRINTF                printf
 #define PRINT_LOCATION()      printf("%s: %d:\n", __PRETTY_FUNCTION__, __LINE__)
 #define PRINT_MESS(x)         printf("%s: %d: %s \n"   , __FUNCTION__, __LINE__, (char*)(x))
 #define PRTNT_HEAP()          if (CFG_DEBUG == 3) printf("\n%s: %d: Heap free: %d\n", __FUNCTION__, __LINE__, util_heap_get_free_size())
@@ -139,6 +140,7 @@ bool is_ota(void);
 
 #else
 
+#define PRINTF(...)
 #define PRINT_LOCATION()
 #define PRINT_MESS(x)
 #define PRTNT_HEAP()

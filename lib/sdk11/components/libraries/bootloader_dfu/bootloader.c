@@ -352,21 +352,10 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
  */
 static void interrupts_disable(void)
 {
-    uint32_t interrupt_setting_mask;
-    uint32_t irq = 0; // We start from first interrupt, i.e. interrupt 0.
-
-    // Fetch the current interrupt settings.
-    interrupt_setting_mask = NVIC->ISER[0];
-
-    // TODO 48 exceed 32 bit, should be ISER[1]
-    for (; irq < MAX_NUMBER_INTERRUPTS; irq++)
-    {
-        if (interrupt_setting_mask & (1ul << irq))
-        {
-            // The interrupt was enabled, and hence disable it.
-            NVIC_DisableIRQ((IRQn_Type)irq);
-        }
-    }
+  for (uint32_t irq = 0; irq < MAX_NUMBER_INTERRUPTS; irq++)
+  {
+    NVIC_DisableIRQ((IRQn_Type)irq);
+  }
 }
 
 

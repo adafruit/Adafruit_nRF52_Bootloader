@@ -7,4 +7,4 @@
 #define USER_FLASH_START   (SD_FLASH_SIZE + MBR_SIZE)
 #define USER_FLASH_END     0xAD000 // Fat Fs start here
 
-#define CFG_UF2_FAMILY_ID      0xADA52840
+#define CFG_UF2_FAMILY_ID  0xADA52840
