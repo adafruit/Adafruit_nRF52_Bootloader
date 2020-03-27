@@ -61,7 +61,7 @@ struct TextFile {
 //
 //--------------------------------------------------------------------+
 
-#define NUM_FAT_BLOCKS UF2_NUM_BLOCKS
+#define NUM_FAT_BLOCKS CFG_UF2_NUM_BLOCKS
 
 #define STR0(x) #x
 #define STR(x) STR0(x)
@@ -200,7 +200,7 @@ static uint32_t current_flash_size(void)
     // use maximum application size
     if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
     {
-      flash_sz = FLASH_SIZE;
+      flash_sz = (USER_FLASH_END-USER_FLASH_START);
     }
   }
 
@@ -299,7 +299,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
         } else { // generate the UF2 file data on-the-fly
             sectionIdx -= NUM_FILES - 1;
             uint32_t addr = USER_FLASH_START + sectionIdx * 256;
-            if (addr < USER_FLASH_START+FLASH_SIZE) {
+            if (addr < CFG_UF2_FLASH_SIZE) {
                 UF2_Block *bl = (void *)data;
                 bl->magicStart0 = UF2_MAGIC_START0;
                 bl->magicStart1 = UF2_MAGIC_START1;
@@ -320,7 +320,14 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /* Write UF2
  *------------------------------------------------------------------*/
 
-/** Write an block
+/**
+ * Write an uf2 block wrapped by 512 sector. Writing behavior is different when upgrading:
+ * - Application
+ *    - current App is erased and flash with new firmware with same starting address
+ *
+ * - SoftDevice + Bootloader
+ *    - Current App is erased, contents of SD + bootloader is written to App starting address
+ *    - Trigger the SD + Bootloader migration
  *
  * @return number of bytes processed, only 3 following values
  *  -1 : if not an uf2 block
@@ -340,6 +347,9 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
   {
     return -1;
   }
+
+
+//  if ( (bl->familyID == CFG_UF2_FAMILY_ID) && in_app_space(bl->targetAddr) )
 
   if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) )
   {

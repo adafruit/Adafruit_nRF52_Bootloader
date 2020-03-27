@@ -194,7 +194,7 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_siz
 {
   (void) lun;
 
-  *block_count = UF2_NUM_BLOCKS;
+  *block_count = CFG_UF2_NUM_BLOCKS;
   *block_size  = 512;
 }
 

@@ -1,7 +1,7 @@
 #include "boards.h"
 
-#define UF2_NUM_BLOCKS        8000   // at least 4,1 MB for FAT16
-#define FLASH_SIZE            (USER_FLASH_END-USER_FLASH_START) // Max flash size
+#define CFG_UF2_NUM_BLOCKS    8000        // at least 4,1 MB for FAT16
+#define CFG_UF2_FLASH_SIZE    (1024*1024) // 1 MB
 
 // Only allow to write application TODO dynamic depending on SD size
 #define USER_FLASH_START      (SD_FLASH_SIZE + MBR_SIZE)

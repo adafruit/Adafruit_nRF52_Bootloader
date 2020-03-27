@@ -51,7 +51,7 @@ SOFTWARE.
 #define UF2_FLAG_NOFLASH  0x00000001
 #define UF2_FLAG_FAMILYID 0x00002000
 
-#define MAX_BLOCKS (FLASH_SIZE / 256 + 100)
+#define MAX_BLOCKS (CFG_UF2_FLASH_SIZE / 256 + 100)
 typedef struct {
     uint32_t numBlocks;
     uint32_t numWritten;
