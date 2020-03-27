@@ -160,19 +160,31 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
 // Callback invoked when WRITE10 command is completed (status received and accepted by host).
 void tud_msc_write10_complete_cb(uint8_t lun)
 {
-  // uf2 file writing is complete --> complete DFU process
-  if ( _wr_state.numBlocks && (_wr_state.numWritten >= _wr_state.numBlocks) )
+  static bool first_write = true;
+
+  if ( _wr_state.numBlocks )
   {
-    led_state(STATE_WRITING_FINISHED);
+    // Start LED writing pattern with first write
+    if (first_write)
+    {
+      first_write = false;
+      led_state(STATE_WRITING_STARTED);
+    }
 
-    dfu_update_status_t update_status;
+    // All block of uf2 file is complete --> complete DFU process
+    if (_wr_state.numWritten >= _wr_state.numBlocks)
+    {
+      led_state(STATE_WRITING_FINISHED);
 
-    memset(&update_status, 0, sizeof(dfu_update_status_t ));
-    update_status.status_code = DFU_UPDATE_APP_COMPLETE;
-    update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
-    update_status.app_size    = _wr_state.numBlocks*256;
+      dfu_update_status_t update_status;
 
-    bootloader_dfu_update_process(update_status);
+      memset(&update_status, 0, sizeof(dfu_update_status_t ));
+      update_status.status_code = DFU_UPDATE_APP_COMPLETE;
+      update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
+      update_status.app_size    = _wr_state.numBlocks*256;
+
+      bootloader_dfu_update_process(update_status);
+    }
   }
 }
 

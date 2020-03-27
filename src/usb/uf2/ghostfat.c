@@ -4,8 +4,6 @@
 #include "flash_nrf5x.h"
 #include <string.h>
 
-#include "boards.h"
-
 #include "bootloader_settings.h"
 #include "bootloader.h"
 
@@ -145,6 +143,33 @@ static FAT_BootBlock const BootBlock = {
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
+static inline bool is_uf2_block (UF2_Block const *bl)
+{
+  return (bl->magicStart0 == UF2_MAGIC_START0) && (bl->magicStart1 == UF2_MAGIC_START1) &&
+         (bl->magicEnd == UF2_MAGIC_END) &&
+         (bl->flags & UF2_FLAG_FAMILYID) && !(bl->flags & UF2_FLAG_NOFLASH) &&
+         (bl->payloadSize == 256) && !(bl->targetAddr & 0xff);
+}
+
+static inline bool in_app_space (uint32_t addr)
+{
+  return USER_FLASH_START <= addr && addr < USER_FLASH_END;
+}
+
+static inline bool in_softdevice_space (uint32_t addr)
+{
+  return addr < USER_FLASH_START;
+}
+
+static inline bool in_uf2_bootloader_space (uint32_t addr)
+{
+  return USER_FLASH_END <= addr /*&& addr < FLASH_SIZE*/;
+}
+
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 static uint32_t uf2current_flash_sz = 0;
 
 
@@ -187,6 +212,9 @@ void uf2_init(void)
   uf2current_flash_sz = current_flash_size();
 }
 
+/*------------------------------------------------------------------*/
+/* Read CURRENT.UF2
+ *------------------------------------------------------------------*/
 void padded_memcpy (char *dst, char const *src, int len)
 {
   for ( int i = 0; i < len; ++i )
@@ -199,10 +227,6 @@ void padded_memcpy (char *dst, char const *src, int len)
   }
 }
 
-
-/*------------------------------------------------------------------*/
-/* Read CURRENT.UF2
- *------------------------------------------------------------------*/
 void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
     uint32_t sectionIdx = block_no;
@@ -303,56 +327,62 @@ void read_block(uint32_t block_no, uint8_t *data) {
  * 512 : write is successful
  *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
  */
-int write_block(uint32_t block_no, uint8_t *data, WriteState *state) {
-    UF2_Block *bl = (void *)data;
+int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
+{
+  UF2_Block *bl = (void*) data;
 
-    if (!is_uf2_block(bl)) {
-        return -1;
+  if ( !is_uf2_block(bl) ) return -1;
+
+  PRINTF("Addr = 0x%08X, Family = 0x%08X\n", bl->targetAddr, bl->familyID);
+
+  // only accept block with same family id
+  if ( !((bl->familyID == CFG_UF2_FAMILY_ID)) )
+  {
+    return -1;
+  }
+
+  if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) )
+  {
+
+  }
+  else
+  {
+    //PRINTF("Write block at %x", bl->targetAddr);
+    flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
+  }
+
+  if ( state && bl->numBlocks )
+  {
+    // Update state num blocks
+    if ( state->numBlocks != bl->numBlocks )
+    {
+      if ( bl->numBlocks >= MAX_BLOCKS || state->numBlocks )
+        state->numBlocks = 0xffffffff;
+      else
+        state->numBlocks = bl->numBlocks;
     }
 
-    // PRINTF("Addr = 0x%08X, Family = 0x%08X\n", bl->targetAddr, bl->familyID);
+    if ( bl->blockNo < MAX_BLOCKS )
+    {
+      uint8_t const mask = 1 << (bl->blockNo % 8);
+      uint32_t const pos = bl->blockNo / 8;
 
-    // only accept block with same family id
-    if ( !((bl->familyID == CFG_UF2_FAMILY_ID)) ) {
-      return -1;
+      // only increase written number with new write (possibly prevent overwriting from OS)
+      if ( !(state->writtenMask[pos] & mask) )
+      {
+        state->writtenMask[pos] |= mask;
+        state->numWritten++;
+      }
+
+      // flush last blocks
+      if ( state->numWritten >= state->numBlocks )
+      {
+        flash_nrf5x_flush(true);
+      }
     }
 
-    if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) ) {
+    //PRINTF("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
+  }
 
-    } else {
-        //PRINTF("Write block at %x", bl->targetAddr);
-
-        static bool first_write = true;
-        if ( first_write ) {
-          first_write = false;
-          led_state(STATE_WRITING_STARTED);
-        }
-
-        flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
-    }
-
-    if (state && bl->numBlocks) {
-        if (state->numBlocks != bl->numBlocks) {
-            if (bl->numBlocks >= MAX_BLOCKS || state->numBlocks)
-                state->numBlocks = 0xffffffff;
-            else
-                state->numBlocks = bl->numBlocks;
-        }
-        if (bl->blockNo < MAX_BLOCKS) {
-            uint8_t mask = 1 << (bl->blockNo % 8);
-            uint32_t pos = bl->blockNo / 8;
-            if (!(state->writtenMask[pos] & mask)) {
-                // logval("incr", state->numWritten);
-                state->writtenMask[pos] |= mask;
-                state->numWritten++;
-            }
-            if (state->numWritten >= state->numBlocks) {
-                // flush last blocks
-                flash_nrf5x_flush(true);
-            }
-        }
-        //PRINTF("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
-    }
-
-    return 512;
+  return 512;
 }
