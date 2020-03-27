@@ -143,17 +143,18 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   (void) lun;
 
   uint32_t count = 0;
-  int wr_ret;
-
-  while ( (count < bufsize) && ((wr_ret = write_block(lba, buffer, &_wr_state)) > 0) )
+  while ( count < bufsize )
   {
+    // Consider non-uf2 block write as successful
+    // only break if write_block is busy with flashing (return 0)
+    if ( 0 == write_block(lba, buffer, &_wr_state) ) break;
+
     lba++;
     buffer += 512;
     count  += 512;
   }
 
-  // Consider non-uf2 block write as successful
-  return  (wr_ret < 0) ? bufsize : count;
+  return count;
 }
 
 // Callback invoked when WRITE10 command is completed (status received and accepted by host).
