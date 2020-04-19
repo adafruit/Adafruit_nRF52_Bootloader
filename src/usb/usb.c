@@ -45,6 +45,14 @@
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
 
+//--------------------------------------------------------------------+
+// Forward USB interrupt events to TinyUSB IRQ Handler
+//--------------------------------------------------------------------+
+void USBD_IRQHandler(void)
+{
+  tud_int_handler(0);
+}
+
 //------------- IMPLEMENTATION -------------//
 void usb_init(bool cdc_only)
 {
