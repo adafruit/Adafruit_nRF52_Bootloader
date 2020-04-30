@@ -112,9 +112,10 @@ else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
 ifdef USE_S340 
-#if S340 then adjust SD_NAME and MCU
+#if S340 then adjust SD_NAME, undefine S140 and define S340 
   SD_NAME = s340
   MCU_FLAGS = -DNRF52840_XXAA -DS340
+# CFLAGS+ = -US140 -DS340
 endif
 
 #------------------------------------------------------------------------------
