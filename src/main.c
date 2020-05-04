@@ -492,7 +492,7 @@ void SD_EVT_IRQHandler(void)
 #include "SEGGER_RTT.h"
 
 __attribute__ ((used))
-int sys_write (int fhdl, const void *buf, size_t count)
+int _write (int fhdl, const void *buf, size_t count)
 {
   (void) fhdl;
   SEGGER_RTT_Write(0, (char*) buf, (int) count);
@@ -500,7 +500,7 @@ int sys_write (int fhdl, const void *buf, size_t count)
 }
 
 __attribute__ ((used))
-int sys_read (int fhdl, char *buf, size_t count)
+int _read (int fhdl, char *buf, size_t count)
 {
   (void) fhdl;
   return SEGGER_RTT_Read(0, buf, count);
