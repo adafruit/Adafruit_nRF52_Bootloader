@@ -482,3 +482,29 @@ void SD_EVT_IRQHandler(void)
   // Use App Scheduler to defer handling code in non-isr context
   app_sched_event_put(NULL, 0, ada_sd_task);
 }
+
+
+//--------------------------------------------------------------------+
+// RTT printf retarget for Debug
+//--------------------------------------------------------------------+
+#ifdef CFG_DEBUG
+
+#include "SEGGER_RTT.h"
+
+__attribute__ ((used))
+int sys_write (int fhdl, const void *buf, size_t count)
+{
+  (void) fhdl;
+  SEGGER_RTT_Write(0, (char*) buf, (int) count);
+  return count;
+}
+
+__attribute__ ((used))
+int sys_read (int fhdl, char *buf, size_t count)
+{
+  (void) fhdl;
+  return SEGGER_RTT_Read(0, buf, count);
+}
+
+
+#endif

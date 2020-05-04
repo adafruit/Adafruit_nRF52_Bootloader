@@ -70,16 +70,8 @@
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT
 //--------------------------------------------------------------------+
-#define CFG_TUSB_ATTR_USBRAM
+#define CFG_TUSB_MEM_SECTION
 #define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(4)))
-
-
-#define BREAKPOINT_IGNORE_COUNT(n) \
-  do {\
-    static uint8_t ignore_count = 0;\
-    ignore_count++;\
-    if ( ignore_count > n ) verify_breakpoint();\
-  }while(0)
 
 #ifdef __cplusplus
  }

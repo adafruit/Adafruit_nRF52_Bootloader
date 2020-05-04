@@ -109,7 +109,6 @@ bool is_ota(void);
 //--------------------------------------------------------------------+
 // DEBUG
 //--------------------------------------------------------------------+
-//#define CFG_DEBUG
 
 #ifdef CFG_DEBUG
 
@@ -130,13 +129,6 @@ bool is_ota(void);
     printf("\n");\
   }while(0)
 
-#define ADALOG(tag, ...) \
-  do { \
-    if ( tag ) printf("[%s] ", tag);\
-    printf(__VA_ARGS__);\
-    printf("\n");\
-  }while(0)
-
 #else
 
 #define PRINTF(...)
@@ -146,8 +138,6 @@ bool is_ota(void);
 #define PRINT_INT(x)
 #define PRINT_HEX(x)
 #define PRINT_BUFFER(buf, n)
-
-#define ADALOG(...)
 
 #endif
 

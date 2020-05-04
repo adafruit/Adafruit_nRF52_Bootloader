@@ -196,15 +196,18 @@ IPATH += $(SDK_PATH)/drivers_nrf/delay
 IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include
 IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
 
-INC_PATHS = $(addprefix -I,$(IPATH))
-
 #------------------------------------------------------------------------------
 # Compiler Flags
 #------------------------------------------------------------------------------
 
-# Debugging/Optimization
+# Debug option use RTT for printf
 ifeq ($(DEBUG), 1)
-	CFLAGS += -ggdb
+	RTT_SRC = lib/SEGGER_RTT
+	
+	CFLAGS += -ggdb -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+	IPATH += $(RTT_SRC)/RTT
+  C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT_printf.c
+  C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
 endif
 
 #flags common to all targets
@@ -287,6 +290,8 @@ vpath %.c $(C_PATHS)
 vpath %.S $(ASM_PATHS)
 
 OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
+
+INC_PATHS = $(addprefix -I,$(IPATH))
 
 #------------------------------------------------------------------------------
 # BUILD TARGETS

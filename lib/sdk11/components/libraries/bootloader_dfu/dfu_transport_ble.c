@@ -736,7 +736,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
 #ifdef CFG_DEBUG
     extern const char* dbg_ble_event_str(uint16_t evt_id);
-    ADALOG("BLE", dbg_ble_event_str(p_ble_evt->header.evt_id));
+    PRINTF("BLE %s\r\n", dbg_ble_event_str(p_ble_evt->header.evt_id));
 #endif
 
     switch (p_ble_evt->header.evt_id)
@@ -899,7 +899,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
         {
           uint16_t att_mtu = MIN(p_ble_evt->evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu, BLEGATT_ATT_MTU_MAX);
-          ADALOG("GAP", "ATT MTU is changed to %d", att_mtu);
+          PRINTF("GAP ATT MTU is changed to %d\r\n", att_mtu);
           APP_ERROR_CHECK( sd_ble_gatts_exchange_mtu_reply(m_conn_handle, att_mtu) );
         }
         break;
