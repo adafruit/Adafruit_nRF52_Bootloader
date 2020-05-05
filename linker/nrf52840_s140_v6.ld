@@ -11,7 +11,9 @@ MEMORY
    *  those values do not match. The check is performed in main.c, see
    *  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
    */
-  FLASH (rx) : ORIGIN = 0xF4000, LENGTH = 0xFE000-0xF4000 /* 40 KB */
+  FLASH (rx) : ORIGIN = 0xF4000, LENGTH = 0xFE000-0xF4000-2048 /* 38 KB */
+
+  BOOTLOADER_CONFIG (r): ORIGIN = 0xFE000 - 2048, LENGTH = 2048
 
   /** Location of mbr params page in flash. */
   MBR_PARAMS_PAGE (rw) : ORIGIN = 0xFE000, LENGTH = 0x1000
@@ -49,6 +51,11 @@ SECTIONS
     KEEP(*(fs_data))
     PROVIDE( __stop_fs_data = .);
   } = 0
+
+  .bootloaderConfig :
+  {
+    KEEP(*(.bootloaderConfig))
+  } > BOOTLOADER_CONFIG
 
   /* Place the bootloader settings page in flash. */
   .bootloaderSettings(NOLOAD) :

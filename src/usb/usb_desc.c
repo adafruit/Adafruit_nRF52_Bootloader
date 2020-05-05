@@ -87,7 +87,7 @@ enum {
 uint8_t const desc_configuration_cdc_msc[] =
 {
   // Interface count, string index, total length, attribute, power in mA
-  TUD_CONFIG_DESCRIPTOR(ITF_NUM_TOTAL, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
+  TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, ITF_STR_CDC, 0x81, 8, 0x02, 0x82, 64),
@@ -99,7 +99,7 @@ uint8_t const desc_configuration_cdc_msc[] =
 uint8_t const desc_configuration_cdc_only[] =
 {
   // Interface count, string index, total length, attribute, power in mA
-  TUD_CONFIG_DESCRIPTOR(ITF_NUM_TOTAL-1, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
+  TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL-1, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, ITF_STR_CDC, 0x81, 8, 0x02, 0x82, 64),
@@ -150,8 +150,10 @@ static uint16_t _desc_str[64+1];
 
 // Invoked when received GET STRING DESCRIPTOR request
 // Application return pointer to descriptor, whose contents must exist long enough for transfer to complete
-uint16_t const* tud_descriptor_string_cb(uint8_t index)
+uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
+  (void) langid;
+
   uint8_t chr_count;
 
   if ( index == 0)

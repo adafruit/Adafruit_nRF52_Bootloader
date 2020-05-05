@@ -36,10 +36,6 @@
 #include "tusb.h"
 #endif
 
-#define APP_TIMER_PRESCALER    0
-
-#define IRQ_ENABLED            0x01                    /**< Field identifying if an interrupt is enabled. */
-
 /**< Maximum number of interrupts available. (from IRQn_Type) */
 #if defined(NRF52832_XXAA)
   #define MAX_NUMBER_INTERRUPTS  39
@@ -118,7 +114,7 @@ static void wait_for_events(void)
 //    APP_ERROR_CHECK(err_code);
 
     // Feed all Watchdog just in case application enable it
-    // WDT cannot be disabled once started. It even last through soft reset (NVIC Reset)
+    // WDT cannot be disabled once started. It even last through NVIC soft reset
     if ( nrf_wdt_started(NRF_WDT) )
     {
       for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
@@ -356,20 +352,10 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
  */
 static void interrupts_disable(void)
 {
-    uint32_t interrupt_setting_mask;
-    uint32_t irq = 0; // We start from first interrupt, i.e. interrupt 0.
-
-    // Fetch the current interrupt settings.
-    interrupt_setting_mask = NVIC->ISER[0];
-
-    for (; irq < MAX_NUMBER_INTERRUPTS; irq++)
-    {
-        if (interrupt_setting_mask & (IRQ_ENABLED << irq))
-        {
-            // The interrupt was enabled, and hence disable it.
-            NVIC_DisableIRQ((IRQn_Type)irq);
-        }
-    }
+  for (uint32_t irq = 0; irq < MAX_NUMBER_INTERRUPTS; irq++)
+  {
+    NVIC_DisableIRQ((IRQn_Type)irq);
+  }
 }
 
 
@@ -448,7 +434,8 @@ uint32_t bootloader_dfu_sd_update_continue(void)
 
 uint32_t bootloader_dfu_sd_update_finalize(void)
 {
-    dfu_update_status_t update_status = {DFU_UPDATE_SD_SWAPPED, };
+    dfu_update_status_t update_status = { 0 };
+    update_status.status_code = DFU_UPDATE_SD_SWAPPED;
 
     bootloader_dfu_update_process(update_status);
 

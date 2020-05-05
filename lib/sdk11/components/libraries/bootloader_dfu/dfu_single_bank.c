@@ -140,8 +140,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
   if ( is_ota() )
   {
-    uint32_t err_code;
-    err_code    = pstorage_clear(&m_storage_handle_app, m_image_size);
+    uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
     APP_ERROR_CHECK(err_code);
   }
   else
@@ -164,7 +163,8 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
  */
 static void dfu_cleared_func_app(void)
 {
-    dfu_update_status_t update_status = {DFU_BANK_0_ERASED, };
+    dfu_update_status_t update_status = { 0 };
+    update_status.status_code = DFU_BANK_0_ERASED;
     bootloader_dfu_update_process(update_status);
 }
 
@@ -498,7 +498,8 @@ uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
     {
         case DFU_STATE_RDY:
             m_dfu_state = DFU_STATE_RX_INIT_PKT;
-            // When receiving init packet in state ready just update and fall through this case.         
+            // When receiving init packet in state ready just update and fall through this case.
+            /* FALLTHRU */
 
         case DFU_STATE_RX_INIT_PKT:
             // DFU initialization has been done and a start packet has been received.

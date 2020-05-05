@@ -1,13 +1,17 @@
 #include "boards.h"
+#include "dfu_types.h"
 
-#define UF2_NUM_BLOCKS     8000   // at least 4,1 MB for FAT16
+#define CFG_UF2_FAMILY_ID               0xADA52840
+#define CFG_UF2_BOOTLOADER_ID           ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
 
-#ifndef UF2_VOLUME_LABEL
-#define UF2_VOLUME_LABEL   "NRF52BOOT  "
-#endif
+#define CFG_UF2_NUM_BLOCKS              8000        // at least 4,1 MB for FAT16
+#define CFG_UF2_FLASH_SIZE              (1024*1024) // 1 MB
 
-#define FLASH_SIZE         (USER_FLASH_END-USER_FLASH_START) // Max flash size
+// Softdevice Address Space
+#define CFG_UF2_SOFTDEVICE_ADDR_START   0
+#define CFG_UF2_SOFTDEVICE_ADDR_END     USER_FLASH_START
 
+#if 0
 // Only allow to write application TODO dynamic depending on SD size
 #ifdef SOFTDEVICE_PRESENT
 #define USER_FLASH_START   0x26000
@@ -16,7 +20,12 @@
 #endif
 
 #define USER_FLASH_END     0xAD000 // Fat Fs start here
+#endif 
 
-#define FLASH_PAGE_SIZE    4096
+// Application Address Space
+#define USER_FLASH_START                (SD_FLASH_SIZE + MBR_SIZE)
+#define USER_FLASH_END                  0xAD000
 
-#define UF2_FAMILY_ID      0xADA52840
+// Bootloader Address Space
+#define CFG_UF2_BOOTLOADER_ADDR_START   BOOTLOADER_REGION_START
+#define CFG_UF2_BOOTLOADER_ADDR_END     BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS

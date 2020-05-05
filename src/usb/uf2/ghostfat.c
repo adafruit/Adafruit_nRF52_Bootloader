@@ -4,11 +4,12 @@
 #include "flash_nrf5x.h"
 #include <string.h>
 
-#include "boards.h"
-#include "tusb.h"
-
 #include "bootloader_settings.h"
 #include "bootloader.h"
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 
 typedef struct {
     uint8_t JumpInstruction[3];
@@ -55,7 +56,12 @@ struct TextFile {
   char const *content;
 };
 
-#define NUM_FAT_BLOCKS UF2_NUM_BLOCKS
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+
+#define NUM_FAT_BLOCKS CFG_UF2_NUM_BLOCKS
 
 #define STR0(x) #x
 #define STR(x) STR0(x)
@@ -90,11 +96,10 @@ static struct TextFile const info[] = {
 STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 
 
-#define NUM_FILES (ARRAY_SIZE(info))
-#define NUM_DIRENTRIES (NUM_FILES + 1) // Code adds volume label as first root directory entry
+#define NUM_FILES          (ARRAY_SIZE(info))
+#define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
-
-#define UF2_SIZE           (current_flash_size() * 2)
+#define UF2_SIZE           (uf2current_flash_sz * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
@@ -128,71 +133,104 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerFAT        = SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
-	.PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
+    .PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
     .VolumeLabel          = UF2_VOLUME_LABEL,
     .FilesystemIdentifier = "FAT16   ",
 };
 
-#define NRF_LOG_DEBUG(...)
-#define NRF_LOG_WARNING(...)
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+static inline bool is_uf2_block (UF2_Block const *bl)
+{
+  return (bl->magicStart0 == UF2_MAGIC_START0) && (bl->magicStart1 == UF2_MAGIC_START1) &&
+         (bl->magicEnd == UF2_MAGIC_END) &&
+         (bl->flags & UF2_FLAG_FAMILYID) && !(bl->flags & UF2_FLAG_NOFLASH) &&
+         (bl->payloadSize == 256) && !(bl->targetAddr & 0xff);
+}
+
+static inline bool in_app_space (uint32_t addr)
+{
+  return USER_FLASH_START <= addr && addr < USER_FLASH_END;
+}
+
+static inline bool in_uicr_space(uint32_t addr)
+{
+  return addr == 0x10001000;
+}
+
+static inline bool in_bootloader_space (uint32_t addr)
+{
+  return USER_FLASH_END <= addr && addr < CFG_UF2_FLASH_SIZE;
+}
+
+static inline bool in_softdevice_space (uint32_t addr)
+{
+  return addr < USER_FLASH_START;
+}
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+static uint32_t uf2current_flash_sz = 0;
+
 
 // get current.uf2 flash size in bytes, round up to 256 bytes
 static uint32_t current_flash_size(void)
 {
-  static uint32_t flash_sz = 0;
-  uint32_t result = flash_sz; // presumes atomic 32-bit read/write and static result
+  uint32_t flash_sz = 0;
 
-  // only need to compute once
-  if ( result == 0 )
+  // return 1 block of 256 bytes
+  if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
   {
-    // return 1 block of 256 bytes
-    if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
+    flash_sz = 256;
+  }else
+  {
+    bootloader_settings_t const * boot_setting;
+    bootloader_util_settings_get(&boot_setting);
+
+    flash_sz = boot_setting->bank_0_size;
+
+    // Copy size must be multiple of 256 bytes
+    // else we will got an issue copying current.uf2
+    if (flash_sz & 0xff)
     {
-      result = 256;
-    }else
-    {
-      bootloader_settings_t const * boot_setting;
-      bootloader_util_settings_get(&boot_setting);
-
-      result = boot_setting->bank_0_size;
-
-      // Copy size must be multiple of 256 bytes
-      // else we will got an issue copying current.uf2
-      if (result & 0xff)
-      {
-        result = (result & ~0xff) + 256;
-      }
-
-      // if bank0 size is not valid, happens when flashed with jlink
-      // use maximum application size
-      if ( (result == 0) || (result == 0xFFFFFFFFUL) )
-      {
-        result = FLASH_SIZE;
-      }
+      flash_sz = (flash_sz & ~0xff) + 256;
     }
-    flash_sz = result; // presumes atomic 32-bit read/write and static result
+
+    // if bank0 size is not valid, happens when flashed with jlink
+    // use maximum application size
+    if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
+    {
+      flash_sz = (USER_FLASH_END-USER_FLASH_START);
+    }
   }
 
   return flash_sz;
 }
 
-void padded_memcpy (char *dst, char const *src, int len)
+void uf2_init(void)
 {
-    for (int i = 0; i < len; ++i) {
-        if (*src)
-            *dst = *src++;
-        else
-            *dst = ' ';
-        dst++;
-    }
+  uf2current_flash_sz = current_flash_size();
 }
 
-
 /*------------------------------------------------------------------*/
-/* Read
+/* Read CURRENT.UF2
  *------------------------------------------------------------------*/
+void padded_memcpy (char *dst, char const *src, int len)
+{
+  for ( int i = 0; i < len; ++i )
+  {
+    if ( *src )
+      *dst = *src++;
+    else
+      *dst = ' ';
+    dst++;
+  }
+}
+
 void read_block(uint32_t block_no, uint8_t *data) {
     memset(data, 0, 512);
     uint32_t sectionIdx = block_no;
@@ -212,11 +250,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
             // WARNING -- code presumes only one NULL .content for .UF2 file
             //            and all non-NULL .content fit in one sector
             //            and requires it be the last element of the array
-            for (int i = 1; i < NUM_FILES * 2 + 4; ++i) {
+            for (uint32_t i = 1; i < NUM_FILES * 2 + 4; ++i) {
                 data[i] = 0xff;
             }
         }
-        for (int i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
+        for (uint32_t i = 0; i < 256; ++i) { // Generate the FAT chain for the firmware "file"
             uint32_t v = sectionIdx * 256 + i;
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
@@ -235,7 +273,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             remainingEntries--;
         }
 
-        for (int i = DIRENTRIES_PER_SECTOR * sectionIdx;
+        for (uint32_t i = DIRENTRIES_PER_SECTOR * sectionIdx;
              remainingEntries > 0 && i < NUM_FILES;
              i++, d++) {
 
@@ -265,17 +303,17 @@ void read_block(uint32_t block_no, uint8_t *data) {
         } else { // generate the UF2 file data on-the-fly
             sectionIdx -= NUM_FILES - 1;
             uint32_t addr = USER_FLASH_START + sectionIdx * 256;
-            if (addr < USER_FLASH_START+FLASH_SIZE) {
+            if (addr < CFG_UF2_FLASH_SIZE) {
                 UF2_Block *bl = (void *)data;
                 bl->magicStart0 = UF2_MAGIC_START0;
                 bl->magicStart1 = UF2_MAGIC_START1;
                 bl->magicEnd = UF2_MAGIC_END;
                 bl->blockNo = sectionIdx;
-                bl->numBlocks = current_flash_size() / 256;
+                bl->numBlocks = uf2current_flash_sz / 256;
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
                 bl->flags = UF2_FLAG_FAMILYID;
-                bl->familyID = UF2_FAMILY_ID;
+                bl->familyID = CFG_UF2_FAMILY_ID;
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
@@ -286,71 +324,150 @@ void read_block(uint32_t block_no, uint8_t *data) {
 /* Write UF2
  *------------------------------------------------------------------*/
 
-/** Write an block
+/**
+ * Write an uf2 block wrapped by 512 sector. Writing behavior is different when upgrading:
+ * - Application
+ *    - current App is erased and flash with new firmware with same starting address
+ *
+ * - SoftDevice + Bootloader
+ *    - Current App is erased, contents of SD + bootloader is written to App starting address
+ *    - Trigger the SD + Bootloader migration
  *
  * @return number of bytes processed, only 3 following values
  *  -1 : if not an uf2 block
  * 512 : write is successful
  *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
  */
-int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state) {
-    UF2_Block *bl = (void *)data;
+int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
+{
+  UF2_Block *bl = (void*) data;
 
-     NRF_LOG_DEBUG("Write magic: %x", bl->magicStart0);
+  if ( !is_uf2_block(bl) ) return -1;
 
-    if (!is_uf2_block(bl)) {
+  PRINTF("Addr = 0x%08lX, payloadSize = %ld, Family = 0x%08lX\n", bl->targetAddr, bl->payloadSize, bl->familyID);
+#if 0
+  uint32_t wr_addr;
+
+  switch ( bl->familyID )
+  {
+    case CFG_UF2_FAMILY_ID:
+      // Upgrade application
+      // Directly write over application -- > Target address is the written address
+      if ( !in_app_space(bl->targetAddr) ) return -1;
+
+      wr_addr = bl->targetAddr;
+    break;
+
+    case CFG_UF2_BOOTLOADER_ID:
+      /* Upgrading SoftDevice + Bootloader combo
+       *
+       * To prevent corruption/disconnection while transferring we don't directly write over
+       * SoftDevice and Bootloader. Instead SD + Bootloader is written to Application region.
+       * Once everything is received and verified.They are written to their respective address
+       *
+       * Note: to simplify the upgrade process, we ASSUME
+       *  - Bootloader size is fixed and is the same as the old bootloader
+       *  - New SoftDevice can has different size than the old one
+       *
+       *                         -------------         -------------         -------------
+       *                        |             |       |             |     + |     New     |
+       *                        | Bootloader  |       | Bootloader  |    +  | Bootloader  |
+       * BOOTLOADER_ADDR_START--|-------------|       |-------------|   +   |-------------|
+       *                        |             |       |    New      |  +    |             |
+       *                        |             |       | Bootloader  | +     |             |
+       *                        |             |       |  ++++++++   |       |             |
+       *                        | Application | --->  |             |       |  Invalid    |
+       *                        |             |       |             |       | Application |
+       *                        |             |       |  ++++++++   |       |             |
+       *                        |             |       |    New      |       |             |
+       *                        |             |       | SoftDevice  | +     |-------------|
+       *      USER_FLASH_START--|-------------|       |-------------|  +    |             |
+       *                        |             |       |             |   +   |             |
+       *                        |             |       |             |    +  |     New     |
+       *                        | SoftDevice  |       | SoftDevice  |     + | SoftDevice  |
+       *                         -------------         -------------         -------------
+       */
+
+      if ( in_uicr_space(bl->targetAddr) )
+      {
+        /* UCIR contains bootloader & MBR address as follow:
+         * - 0x10001014: for bootloader address
+         * - 0x10001018: for MBR
+         * Both values are fixed if bootloader size is not change
+         */
+
+        // Nothing to do since bootloader size is fixed
+        return 512;
+      }
+      else if ( in_softdevice_space(bl->targetAddr) )
+      {
+        // Right above the old SoftDevice
+        wr_addr = USER_FLASH_START + bl->targetAddr;
+      }
+      else if ( in_bootloader_space(bl->targetAddr) )
+      {
+        // Right below the old Bootloader
+        //wr_addr = USER_FLASH_START + bl->targetAddr;
+      }
+      else
+      {
+
         return -1;
-    }
+      }
+    break;
 
-    // only accept block with same family id
-    if ( UF2_FAMILY_ID && !((bl->flags & UF2_FLAG_FAMILYID) && (bl->familyID == UF2_FAMILY_ID)) ) {
-      return -1;
-    }
+    // unknown family ID
+    default: return -1;
+  }
 
-    if ((bl->flags & UF2_FLAG_NOFLASH) || bl->payloadSize > 256 || (bl->targetAddr & 0xff) ||
-        bl->targetAddr < USER_FLASH_START || bl->targetAddr + bl->payloadSize > USER_FLASH_END) {
-#if USE_DBG_MSC
-        if (!quiet)
-            logval("invalid target addr", bl->targetAddr);
+  (void) wr_addr;
 #endif
-        NRF_LOG_WARNING("Skip block at %x", bl->targetAddr);
-        // this happens when we're trying to re-flash CURRENT.UF2 file previously
-        // copied from a device; we still want to count these blocks to reset properly
-    } else {
-        // logval("write block at", bl->targetAddr);
-        NRF_LOG_DEBUG("Write block at %x", bl->targetAddr);
 
-        static bool first_write = true;
-        if ( first_write ) {
-          first_write = false;
-          led_state(STATE_WRITING_STARTED);
-        }
+  // only accept block with same family id
+  if ( (bl->familyID != CFG_UF2_FAMILY_ID) ) return -1;
 
-        flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
+  if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) )
+  {
+
+  }
+  else
+  {
+    //PRINTF("Write block at %x", bl->targetAddr);
+    flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
+  }
+
+  if ( state && bl->numBlocks )
+  {
+    // Update state num blocks
+    if ( state->numBlocks != bl->numBlocks )
+    {
+      if ( bl->numBlocks >= MAX_BLOCKS || state->numBlocks )
+        state->numBlocks = 0xffffffff;
+      else
+        state->numBlocks = bl->numBlocks;
     }
 
-    if (state && bl->numBlocks) {
-        if (state->numBlocks != bl->numBlocks) {
-            if (bl->numBlocks >= MAX_BLOCKS || state->numBlocks)
-                state->numBlocks = 0xffffffff;
-            else
-                state->numBlocks = bl->numBlocks;
-        }
-        if (bl->blockNo < MAX_BLOCKS) {
-            uint8_t mask = 1 << (bl->blockNo % 8);
-            uint32_t pos = bl->blockNo / 8;
-            if (!(state->writtenMask[pos] & mask)) {
-                // logval("incr", state->numWritten);
-                state->writtenMask[pos] |= mask;
-                state->numWritten++;
-            }
-            if (state->numWritten >= state->numBlocks) {
-                // flush last blocks
-                flash_nrf5x_flush(true);
-            }
-        }
-        NRF_LOG_DEBUG("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
+    if ( bl->blockNo < MAX_BLOCKS )
+    {
+      uint8_t const mask = 1 << (bl->blockNo % 8);
+      uint32_t const pos = bl->blockNo / 8;
+
+      // only increase written number with new write (possibly prevent overwriting from OS)
+      if ( !(state->writtenMask[pos] & mask) )
+      {
+        state->writtenMask[pos] |= mask;
+        state->numWritten++;
+      }
+
+      // flush last blocks
+      if ( state->numWritten >= state->numBlocks )
+      {
+        flash_nrf5x_flush(true);
+      }
     }
 
-    return 512;
+    //PRINTF("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
+  }
+
+  return 512;
 }

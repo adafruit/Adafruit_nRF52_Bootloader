@@ -54,8 +54,6 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define SLAVE_LATENCY                        0                                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                     (4 * 100)                                               /**< Connection supervisory timeout (4 seconds). */
 
-#define APP_TIMER_PRESCALER                  0                                                       /**< Value of the RTC1 PRESCALER register. */
-
 #define APP_ADV_INTERVAL                     MSEC_TO_UNITS(25, UNIT_0_625_MS)                        /**< The advertising interval (25 ms.). */
 #define APP_ADV_TIMEOUT                      BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED                   /**< The advertising timeout in units of seconds. This is set to @ref BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED so that the advertisement is done as long as there there is a call to @ref dfu_transport_close function.*/
 #define APP_DIRECTED_ADV_TIMEOUT             50                                                       /**< number of direct advertisement (each lasting 1.28seconds). */
@@ -738,7 +736,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
 #ifdef CFG_DEBUG
     extern const char* dbg_ble_event_str(uint16_t evt_id);
-    ADALOG("BLE", dbg_ble_event_str(p_ble_evt->header.evt_id));
+    PRINTF("BLE %s\r\n", dbg_ble_event_str(p_ble_evt->header.evt_id));
 #endif
 
     switch (p_ble_evt->header.evt_id)
@@ -901,7 +899,7 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
         {
           uint16_t att_mtu = MIN(p_ble_evt->evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu, BLEGATT_ATT_MTU_MAX);
-          ADALOG("GAP", "ATT MTU is changed to %d", att_mtu);
+          PRINTF("GAP ATT MTU is changed to %d\r\n", att_mtu);
           APP_ERROR_CHECK( sd_ble_gatts_exchange_mtu_reply(m_conn_handle, att_mtu) );
         }
         break;
@@ -967,7 +965,7 @@ static void service_error_handler(uint32_t nrf_error)
 }
 
 
-static void ascii_to_utf8(ble_srv_utf8_str_t * p_utf8, char * p_ascii)
+static void ascii_to_utf8(ble_srv_utf8_str_t * p_utf8, const char * p_ascii)
 {
     p_utf8->length = (uint16_t)strlen(p_ascii);
     p_utf8->p_str  = (uint8_t *)p_ascii;

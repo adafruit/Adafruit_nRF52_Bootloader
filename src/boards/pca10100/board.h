@@ -41,19 +41,15 @@
 #define BUTTON_2            12
 #define BUTTON_PULL         NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER       8
-#define TX_PIN_NUMBER       6
-#define CTS_PIN_NUMBER      0
-#define RTS_PIN_NUMBER      0
-#define HWFC                false
-
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER    "Nordic"
 #define BLEDIS_MODEL           "PCA10100"
 
+//--------------------------------------------------------------------+
+// USB
+//--------------------------------------------------------------------+
 #define UF2_PRODUCT_NAME    "Nordic nRF52833 DK"
 #define UF2_BOARD_ID        "nRF52833-pca10100-v1"
 #define UF2_INDEX_URL       "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52833-DK"

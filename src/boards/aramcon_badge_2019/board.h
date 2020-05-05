@@ -46,16 +46,9 @@
 #define BUTTON_2              _PINNUM(0, 29) // middle button
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         _PINNUM(0, 28) // SDA
-#define TX_PIN_NUMBER         _PINNUM(0, 3) // SCL
-#define CTS_PIN_NUMBER        0
-#define RTS_PIN_NUMBER        0
-#define HWFC                  false
-
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "ARAMCON Badge Team"
 #define BLEDIS_MODEL          "ARAMCON Badge 2019"
 

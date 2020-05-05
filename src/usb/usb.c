@@ -34,6 +34,7 @@
 #include "tusb.h"
 #include "usb_desc.h"
 
+#include "uf2/uf2.h"
 #include "boards.h"
 
 //--------------------------------------------------------------------+
@@ -43,6 +44,14 @@
 /* tinyusb function that handles power event (detected, ready, removed)
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
+
+//--------------------------------------------------------------------+
+// Forward USB interrupt events to TinyUSB IRQ Handler
+//--------------------------------------------------------------------+
+void USBD_IRQHandler(void)
+{
+  tud_int_handler(0);
+}
 
 //------------- IMPLEMENTATION -------------//
 void usb_init(bool cdc_only)
@@ -88,6 +97,8 @@ void usb_init(bool cdc_only)
   }
 
   usb_desc_init(cdc_only);
+
+  uf2_init();
 
   // Init TinyUSB stack
   tusb_init();

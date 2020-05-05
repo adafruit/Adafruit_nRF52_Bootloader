@@ -39,7 +39,7 @@
 static WriteState _wr_state = { 0 };
 
 void read_block(uint32_t block_no, uint8_t *data);
-int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state);
+int  write_block(uint32_t block_no, uint8_t *data, WriteState *state);
 
 //--------------------------------------------------------------------+
 // tinyusb callbacks
@@ -143,35 +143,48 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   (void) lun;
 
   uint32_t count = 0;
-  int wr_ret;
-
-  while ( (count < bufsize) && ((wr_ret = write_block(lba, buffer, false, &_wr_state)) > 0) )
+  while ( count < bufsize )
   {
+    // Consider non-uf2 block write as successful
+    // only break if write_block is busy with flashing (return 0)
+    if ( 0 == write_block(lba, buffer, &_wr_state) ) break;
+
     lba++;
     buffer += 512;
     count  += 512;
   }
 
-  // Consider non-uf2 block write as successful
-  return  (wr_ret < 0) ? bufsize : count;
+  return count;
 }
 
 // Callback invoked when WRITE10 command is completed (status received and accepted by host).
 void tud_msc_write10_complete_cb(uint8_t lun)
 {
-  // uf2 file writing is complete --> complete DFU process
-  if ( _wr_state.numBlocks && (_wr_state.numWritten >= _wr_state.numBlocks) )
+  static bool first_write = true;
+
+  if ( _wr_state.numBlocks )
   {
-    led_state(STATE_WRITING_FINISHED);
+    // Start LED writing pattern with first write
+    if (first_write)
+    {
+      first_write = false;
+      led_state(STATE_WRITING_STARTED);
+    }
 
-    dfu_update_status_t update_status;
+    // All block of uf2 file is complete --> complete DFU process
+    if (_wr_state.numWritten >= _wr_state.numBlocks)
+    {
+      led_state(STATE_WRITING_FINISHED);
 
-    memset(&update_status, 0, sizeof(dfu_update_status_t ));
-    update_status.status_code = DFU_UPDATE_APP_COMPLETE;
-    update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
-    update_status.app_size    = _wr_state.numBlocks*256;
+      dfu_update_status_t update_status;
 
-    bootloader_dfu_update_process(update_status);
+      memset(&update_status, 0, sizeof(dfu_update_status_t ));
+      update_status.status_code = DFU_UPDATE_APP_COMPLETE;
+      update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
+      update_status.app_size    = _wr_state.numBlocks*256;
+
+      bootloader_dfu_update_process(update_status);
+    }
   }
 }
 
@@ -181,7 +194,7 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_siz
 {
   (void) lun;
 
-  *block_count = UF2_NUM_BLOCKS;
+  *block_count = CFG_UF2_NUM_BLOCKS;
   *block_size  = 512;
 }
 

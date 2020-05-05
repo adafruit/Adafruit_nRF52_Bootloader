@@ -41,10 +41,7 @@
 
 /*------------- RTOS -------------*/
 #define CFG_TUSB_OS                 OPT_OS_NONE
-//#define CFG_TUD_TASK_PRIO         0
 //#define CFG_TUD_TASK_QUEUE_SZ     16
-//#define CFG_TUD_TASK_STACK_SZ     150
-
 
 //--------------------------------------------------------------------+
 // DEVICE CONFIGURATION
@@ -52,7 +49,6 @@
 //--------------------------------------------------------------------+
 
 /*------------- Core -------------*/
-#define CFG_TUD_DESC_AUTO           0
 #define CFG_TUD_ENDOINT0_SIZE       64
 
 //------------- Class enabled -------------//
@@ -74,16 +70,8 @@
 //--------------------------------------------------------------------+
 // USB RAM PLACEMENT
 //--------------------------------------------------------------------+
-#define CFG_TUSB_ATTR_USBRAM
+#define CFG_TUSB_MEM_SECTION
 #define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(4)))
-
-
-#define BREAKPOINT_IGNORE_COUNT(n) \
-  do {\
-    static uint8_t ignore_count = 0;\
-    ignore_count++;\
-    if ( ignore_count > n ) verify_breakpoint();\
-  }while(0)
 
 #ifdef __cplusplus
  }

@@ -31,7 +31,7 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 15)
+#define LED_PRIMARY_PIN       _PINNUM(1, 9)
 #define LED_SECONDARY_PIN     _PINNUM(1, 10)
 #define LED_STATE_ON          1
 
@@ -46,15 +46,6 @@
 #define BUTTON_1              _PINNUM(1, 02)
 #define BUTTON_2              _PINNUM(0, 10)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
-
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         8
-#define TX_PIN_NUMBER         6
-#define CTS_PIN_NUMBER        0
-#define RTS_PIN_NUMBER        0
-#define HWFC                  false
 
 //--------------------------------------------------------------------+
 // BLE OTA
@@ -71,7 +62,7 @@
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 Sense"
-#define UF2_VOLUME_LABEL      "FTHR840BOOT"
+#define UF2_VOLUME_LABEL      "FTHRSNSBOOT"
 #define UF2_BOARD_ID          "nRF52840-Feather-Sense"
 #define UF2_INDEX_URL         "https://www.adafruit.com/product/4516"
 

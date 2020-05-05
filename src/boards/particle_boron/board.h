@@ -47,19 +47,15 @@
 #define BUTTON_FRESET       _PINNUM(0, 03) // A0
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER  8
-#define TX_PIN_NUMBER  6
-#define CTS_PIN_NUMBER 0
-#define RTS_PIN_NUMBER 0
-#define HWFC           false
-
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Particle Industries"
 #define BLEDIS_MODEL          "Boron"
 
+//--------------------------------------------------------------------+
+// USB
+//--------------------------------------------------------------------+
 #define UF2_PRODUCT_NAME   "Particle Boron"
 #define UF2_VOLUME_LABEL   "BORONBOOT  "
 #define UF2_BOARD_ID       "nRF52840-Boron-v1"

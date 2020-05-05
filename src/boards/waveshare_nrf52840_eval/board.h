@@ -50,15 +50,6 @@
 #define BUTTON_2              _PINNUM(0, 29)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER         8
-#define TX_PIN_NUMBER         6
-#define CTS_PIN_NUMBER        0
-#define RTS_PIN_NUMBER        0
-#define HWFC                  false
-
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

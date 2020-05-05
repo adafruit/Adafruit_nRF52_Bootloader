@@ -47,19 +47,15 @@
 #define BUTTON_2            1  // P0.1 not exposed anywhere, FRST n/a
 #define BUTTON_PULL         NRF_GPIO_PIN_PULLUP
 
-/*------------------------------------------------------------------*/
-/* UART (only used by nRF52832)
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER       7
-#define TX_PIN_NUMBER       8
-#define CTS_PIN_NUMBER      0
-#define RTS_PIN_NUMBER      0
-#define HWFC                false
-
-// Used as model string in OTA mode
+//--------------------------------------------------------------------+
+// BLE OTA
+//--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER    "Electronut Labs"
 #define BLEDIS_MODEL           "Papyr"
 
+//--------------------------------------------------------------------+
+// USB
+//--------------------------------------------------------------------+
 #define UF2_PRODUCT_NAME    "Electronut Labs Papyr"
 #define UF2_BOARD_ID        "nRF52840-Papyr-v1"
 #define UF2_INDEX_URL       "https://docs.electronut.in/papyr"

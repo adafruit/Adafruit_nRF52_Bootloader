@@ -4,9 +4,12 @@
 
 This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 
+- [Adafruit CLUE](https://www.adafruit.com/product/4500)
+- [Adafruit Circuit Playground Bluefruit](https://www.adafruit.com/product/4333)
 - [Adafruit Feather nRF52832](https://www.adafruit.com/product/3406)
 - [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062)
-- [Adafruit Circuit Playground Bluefruit](https://www.adafruit.com/product/4333)
+- [Adafruit Feather nRF52840 Sense](https://www.adafruit.com/product/4516)
+- [Adafruit ItsyBitsy nRF52840 Express](https://www.adafruit.com/product/4481)
 - Adafruit Metro nRF52840 Express
 - [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
 - MakerDiary MDK nRF52840 USB Dongle
@@ -102,9 +105,7 @@ both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to a
 ## How to compile and build
 
 You should only continue if you are looking to develop bootloader for your own.
-You must have have  a J-Link available to "unbrick" your device.
-
-### Option 1: Build with Makefile
+You must have have a J-Link available to "unbrick" your device.
 
 Prerequisites
 
@@ -114,7 +115,7 @@ Prerequisites
 To build:
 
 ```
-make BOARD=feather_nrf52840_express all combinehex
+make BOARD=feather_nrf52840_express all
 ```
 
 To flash the bootloader with JLink:
@@ -133,12 +134,6 @@ To flash SoftDevice (and chip erase):
 
 ```
 make BOARD=feather_nrf52840_express sd
-```
-
-To erase all of flash:
-
-```
-make BOARD=feather_nrf52840_express erase
 ```
 
 For the list of supported boards, run `make` without `BOARD=` :
@@ -164,12 +159,10 @@ make: *** [_build/main.o] Error 127
 ```
 
 ... you may need to pass the location of the GCC ARM toolchain binaries to `make` using
-the variable `GNU_INSTALL_ROOT` as below:
+the variable `CROSS_COMPILE` as below:
 ```
-$ make GNU_INSTALL_ROOT=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/ BOARD=feather_nrf52832 all
+$ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
 ```
-
-_Please note that the path needs a trailing path separator (a `/`)_
 
 #### 2. `mergehex: No such file or directory`
 
@@ -181,22 +174,3 @@ part of Nordic's nRF5x Command Line Tools.
 Make sure that `nrfjprog` is available from the command-line. This binary is
 part of Nordic's nRF5x Command Line Tools.
 
-On POSIX-type systems you can temporarily add the path to `nrfjprog` via a
-variation on the following command:
-
-```
-$ export PATH=$PATH:/location/of/nRF5x-Command-Line-Tools_9_7_2_OSX/nrfjprog
-```
-
-### Option 2: Build using Segger Embedded Studio
-
-For easier debugging you can also use [SES](https://www.segger.com/products/development-tools/embedded-studio/).
-The project file is located at `src/segger/Adafruit_nRF52_Bootloader.emProject`.
-
-> **Note**: SES only flashes the bootloader when you click download, not the SoftDevice.
-You need to flash the SoftDevice beforehand if you haven't already done so.
-As mentioned above do something like:
-
-```
-make BOARD=feather_nrf52840_express sd
-```
