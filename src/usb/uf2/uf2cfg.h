@@ -11,6 +11,17 @@
 #define CFG_UF2_SOFTDEVICE_ADDR_START   0
 #define CFG_UF2_SOFTDEVICE_ADDR_END     USER_FLASH_START
 
+#if 0
+// Only allow to write application TODO dynamic depending on SD size
+#ifdef SOFTDEVICE_PRESENT
+#define USER_FLASH_START   0x26000
+#else
+#define USER_FLASH_START   0x1000
+#endif
+
+#define USER_FLASH_END     0xAD000 // Fat Fs start here
+#endif 
+
 // Application Address Space
 #define USER_FLASH_START                (SD_FLASH_SIZE + MBR_SIZE)
 #define USER_FLASH_END                  0xAD000

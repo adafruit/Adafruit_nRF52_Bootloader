@@ -120,11 +120,14 @@ void usb_teardown(void)
     NRF_USBD->INTENCLR = NRF_USBD->INTEN;
 
     nrf_usbd_disable(NRF_USBD);
+
+#if defined(SOFTDEVICE_PRESENT)
     sd_clock_hfclk_release();
 
     sd_power_usbdetected_enable(false);
     sd_power_usbpwrrdy_enable(false);
     sd_power_usbremoved_enable(false);
+#endif
   }
 }
 

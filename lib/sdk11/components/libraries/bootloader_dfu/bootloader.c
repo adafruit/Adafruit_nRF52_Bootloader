@@ -165,7 +165,7 @@ bool bootloader_app_is_valid(uint32_t app_addr)
         // A stored crc value of 0 indicates that CRC checking is not used.
         if (p_bootloader_settings->bank_0_crc != 0)
         {
-            image_crc = crc16_compute((uint8_t *)DFU_BANK_0_REGION_START,
+            image_crc = crc16_compute((uint8_t *)app_addr,
                                       p_bootloader_settings->bank_0_size,
                                       NULL);
         }
@@ -361,9 +361,11 @@ static void interrupts_disable(void)
 
 void bootloader_app_start(uint32_t app_addr)
 {
+#ifdef SOFTDEVICE_PRESENT
     // If the applications CRC has been checked and passed, the magic number will be written and we
     // can start the application safely.
     APP_ERROR_CHECK ( sd_softdevice_disable() );
+#endif
 
     interrupts_disable();
 
@@ -377,9 +379,13 @@ void bootloader_app_start(uint32_t app_addr)
     sd_mbr_command(&command);
 #endif
 
-    APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(CODE_REGION_1_START) );
+#ifdef SOFTDEVICE_PRESENT
+    APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(app_addr) );
+#else
+    SCB->VTOR = app_addr;
+#endif
 
-    bootloader_util_app_start(CODE_REGION_1_START);
+    bootloader_util_app_start(app_addr);
 }
 
 
