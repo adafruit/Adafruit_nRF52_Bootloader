@@ -17,6 +17,8 @@ SD_VERSION   = 6.1.1
 SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
+MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
+
 # linker by MCU and SoftDevice eg. nrf52840_s140_v6.ld
 LD_FILE      = linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
 
@@ -326,13 +328,24 @@ flash: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo Flashing: $(notdir $<)
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 
+# dfu using CDC interface
 dfu-flash: $(BUILD)/$(MERGED_FILE).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
 	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
+erase:
+	@echo Erasing flash
+	$(NRFJPROG) -f nrf52 --eraseall
+
+# flash SD only
 sd:
 	@echo Flashing: $(SD_HEX)
 	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset
+
+# flash MBR only
+mbr:
+	@echo Flashing: $(MBR_HEX)
+	$(NRFJPROG) --program $(MBR_HEX) -f nrf52 --sectorerase
 
 gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<
