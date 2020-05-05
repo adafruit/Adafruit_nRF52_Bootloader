@@ -156,16 +156,20 @@ static inline bool in_app_space (uint32_t addr)
   return USER_FLASH_START <= addr && addr < USER_FLASH_END;
 }
 
+static inline bool in_uicr_space(uint32_t addr)
+{
+  return addr == 0x10001000;
+}
+
+static inline bool in_bootloader_space (uint32_t addr)
+{
+  return USER_FLASH_END <= addr && addr < CFG_UF2_FLASH_SIZE;
+}
+
 static inline bool in_softdevice_space (uint32_t addr)
 {
   return addr < USER_FLASH_START;
 }
-
-static inline bool in_uf2_bootloader_space (uint32_t addr)
-{
-  return USER_FLASH_END <= addr /*&& addr < FLASH_SIZE*/;
-}
-
 
 //--------------------------------------------------------------------+
 //
@@ -340,16 +344,87 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   if ( !is_uf2_block(bl) ) return -1;
 
-  PRINTF("Addr = 0x%08X, Family = 0x%08X\n", bl->targetAddr, bl->familyID);
+  PRINTF("Addr = 0x%08lX, payloadSize = %ld, Family = 0x%08lX\n", bl->targetAddr, bl->payloadSize, bl->familyID);
+#if 0
+  uint32_t wr_addr;
 
-  // only accept block with same family id
-  if ( !((bl->familyID == CFG_UF2_FAMILY_ID)) )
+  switch ( bl->familyID )
   {
-    return -1;
+    case CFG_UF2_FAMILY_ID:
+      // Upgrade application
+      // Directly write over application -- > Target address is the written address
+      if ( !in_app_space(bl->targetAddr) ) return -1;
+
+      wr_addr = bl->targetAddr;
+    break;
+
+    case CFG_UF2_BOOTLOADER_ID:
+      /* Upgrading SoftDevice + Bootloader combo
+       *
+       * To prevent corruption/disconnection while transferring we don't directly write over
+       * SoftDevice and Bootloader. Instead SD + Bootloader is written to Application region.
+       * Once everything is received and verified.They are written to their respective address
+       *
+       * Note: to simplify the upgrade process, we ASSUME
+       *  - Bootloader size is fixed and is the same as the old bootloader
+       *  - New SoftDevice can has different size than the old one
+       *
+       *                         -------------         -------------         -------------
+       *                        |             |       |             |     + |     New     |
+       *                        | Bootloader  |       | Bootloader  |    +  | Bootloader  |
+       * BOOTLOADER_ADDR_START--|-------------|       |-------------|   +   |-------------|
+       *                        |             |       |    New      |  +    |             |
+       *                        |             |       | Bootloader  | +     |             |
+       *                        |             |       |  ++++++++   |       |             |
+       *                        | Application | --->  |             |       |  Invalid    |
+       *                        |             |       |             |       | Application |
+       *                        |             |       |  ++++++++   |       |             |
+       *                        |             |       |    New      |       |             |
+       *                        |             |       | SoftDevice  | +     |-------------|
+       *      USER_FLASH_START--|-------------|       |-------------|  +    |             |
+       *                        |             |       |             |   +   |             |
+       *                        |             |       |             |    +  |     New     |
+       *                        | SoftDevice  |       | SoftDevice  |     + | SoftDevice  |
+       *                         -------------         -------------         -------------
+       */
+
+      if ( in_uicr_space(bl->targetAddr) )
+      {
+        /* UCIR contains bootloader & MBR address as follow:
+         * - 0x10001014: for bootloader address
+         * - 0x10001018: for MBR
+         * Both values are fixed if bootloader size is not change
+         */
+
+        // Nothing to do since bootloader size is fixed
+        return 512;
+      }
+      else if ( in_softdevice_space(bl->targetAddr) )
+      {
+        // Right above the old SoftDevice
+        wr_addr = USER_FLASH_START + bl->targetAddr;
+      }
+      else if ( in_bootloader_space(bl->targetAddr) )
+      {
+        // Right below the old Bootloader
+        //wr_addr = USER_FLASH_START + bl->targetAddr;
+      }
+      else
+      {
+
+        return -1;
+      }
+    break;
+
+    // unknown family ID
+    default: return -1;
   }
 
+  (void) wr_addr;
+#endif
 
-//  if ( (bl->familyID == CFG_UF2_FAMILY_ID) && in_app_space(bl->targetAddr) )
+  // only accept block with same family id
+  if ( (bl->familyID != CFG_UF2_FAMILY_ID) ) return -1;
 
   if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) )
   {
