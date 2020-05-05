@@ -345,7 +345,7 @@ sd:
 # flash MBR only
 mbr:
 	@echo Flashing: $(MBR_HEX)
-	$(NRFJPROG) --program $(MBR_HEX) -f nrf52 --sectorerase
+	$(NRFJPROG) --program $(MBR_HEX) -f nrf52 --sectorerase --reset
 
 gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<

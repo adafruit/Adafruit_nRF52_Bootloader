@@ -56,6 +56,7 @@ void USBD_IRQHandler(void)
 //------------- IMPLEMENTATION -------------//
 void usb_init(bool cdc_only)
 {
+  // 0, 1 is reserved for SD
   NVIC_SetPriority(USBD_IRQn, 2);
 
   // USB power may already be ready at this time -> no event generated
@@ -64,9 +65,14 @@ void usb_init(bool cdc_only)
 
 #ifdef SOFTDEVICE_PRESENT
   uint8_t sd_en = false;
-  (void) sd_softdevice_is_enabled(&sd_en);
 
-  if ( sd_en ) {
+  if ( SD_MAGIC_OK() )
+  {
+    sd_softdevice_is_enabled(&sd_en);
+  }
+
+  if ( sd_en )
+  {
     sd_power_usbdetected_enable(true);
     sd_power_usbpwrrdy_enable(true);
     sd_power_usbremoved_enable(true);
@@ -106,29 +112,8 @@ void usb_init(bool cdc_only)
 
 void usb_teardown(void)
 {
-  if ( NRF_USBD->ENABLE )
-  {
-    // Abort all transfers
-
-    // Disable pull up
-    nrf_usbd_pullup_disable(NRF_USBD);
-
-    // Disable Interrupt
-    NVIC_DisableIRQ(USBD_IRQn);
-
-    // disable all interrupt
-    NRF_USBD->INTENCLR = NRF_USBD->INTEN;
-
-    nrf_usbd_disable(NRF_USBD);
-
-#if defined(SOFTDEVICE_PRESENT)
-    sd_clock_hfclk_release();
-
-    sd_power_usbdetected_enable(false);
-    sd_power_usbpwrrdy_enable(false);
-    sd_power_usbremoved_enable(false);
-#endif
-  }
+  // Simulate an disconnect which cause pullup disable, USB perpheral disable and hclk disable
+  tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_REMOVED);
 }
 
 //--------------------------------------------------------------------+

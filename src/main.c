@@ -166,6 +166,9 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
+  // Populate Boot Address and MBR Param if not already
+  bootloader_mbr_addrs_populate();
+
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
   bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);
 
