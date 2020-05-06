@@ -119,6 +119,7 @@ void usb_teardown(void);
 
 // Allow for using reset button essentially to swap between application and bootloader.
 // This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
+// TODO correct USER_FLASH_START = APP after SoftDevice
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(USER_FLASH_START + 0x200)) == 0x87eeb07c)
 
 // These value must be the same with one in dfu_transport_ble.c
@@ -167,6 +168,8 @@ void softdev_mbr_init(void)
 int main(void)
 {
   // Populate Boot Address and MBR Param if not already
+  // Happens if flashing SD hex that overwrite current MBR
+  // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
   bootloader_mbr_addrs_populate();
 
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
@@ -187,9 +190,6 @@ int main(void)
 
   // Save bootloader version to pre-defined register, retrieved by application
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
-
-  // This check ensures that the defined fields in the bootloader corresponds with actual setting in the chip.
-  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
 
   board_init();
   bootloader_init();
@@ -271,11 +271,13 @@ int main(void)
     }
   }
 
+#if 0
   // Adafruit Factory reset
   if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
   {
     adafruit_factory_reset();
   }
+#endif
 
   // Reset Board
   board_teardown();
@@ -300,6 +302,7 @@ int main(void)
 }
 
 
+#if 0
 // Perform factory reset to erase Application + Data
 void adafruit_factory_reset(void)
 {
@@ -317,6 +320,7 @@ void adafruit_factory_reset(void)
   // back to normal
   led_state(STATE_FACTORY_RESET_FINISHED);
 }
+#endif
 
 /**
  * Initializes the SoftDevice and the BLE event interrupt.
