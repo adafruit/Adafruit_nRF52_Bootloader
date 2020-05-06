@@ -142,7 +142,6 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
-void adafruit_factory_reset(void);
 static uint32_t softdev_init(bool init_softdevice);
 
 uint32_t* dbl_reset_mem = ((uint32_t*)  DFU_DBL_RESET_MEM );
@@ -272,14 +271,6 @@ int main(void)
     }
   }
 
-#if 0
-  // Adafruit Factory reset
-  if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
-  {
-    adafruit_factory_reset();
-  }
-#endif
-
   // Reset Board
   board_teardown();
 
@@ -305,27 +296,6 @@ int main(void)
 
   NVIC_SystemReset();
 }
-
-
-#if 0
-// Perform factory reset to erase Application + Data
-void adafruit_factory_reset(void)
-{
-  led_state(STATE_FACTORY_RESET_STARTED);
-
-  // clear all App Data if any
-  if ( DFU_APP_DATA_RESERVED )
-  {
-    nrfx_nvmc_page_erase(APPDATA_ADDR_START);
-  }
-
-  // Only need to erase the 1st page of Application code to make it invalid
-  nrfx_nvmc_page_erase(DFU_BANK_0_REGION_START);
-
-  // back to normal
-  led_state(STATE_FACTORY_RESET_FINISHED);
-}
-#endif
 
 /**
  * Initializes the SotdDevice by following SD specs section
