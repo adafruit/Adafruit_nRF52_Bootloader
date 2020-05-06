@@ -33,13 +33,10 @@
 uint32_t bootloader_init(void);
 
 /**@brief Function for validating application region in flash.
- * 
- * @param[in]  app_addr      Address to the region in flash where the application is stored.
- * 
  * @retval     true          If Application region is valid.
  * @retval     false         If Application region is not valid.
  */
-bool bootloader_app_is_valid(uint32_t app_addr);
+bool bootloader_app_is_valid(void);
 
 /**@brief Function for starting the Device Firmware Update.
  * 

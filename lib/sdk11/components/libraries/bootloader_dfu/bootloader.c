@@ -143,37 +143,32 @@ static void wait_for_events(void)
 }
 
 
-bool bootloader_app_is_valid(uint32_t app_addr)
+bool bootloader_app_is_valid(void)
 {
-  bootloader_settings_t const * p_bootloader_settings;
+  uint32_t const app_addr = DFU_BANK_0_REGION_START;
+  bootloader_settings_t const *p_bootloader_settings;
 
-    // There exists an application in CODE region 1.
-    if (*((uint32_t *)app_addr) == EMPTY_FLASH_MASK)
+  bool success = false;
+
+  bootloader_util_settings_get(&p_bootloader_settings);
+
+  // The application in CODE region 1 is flagged as valid during update.
+  if ( p_bootloader_settings->bank_0 == BANK_VALID_APP )
+  {
+    uint16_t image_crc = 0;
+
+    // A stored crc value of 0 indicates that CRC checking is not used.
+    if ( p_bootloader_settings->bank_0_crc != 0 )
     {
-        return false;
+      image_crc = crc16_compute((uint8_t*) app_addr,
+                                p_bootloader_settings->bank_0_size,
+                                NULL);
     }
 
-    bool success = false;
+    success = (image_crc == p_bootloader_settings->bank_0_crc);
+  }
 
-    bootloader_util_settings_get(&p_bootloader_settings);
-
-    // The application in CODE region 1 is flagged as valid during update.
-    if (p_bootloader_settings->bank_0 == BANK_VALID_APP)
-    {
-        uint16_t image_crc = 0;
-
-        // A stored crc value of 0 indicates that CRC checking is not used.
-        if (p_bootloader_settings->bank_0_crc != 0)
-        {
-            image_crc = crc16_compute((uint8_t *)app_addr,
-                                      p_bootloader_settings->bank_0_size,
-                                      NULL);
-        }
-
-        success = (image_crc == p_bootloader_settings->bank_0_crc);
-    }
-
-    return success;
+  return success;
 }
 
 
