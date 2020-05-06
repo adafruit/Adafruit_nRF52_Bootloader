@@ -284,8 +284,14 @@ int main(void)
 
   if (bootloader_app_is_valid() && !bootloader_dfu_sd_in_progress())
   {
-    // MBR must be init before start application
-    if ( is_sd_existed() && !sd_inited ) softdev_mbr_init();
+    if ( is_sd_existed() )
+    {
+      // MBR forward IRQ to SD (if not already)
+      if ( !sd_inited ) softdev_mbr_init();
+
+      // Make sure SD is disabled
+      sd_softdevice_disable();
+    }
 
     // clear in case we kept DFU_DBL_RESET_APP there
     (*dbl_reset_mem) = 0;
@@ -309,7 +315,7 @@ static uint32_t softdev_init(bool init_softdevice)
 {
   if (init_softdevice) softdev_mbr_init();
 
-  // map vector table to bootloader address
+  // Forward vector table to bootloader address so that we can handle BLE events
   APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
 
   // Enable Softdevice, Use Internal OSC to compatible with all boards

@@ -337,10 +337,6 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
 
 void bootloader_app_start(void)
 {
-  // If the applications CRC has been checked and passed, the magic number will be written and we
-  // can start the application safely.
-  if ( is_sd_existed() ) sd_softdevice_disable();
-
   // Disable all interrupts
   NVIC->ICER[0]=0xFFFFFFFF;
   NVIC->ICPR[0]=0xFFFFFFFF;
@@ -349,15 +345,17 @@ void bootloader_app_start(void)
   NVIC->ICPR[1]=0xFFFFFFFF;
 #endif
 
-  // default to boot right after MBR
-  uint32_t app_addr = MBR_SIZE;
+  uint32_t app_addr;
 
   if ( is_sd_existed() )
   {
+    // App starts after SoftDevice
     app_addr = SD_SIZE_GET(MBR_SIZE);
     sd_softdevice_vector_table_base_set(app_addr);
   }else
   {
+    // App starts right after MBR
+    app_addr = MBR_SIZE;
     sd_mbr_command_t command =
     {
       .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,
@@ -365,11 +363,9 @@ void bootloader_app_start(void)
     };
 
     sd_mbr_command(&command);
-
-    // VTOR as last resource ?
-    // SCB->VTOR = app_addr;
   }
 
+  // jump to app
   bootloader_util_app_start(app_addr);
 }
 
