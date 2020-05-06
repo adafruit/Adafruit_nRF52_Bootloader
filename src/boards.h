@@ -119,7 +119,7 @@ bool is_ota(void);
 #define PRINT_MESS(x)         printf("%s: %d: %s \n"   , __FUNCTION__, __LINE__, (char*)(x))
 #define PRINT_STR(x)          printf("%s: %d: " #x " = %s\n"   , __FUNCTION__, __LINE__, (char*)(x) )
 #define PRINT_INT(x)          printf("%s: %d: " #x " = %ld\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
-#define PRINT_HEX(x)          printf("%s: %d: " #x " = 0x%X\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
+#define PRINT_HEX(x)          printf("%s: %d: " #x " = 0x%lX\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
 
 #define PRINT_BUFFER(buf, n) \
   do {\

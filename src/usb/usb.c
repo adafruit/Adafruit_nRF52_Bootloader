@@ -66,7 +66,7 @@ void usb_init(bool cdc_only)
 #ifdef SOFTDEVICE_PRESENT
   uint8_t sd_en = false;
 
-  if ( SD_MAGIC_OK() )
+  if ( is_sd_existed() )
   {
     sd_softdevice_is_enabled(&sd_en);
   }

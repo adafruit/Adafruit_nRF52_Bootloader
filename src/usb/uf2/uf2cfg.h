@@ -8,16 +8,11 @@
 #define CFG_UF2_FLASH_SIZE              (1024*1024) // 1 MB
 
 // Softdevice Address Space
-#define CFG_UF2_SOFTDEVICE_ADDR_START   0
-#define CFG_UF2_SOFTDEVICE_ADDR_END     USER_FLASH_START
+#define CFG_UF2_SOFTDEVICE_ADDR_START   MBR_SIZE // skip MBR included in SD hex
+#define CFG_UF2_SOFTDEVICE_ADDR_END     SD_SIZE_GET(MBR_SIZE)
 
 // Application Address Space
-#ifdef SOFTDEVICE_PRESENT
-  #define USER_FLASH_START   (SD_FLASH_SIZE + MBR_SIZE)
-#else
-  #define USER_FLASH_START   0x1000 // MBR is still required
-#endif
-
+#define USER_FLASH_START                MBR_SIZE // skip MBR included in SD hex
 #define USER_FLASH_END                  0xAD000
 
 // Bootloader Address Space

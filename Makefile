@@ -340,7 +340,7 @@ erase:
 # flash SD only
 sd:
 	@echo Flashing: $(SD_HEX)
-	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset
+	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --sectorerase  --reset
 
 # flash MBR only
 mbr:
