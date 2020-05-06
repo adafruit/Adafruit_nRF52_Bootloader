@@ -52,7 +52,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms);
  *
  * @param[in]  app_addr      Address to the region where the application is stored.
  */
-void bootloader_app_start(uint32_t app_addr);
+void bootloader_app_start(void);
 
 /**@brief Function for retrieving the bootloader settings.
  *

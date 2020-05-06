@@ -189,6 +189,7 @@ int main(void)
   if (dfu_start) NRF_POWER->GPREGRET = 0;
 
   // Save bootloader version to pre-defined register, retrieved by application
+  // TODO move to CF2
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
 
   board_init();
@@ -214,7 +215,7 @@ int main(void)
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
 
-  bool const valid_app = bootloader_app_is_valid(DFU_BANK_0_REGION_START);
+  bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
   if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET())
@@ -282,20 +283,24 @@ int main(void)
   // Reset Board
   board_teardown();
 
-  // Jump to application if valid
-  if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
+  /* Jump to application if valid
+   * "Master Boot Record and SoftDevice initializaton procedure"
+   * - SD_MBR_COMMAND_INIT_SD (if not already)
+   * - sd_softdevice_disable()
+   * - sd_softdevice_vector_table_base_set(APP_ADDR)
+   * - jump to App reset
+   */
+
+  if (bootloader_app_is_valid() && !bootloader_dfu_sd_in_progress())
   {
-#ifdef SOFTDEVICE_PRESENT
     // MBR must be init before start application
-    if ( !sd_inited ) softdev_mbr_init();
-#endif
+    if ( is_sd_existed() && !sd_inited ) softdev_mbr_init();
 
     // clear in case we kept DFU_DBL_RESET_APP there
     (*dbl_reset_mem) = 0;
 
-    // Select a bank region to use as application region.
-    // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
-    bootloader_app_start(DFU_BANK_0_REGION_START);
+    // start application
+    bootloader_app_start();
   }
 
   NVIC_SystemReset();
@@ -323,7 +328,9 @@ void adafruit_factory_reset(void)
 #endif
 
 /**
- * Initializes the SoftDevice and the BLE event interrupt.
+ * Initializes the SotdDevice by following SD specs section
+ * "Master Boot Record and SoftDevice initializaton procedure"
+ *
  * @param[in] init_softdevice  true if SoftDevice should be initialized. The SoftDevice must only
  *                             be initialized if a chip reset has occured. Soft reset (jump ) from
  *                             application must not reinitialize the SoftDevice.

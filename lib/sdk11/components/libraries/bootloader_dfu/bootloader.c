@@ -36,13 +36,6 @@
 #include "tusb.h"
 #endif
 
-/**< Maximum number of interrupts available. (from IRQn_Type) */
-#if defined(NRF52832_XXAA)
-  #define MAX_NUMBER_INTERRUPTS  39
-#elif defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
-  #define MAX_NUMBER_INTERRUPTS  48
-#endif
-
 /**@brief Enumeration for specifying current bootloader status.
  */
 typedef enum
@@ -342,45 +335,42 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
     return err_code;
 }
 
-
-/**@brief Function for disabling all interrupts before jumping from bootloader to application.
- */
-static void interrupts_disable(void)
+void bootloader_app_start(void)
 {
-  for (uint32_t irq = 0; irq < MAX_NUMBER_INTERRUPTS; irq++)
-  {
-    NVIC_DisableIRQ((IRQn_Type)irq);
-  }
-}
+  // If the applications CRC has been checked and passed, the magic number will be written and we
+  // can start the application safely.
+  if ( is_sd_existed() ) sd_softdevice_disable();
 
-
-void bootloader_app_start(uint32_t app_addr)
-{
-#ifdef SOFTDEVICE_PRESENT
-    // If the applications CRC has been checked and passed, the magic number will be written and we
-    // can start the application safely.
-    APP_ERROR_CHECK ( sd_softdevice_disable() );
+  // Disable all interrupts
+  NVIC->ICER[0]=0xFFFFFFFF;
+  NVIC->ICPR[0]=0xFFFFFFFF;
+#if defined(__NRF_NVIC_ISER_COUNT) && __NRF_NVIC_ISER_COUNT == 2
+  NVIC->ICER[1]=0xFFFFFFFF;
+  NVIC->ICPR[1]=0xFFFFFFFF;
 #endif
 
-    interrupts_disable();
+  // default to boot right after MBR
+  uint32_t app_addr = MBR_SIZE;
 
-#if 0 // may need set forward irq
+  if ( is_sd_existed() )
+  {
+    app_addr = SD_SIZE_GET(MBR_SIZE);
+    sd_softdevice_vector_table_base_set(app_addr);
+  }else
+  {
     sd_mbr_command_t command =
     {
-        .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,
-        .params.irq_forward_address_set.address = MBR_SIZE,
+      .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,
+      .params.irq_forward_address_set.address = app_addr,
     };
 
     sd_mbr_command(&command);
-#endif
 
-#ifdef SOFTDEVICE_PRESENT
-    APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(app_addr) );
-#else
-    SCB->VTOR = app_addr;
-#endif
+    // VTOR as last resource ?
+    // SCB->VTOR = app_addr;
+  }
 
-    bootloader_util_app_start(app_addr);
+  bootloader_util_app_start(app_addr);
 }
 
 
