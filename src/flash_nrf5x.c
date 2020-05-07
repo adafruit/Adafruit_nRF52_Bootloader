@@ -37,6 +37,7 @@ void flash_nrf5x_flush (bool need_erase)
 {
   if ( _fl_addr == FLASH_CACHE_INVALID_ADDR ) return;
 
+  // skip the write if contents matches
   if ( memcmp(_fl_buf, (void *) _fl_addr, FLASH_PAGE_SIZE) != 0 )
   {
     // - nRF52832 dfu via uart can miss incoming byte when erasing because cpu is blocked for > 2ms.
