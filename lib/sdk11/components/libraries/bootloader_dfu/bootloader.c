@@ -196,7 +196,7 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
     {
         settings.bank_0_crc  = update_status.app_crc;
         settings.bank_0_size = update_status.app_size;
-        settings.bank_0      = BANK_VALID_APP;
+        settings.bank_0      = (update_status.app_size ? BANK_VALID_APP : BANK_INVALID_APP);
         settings.bank_1      = BANK_INVALID_APP;
 
         m_update_status      = BOOTLOADER_SETTINGS_SAVING;

@@ -138,7 +138,8 @@ typedef enum
     DFU_UPDATE_BOOT_COMPLETE,                                                                           /**< Status update complete.*/
     DFU_BANK_0_ERASED,                                                                                  /**< Status bank 0 erased.*/
     DFU_TIMEOUT,                                                                                        /**< Status timeout.*/
-    DFU_RESET                                                                                           /**< Status Reset to indicate current update procedure has been aborted and system should reset. */
+    DFU_RESET,                                                                                           /**< Status Reset to indicate current update procedure has been aborted and system should reset. */
+    DFU_UF2_BOOTLOADER_COMPLETE
 } dfu_update_status_code_t;
 
 /**@brief Structure holding DFU complete event.

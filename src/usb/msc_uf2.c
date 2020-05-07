@@ -183,7 +183,7 @@ void tud_msc_write10_complete_cb(uint8_t lun)
       }else
       {
         // update App
-        update_status.status_code = DFU_UF2_APP_COMPLETE;
+        update_status.status_code = DFU_UPDATE_APP_COMPLETE;
         update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
         update_status.app_size    = _wr_state.numBlocks*256;
 
@@ -193,8 +193,16 @@ void tud_msc_write10_complete_cb(uint8_t lun)
            * to stay compatible with DFU CDC interface. We re-calculate it based on written
            * address and its contents ( SD_MAGIC matches )
            */
-          update_status.app_size -= SD_SIZE_GET(MBR_SIZE);
+          update_status.app_size -= (SD_SIZE_GET(MBR_SIZE) - MBR_SIZE);
         }
+
+        if ( _wr_state.has_mbr )
+        {
+          // MBR write isn't counted app size as well
+          update_status.app_size -= MBR_SIZE;
+        }
+
+        PRINT_INT(update_status.app_size);
       }
 
       bootloader_dfu_update_process(update_status);

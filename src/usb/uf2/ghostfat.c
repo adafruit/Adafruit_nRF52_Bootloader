@@ -212,6 +212,7 @@ static uint32_t current_flash_size(void)
 void uf2_init(void)
 {
   uf2current_flash_sz = current_flash_size();
+  PRINT_INT(uf2current_flash_sz);
 }
 
 /*------------------------------------------------------------------*/
@@ -348,7 +349,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       /* Upgrading Application
        *
        * Although SoftDevice is considered as part of application and the flashing is the same with/without it.
-       * There are still 3 cases with slight differences in finishing procedure:
+       * There are still 4 cases with slight differences in finishing procedure:
        *  1. Application with SoftDevice:
        *      - starting address 0x0000
        *      - since MBR is included in SD Hex file (then uf2 file), we must skip it
@@ -357,6 +358,8 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *      - starting address is right after SD e.g 0x26000
        *    b. For running without SoftDevice e.g using other stack such as nimble or zephyr.
        *      - starting address is right after MBR 0x1000
+       *  3. SoftDevice only, should user somehow only flash with SD only. Bootloader mark app as invalid and wiil
+       *  back on bootloader mode after reset.
        *
        *                          -------------         -------------
        *                         |             |       |             |
@@ -377,13 +380,17 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
 
         // writing to SD Info struct is used as SD detector
-        if (bl->targetAddr == (SOFTDEVICE_INFO_STRUCT_ADDRESS & 0xff) ) state->has_sd = true;
+        if (bl->targetAddr == (SOFTDEVICE_INFO_STRUCT_ADDRESS & 0xFFFFFF00) )
+        {
+          state->has_sd = true;
+        }
 
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
       }else if ( bl->targetAddr < USER_FLASH_START )
       {
         // do nothing if writing to MBR
         // keep going as successful write
+        state->has_mbr = true;
       }else
       {
         return -1;
