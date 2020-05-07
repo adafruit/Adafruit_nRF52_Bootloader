@@ -156,19 +156,14 @@ static inline bool in_app_space (uint32_t addr)
   return USER_FLASH_START <= addr && addr < USER_FLASH_END;
 }
 
+static inline bool in_bootloader_space (uint32_t addr)
+{
+  return CFG_UF2_BOOTLOADER_ADDR_START <= addr && addr < CFG_UF2_BOOTLOADER_ADDR_END;
+}
+
 static inline bool in_uicr_space(uint32_t addr)
 {
   return addr == 0x10001000;
-}
-
-static inline bool in_bootloader_space (uint32_t addr)
-{
-  return USER_FLASH_END <= addr && addr < CFG_UF2_FLASH_SIZE;
-}
-
-static inline bool in_softdevice_space (uint32_t addr)
-{
-  return addr < USER_FLASH_START;
 }
 
 //--------------------------------------------------------------------+
@@ -183,7 +178,7 @@ static uint32_t current_flash_size(void)
   uint32_t flash_sz = 0;
 
   // return 1 block of 256 bytes
-  if ( !bootloader_app_is_valid(DFU_BANK_0_REGION_START) )
+  if ( !bootloader_app_is_valid() )
   {
     flash_sz = 256;
   }else
@@ -192,6 +187,9 @@ static uint32_t current_flash_size(void)
     bootloader_util_settings_get(&boot_setting);
 
     flash_sz = boot_setting->bank_0_size;
+
+    // Include SoftDevice (excluding MBR) for current.uf2
+    if ( is_sd_existed() ) flash_sz += (SD_SIZE_GET(MBR_SIZE) - MBR_SIZE);
 
     // Copy size must be multiple of 256 bytes
     // else we will got an issue copying current.uf2
@@ -344,30 +342,63 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   if ( !is_uf2_block(bl) ) return -1;
 
-  PRINTF("Addr = 0x%08lX, payloadSize = %ld, Family = 0x%08lX\n", bl->targetAddr, bl->payloadSize, bl->familyID);
-#if 0
-  uint32_t wr_addr;
-
   switch ( bl->familyID )
   {
     case CFG_UF2_FAMILY_ID:
-      // Upgrade application
-      // Directly write over application -- > Target address is the written address
-      if ( !in_app_space(bl->targetAddr) ) return -1;
+      /* Upgrading Application
+       *
+       * Although SoftDevice is considered as part of application and the flashing is the same with/without it.
+       * There are still 3 cases with slight differences in finishing procedure:
+       *  1. Application with SoftDevice:
+       *      - starting address 0x0000
+       *      - since MBR is included in SD Hex file (then uf2 file), we must skip it
+       *  2. Application only
+       *    a. For running with existing SoftDevice on the flash:
+       *      - starting address is right after SD e.g 0x26000
+       *    b. For running without SoftDevice e.g using other stack such as nimble or zephyr.
+       *      - starting address is right after MBR 0x1000
+       *
+       *                          -------------         -------------
+       *                         |             |       |             |
+       *                         | Bootloader  |       | Bootloader  |
+       *  BOOTLOADER_ADDR_START--|-------------|       |-------------|
+       *                         |             |       |             |
+       *                         |             |       |             |
+       *                         | Application | --->  |     New     |
+       *                         |             |       | Application |
+       *                         |             |       |             |
+       *                         |             |       |             |
+       *       USER_FLASH_START--|-------------|       |-------------|
+       *                         |     MBR     |       |     MBR     |
+       *                          -------------         -------------
+       */
+      if ( in_app_space(bl->targetAddr) )
+      {
+        PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
 
-      wr_addr = bl->targetAddr;
+        // writing to SD Info struct is used as SD detector
+        if (bl->targetAddr == (SOFTDEVICE_INFO_STRUCT_ADDRESS & 0xff) ) state->has_sd = true;
+
+        flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
+      }else if ( bl->targetAddr < USER_FLASH_START )
+      {
+        // do nothing if writing to MBR
+        // keep going as successful write
+      }else
+      {
+        return -1;
+      }
     break;
 
     case CFG_UF2_BOOTLOADER_ID:
-      /* Upgrading SoftDevice + Bootloader combo
+      /* Upgrading Bootloader (with/without SoftDevice)
        *
        * To prevent corruption/disconnection while transferring we don't directly write over
-       * SoftDevice and Bootloader. Instead SD + Bootloader is written to Application region.
-       * Once everything is received and verified.They are written to their respective address
+       * Bootloader. Instead Bootloader is written to Application region.
+       * Once everything is received and verified. It is written to its respective address
        *
-       * Note: to simplify the upgrade process, we ASSUME
-       *  - Bootloader size is fixed and is the same as the old bootloader
-       *  - New SoftDevice can has different size than the old one
+       * Note: to simplify the upgrade process, we ASSUME, Bootloader size is fixed and
+       * is the same as the old bootloader
        *
        *                         -------------         -------------         -------------
        *                        |             |       |             |     + |     New     |
@@ -376,42 +407,41 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *                        |             |       |    New      |  +    |             |
        *                        |             |       | Bootloader  | +     |             |
        *                        |             |       |  ++++++++   |       |             |
-       *                        | Application | --->  |             |       |  Invalid    |
-       *                        |             |       |             |       | Application |
-       *                        |             |       |  ++++++++   |       |             |
-       *                        |             |       |    New      |       |             |
-       *                        |             |       | SoftDevice  | +     |-------------|
-       *      USER_FLASH_START--|-------------|       |-------------|  +    |             |
-       *                        |             |       |             |   +   |             |
-       *                        |             |       |             |    +  |     New     |
-       *                        | SoftDevice  |       | SoftDevice  |     + | SoftDevice  |
+       *                        | Application | --->  |             |       |             |
+       *                        |             |       |             |       |             |
+       *                        |             |       |  ++++++++   |       |  ++++++++   |
+       *                        |             |       |    New      |       |    New      |
+       *                        |             |       | SoftDevice  |       | SoftDevice  |
+       *      USER_FLASH_START--|-------------|       |-------------|       |-------------|
+       *                        |     MBR     |       |     MBR     |       |     MBR     |
        *                         -------------         -------------         -------------
        */
-
       if ( in_uicr_space(bl->targetAddr) )
       {
         /* UCIR contains bootloader & MBR address as follow:
-         * - 0x10001014: for bootloader address
-         * - 0x10001018: for MBR
-         * Both values are fixed if bootloader size is not change
+         * - 0x10001014 bootloader address: only change of bootloader size changes
+         * - 0x10001018 MBR Params: mostly fixed
+         *
+         * WARNING: incorrect value of these UCIR will break device
          */
 
         // Nothing to do since bootloader size is fixed
         return 512;
       }
-      else if ( in_softdevice_space(bl->targetAddr) )
+      else if ( in_bootloader_space(bl->targetAddr) )
       {
         // Right above the old SoftDevice
-        wr_addr = USER_FLASH_START + bl->targetAddr;
       }
-      else if ( in_bootloader_space(bl->targetAddr) )
+      else if ( in_app_space(bl->targetAddr) )
       {
         // Right below the old Bootloader
         //wr_addr = USER_FLASH_START + bl->targetAddr;
+        // writing to SD Info struct is used as SD detector
+        // if (bl->targetAddr == SOFTDEVICE_INFO_STRUCT_ADDRESS) state->has_sd = true;
+
       }
       else
       {
-
         return -1;
       }
     break;
@@ -420,25 +450,10 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     default: return -1;
   }
 
-  (void) wr_addr;
-#endif
-
-  // only accept block with same family id
-  if ( (bl->familyID != CFG_UF2_FAMILY_ID) ) return -1;
-
-  if ( (bl->targetAddr < USER_FLASH_START) || (bl->targetAddr + bl->payloadSize > USER_FLASH_END) )
+  //------------- Update written blocks -------------//
+  if ( bl->numBlocks )
   {
-
-  }
-  else
-  {
-    //PRINTF("Write block at %x", bl->targetAddr);
-    flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
-  }
-
-  if ( state && bl->numBlocks )
-  {
-    // Update state num blocks
+    // Update state num blocks if needed
     if ( state->numBlocks != bl->numBlocks )
     {
       if ( bl->numBlocks >= MAX_BLOCKS || state->numBlocks )
@@ -460,13 +475,12 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       }
 
       // flush last blocks
+      // TODO numWritten can be smaller than numBlocks if return early
       if ( state->numWritten >= state->numBlocks )
       {
         flash_nrf5x_flush(true);
       }
     }
-
-    //PRINTF("wr %d=%d (of %d)", state->numWritten, bl->blockNo, bl->numBlocks);
   }
 
   return 512;

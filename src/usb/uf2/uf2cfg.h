@@ -7,10 +7,6 @@
 #define CFG_UF2_NUM_BLOCKS              8000        // at least 4,1 MB for FAT16
 #define CFG_UF2_FLASH_SIZE              (1024*1024) // 1 MB
 
-// Softdevice Address Space
-#define CFG_UF2_SOFTDEVICE_ADDR_START   MBR_SIZE // skip MBR included in SD hex
-#define CFG_UF2_SOFTDEVICE_ADDR_END     SD_SIZE_GET(MBR_SIZE)
-
 // Application Address Space
 #define USER_FLASH_START                MBR_SIZE // skip MBR included in SD hex
 #define USER_FLASH_END                  0xAD000

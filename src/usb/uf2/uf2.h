@@ -52,6 +52,8 @@ SOFTWARE.
 typedef struct {
     uint32_t numBlocks;
     uint32_t numWritten;
+    bool has_sd;            // if SD is included as part of uf2 file
+    bool update_bootloader; // if updating bootloader
     uint8_t writtenMask[MAX_BLOCKS / 8 + 1];
 } WriteState;
 
