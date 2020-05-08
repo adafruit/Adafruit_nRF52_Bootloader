@@ -127,18 +127,6 @@ void usb_teardown(void);
 #define BLEGATT_ATT_MTU_MAX             247
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
-// Adafruit for factory reset
-#define APPDATA_ADDR_START              (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
-
-#ifdef NRF52840_XXAA
-  // Flash 1024 KB
-  STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
-
-#else
-  // Flash 512 KB
-  STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
-#endif
-
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
