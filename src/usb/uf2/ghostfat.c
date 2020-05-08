@@ -183,27 +183,8 @@ static uint32_t current_flash_size(void)
     flash_sz = 256;
   }else
   {
-    bootloader_settings_t const * boot_setting;
-    bootloader_util_settings_get(&boot_setting);
-
-    flash_sz = boot_setting->bank_0_size;
-
-    // Include SoftDevice (excluding MBR) for current.uf2
-    if ( is_sd_existed() ) flash_sz += (SD_SIZE_GET(MBR_SIZE) - MBR_SIZE);
-
-    // Copy size must be multiple of 256 bytes
-    // else we will got an issue copying current.uf2
-    if (flash_sz & 0xff)
-    {
-      flash_sz = (flash_sz & ~0xff) + 256;
-    }
-
-    // if bank0 size is not valid, happens when flashed with jlink
-    // use maximum application size
-    if ( (flash_sz == 0) || (flash_sz == 0xFFFFFFFFUL) )
-    {
-      flash_sz = (USER_FLASH_END-USER_FLASH_START);
-    }
+    // Use full application size for simplicity
+    flash_sz = (USER_FLASH_END-USER_FLASH_START);
   }
 
   return flash_sz;
