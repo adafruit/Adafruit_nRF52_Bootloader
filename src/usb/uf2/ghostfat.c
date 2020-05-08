@@ -99,7 +99,7 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 #define NUM_FILES          (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
-#define UF2_SIZE           (uf2current_flash_sz * 2)
+#define UF2_SIZE           ((USER_FLASH_END-USER_FLASH_START) * 2)
 #define UF2_SECTORS        (UF2_SIZE / 512)
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
@@ -169,31 +169,10 @@ static inline bool in_uicr_space(uint32_t addr)
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
-static uint32_t uf2current_flash_sz = 0;
-
-
-// get current.uf2 flash size in bytes, round up to 256 bytes
-static uint32_t current_flash_size(void)
-{
-  uint32_t flash_sz = 0;
-
-  // return 1 block of 256 bytes
-  if ( !bootloader_app_is_valid() )
-  {
-    flash_sz = 256;
-  }else
-  {
-    // Use full application size for simplicity
-    flash_sz = (USER_FLASH_END-USER_FLASH_START);
-  }
-
-  return flash_sz;
-}
 
 void uf2_init(void)
 {
-  uf2current_flash_sz = current_flash_size();
-  PRINT_INT(uf2current_flash_sz);
+  // nothing to do
 }
 
 /*------------------------------------------------------------------*/
@@ -289,7 +268,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->magicStart1 = UF2_MAGIC_START1;
                 bl->magicEnd = UF2_MAGIC_END;
                 bl->blockNo = sectionIdx;
-                bl->numBlocks = uf2current_flash_sz / 256;
+                bl->numBlocks = (UF2_SIZE/2) / 256;
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
                 bl->flags = UF2_FLAG_FAMILYID;
