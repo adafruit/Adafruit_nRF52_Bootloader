@@ -138,12 +138,20 @@ static void wait_for_events(void)
 
 bool bootloader_app_is_valid(void)
 {
-  uint32_t const app_addr = DFU_BANK_0_REGION_START;
-  bootloader_settings_t const *p_bootloader_settings;
-
   bool success = false;
+  uint32_t const app_addr = DFU_BANK_0_REGION_START;
 
+  bootloader_settings_t const *p_bootloader_settings;
   bootloader_util_settings_get(&p_bootloader_settings);
+
+  enum { EMPTY_FLASH = 0xFFFFFFFFUL };
+
+  // Application is invalid if first 2 words are all 0xFFFFFFF
+  if ( *((uint32_t *)app_addr    ) == EMPTY_FLASH &&
+       *((uint32_t *)(app_addr+4)) == EMPTY_FLASH )
+  {
+    return false;
+  }
 
   // The application in CODE region 1 is flagged as valid during update.
   if ( p_bootloader_settings->bank_0 == BANK_VALID_APP )
