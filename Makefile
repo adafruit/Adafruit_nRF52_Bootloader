@@ -95,6 +95,9 @@ endif
 # all files in src
 C_SRC += $(wildcard src/*.c)
 
+# all files in boards
+C_SRC += $(wildcard src/boards/*.c)
+
 # all sources files in specific board
 C_SRC += $(wildcard src/boards/$(BOARD)/*.c)
 
@@ -164,11 +167,10 @@ ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
 
 # src
 IPATH += src
+IPATH += src/boards
 IPATH += src/boards/$(BOARD)
-
 IPATH += src/cmsis/include
 IPATH += src/usb
-IPATH += src/boards
 IPATH += $(TUSB_PATH)
 
 # nrfx
