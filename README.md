@@ -41,7 +41,9 @@ This repository depends on the following submodules:
 Note that `tinyusb` also includes `nrfx` as a submodule, so you need
 to initialize and update  submodules with the `--recursive`` flag.
 
-Clone this repo with following commands, or fork it for your own development
+Clone this repo with following commands, or fork it for your own development.
+
+Note: make sure [Git LFS](https://git-lfs.github.com/) support is [installed](https://help.github.com/en/github/managing-large-files/installing-git-large-file-storage).
 
 ```
 git clone https://github.com/adafruit/Adafruit_nRF52_Bootloader
