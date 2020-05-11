@@ -155,8 +155,8 @@ int main(void)
 {
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
-  // Note: skip it for now since this will prevent us to change the size of bootloader
-   bootloader_mbr_addrs_populate();
+  // Note: skip it for now since this will prevent us to change the size of bootloader in the future
+  // bootloader_mbr_addrs_populate();
 
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
   bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);
