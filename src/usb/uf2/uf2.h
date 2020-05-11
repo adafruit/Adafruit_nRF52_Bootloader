@@ -52,9 +52,12 @@ SOFTWARE.
 typedef struct {
     uint32_t numBlocks;
     uint32_t numWritten;
-    bool has_sd;            // if uf2 includes SD
-    bool has_mbr;           // if uf2 includes MBR
-    bool update_bootloader; // if updating bootloader
+
+    bool aborted;             // aborting update and reset
+    uint32_t boot_addr_ucir;  // if ucir bootloader address value
+    uint32_t boot_size;       // new bootloader size
+    uint32_t boot_stored_addr;  // temporary base address storing new bootloader
+
     uint8_t writtenMask[MAX_BLOCKS / 8 + 1];
 } WriteState;
 

@@ -153,10 +153,10 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
-  // Populate Boot Address and MBR Param if not already
-  // Happens if flashing SD hex that overwrite current MBR
+  // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
-  bootloader_mbr_addrs_populate();
+  // Note: skip it for now since this will prevent us to change the size of bootloader
+   bootloader_mbr_addrs_populate();
 
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
   bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);

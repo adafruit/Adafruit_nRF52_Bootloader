@@ -162,7 +162,21 @@ void tud_msc_write10_complete_cb(uint8_t lun)
 {
   static bool first_write = true;
 
-  if ( _wr_state.numBlocks )
+  // abort the DFU, uf2 block failed integrity check
+  if ( _wr_state.aborted )
+  {
+    // aborted and reset
+    PRINTF("Aborted\r\n");
+
+    dfu_update_status_t update_status;
+    memset(&update_status, 0, sizeof(dfu_update_status_t ));
+    update_status.status_code = DFU_RESET;
+
+    bootloader_dfu_update_process(update_status);
+
+    led_state(STATE_WRITING_FINISHED);
+  }
+  else if ( _wr_state.numBlocks )
   {
     // Start LED writing pattern with first write
     if (first_write)
@@ -177,13 +191,53 @@ void tud_msc_write10_complete_cb(uint8_t lun)
       dfu_update_status_t update_status;
       memset(&update_status, 0, sizeof(dfu_update_status_t ));
 
-      if ( _wr_state.update_bootloader )
+      if ( _wr_state.boot_addr_ucir )
       {
         // update bootloader
+        update_status.status_code = DFU_RESET;
+
+        if ( 0 == memcmp((uint8_t*) _wr_state.boot_stored_addr, (uint8_t*) BOOTLOADER_ADDR_START, _wr_state.boot_size) )
+        {
+          // skip if there is no bootloader change
+        }else
+        {
+          PRINTF("Coyping bootloader to 0x%08lX from 0x%08lX with size = 0x%lX\r\n",
+                 _wr_state.boot_addr_ucir, _wr_state.boot_stored_addr, _wr_state.boot_size);
+
+          // erase an change UCIR bootloader
+//          if (  )
+
+          sd_mbr_command_t command =
+          {
+            .command = SD_MBR_COMMAND_COPY_BL,
+            .params.copy_bl.bl_src = (uint32_t*) _wr_state.boot_stored_addr,
+            .params.copy_bl.bl_len = _wr_state.boot_size/4 // size in words
+          };
+
+          if ( NRF_SUCCESS != sd_mbr_command(&command) )
+          {
+            PRINTF("Failed to execute SD_MBR_COMMAND_COPY_BL, we are about to bricked\r\n");
+          }else
+          {
+            PRINTF("SD_MBR_COMMAND_COPY_BL successfully\r\n");
+          }
+
+          NRFX_DELAY_MS(10);
+//          update_status.status_code = DFU_UPDATE_BOOT_COMPLETE;
+//          update_status.bl_size     = _wr_state.boot_size;
+//
+//          // Reuse the DFU combined SD + Bootloader with SD Size = 0
+//          update_status.sd_image_start = _wr_state.boot_stored_addr;
+//          update_status.sd_size        = 0;
+        }
+
+        PRINTF("bootloader update complete\r\n");
       }else
       {
         // update App
         update_status.status_code = DFU_UPDATE_APP_COMPLETE;
+
+        PRINTF("Application update complete\r\n");
       }
 
       bootloader_dfu_update_process(update_status);

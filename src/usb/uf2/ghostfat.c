@@ -151,20 +151,39 @@ static inline bool is_uf2_block (UF2_Block const *bl)
          (bl->payloadSize == 256) && !(bl->targetAddr & 0xff);
 }
 
+// used when upgrading application
 static inline bool in_app_space (uint32_t addr)
 {
   return USER_FLASH_START <= addr && addr < USER_FLASH_END;
 }
 
+// used when upgrading bootloader
 static inline bool in_bootloader_space (uint32_t addr)
 {
-  return CFG_UF2_BOOTLOADER_ADDR_START <= addr && addr < CFG_UF2_BOOTLOADER_ADDR_END;
+  return BOOTLOADER_LOWEST_ADDR <= addr && addr < BOOTLOADER_ADDR_END;
 }
 
+static inline uint32_t get_new_bootloader_size(uint32_t numblocks)
+{
+  // -1 for UCIR block
+  uint32_t new_size = (numblocks-1)*256;
+
+  // round up to 4K
+  uint32_t mod4k = new_size & 0xFFFUL;
+  if ( mod4k )  new_size += 4096 - mod4k;
+
+  return new_size;
+}
+
+// used when upgrading bootloader
 static inline bool in_uicr_space(uint32_t addr)
 {
   return addr == 0x10001000;
 }
+
+//static inline get_new_bootloader_base(uint32_t )
+
+static inline uint32_t max32 (uint32_t x, uint32_t y) { return (x > y) ? x : y; }
 
 //--------------------------------------------------------------------+
 //
@@ -284,14 +303,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
  *------------------------------------------------------------------*/
 
 /**
- * Write an uf2 block wrapped by 512 sector. Writing behavior is different when upgrading:
- * - Application
- *    - current App is erased and flash with new firmware with same starting address
- *
- * - SoftDevice + Bootloader
- *    - Current App is erased, contents of SD + bootloader is written to App starting address
- *    - Trigger the SD + Bootloader migration
- *
+ * Write an uf2 block wrapped by 512 sector.
  * @return number of bytes processed, only 3 following values
  *  -1 : if not an uf2 block
  * 512 : write is successful
@@ -308,18 +320,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     case CFG_UF2_FAMILY_ID:
       /* Upgrading Application
        *
-       * Although SoftDevice is considered as part of application and the flashing is the same with/without it.
-       * There are still 4 cases with slight differences in finishing procedure:
-       *  1. Application with SoftDevice:
-       *      - starting address 0x0000
-       *      - since MBR is included in SD Hex file (then uf2 file), we must skip it
-       *  2. Application only
-       *    a. For running with existing SoftDevice on the flash:
-       *      - starting address is right after SD e.g 0x26000
-       *    b. For running without SoftDevice e.g using other stack such as nimble or zephyr.
-       *      - starting address is right after MBR 0x1000
-       *  3. SoftDevice only, should user somehow only flash with SD only. Bootloader mark app as invalid and wiil
-       *  back on bootloader mode after reset.
+       * SoftDevice is considered as part of application and can be (or not) included in uf2.
        *
        *                          -------------         -------------
        *                         |             |       |             |
@@ -338,19 +339,12 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       if ( in_app_space(bl->targetAddr) )
       {
         PRINTF("Write addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
-
-        // writing to SD Info struct is used as SD detector
-        if (bl->targetAddr == (SOFTDEVICE_INFO_STRUCT_ADDRESS & 0xFFFFFF00) )
-        {
-          state->has_sd = true;
-        }
-
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
       }else if ( bl->targetAddr < USER_FLASH_START )
       {
-        // do nothing if writing to MBR
+        // do nothing if writing to MBR, occurs when SD hex is included
         // keep going as successful write
-        state->has_mbr = true;
+        PRINTF("skip writing to MBR\r\n");
       }else
       {
         return -1;
@@ -358,14 +352,23 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     break;
 
     case CFG_UF2_BOOTLOADER_ID:
-      /* Upgrading Bootloader (with/without SoftDevice)
+      /* Upgrading Bootloader
+       *
+       * Along with bootloader code, UCIR (at 0x1000100) is also included containing
+       * 0x10001014 (bootloader address), and 0x10001018 (MBR Params address).
+       *
+       * Since SoftDevice is not part of Bootloader, it must not be included as part of uf2 file.
+       * To prevent generating uf2 from incorrect bin/hex. Bootloader imposes a hard code limit size
+       * of 64 KB (end address is fixed at MBR Params). If uf2 contains any address lower than this
+       * (except UCIR) the update is aborted.
        *
        * To prevent corruption/disconnection while transferring we don't directly write over
-       * Bootloader. Instead Bootloader is written to Application region.
-       * Once everything is received and verified. It is written to its respective address
+       * Bootloader. Instead it is written to highest possible address in Application
+       * region. Once everything is received and verified, it is safely activated using
+       * MBR COPY BL command.
        *
-       * Note: to simplify the upgrade process, we ASSUME, Bootloader size is fixed and
-       * is the same as the old bootloader
+       * Note: part of the existing application can be affected when updating bootloader.
+       * TODO May be worth to have some kind crc/application integrity checking
        *
        *                         -------------         -------------         -------------
        *                        |             |       |             |     + |     New     |
@@ -374,41 +377,68 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
        *                        |             |       |    New      |  +    |             |
        *                        |             |       | Bootloader  | +     |             |
        *                        |             |       |  ++++++++   |       |             |
-       *                        | Application | --->  |             |       |             |
+       *                        |             | --->  |             |       |             |
        *                        |             |       |             |       |             |
-       *                        |             |       |  ++++++++   |       |  ++++++++   |
-       *                        |             |       |    New      |       |    New      |
-       *                        |             |       | SoftDevice  |       | SoftDevice  |
+       *                        | Application |       | Application |       | Application |
+       *                        |             |       |             |       |             |
+       *                        |             |       |             |       |             |
        *      USER_FLASH_START--|-------------|       |-------------|       |-------------|
        *                        |     MBR     |       |     MBR     |       |     MBR     |
        *                         -------------         -------------         -------------
        */
+      PRINTF("addr = 0x%08lX, block = %ld (%ld of %ld)\r\n", bl->targetAddr, bl->blockNo, state->numWritten, bl->numBlocks);
+
+      uint32_t const new_boot_size = get_new_bootloader_size(bl->numBlocks);
+
+      // Offset write the new bootloader address.
+      // The offset is the current bootloader size or the new size whichever is larger
+      uint32_t const offset_addr = max32(new_boot_size, BOOTLOADER_ADDR_END-BOOTLOADER_ADDR_START);
+
       if ( in_uicr_space(bl->targetAddr) )
       {
         /* UCIR contains bootloader & MBR address as follow:
-         * - 0x10001014 bootloader address: only change of bootloader size changes
+         * - 0x10001014 bootloader address: only change if bootloader size changes
          * - 0x10001018 MBR Params: mostly fixed
          *
-         * WARNING: incorrect value of these UCIR will break device
+         * WARNING: incorrect value of these UCIR will brick device
          */
+        uint32_t ucir_boot_addr;
+        uint32_t ucir_mbr_param;
 
-        // Nothing to do since bootloader size is fixed
-        return 512;
-      }
-      else if ( in_bootloader_space(bl->targetAddr) )
-      {
-        // Right above the old SoftDevice
-      }
-      else if ( in_app_space(bl->targetAddr) )
-      {
-        // Right below the old Bootloader
-        //wr_addr = USER_FLASH_START + bl->targetAddr;
-        // writing to SD Info struct is used as SD detector
-        // if (bl->targetAddr == SOFTDEVICE_INFO_STRUCT_ADDRESS) state->has_sd = true;
+        memcpy(&ucir_boot_addr, bl->data + 0x14, 4);
+        memcpy(&ucir_mbr_param, bl->data + 0x18, 4);
 
+        PRINT_HEX(ucir_boot_addr);
+        PRINT_HEX(ucir_mbr_param);
+
+        PRINT_HEX(new_boot_size);
+
+        // Check MBR params is fixed and prohibited to change and
+        // Bootloader address against its new size
+        if ( (ucir_mbr_param != BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS) ||
+             (ucir_boot_addr != BOOTLOADER_ADDR_END - new_boot_size) )
+        {
+          PRINTF("Incorrect UCIR value");
+          state->aborted = true;
+          return -1;
+        }else
+        {
+          // Good to go, save the boot address
+          state->boot_addr_ucir   = ucir_boot_addr;
+          state->boot_size        = new_boot_size;
+          state->boot_stored_addr = BOOTLOADER_ADDR_END - (new_boot_size + offset_addr);
+
+          PRINT_HEX(state->boot_stored_addr);
+        }
+      }
+      else if ( in_bootloader_space(bl->targetAddr) && (bl->targetAddr >= BOOTLOADER_LOWEST_ADDR) )
+      {
+//        PRINT_HEX(offset_addr);
+        flash_nrf5x_write(bl->targetAddr-offset_addr, bl->data, bl->payloadSize, true);
       }
       else
       {
+        state->aborted = true;
         return -1;
       }
     break;
@@ -446,6 +476,12 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       if ( state->numWritten >= state->numBlocks )
       {
         flash_nrf5x_flush(true);
+
+        // Failed if update bootloader without UCIR value
+        if ( (bl->familyID == CFG_UF2_BOOTLOADER_ID) && !state->boot_addr_ucir )
+        {
+          state->aborted = true;
+        }
       }
     }
   }
