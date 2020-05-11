@@ -191,44 +191,30 @@ void tud_msc_write10_complete_cb(uint8_t lun)
       dfu_update_status_t update_status;
       memset(&update_status, 0, sizeof(dfu_update_status_t ));
 
-      if ( _wr_state.boot_addr_ucir )
+      if ( _wr_state.update_bootloader )
       {
-        // update bootloader
+        // update bootloader always end with reset
         update_status.status_code = DFU_RESET;
 
-        if ( 0 == memcmp((uint8_t*) _wr_state.boot_stored_addr, (uint8_t*) BOOTLOADER_ADDR_START, _wr_state.boot_size) )
-        {
-          // skip if there is no bootloader change
-        }else
-        {
-          PRINTF("Coyping bootloader to 0x%08lX from 0x%08lX with size = 0x%lX\r\n",
-                 _wr_state.boot_addr_ucir, _wr_state.boot_stored_addr, _wr_state.boot_size);
+        // Location of current stored new bootloader
+        uint32_t * new_bootloader = (uint32_t *) BOOTLOADER_ADDR_NEW_RECIEVED;
 
-          // erase an change UCIR bootloader
-//          if (  )
+        PRINT_HEX(new_bootloader);
+
+        // skip if there is no bootloader change
+        if ( memcmp(new_bootloader, (uint8_t*) BOOTLOADER_ADDR_START, DFU_BL_IMAGE_MAX_SIZE) )
+        {
+          PRINTF("Coyping new bootloader\r\n");
 
           sd_mbr_command_t command =
           {
             .command = SD_MBR_COMMAND_COPY_BL,
-            .params.copy_bl.bl_src = (uint32_t*) _wr_state.boot_stored_addr,
-            .params.copy_bl.bl_len = _wr_state.boot_size/4 // size in words
+            .params.copy_bl.bl_src = new_bootloader,
+            .params.copy_bl.bl_len = DFU_BL_IMAGE_MAX_SIZE/4 // size in words
           };
 
-          if ( NRF_SUCCESS != sd_mbr_command(&command) )
-          {
-            PRINTF("Failed to execute SD_MBR_COMMAND_COPY_BL, we are about to bricked\r\n");
-          }else
-          {
-            PRINTF("SD_MBR_COMMAND_COPY_BL successfully\r\n");
-          }
-
-          NRFX_DELAY_MS(10);
-//          update_status.status_code = DFU_UPDATE_BOOT_COMPLETE;
-//          update_status.bl_size     = _wr_state.boot_size;
-//
-//          // Reuse the DFU combined SD + Bootloader with SD Size = 0
-//          update_status.sd_image_start = _wr_state.boot_stored_addr;
-//          update_status.sd_size        = 0;
+          // on success, COPY_BL won't return but run the new bootloader right away.
+          sd_mbr_command(&command);
         }
 
         PRINTF("bootloader update complete\r\n");

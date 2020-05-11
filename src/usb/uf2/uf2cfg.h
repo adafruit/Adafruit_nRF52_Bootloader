@@ -11,13 +11,14 @@
 #define USER_FLASH_START          MBR_SIZE // skip MBR included in SD hex
 #define USER_FLASH_END            0xAD000
 
-// Current Bootloader start address
-#define BOOTLOADER_ADDR_START     BOOTLOADER_REGION_START
+// Due to SD_MBR_COMMAND_COPY_BL, bootloader start address cannot
+// be changed with DFU, and only done with a debugger
 
-// Bootloader end address which is always fixed
-#define BOOTLOADER_ADDR_END       BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS
+// Bootloader start address
+#define BOOTLOADER_ADDR_START         BOOTLOADER_REGION_START
 
-// 64 KB is hard coded limit size for bootloader when updating.
-// This is used as sanity check to make sure user doesn't make mistake
-// converting wrong bin/hex into uf2 file for bootloader.
-#define BOOTLOADER_LOWEST_ADDR    (BOOTLOADER_ADDR_END - 64*1024)
+// Bootloader end address
+#define BOOTLOADER_ADDR_END           BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS
+
+// Address where new bootloader is written before activation (skip application data)
+#define BOOTLOADER_ADDR_NEW_RECIEVED  (USER_FLASH_END-DFU_BL_IMAGE_MAX_SIZE)

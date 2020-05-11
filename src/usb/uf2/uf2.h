@@ -54,9 +54,8 @@ typedef struct {
     uint32_t numWritten;
 
     bool aborted;             // aborting update and reset
-    uint32_t boot_addr_ucir;  // if ucir bootloader address value
-    uint32_t boot_size;       // new bootloader size
-    uint32_t boot_stored_addr;  // temporary base address storing new bootloader
+    bool update_bootloader;   // if updating bootloader (else app)
+    bool has_uicr;            // if containing uicr data
 
     uint8_t writtenMask[MAX_BLOCKS / 8 + 1];
 } WriteState;
