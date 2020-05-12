@@ -416,11 +416,11 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
         // Should be Softdevice
         flash_nrf5x_write(bl->targetAddr, bl->data, bl->payloadSize, true);
       }
+#endif
       else if ( bl->targetAddr < USER_FLASH_START )
       {
         PRINTF("skip writing to MBR\r\n");
       }
-#endif
       else
       {
         state->aborted = true;

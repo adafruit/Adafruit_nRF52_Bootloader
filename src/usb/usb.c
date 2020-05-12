@@ -24,11 +24,8 @@
 
 #include "nrfx.h"
 #include "nrfx_power.h"
-
-#ifdef SOFTDEVICE_PRESENT
 #include "nrf_sdm.h"
 #include "nrf_soc.h"
-#endif
 
 #include "nrf_usbd.h"
 #include "tusb.h"
@@ -63,7 +60,6 @@ void usb_init(bool cdc_only)
   // We need to invoke the handler based on the status initially
   uint32_t usb_reg;
 
-#ifdef SOFTDEVICE_PRESENT
   uint8_t sd_en = false;
 
   if ( is_sd_existed() )
@@ -79,7 +75,6 @@ void usb_init(bool cdc_only)
 
     sd_power_usbregstatus_get(&usb_reg);
   }else
-#endif
   {
     // Power module init
     const nrfx_power_config_t pwr_cfg = { 0 };
