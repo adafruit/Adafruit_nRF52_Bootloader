@@ -47,7 +47,7 @@ void flash_nrf5x_flush (bool need_erase)
     // Note: MSC uf2 does not erase page in advance like dfu serial
     if ( need_erase )
     {
-      PRINTF("Erase 0x%08lX\r\n", _fl_addr);
+      PRINTF("Erase and ");
       nrfx_nvmc_page_erase(_fl_addr);
     }
 

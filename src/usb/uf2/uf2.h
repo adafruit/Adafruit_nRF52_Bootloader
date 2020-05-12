@@ -56,6 +56,7 @@ typedef struct {
     bool aborted;             // aborting update and reset
     bool update_bootloader;   // if updating bootloader (else app)
     bool has_uicr;            // if containing uicr data
+    bool boot_id_matches;     // if bootloader id in cf2 config matches our VID/PID
 
     uint8_t writtenMask[MAX_BLOCKS / 8 + 1];
 } WriteState;

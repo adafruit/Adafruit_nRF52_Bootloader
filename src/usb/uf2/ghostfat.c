@@ -1,6 +1,7 @@
 #include "compile_date.h"
 
 #include "uf2.h"
+#include "configkeys.h"
 #include "flash_nrf5x.h"
 #include <string.h>
 
@@ -139,6 +140,10 @@ static FAT_BootBlock const BootBlock = {
     .VolumeLabel          = UF2_VOLUME_LABEL,
     .FilesystemIdentifier = "FAT16   ",
 };
+
+// Use bootloaderConfig to detect BOOTLOADER ID when updating bootloader
+// This helps to prevent incorrect uf2 from other boards.
+extern const uint32_t bootloaderConfig[];
 
 //--------------------------------------------------------------------+
 //
@@ -406,6 +411,37 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       }
       else if ( in_bootloader_space(bl->targetAddr) )
       {
+        // Bootloader CF2 config
+        if ( !state->boot_id_matches && (bl->targetAddr >= ((uint32_t) bootloaderConfig)) )
+        {
+          // check if bootloader ID matches current VID/PID
+          for (uint32_t i=0; i < bl->payloadSize; i += 8)
+          {
+            uint32_t key;
+            memcpy(&key, bl->data+i, 4);
+
+            if ( key == CFG_BOOTLOADER_BOARD_ID )
+            {
+              uint32_t value;
+              memcpy(&value, bl->data+i+4, 4);
+
+              PRINTF("Bootloader ID = 0x%08lX and ", value);
+              if ( value == ((USB_DESC_VID << 16) | USB_DESC_UF2_PID) )
+              {
+                PRINTF("matches our VID/PID\r\n");
+                state->boot_id_matches = true;
+                break;
+              }
+              else
+              {
+                PRINTF("DOES NOT mismatches our VID/PID\r\n");
+                state->aborted = true;
+                return -1;
+              }
+            }
+          }
+        }
+
         // Offset to write the new bootloader address (skipping the App Data)
         uint32_t const offset_addr = BOOTLOADER_ADDR_END-USER_FLASH_END;
         flash_nrf5x_write(bl->targetAddr-offset_addr, bl->data, bl->payloadSize, true);
