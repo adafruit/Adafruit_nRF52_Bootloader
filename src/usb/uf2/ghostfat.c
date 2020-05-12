@@ -279,7 +279,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->targetAddr = addr;
                 bl->payloadSize = 256;
                 bl->flags = UF2_FLAG_FAMILYID;
-                bl->familyID = CFG_UF2_FAMILY_ID;
+                bl->familyID = CFG_UF2_FAMILY_APP_ID;
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
@@ -305,7 +305,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   switch ( bl->familyID )
   {
-    case CFG_UF2_FAMILY_ID:
+    case CFG_UF2_FAMILY_APP_ID:
       /* Upgrading Application
        *
        * SoftDevice is considered as part of application and can be (or not) included in uf2.
@@ -339,7 +339,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       }
     break;
 
-    case CFG_UF2_BOOTLOADER_ID:
+    case CFG_UF2_FAMILY_BOOT_ID:
       /* Upgrading Bootloader
        *
        * - For simplicity, the Bootloader Start Address is fixed for now.

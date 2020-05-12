@@ -355,7 +355,7 @@ $(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE).hex
 # Bootolader only uf2
 $(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo CR $(notdir $@)
-	python lib/uf2/utils/uf2conv.py -f 0x239A0029 -c -o $@ $^
+	python lib/uf2/utils/uf2conv.py -f 0xd663823c -c -o $@ $^
 
 # merge bootloader and sd hex together
 $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE).hex
