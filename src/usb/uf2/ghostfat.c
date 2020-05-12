@@ -174,10 +174,6 @@ static inline bool in_uicr_space(uint32_t addr)
   return addr == 0x10001000;
 }
 
-//static inline get_new_bootloader_base(uint32_t )
-
-static inline uint32_t max32 (uint32_t x, uint32_t y) { return (x > y) ? x : y; }
-
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
