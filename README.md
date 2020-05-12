@@ -79,6 +79,12 @@ To create a UF2 image from a .hex file:
 uf2conv.py firmware.hex -c -f 0xADA52840
 ```
 
+To create a UF2 image for bootloader from a .hex file using separated family of **0xd663823c**
+
+```
+uf2conv.py bootloader.hex -c -f 0xd663823c
+```
+
 ## Burn & Upgrade with pre-built binaries
 
 You can burn and/or upgrade the bootloader with either a J-link or DFU (serial) to a specific pre-built binary version
