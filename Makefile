@@ -19,8 +19,8 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 
-# linker by MCU and SoftDevice eg. nrf52840_s140_v6.ld
-LD_FILE      = linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
+# linker by MCU eg. nrf52840.ld
+LD_FILE      = linker/$(MCU_SUB_VARIANT).ld
 
 GIT_VERSION = $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
