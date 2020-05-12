@@ -144,6 +144,7 @@ bool is_ota(void)
 
 void softdev_mbr_init(void)
 {
+  PRINTF("SD_MBR_COMMAND_INIT_SD\r\n");
   sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
   sd_mbr_command(&com);
 }
@@ -153,6 +154,8 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
+  PRINTF("Bootlaoder Start\r\n");
+
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
   // Note: skip it for now since this will prevent us to change the size of bootloader in the future
@@ -271,6 +274,7 @@ int main(void)
 
   if (bootloader_app_is_valid() && !bootloader_dfu_sd_in_progress())
   {
+    PRINTF("App is valid\r\n");
     if ( is_sd_existed() )
     {
       // MBR forward IRQ to SD (if not already)

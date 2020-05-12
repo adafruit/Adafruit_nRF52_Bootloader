@@ -358,11 +358,14 @@ void bootloader_app_start(void)
 
   if ( is_sd_existed() )
   {
+    PRINTF("SoftDevice exist\r\n");
     // App starts after SoftDevice
     app_addr = SD_SIZE_GET(MBR_SIZE);
     fwd_ret = sd_softdevice_vector_table_base_set(app_addr);
   }else
   {
+    PRINTF("SoftDevice not exist\r\n");
+
     // App starts right after MBR
     app_addr = MBR_SIZE;
     sd_mbr_command_t command =
@@ -377,6 +380,8 @@ void bootloader_app_start(void)
   // unlikely failed to forward vector table, manually set forward address
   if ( fwd_ret != NRF_SUCCESS )
   {
+    PRINT_HEX(fwd_ret);
+
     // MBR use first 4-bytes of SRAM to store foward address
     *(uint32_t *)(0x20000000) = app_addr;
   }

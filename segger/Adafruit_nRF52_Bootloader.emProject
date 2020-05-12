@@ -332,9 +332,9 @@
           <file file_name="../src/boards/feather_nrf52840_express/board.h" />
           <file file_name="../src/boards/feather_nrf52840_express/pinconfig.c" />
         </folder>
+        <file file_name="../src/boards/boards.c" />
+        <file file_name="../src/boards/boards.h" />
       </folder>
-      <file file_name="../src/boards.c" />
-      <file file_name="../src/boards.h" />
       <folder
         Name="cmsis"
         exclude=""

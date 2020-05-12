@@ -210,7 +210,6 @@ ifeq ($(DEBUG), 1)
 	
 	CFLAGS += -ggdb -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 	IPATH += $(RTT_SRC)/RTT
-  C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT_printf.c
   C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
 endif
 
@@ -314,7 +313,58 @@ endif
 .PHONY: all clean flash dfu-flash sd gdbflash gdb
 
 # default target to build
-all: $(BUILD)/$(OUT_FILE)-nosd.out $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).uf2
+all: $(BUILD)/$(OUT_FILE).out $(BUILD)/$(OUT_FILE)-nosd.hex $(BUILD)/$(OUT_FILE)-nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
+
+#------------------- Compile rules -------------------
+
+# Create build directories
+$(BUILD):
+	@$(MK) $@
+
+clean:
+	@$(RM) $(BUILD)
+
+# Create objects from C SRC files
+$(BUILD)/%.o: %.c
+	@echo CC $(notdir $<)
+	@$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
+
+# Assemble files
+$(BUILD)/%.o: %.S
+	@echo AS $(notdir $<)
+	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
+
+# Link
+$(BUILD)/$(OUT_FILE).out: $(BUILD) $(OBJECTS)
+	@echo LD $(notdir $@)
+	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
+	@$(SIZE) $@
+
+#------------------- Binary generator -------------------
+
+# Create hex file (no sd, no mbr)
+$(BUILD)/$(OUT_FILE).hex: $(BUILD)/$(OUT_FILE).out
+	@echo CR $(notdir $@)
+	@$(OBJCOPY) -O ihex $< $@
+
+# Hex file with mbr (still no SD)
+$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE).hex
+	@echo CR $(notdir $@)
+	@python lib/intelhex/scripts/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
+
+# Bootolader only uf2
+$(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
+	@echo CR $(notdir $@)
+	python lib/uf2/utils/uf2conv.py -f 0x239A0029 -c -o $@ $^
+
+# merge bootloader and sd hex together
+$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE).hex
+	@echo CR $(notdir $@)
+	@python lib/intelhex/scripts/hexmerge.py -o $@ $< $(SD_HEX)
+
+# Create pkg zip file for bootloader+SD combo to use with DFU CDC
+$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE).hex
+	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
 
 #------------------- Flash target -------------------
 
@@ -342,7 +392,7 @@ erase:
 # flash SD only
 sd:
 	@echo Flashing: $(SD_HEX)
-	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --sectorerase  --reset
+	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --sectorerase --reset
 
 # flash MBR only
 mbr:
@@ -353,53 +403,5 @@ gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<
 	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
 
-gdb: $(BUILD)/$(OUT_FILE)-nosd.out
+gdb: $(BUILD)/$(OUT_FILE).out
 	$(GDB_BMP) $<
-
-#------------------- Compile rules -------------------
-
-# Create build directories
-$(BUILD):
-	@$(MK) $@
-
-clean:
-	@$(RM) $(BUILD)
-
-# Create objects from C SRC files
-$(BUILD)/%.o: %.c
-	@echo CC $(notdir $<)
-	@$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
-
-# Assemble files
-$(BUILD)/%.o: %.S
-	@echo AS $(notdir $<)
-	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
-
-# Link
-$(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
-	@echo LD $(notdir $@)
-	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
-	@$(SIZE) $@
-
-#------------------- Binary generator -------------------
-
-# Create hex file
-$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
-	@echo CR $(notdir $@)
-	@$(OBJCOPY) -O ihex $< $@
-
-# merge bootloader and sd hex together
-$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@echo CR $(notdir $@)
-	@mergehex -q -m $< $(SD_HEX) -o $@
-
-$(BUILD)/$(MERGED_FILE).uf2: $(BUILD)/$(MERGED_FILE).hex
-	@echo CR $(notdir $@)
-	python lib/uf2/utils/uf2conv.py -f 0x239A0029 -c -o  $@ $^
-
-# Create pkg zip file for bootloader+SD combo to use with DFU Serial
-.PHONY: genpkg
-genpkg: $(BUILD)/$(MERGED_FILE).zip
-
-$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@

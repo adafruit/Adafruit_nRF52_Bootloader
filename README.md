@@ -20,33 +20,20 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - Particle Xenon
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
-application images to the flash drive to load new firmware.
-See https://github.com/Microsoft/uf2 and https://github.com/adafruit/uf2-samdx1
-for more information.
+application images to the flash drive to load new firmware. See https://github.com/Microsoft/uf2 and https://github.com/adafruit/uf2-samdx1 for more information.
 
-[adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil),
-a modified version of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil),
-is required to perform DFU.
-Install `python3` if it is not installed already and run this command to install adafruit-nrfutil from PyPi:
+[adafruit-nrfutil](https://github.com/adafruit/Adafruit_nRF52_nrfutil), a modified version of [Nordic nrfutil](https://github.com/NordicSemiconductor/pc-nrfutil), is required to perform DFU. Install `python3` if it is not installed already and run this command to install adafruit-nrfutil from PyPi:
 
 ```
 $ pip3 install --user adafruit-nrfutil
 ```
-
-This repository depends on the following submodules:
-
-- [tinyusb](https://github.com/hathach/tinyusb)
-- [nrfx](https://github.com/NordicSemiconductor/nrfx)
-
-Note that `tinyusb` also includes `nrfx` as a submodule, so you need
-to initialize and update  submodules with the `--recursive`` flag.
 
 Clone this repo with following commands, or fork it for your own development
 
 ```
 git clone https://github.com/adafruit/Adafruit_nRF52_Bootloader
 cd Adafruit_nRF52_Bootloader
-git submodule update --init --recursive
+git submodule update --init
 ```
 
 ## Features
@@ -111,6 +98,7 @@ Prerequisites
 
 - ARM GCC
 - Nordic's [nRF5x Command Line Tools](https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF-Command-Line-Tools)
+- [Python IntelHex](https://pypi.org/project/IntelHex/)
 
 To build:
 
