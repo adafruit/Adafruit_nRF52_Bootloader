@@ -152,10 +152,17 @@ the variable `CROSS_COMPILE` as below:
 $ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
 ```
 
-#### 2. `mergehex: No such file or directory`
+#### 2. `ModuleNotFoundError: No module named 'intelhex'`
 
-Make sure that `mergehex` is available from the command-line. This binary is
-part of Nordic's nRF5x Command Line Tools.
+Install python-intelhex with
+
+```
+pip install intelhex
+```
+
+
+
+
 
 #### 3. `make: nrfjprog: No such file or directory`
 
