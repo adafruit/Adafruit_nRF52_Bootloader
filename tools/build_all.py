@@ -18,7 +18,8 @@ build_separator = '-' * 74
 # All supported boards
 all_boards = []
 for entry in os.scandir("src/boards"):
-    all_boards.append(entry.name)
+    if entry.is_dir():
+        all_boards.append(entry.name)
 all_boards.sort()
 
 #sha, version = build_info.get_version_info()
