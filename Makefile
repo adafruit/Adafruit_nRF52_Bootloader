@@ -350,7 +350,7 @@ $(BUILD)/$(OUT_FILE).hex: $(BUILD)/$(OUT_FILE).out
 # Hex file with mbr (still no SD)
 $(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE).hex
 	@echo CR $(notdir $@)
-	@python lib/intelhex/scripts/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
+	@python tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
 
 # Bootolader only uf2
 $(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
@@ -360,7 +360,7 @@ $(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
 # merge bootloader and sd hex together
 $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE).hex
 	@echo CR $(notdir $@)
-	@python lib/intelhex/scripts/hexmerge.py -o $@ $< $(SD_HEX)
+	@python tools/hexmerge.py -o $@ $< $(SD_HEX)
 
 # Create pkg zip file for bootloader+SD combo to use with DFU CDC
 $(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE).hex
