@@ -28,7 +28,7 @@ MEMORY
   DBL_RESET (rwx) :  ORIGIN = 0x20007F7C, LENGTH = 0x04
 
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
-   *  from application to bootloader when using buttonluss DFU OTA. */
+   *  from application to bootloader when using buttonless DFU OTA. */
   NOINIT (rwx) :  ORIGIN = 0x20007F80, LENGTH = 0x80
 
 

@@ -4,6 +4,7 @@
 #include "configkeys.h"
 #include "flash_nrf5x.h"
 #include <string.h>
+#include <stdio.h>
 
 #include "bootloader_settings.h"
 #include "bootloader.h"
@@ -67,13 +68,12 @@ struct TextFile {
 #define STR0(x) #x
 #define STR(x) STR0(x)
 
-const char infoUf2File[] = //
+char infoUf2File[128*3] =
     "UF2 Bootloader " UF2_VERSION "\r\n"
     "Model: " UF2_PRODUCT_NAME "\r\n"
-    "Board-ID: " UF2_BOARD_ID "\r\n"
-    "Date: " __DATE__ "\r\n";
+    "Board-ID: " UF2_BOARD_ID "\r\n";
 
-const char indexFile[] = //
+const char indexFile[] =
     "<!doctype html>\n"
     "<html>"
     "<body>"
@@ -83,17 +83,17 @@ const char indexFile[] = //
     "</body>"
     "</html>\n";
 
-// WARNING -- code presumes only one NULL .content for .UF2 file
-//            and requires it be the last element of the array
 static struct TextFile const info[] = {
     {.name = "INFO_UF2TXT", .content = infoUf2File},
     {.name = "INDEX   HTM", .content = indexFile},
-    {.name = "CURRENT UF2"},
+
+    // current.uf2 must be the last element and its content must be NULL
+    {.name = "CURRENT UF2", .content = NULL},
 };
 
-// WARNING -- code presumes each non-UF2 file content fits in single sector
-//            Cannot programmatically statically assert .content length
-//            for each element above.
+// code presumes each non-UF2 file content fits in single sector
+// Cannot programmatically statically assert .content length
+// for each element above.
 STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 
 
@@ -180,7 +180,24 @@ static inline bool in_uicr_space(uint32_t addr)
 
 void uf2_init(void)
 {
-  // nothing to do
+  strcat(infoUf2File, "SoftDevice: ");
+
+  if ( is_sd_existed() )
+  {
+    uint32_t const sd_id      = SD_ID_GET(MBR_SIZE);
+    uint32_t const sd_version = SD_VERSION_GET(MBR_SIZE);
+
+    uint32_t const ver1 = sd_version / 1000000;
+    uint32_t const ver2 = (sd_version % 1000000)/1000;
+    uint32_t const ver3 = sd_version % 1000;
+
+    sprintf(infoUf2File + strlen(infoUf2File), "S%lu version %lu.%lu.%lu\r\n", sd_id, ver1, ver2, ver3);
+  }else
+  {
+    strcat(infoUf2File, "not found\r\n");
+  }
+
+  strcat(infoUf2File, "Date: " __DATE__ "\r\n");
 }
 
 /*------------------------------------------------------------------*/
@@ -258,9 +275,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
             d->updateTime       = __DOSTIME__;
             d->updateDate       = __DOSDATE__;
             d->startCluster     = startCluster & 0xFF;
-            // WARNING -- code presumes only one NULL .content for .UF2 file
-            //            and requires it be the last element of the array
-            d->size = inf->content ? strlen(inf->content) : UF2_SIZE;
+            d->size = (inf->content ? strlen(inf->content) : UF2_SIZE);
         }
 
     } else {
