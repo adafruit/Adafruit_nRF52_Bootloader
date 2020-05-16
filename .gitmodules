@@ -1,6 +1,6 @@
 [submodule "tinyusb"]
 	path = lib/tinyusb
-	url = https://github.com/hathach/tinyusb.git
+	url = https://github.com/meshtastic/tinyusb.git
 [submodule "lib/nrfx"]
 	path = lib/nrfx
 	url = https://github.com/NordicSemiconductor/nrfx.git
