@@ -65,9 +65,31 @@ struct TextFile {
 
 #define NUM_FAT_BLOCKS CFG_UF2_NUM_BLOCKS
 
-#define RESERVED_SECTORS   1
-#define ROOT_DIR_SECTORS   4
-#define SECTORS_PER_FAT    ((NUM_FAT_BLOCKS * 2 + 511) / 512)
+#define BPB_SECTOR_SIZE           ( 512)
+#define BPB_SECTORS_PER_CLUSTER   (   1)
+#define BPB_RESERVED_SECTORS      (   1)
+#define BPB_NUMBER_OF_FATS        (   2)
+#define BPB_ROOT_DIR_ENTRIES      (  64)
+// Static assertions ensure CFG_UF2_NUM_BLOCKS will result in a valid file system.
+#define BPB_TOTAL_SECTORS         CFG_UF2_NUM_BLOCKS // Configuration ... up to 0x10209 / 0x101e9?
+#define BPB_MEDIA_DESCRIPTOR_BYTE (0xF8)
+#define FAT_ENTRY_SIZE            (2)
+#define FAT_ENTRIES_PER_SECTOR    (BPB_SECTOR_SIZE / FAT_ENTRY_SIZE)
+// NOTE: MS specification explicitly allows FAT to be larger than necessary
+#define BPB_SECTORS_PER_FAT       ( (BPB_TOTAL_SECTORS / FAT_ENTRIES_PER_SECTOR) + \
+                                   ((BPB_TOTAL_SECTORS % FAT_ENTRIES_PER_SECTOR) ? 1 : 0))
+#define DIRENTRIES_PER_SECTOR     (BPB_SECTOR_SIZE/sizeof(DirEntry))
+#define ROOT_DIR_SECTORS          (BPB_ROOT_DIR_ENTRIES/DIRENTRIES_PER_SECTOR)
+
+STATIC_ASSERT(BPB_SECTOR_SIZE                              ==       512); // GhostFAT does not support other sector sizes (currently)
+STATIC_ASSERT(BPB_SECTORS_PER_CLUSTER                      ==         1); // GhostFAT presumes one sector == one cluster (for simplicity)
+STATIC_ASSERT(BPB_NUMBER_OF_FATS                           ==         2); // FAT highest compatibility
+STATIC_ASSERT(sizeof(DirEntry)                             ==        32); // FAT requirement
+STATIC_ASSERT(BPB_SECTOR_SIZE % sizeof(DirEntry)           ==         0); // FAT requirement
+STATIC_ASSERT(BPB_ROOT_DIR_ENTRIES % DIRENTRIES_PER_SECTOR ==         0); // FAT requirement
+STATIC_ASSERT(BPB_SECTOR_SIZE * BPB_SECTORS_PER_CLUSTER    <= (32*1024)); // FAT requirement (64k+ has known compatibility problems)
+
+STATIC_ASSERT(ROOT_DIR_SECTORS                             ==         4); // Not required ... just validating equal to prior code
 
 #define STR0(x) #x
 #define STR(x) STR0(x)
@@ -94,12 +116,12 @@ static struct TextFile const info[] = {
     // current.uf2 must be the last element and its content must be NULL
     {.name = "CURRENT UF2", .content = NULL},
 };
+// FAT requires a final unused entry
+STATIC_ASSERT(ARRAY_SIZE(info)        < BPB_ROOT_DIR_ENTRIES);
 
-// code presumes each non-UF2 file content fits in single sector
-// Cannot programmatically statically assert .content length
-// for each element above.
-STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
-
+// GhostFAT presumes each non-UF2 file content fits in single sector
+STATIC_ASSERT(ARRAY_SIZE(infoUf2File) < BPB_SECTOR_SIZE);
+STATIC_ASSERT(ARRAY_SIZE(indexFile)   < BPB_SECTOR_SIZE);
 
 #define NUM_FILES          (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
@@ -109,28 +131,27 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
 
-#define START_FAT0         RESERVED_SECTORS
-#define START_FAT1         (START_FAT0 + SECTORS_PER_FAT)
-#define START_ROOTDIR      (START_FAT1 + SECTORS_PER_FAT)
+#define START_FAT0         BPB_RESERVED_SECTORS
+#define START_FAT1         (START_FAT0 + BPB_SECTORS_PER_FAT)
+#define START_ROOTDIR      (START_FAT1 + BPB_SECTORS_PER_FAT)
 #define START_CLUSTERS     (START_ROOTDIR + ROOT_DIR_SECTORS)
 
+STATIC_ASSERT(NUM_DIRENTRIES < BPB_ROOT_DIR_ENTRIES);
 // all directory entries must fit in a single sector
 // because otherwise current code overflows buffer
-#define DIRENTRIES_PER_SECTOR (512/sizeof(DirEntry))
-
-STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTORS);
+STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR);
 
 static FAT_BootBlock const BootBlock = {
     .JumpInstruction      = {0xeb, 0x3c, 0x90},
     .OEMInfo              = "UF2 UF2 ",
     .SectorSize           = 512,
     .SectorsPerCluster    = 1,
-    .ReservedSectors      = RESERVED_SECTORS,
+    .ReservedSectors      = BPB_RESERVED_SECTORS,
     .FATCopies            = 2,
     .RootDirectoryEntries = (ROOT_DIR_SECTORS * DIRENTRIES_PER_SECTOR),
     .TotalSectors16       = NUM_FAT_BLOCKS - 2,
     .MediaDescriptor      = 0xF8,
-    .SectorsPerFAT        = SECTORS_PER_FAT,
+    .SectorsPerFAT        = BPB_SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
     .PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
@@ -226,8 +247,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
     } else if (block_no < START_ROOTDIR) {  // Requested FAT table sector
         sectionIdx -= START_FAT0;
         // logval("sidx", sectionIdx);
-        if (sectionIdx >= SECTORS_PER_FAT)
-            sectionIdx -= SECTORS_PER_FAT; // second FAT is same as the first...
+        if (sectionIdx >= BPB_SECTORS_PER_FAT)
+            sectionIdx -= BPB_SECTORS_PER_FAT; // second FAT is same as the first...
         if (sectionIdx == 0) {
             data[0] = 0xf8; // first FAT entry must match BPB MediaDescriptor
             // WARNING -- code presumes only one NULL .content for .UF2 file
