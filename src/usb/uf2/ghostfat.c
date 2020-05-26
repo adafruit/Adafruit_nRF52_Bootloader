@@ -63,8 +63,6 @@ struct TextFile {
 //
 //--------------------------------------------------------------------+
 
-#define NUM_FAT_BLOCKS CFG_UF2_NUM_BLOCKS
-
 #define BPB_SECTOR_SIZE           ( 512)
 #define BPB_SECTORS_PER_CLUSTER   (   1)
 #define BPB_RESERVED_SECTORS      (   1)
@@ -156,8 +154,8 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerCluster    = BPB_SECTORS_PER_CLUSTER,
     .ReservedSectors      = BPB_RESERVED_SECTORS,
     .FATCopies            = BPB_NUMBER_OF_FATS,
-    .RootDirectoryEntries = (ROOT_DIR_SECTOR_COUNT * DIRENTRIES_PER_SECTOR),
-    .TotalSectors16       = NUM_FAT_BLOCKS - 2,
+    .RootDirectoryEntries = BPB_ROOT_DIR_ENTRIES,
+    .TotalSectors16       = BPB_TOTAL_SECTORS,
     .MediaDescriptor      = BPB_MEDIA_DESCRIPTOR_BYTE,
     .SectorsPerFAT        = BPB_SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
@@ -178,10 +176,13 @@ extern const uint32_t bootloaderConfig[];
 //--------------------------------------------------------------------+
 static inline bool is_uf2_block (UF2_Block const *bl)
 {
-  return (bl->magicStart0 == UF2_MAGIC_START0) && (bl->magicStart1 == UF2_MAGIC_START1) &&
+  return (bl->magicStart0 == UF2_MAGIC_START0) &&
+         (bl->magicStart1 == UF2_MAGIC_START1) &&
          (bl->magicEnd == UF2_MAGIC_END) &&
-         (bl->flags & UF2_FLAG_FAMILYID) && !(bl->flags & UF2_FLAG_NOFLASH) &&
-         (bl->payloadSize == 256) && !(bl->targetAddr & 0xff);
+         (bl->flags & UF2_FLAG_FAMILYID) &&
+         !(bl->flags & UF2_FLAG_NOFLASH) &&
+         (bl->payloadSize == 256) &&
+         !(bl->targetAddr & 0xff);
 }
 
 // used when upgrading application
@@ -235,10 +236,11 @@ void padded_memcpy (char *dst, char const *src, int len)
 {
   for ( int i = 0; i < len; ++i )
   {
-    if ( *src )
+    if ( *src ) {
       *dst = *src++;
-    else
+    } else {
       *dst = ' ';
+    }
     dst++;
   }
 }
@@ -340,7 +342,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
  * Write an uf2 block wrapped by 512 sector.
  * @return number of bytes processed, only 3 following values
  *  -1 : if not an uf2 block
- * 512 : write is successful
+ * 512 : write is successful (BPB_SECTOR_SIZE == 512)
  *   0 : is busy with flashing, tinyusb stack will call write_block again with the same parameters later on
  */
 int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
