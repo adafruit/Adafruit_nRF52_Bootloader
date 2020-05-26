@@ -68,8 +68,7 @@ struct TextFile {
 #define BPB_RESERVED_SECTORS      (   1)
 #define BPB_NUMBER_OF_FATS        (   2)
 #define BPB_ROOT_DIR_ENTRIES      (  64)
-// #define BPB_TOTAL_SECTORS         CFG_UF2_NUM_BLOCKS
-#define BPB_TOTAL_SECTORS         (0x101dd) // 0x101dd is absolute max at current code commit
+#define BPB_TOTAL_SECTORS         CFG_UF2_NUM_BLOCKS // 0x101dd is absolute max at current code commit
 #define BPB_MEDIA_DESCRIPTOR_BYTE (0xF8)
 #define FAT_ENTRY_SIZE            (2)
 #define FAT_ENTRIES_PER_SECTOR    (BPB_SECTOR_SIZE / FAT_ENTRY_SIZE)
@@ -163,11 +162,12 @@ static FAT_BootBlock const BootBlock = {
     .ReservedSectors      = BPB_RESERVED_SECTORS,
     .FATCopies            = BPB_NUMBER_OF_FATS,
     .RootDirectoryEntries = BPB_ROOT_DIR_ENTRIES,
-    .TotalSectors16       = BPB_TOTAL_SECTORS,
+    .TotalSectors16       = (BPB_TOTAL_SECTORS > 0xFFFF) ? 0 : BPB_TOTAL_SECTORS,
     .MediaDescriptor      = BPB_MEDIA_DESCRIPTOR_BYTE,
     .SectorsPerFAT        = BPB_SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
+    .TotalSectors32       = (BPB_TOTAL_SECTORS > 0xFFFF) ? BPB_TOTAL_SECTORS : 0,
     .PhysicalDriveNum     = 0x80, // to match MediaDescriptor of 0xF8
     .ExtendedBootSig      = 0x29,
     .VolumeSerialNumber   = 0x00420042,
