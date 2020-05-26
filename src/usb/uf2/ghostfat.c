@@ -68,8 +68,8 @@ struct TextFile {
 #define BPB_RESERVED_SECTORS      (   1)
 #define BPB_NUMBER_OF_FATS        (   2)
 #define BPB_ROOT_DIR_ENTRIES      (  64)
-// Static assertions ensure CFG_UF2_NUM_BLOCKS will result in a valid file system.
-#define BPB_TOTAL_SECTORS         CFG_UF2_NUM_BLOCKS // Configuration ... up to 0x10209 / 0x101e9?
+// #define BPB_TOTAL_SECTORS         CFG_UF2_NUM_BLOCKS
+#define BPB_TOTAL_SECTORS         (0x101dd) // 0x101dd is absolute max at current code commit
 #define BPB_MEDIA_DESCRIPTOR_BYTE (0xF8)
 #define FAT_ENTRY_SIZE            (2)
 #define FAT_ENTRIES_PER_SECTOR    (BPB_SECTOR_SIZE / FAT_ENTRY_SIZE)
@@ -124,6 +124,17 @@ STATIC_ASSERT(ROOT_DIR_SECTOR_COUNT >= REQUIRED_ROOT_DIRECTORY_SECTORS);        
 STATIC_ASSERT(NUM_DIRENTRIES < (DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTOR_COUNT)); // FAT requirement -- end directory with unused entry
 STATIC_ASSERT(NUM_DIRENTRIES < BPB_ROOT_DIR_ENTRIES);                            // FAT requirement -- Ensures BPB reserves sufficient entries for all files
 STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR); // GhostFAT bug workaround -- else, code overflows buffer
+
+#define NUM_SECTORS_IN_DATA_REGION (BPB_TOTAL_SECTORS - BPB_RESERVED_SECTORS - (BPB_NUMBER_OF_FATS * BPB_SECTORS_PER_FAT) - ROOT_DIR_SECTOR_COUNT)
+#define CLUSTER_COUNT              (NUM_SECTORS_IN_DATA_REGION / BPB_SECTORS_PER_CLUSTER)
+
+// Ensure cluster count results in a valid FAT16 volume!
+STATIC_ASSERT( CLUSTER_COUNT >= 0x0FF5 && CLUSTER_COUNT < 0xFFF5 );
+
+// Many existing FAT implementations have small (1-16) off-by-one style errors
+// So, avoid being within 32 of those limits for even greater compatibility.
+STATIC_ASSERT( CLUSTER_COUNT >= 0x1015 && CLUSTER_COUNT < 0xFFD5 );
+
 
 #define UF2_FIRMWARE_BYTES_PER_SECTOR 256
 #define TRUE_USER_FLASH_SIZE (USER_FLASH_END-USER_FLASH_START)
