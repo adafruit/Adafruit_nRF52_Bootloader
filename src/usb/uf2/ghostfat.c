@@ -79,7 +79,7 @@ struct TextFile {
 #define BPB_SECTORS_PER_FAT       ( (BPB_TOTAL_SECTORS / FAT_ENTRIES_PER_SECTOR) + \
                                    ((BPB_TOTAL_SECTORS % FAT_ENTRIES_PER_SECTOR) ? 1 : 0))
 #define DIRENTRIES_PER_SECTOR     (BPB_SECTOR_SIZE/sizeof(DirEntry))
-#define ROOT_DIR_SECTORS          (BPB_ROOT_DIR_ENTRIES/DIRENTRIES_PER_SECTOR)
+#define ROOT_DIR_SECTOR_COUNT     (BPB_ROOT_DIR_ENTRIES/DIRENTRIES_PER_SECTOR)
 
 STATIC_ASSERT(BPB_SECTOR_SIZE                              ==       512); // GhostFAT does not support other sector sizes (currently)
 STATIC_ASSERT(BPB_SECTORS_PER_CLUSTER                      ==         1); // GhostFAT presumes one sector == one cluster (for simplicity)
@@ -125,8 +125,8 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile)   < BPB_SECTOR_SIZE);
 #define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
 #define REQUIRED_ROOT_DIRECTORY_SECTORS ( ((NUM_DIRENTRIES+1) / DIRENTRIES_PER_SECTOR) + \
                                          (((NUM_DIRENTRIES+1) % DIRENTRIES_PER_SECTOR) ? 1 : 0))
-STATIC_ASSERT(NUM_DIRENTRIES < (DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTORS)); // Need at least one terminating (unused) entry
-STATIC_ASSERT(ROOT_DIR_SECTORS >= REQUIRED_ROOT_DIRECTORY_SECTORS); // Ensures BPB reserves sufficient entries for files
+STATIC_ASSERT(ROOT_DIR_SECTOR_COUNT >= REQUIRED_ROOT_DIRECTORY_SECTORS); // Ensures BPB reserves sufficient entries for files
+STATIC_ASSERT(NUM_DIRENTRIES < (DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTOR_COUNT)); // Need at least one terminating (unused) entry
 STATIC_ASSERT(NUM_DIRENTRIES < BPB_ROOT_DIR_ENTRIES);
 // all directory entries must fit in a single sector
 // because otherwise current code overflows buffer
@@ -143,10 +143,10 @@ STATIC_ASSERT(TRUE_USER_FLASH_SIZE % UF2_FIRMWARE_BYTES_PER_SECTOR == 0);
 #define UF2_FIRST_SECTOR   ((NUM_FILES + 1) * BPB_SECTORS_PER_CLUSTER) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    ((UF2_FIRST_SECTOR + UF2_SECTORS - 1) * BPB_SECTORS_PER_CLUSTER)
 
-#define START_FAT0         BPB_RESERVED_SECTORS
-#define START_FAT1         (START_FAT0 + BPB_SECTORS_PER_FAT)
-#define START_ROOTDIR      (START_FAT1 + BPB_SECTORS_PER_FAT)
-#define START_CLUSTERS     (START_ROOTDIR + ROOT_DIR_SECTORS)
+#define FS_START_FAT0_SECTOR      BPB_RESERVED_SECTORS
+#define FS_START_FAT1_SECTOR      (FS_START_FAT0_SECTOR + BPB_SECTORS_PER_FAT)
+#define FS_START_ROOTDIR_SECTOR   (FS_START_FAT1_SECTOR + BPB_SECTORS_PER_FAT)
+#define FS_START_CLUSTERS_SECTOR  (FS_START_ROOTDIR_SECTOR + ROOT_DIR_SECTOR_COUNT)
 
 
 static FAT_BootBlock const BootBlock = {
@@ -156,7 +156,7 @@ static FAT_BootBlock const BootBlock = {
     .SectorsPerCluster    = BPB_SECTORS_PER_CLUSTER,
     .ReservedSectors      = BPB_RESERVED_SECTORS,
     .FATCopies            = BPB_NUMBER_OF_FATS,
-    .RootDirectoryEntries = (ROOT_DIR_SECTORS * DIRENTRIES_PER_SECTOR),
+    .RootDirectoryEntries = (ROOT_DIR_SECTOR_COUNT * DIRENTRIES_PER_SECTOR),
     .TotalSectors16       = NUM_FAT_BLOCKS - 2,
     .MediaDescriptor      = BPB_MEDIA_DESCRIPTOR_BYTE,
     .SectorsPerFAT        = BPB_SECTORS_PER_FAT,
@@ -252,8 +252,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
         data[510] = 0x55; // Always at offsets 510/511, even when BPB_SECTOR_SIZE is larger
         data[511] = 0xaa; // Always at offsets 510/511, even when BPB_SECTOR_SIZE is larger
         // logval("data[0]", data[0]);
-    } else if (block_no < START_ROOTDIR) {  // Requested FAT table sector
-        sectionIdx -= START_FAT0;
+    } else if (block_no < FS_START_ROOTDIR_SECTOR) {  // Requested FAT table sector
+        sectionIdx -= FS_START_FAT0_SECTOR;
         // logval("sidx", sectionIdx);
         if (sectionIdx >= BPB_SECTORS_PER_FAT) {
             sectionIdx -= BPB_SECTORS_PER_FAT; // second FAT is same as the first...
@@ -273,9 +273,9 @@ void read_block(uint32_t block_no, uint8_t *data) {
             if (UF2_FIRST_SECTOR <= v && v <= UF2_LAST_SECTOR)
                 ((uint16_t *)(void *)data)[i] = v == UF2_LAST_SECTOR ? 0xffff : v + 1;
         }
-    } else if (block_no < START_CLUSTERS) { // Requested root directory sector
+    } else if (block_no < FS_START_CLUSTERS_SECTOR) { // Requested root directory sector
 
-        sectionIdx -= START_ROOTDIR;
+        sectionIdx -= FS_START_ROOTDIR_SECTOR;
 
         DirEntry *d = (void *)data;
         int remainingEntries = DIRENTRIES_PER_SECTOR;
@@ -309,7 +309,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
         }
 
     } else {
-        sectionIdx -= START_CLUSTERS;
+        sectionIdx -= FS_START_CLUSTERS_SECTOR;
         if (sectionIdx < NUM_FILES - 1) {
             memcpy(data, info[sectionIdx].content, strlen(info[sectionIdx].content));
         } else { // generate the UF2 file data on-the-fly
