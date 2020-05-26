@@ -300,11 +300,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
             d->createTime       = __DOSTIME__;
             d->createDate       = __DOSDATE__;
             d->lastAccessDate   = __DOSDATE__;
-            d->highStartCluster = startCluster >> 8; // BUGBUG -- shouldn't this be 16?
+            d->highStartCluster = startCluster >> 16;
             // DIR_WrtTime and DIR_WrtDate must be supported
             d->updateTime       = __DOSTIME__;
             d->updateDate       = __DOSDATE__;
-            d->startCluster     = startCluster & 0xFF; // BUGBUG -- shouldn't this be 0xFFFF?
+            d->startCluster     = startCluster & 0xFFFF;
             d->size = (inf->content ? strlen(inf->content) : UF2_SIZE);
         }
 
