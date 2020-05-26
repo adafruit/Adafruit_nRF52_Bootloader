@@ -68,7 +68,7 @@ struct TextFile {
 #define BPB_RESERVED_SECTORS      (   1)
 #define BPB_NUMBER_OF_FATS        (   2)
 #define BPB_ROOT_DIR_ENTRIES      (  64)
-#define BPB_TOTAL_SECTORS         CFG_UF2_NUM_BLOCKS // 0x101dd is absolute max at current code commit
+#define BPB_TOTAL_SECTORS         (0x10109) // Use a fixed (near max) number of sectors for the FAT file system
 #define BPB_MEDIA_DESCRIPTOR_BYTE (0xF8)
 #define FAT_ENTRY_SIZE            (2)
 #define FAT_ENTRIES_PER_SECTOR    (BPB_SECTOR_SIZE / FAT_ENTRY_SIZE)
@@ -77,6 +77,10 @@ struct TextFile {
                                    ((BPB_TOTAL_SECTORS % FAT_ENTRIES_PER_SECTOR) ? 1 : 0))
 #define DIRENTRIES_PER_SECTOR     (BPB_SECTOR_SIZE/sizeof(DirEntry))
 #define ROOT_DIR_SECTOR_COUNT     (BPB_ROOT_DIR_ENTRIES/DIRENTRIES_PER_SECTOR)
+
+#if defined(CFG_UF2_NUM_BLOCKS)
+  STATIC_ASSERT(BPB_TOTAL_SECTORS >= CFG_UF2_NUM_BLOCKS); // configuration used, and asked for a larger size GhostFAT?
+#endif
 
 STATIC_ASSERT(BPB_SECTOR_SIZE                              ==       512); // GhostFAT does not support other sector sizes (currently)
 STATIC_ASSERT(BPB_SECTORS_PER_CLUSTER                      ==         1); // GhostFAT presumes one sector == one cluster (for simplicity)
