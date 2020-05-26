@@ -65,6 +65,10 @@ struct TextFile {
 
 #define NUM_FAT_BLOCKS CFG_UF2_NUM_BLOCKS
 
+#define RESERVED_SECTORS   1
+#define ROOT_DIR_SECTORS   4
+#define SECTORS_PER_FAT    ((NUM_FAT_BLOCKS * 2 + 511) / 512)
+
 #define STR0(x) #x
 #define STR(x) STR0(x)
 
@@ -105,10 +109,6 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
 
-#define RESERVED_SECTORS   1
-#define ROOT_DIR_SECTORS   4
-#define SECTORS_PER_FAT    ((NUM_FAT_BLOCKS * 2 + 511) / 512)
-
 #define START_FAT0         RESERVED_SECTORS
 #define START_FAT1         (START_FAT0 + SECTORS_PER_FAT)
 #define START_ROOTDIR      (START_FAT1 + SECTORS_PER_FAT)
@@ -119,7 +119,6 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile) < 512);
 #define DIRENTRIES_PER_SECTOR (512/sizeof(DirEntry))
 
 STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTORS);
-
 
 static FAT_BootBlock const BootBlock = {
     .JumpInstruction      = {0xeb, 0x3c, 0x90},
