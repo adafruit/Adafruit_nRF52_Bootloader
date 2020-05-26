@@ -126,8 +126,18 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile)   < BPB_SECTOR_SIZE);
 #define NUM_FILES          (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
 
-#define UF2_SIZE           ((USER_FLASH_END-USER_FLASH_START) * 2)
-#define UF2_SECTORS        (UF2_SIZE / 512)
+#define UF2_FIRMWARE_BYTES_PER_SECTOR 256
+#define TRUE_USER_FLASH_SIZE (USER_FLASH_END-USER_FLASH_START)
+STATIC_ASSERT(TRUE_USER_FLASH_SIZE % UF2_FIRMWARE_BYTES_PER_SECTOR == 0);
+
+#define UF2_SECTORS        ( (TRUE_USER_FLASH_SIZE / UF2_FIRMWARE_BYTES_PER_SECTOR) + \
+                            ((TRUE_USER_FLASH_SIZE % UF2_FIRMWARE_BYTES_PER_SECTOR) ? 1 : 0))
+#define UF2_SIZE           (UF2_SECTORS * BPB_SECTOR_SIZE)
+#define UF2_SIZE_OLD       ((USER_FLASH_END-USER_FLASH_START) * 2)
+#define UF2_SECTORS_OLD    (UF2_SIZE / 512)
+STATIC_ASSERT(UF2_SECTORS == UF2_SECTORS_OLD);
+STATIC_ASSERT(UF2_SIZE == UF2_SIZE_OLD);
+
 #define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
 #define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
 
@@ -144,10 +154,10 @@ STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR);
 static FAT_BootBlock const BootBlock = {
     .JumpInstruction      = {0xeb, 0x3c, 0x90},
     .OEMInfo              = "UF2 UF2 ",
-    .SectorSize           = 512,
-    .SectorsPerCluster    = 1,
+    .SectorSize           = BPB_SECTOR_SIZE,
+    .SectorsPerCluster    = BPB_SECTORS_PER_CLUSTER,
     .ReservedSectors      = BPB_RESERVED_SECTORS,
-    .FATCopies            = 2,
+    .FATCopies            = BPB_NUMBER_OF_FATS,
     .RootDirectoryEntries = (ROOT_DIR_SECTORS * DIRENTRIES_PER_SECTOR),
     .TotalSectors16       = NUM_FAT_BLOCKS - 2,
     .MediaDescriptor      = 0xF8,
@@ -236,19 +246,20 @@ void padded_memcpy (char *dst, char const *src, int len)
 }
 
 void read_block(uint32_t block_no, uint8_t *data) {
-    memset(data, 0, 512);
+    memset(data, 0, BPB_SECTOR_SIZE);
     uint32_t sectionIdx = block_no;
 
     if (block_no == 0) { // Requested boot block
         memcpy(data, &BootBlock, sizeof(BootBlock));
-        data[510] = 0x55;
-        data[511] = 0xaa;
+        data[510] = 0x55; // Always at offsets 510/511, even when BPB_SECTOR_SIZE is larger
+        data[511] = 0xaa; // Always at offsets 510/511, even when BPB_SECTOR_SIZE is larger
         // logval("data[0]", data[0]);
     } else if (block_no < START_ROOTDIR) {  // Requested FAT table sector
         sectionIdx -= START_FAT0;
         // logval("sidx", sectionIdx);
-        if (sectionIdx >= BPB_SECTORS_PER_FAT)
+        if (sectionIdx >= BPB_SECTORS_PER_FAT) {
             sectionIdx -= BPB_SECTORS_PER_FAT; // second FAT is same as the first...
+        }
         if (sectionIdx == 0) {
             data[0] = 0xf8; // first FAT entry must match BPB MediaDescriptor
             // WARNING -- code presumes only one NULL .content for .UF2 file
@@ -538,5 +549,6 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     }
   }
 
-  return 512;
+  STATIC_ASSERT(BPB_SECTOR_SIZE == 512); // if sector size changes, may need to re-validate this code
+  return BPB_SECTOR_SIZE;
 }
