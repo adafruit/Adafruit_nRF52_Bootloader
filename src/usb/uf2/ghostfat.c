@@ -89,8 +89,6 @@ STATIC_ASSERT(BPB_SECTOR_SIZE % sizeof(DirEntry)           ==         0); // FAT
 STATIC_ASSERT(BPB_ROOT_DIR_ENTRIES % DIRENTRIES_PER_SECTOR ==         0); // FAT requirement
 STATIC_ASSERT(BPB_SECTOR_SIZE * BPB_SECTORS_PER_CLUSTER    <= (32*1024)); // FAT requirement (64k+ has known compatibility problems)
 
-STATIC_ASSERT(ROOT_DIR_SECTORS                             ==         4); // Not required ... just validating equal to prior code
-
 #define STR0(x) #x
 #define STR(x) STR0(x)
 
@@ -125,6 +123,14 @@ STATIC_ASSERT(ARRAY_SIZE(indexFile)   < BPB_SECTOR_SIZE);
 
 #define NUM_FILES          (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
+#define REQUIRED_ROOT_DIRECTORY_SECTORS ( ((NUM_DIRENTRIES+1) / DIRENTRIES_PER_SECTOR) + \
+                                         (((NUM_DIRENTRIES+1) % DIRENTRIES_PER_SECTOR) ? 1 : 0))
+STATIC_ASSERT(NUM_DIRENTRIES < (DIRENTRIES_PER_SECTOR * ROOT_DIR_SECTORS)); // Need at least one terminating (unused) entry
+STATIC_ASSERT(ROOT_DIR_SECTORS >= REQUIRED_ROOT_DIRECTORY_SECTORS); // Ensures BPB reserves sufficient entries for files
+STATIC_ASSERT(NUM_DIRENTRIES < BPB_ROOT_DIR_ENTRIES);
+// all directory entries must fit in a single sector
+// because otherwise current code overflows buffer
+STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR);
 
 #define UF2_FIRMWARE_BYTES_PER_SECTOR 256
 #define TRUE_USER_FLASH_SIZE (USER_FLASH_END-USER_FLASH_START)
@@ -133,23 +139,15 @@ STATIC_ASSERT(TRUE_USER_FLASH_SIZE % UF2_FIRMWARE_BYTES_PER_SECTOR == 0);
 #define UF2_SECTORS        ( (TRUE_USER_FLASH_SIZE / UF2_FIRMWARE_BYTES_PER_SECTOR) + \
                             ((TRUE_USER_FLASH_SIZE % UF2_FIRMWARE_BYTES_PER_SECTOR) ? 1 : 0))
 #define UF2_SIZE           (UF2_SECTORS * BPB_SECTOR_SIZE)
-#define UF2_SIZE_OLD       ((USER_FLASH_END-USER_FLASH_START) * 2)
-#define UF2_SECTORS_OLD    (UF2_SIZE / 512)
-STATIC_ASSERT(UF2_SECTORS == UF2_SECTORS_OLD);
-STATIC_ASSERT(UF2_SIZE == UF2_SIZE_OLD);
 
-#define UF2_FIRST_SECTOR   (NUM_FILES + 1) // WARNING -- code presumes each non-UF2 file content fits in single sector
-#define UF2_LAST_SECTOR    (UF2_FIRST_SECTOR + UF2_SECTORS - 1)
+#define UF2_FIRST_SECTOR   ((NUM_FILES + 1) * BPB_SECTORS_PER_CLUSTER) // WARNING -- code presumes each non-UF2 file content fits in single sector
+#define UF2_LAST_SECTOR    ((UF2_FIRST_SECTOR + UF2_SECTORS - 1) * BPB_SECTORS_PER_CLUSTER)
 
 #define START_FAT0         BPB_RESERVED_SECTORS
 #define START_FAT1         (START_FAT0 + BPB_SECTORS_PER_FAT)
 #define START_ROOTDIR      (START_FAT1 + BPB_SECTORS_PER_FAT)
 #define START_CLUSTERS     (START_ROOTDIR + ROOT_DIR_SECTORS)
 
-STATIC_ASSERT(NUM_DIRENTRIES < BPB_ROOT_DIR_ENTRIES);
-// all directory entries must fit in a single sector
-// because otherwise current code overflows buffer
-STATIC_ASSERT(NUM_DIRENTRIES < DIRENTRIES_PER_SECTOR);
 
 static FAT_BootBlock const BootBlock = {
     .JumpInstruction      = {0xeb, 0x3c, 0x90},
@@ -160,7 +158,7 @@ static FAT_BootBlock const BootBlock = {
     .FATCopies            = BPB_NUMBER_OF_FATS,
     .RootDirectoryEntries = (ROOT_DIR_SECTORS * DIRENTRIES_PER_SECTOR),
     .TotalSectors16       = NUM_FAT_BLOCKS - 2,
-    .MediaDescriptor      = 0xF8,
+    .MediaDescriptor      = BPB_MEDIA_DESCRIPTOR_BYTE,
     .SectorsPerFAT        = BPB_SECTORS_PER_FAT,
     .SectorsPerTrack      = 1,
     .Heads                = 1,
@@ -261,7 +259,8 @@ void read_block(uint32_t block_no, uint8_t *data) {
             sectionIdx -= BPB_SECTORS_PER_FAT; // second FAT is same as the first...
         }
         if (sectionIdx == 0) {
-            data[0] = 0xf8; // first FAT entry must match BPB MediaDescriptor
+            // first FAT entry must match BPB MediaDescriptor
+            data[0] = BPB_MEDIA_DESCRIPTOR_BYTE;
             // WARNING -- code presumes only one NULL .content for .UF2 file
             //            and all non-NULL .content fit in one sector
             //            and requires it be the last element of the array
