@@ -39,7 +39,7 @@
 static WriteState _wr_state = { 0 };
 
 void read_block(uint32_t block_no, uint8_t *data);
-int write_block(uint32_t block_no, uint8_t *data, bool quiet, WriteState *state);
+int  write_block(uint32_t block_no, uint8_t *data, WriteState *state);
 
 //--------------------------------------------------------------------+
 // tinyusb callbacks
@@ -143,35 +143,93 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   (void) lun;
 
   uint32_t count = 0;
-  int wr_ret;
-
-  while ( (count < bufsize) && ((wr_ret = write_block(lba, buffer, false, &_wr_state)) > 0) )
+  while ( count < bufsize )
   {
+    // Consider non-uf2 block write as successful
+    // only break if write_block is busy with flashing (return 0)
+    if ( 0 == write_block(lba, buffer, &_wr_state) ) break;
+
     lba++;
     buffer += 512;
     count  += 512;
   }
 
-  // Consider non-uf2 block write as successful
-  return  (wr_ret < 0) ? bufsize : count;
+  return count;
 }
 
 // Callback invoked when WRITE10 command is completed (status received and accepted by host).
 void tud_msc_write10_complete_cb(uint8_t lun)
 {
-  // uf2 file writing is complete --> complete DFU process
-  if ( _wr_state.numBlocks && (_wr_state.numWritten >= _wr_state.numBlocks) )
+  static bool first_write = true;
+
+  // abort the DFU, uf2 block failed integrity check
+  if ( _wr_state.aborted )
   {
-    led_state(STATE_WRITING_FINISHED);
+    // aborted and reset
+    PRINTF("Aborted\r\n");
 
     dfu_update_status_t update_status;
-
     memset(&update_status, 0, sizeof(dfu_update_status_t ));
-    update_status.status_code = DFU_UPDATE_APP_COMPLETE;
-    update_status.app_crc     = 0; // skip CRC checking with uf2 upgrade
-    update_status.app_size    = _wr_state.numBlocks*256;
+    update_status.status_code = DFU_RESET;
 
     bootloader_dfu_update_process(update_status);
+
+    led_state(STATE_WRITING_FINISHED);
+  }
+  else if ( _wr_state.numBlocks )
+  {
+    // Start LED writing pattern with first write
+    if (first_write)
+    {
+      first_write = false;
+      led_state(STATE_WRITING_STARTED);
+    }
+
+    // All block of uf2 file is complete --> complete DFU process
+    if (_wr_state.numWritten >= _wr_state.numBlocks)
+    {
+      dfu_update_status_t update_status;
+      memset(&update_status, 0, sizeof(dfu_update_status_t ));
+
+      if ( _wr_state.update_bootloader )
+      {
+        // update bootloader always end with reset
+        update_status.status_code = DFU_RESET;
+
+        // Location of current stored new bootloader
+        uint32_t * new_bootloader = (uint32_t *) BOOTLOADER_ADDR_NEW_RECIEVED;
+
+        PRINT_HEX(new_bootloader);
+
+        // skip if there is no bootloader change
+        if ( memcmp(new_bootloader, (uint8_t*) BOOTLOADER_ADDR_START, DFU_BL_IMAGE_MAX_SIZE) )
+        {
+          PRINTF("Coyping new bootloader\r\n");
+
+          sd_mbr_command_t command =
+          {
+            .command = SD_MBR_COMMAND_COPY_BL,
+            .params.copy_bl.bl_src = new_bootloader,
+            .params.copy_bl.bl_len = DFU_BL_IMAGE_MAX_SIZE/4 // size in words
+          };
+
+          // on success, COPY_BL won't return but run the new bootloader right away.
+          sd_mbr_command(&command);
+        }
+
+        PRINTF("bootloader update complete\r\n");
+      }else
+      {
+        // update App
+        update_status.status_code = DFU_UPDATE_APP_COMPLETE;
+
+        PRINTF("Application update complete\r\n");
+      }
+
+      bootloader_dfu_update_process(update_status);
+
+      led_state(STATE_WRITING_FINISHED);
+    }
   }
 }
 
@@ -181,7 +239,7 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_siz
 {
   (void) lun;
 
-  *block_count = UF2_NUM_BLOCKS;
+  *block_count = CFG_UF2_NUM_BLOCKS;
   *block_size  = 512;
 }
 

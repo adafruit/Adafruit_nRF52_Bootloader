@@ -36,17 +36,6 @@
 #include "tusb.h"
 #endif
 
-#define APP_TIMER_PRESCALER    0
-
-#define IRQ_ENABLED            0x01                    /**< Field identifying if an interrupt is enabled. */
-
-/**< Maximum number of interrupts available. (from IRQn_Type) */
-#if defined(NRF52832_XXAA)
-  #define MAX_NUMBER_INTERRUPTS  39
-#elif defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
-  #define MAX_NUMBER_INTERRUPTS  48
-#endif
-
 /**@brief Enumeration for specifying current bootloader status.
  */
 typedef enum
@@ -118,7 +107,7 @@ static void wait_for_events(void)
 //    APP_ERROR_CHECK(err_code);
 
     // Feed all Watchdog just in case application enable it
-    // WDT cannot be disabled once started. It even last through soft reset (NVIC Reset)
+    // WDT cannot be disabled once started. It even last through NVIC soft reset
     if ( nrf_wdt_started(NRF_WDT) )
     {
       for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
@@ -147,37 +136,40 @@ static void wait_for_events(void)
 }
 
 
-bool bootloader_app_is_valid(uint32_t app_addr)
+bool bootloader_app_is_valid(void)
 {
-  bootloader_settings_t const * p_bootloader_settings;
+  bool success = false;
+  uint32_t const app_addr = DFU_BANK_0_REGION_START;
 
-    // There exists an application in CODE region 1.
-    if (*((uint32_t *)app_addr) == EMPTY_FLASH_MASK)
+  bootloader_settings_t const *p_bootloader_settings;
+  bootloader_util_settings_get(&p_bootloader_settings);
+
+  enum { EMPTY_FLASH = 0xFFFFFFFFUL };
+
+  // Application is invalid if first 2 words are all 0xFFFFFFF
+  if ( *((uint32_t *)app_addr    ) == EMPTY_FLASH &&
+       *((uint32_t *)(app_addr+4)) == EMPTY_FLASH )
+  {
+    return false;
+  }
+
+  // The application in CODE region 1 is flagged as valid during update.
+  if ( p_bootloader_settings->bank_0 == BANK_VALID_APP )
+  {
+    uint16_t image_crc = 0;
+
+    // A stored crc value of 0 indicates that CRC checking is not used.
+    if ( p_bootloader_settings->bank_0_crc != 0 )
     {
-        return false;
+      image_crc = crc16_compute((uint8_t*) app_addr,
+                                p_bootloader_settings->bank_0_size,
+                                NULL);
     }
 
-    bool success = false;
+    success = (image_crc == p_bootloader_settings->bank_0_crc);
+  }
 
-    bootloader_util_settings_get(&p_bootloader_settings);
-
-    // The application in CODE region 1 is flagged as valid during update.
-    if (p_bootloader_settings->bank_0 == BANK_VALID_APP)
-    {
-        uint16_t image_crc = 0;
-
-        // A stored crc value of 0 indicates that CRC checking is not used.
-        if (p_bootloader_settings->bank_0_crc != 0)
-        {
-            image_crc = crc16_compute((uint8_t *)DFU_BANK_0_REGION_START,
-                                      p_bootloader_settings->bank_0_size,
-                                      NULL);
-        }
-
-        success = (image_crc == p_bootloader_settings->bank_0_crc);
-    }
-
-    return success;
+  return success;
 }
 
 
@@ -351,49 +343,51 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
     return err_code;
 }
 
-
-/**@brief Function for disabling all interrupts before jumping from bootloader to application.
- */
-static void interrupts_disable(void)
+void bootloader_app_start(void)
 {
-    uint32_t interrupt_setting_mask;
-    uint32_t irq = 0; // We start from first interrupt, i.e. interrupt 0.
-
-    // Fetch the current interrupt settings.
-    interrupt_setting_mask = NVIC->ISER[0];
-
-    for (; irq < MAX_NUMBER_INTERRUPTS; irq++)
-    {
-        if (interrupt_setting_mask & (IRQ_ENABLED << irq))
-        {
-            // The interrupt was enabled, and hence disable it.
-            NVIC_DisableIRQ((IRQn_Type)irq);
-        }
-    }
-}
-
-
-void bootloader_app_start(uint32_t app_addr)
-{
-    // If the applications CRC has been checked and passed, the magic number will be written and we
-    // can start the application safely.
-    APP_ERROR_CHECK ( sd_softdevice_disable() );
-
-    interrupts_disable();
-
-#if 0 // may need set forward irq
-    sd_mbr_command_t command =
-    {
-        .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,
-        .params.irq_forward_address_set.address = MBR_SIZE,
-    };
-
-    sd_mbr_command(&command);
+  // Disable all interrupts
+  NVIC->ICER[0]=0xFFFFFFFF;
+  NVIC->ICPR[0]=0xFFFFFFFF;
+#if defined(__NRF_NVIC_ISER_COUNT) && __NRF_NVIC_ISER_COUNT == 2
+  NVIC->ICER[1]=0xFFFFFFFF;
+  NVIC->ICPR[1]=0xFFFFFFFF;
 #endif
 
-    APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(CODE_REGION_1_START) );
+  uint32_t fwd_ret;
+  uint32_t app_addr;
 
-    bootloader_util_app_start(CODE_REGION_1_START);
+  if ( is_sd_existed() )
+  {
+    PRINTF("SoftDevice exist\r\n");
+    // App starts after SoftDevice
+    app_addr = SD_SIZE_GET(MBR_SIZE);
+    fwd_ret = sd_softdevice_vector_table_base_set(app_addr);
+  }else
+  {
+    PRINTF("SoftDevice not exist\r\n");
+
+    // App starts right after MBR
+    app_addr = MBR_SIZE;
+    sd_mbr_command_t command =
+    {
+      .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,
+      .params.irq_forward_address_set.address = app_addr,
+    };
+
+    fwd_ret = sd_mbr_command(&command);
+  }
+
+  // unlikely failed to forward vector table, manually set forward address
+  if ( fwd_ret != NRF_SUCCESS )
+  {
+    PRINT_HEX(fwd_ret);
+
+    // MBR use first 4-bytes of SRAM to store foward address
+    *(uint32_t *)(0x20000000) = app_addr;
+  }
+
+  // jump to app
+  bootloader_util_app_start(app_addr);
 }
 
 

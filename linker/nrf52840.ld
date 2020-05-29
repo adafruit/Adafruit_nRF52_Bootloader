@@ -11,27 +11,30 @@ MEMORY
    *  those values do not match. The check is performed in main.c, see
    *  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
    */
-  FLASH (rx) : ORIGIN = 0x74000, LENGTH = 0x7E000-0x74000 /* 40 KB */
+  FLASH (rx) : ORIGIN = 0xF4000, LENGTH = 0xFE000-0xF4000-2048 /* 38 KB */
+
+  BOOTLOADER_CONFIG (r): ORIGIN = 0xFE000 - 2048, LENGTH = 2048
 
   /** Location of mbr params page in flash. */
-  MBR_PARAMS_PAGE (rw) : ORIGIN = 0x7E000, LENGTH = 0x1000
+  MBR_PARAMS_PAGE (rw) : ORIGIN = 0xFE000, LENGTH = 0x1000
   
   /** Location of bootloader setting in flash. */
-  BOOTLOADER_SETTINGS (rw) : ORIGIN = 0x7F000, LENGTH = 0x1000
+  BOOTLOADER_SETTINGS (rw) : ORIGIN = 0xFF000, LENGTH = 0x1000
 
 
 
   /** RAM Region for bootloader. */
-  RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20010000-0x20008000
+  /* Avoid conflict with NOINIT for OTA bond sharing */
+  RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20040000-0x20008000
 
   /* Location for double reset detection, no init */
   DBL_RESET (rwx) :  ORIGIN = 0x20007F7C, LENGTH = 0x04
-
+  
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
-   *  from application to bootloader when using buttonluss DFU OTA. */
+   *  from application to bootloader when using buttonless DFU OTA. */
   NOINIT (rwx) :  ORIGIN = 0x20007F80, LENGTH = 0x80
-
-
+  
+  
   
   /** Location in UICR where bootloader start address is stored. */
   UICR_BOOTLOADER (r) : ORIGIN = 0x10001014, LENGTH = 0x04
@@ -48,6 +51,11 @@ SECTIONS
     KEEP(*(fs_data))
     PROVIDE( __stop_fs_data = .);
   } = 0
+
+  .bootloaderConfig :
+  {
+    KEEP(*(.bootloaderConfig))
+  } > BOOTLOADER_CONFIG
 
   /* Place the bootloader settings page in flash. */
   .bootloaderSettings(NOLOAD) :
@@ -72,17 +80,18 @@ SECTIONS
   {
     KEEP(*(.uicrMbrParamsPageAddress))
   } > UICR_MBR_PARAM_PAGE
-  
+
   .dbl_reset(NOLOAD) :
   {
 
-  } > DBL_RESET  
+  } > DBL_RESET
 
   /* No init RAM section in bootloader. Used for bond information exchange. */
   .noinit(NOLOAD) :
   {
 
   } > NOINIT
+
   /* other placements follow here... */
 }
 

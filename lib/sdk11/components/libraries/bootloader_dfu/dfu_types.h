@@ -29,31 +29,38 @@
 #include "nrf.h"
 #include "app_util.h"
 
+#ifndef SD_MAGIC_NUMBER
+#define SD_MAGIC_NUMBER 0x51B1E5DB
+#endif
+
+static inline bool is_sd_existed(void)
+{
+  return *((uint32_t*)(SOFTDEVICE_INFO_STRUCT_ADDRESS+4)) == SD_MAGIC_NUMBER;
+}
+
 #define NRF_UICR_BOOT_START_ADDRESS         (NRF_UICR_BASE + 0x14)      /**< Register where the bootloader start address is stored in the UICR register. */
 #define NRF_UICR_MBR_PARAMS_PAGE_ADDRESS    (NRF_UICR_BASE + 0x18)      /**< Register where the mbr params page is stored in the UICR register. (Only in use in nRF52 MBR).*/
 
-#define CODE_REGION_1_START                 SD_SIZE_GET(MBR_SIZE)       /**< This field should correspond to the size of Code Region 0, (which is identical to Start of Code Region 1), found in UICR.CLEN0 register. This value is used for compile safety, as the linker will fail if application expands into bootloader. Runtime, the bootloader will use the value found in UICR.CLEN0. */
+// Application address is either after MBR or SD (if existed)
+#define CODE_REGION_1_START                 (is_sd_existed() ? SD_SIZE_GET(MBR_SIZE) : MBR_SIZE)       /**< This field should correspond to the size of Code Region 0, (which is identical to Start of Code Region 1), found in UICR.CLEN0 register. This value is used for compile safety, as the linker will fail if application expands into bootloader. Runtime, the bootloader will use the value found in UICR.CLEN0. */
+
 #define SOFTDEVICE_REGION_START             MBR_SIZE                    /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
 #define CODE_PAGE_SIZE                      0x1000                      /**< Size of a flash codepage. Used for size of the reserved flash space in the bootloader region. Will be runtime checked against NRF_UICR->CODEPAGESIZE to ensure the region is correct. */
 
 // Flash = 512 KB
 #if defined(NRF52832_XXAA) || defined(NRF52833_XXAA)
-
-#define BOOTLOADER_REGION_START             0x00074000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
-#define BOOTLOADER_SETTINGS_ADDRESS         0x0007F000                  /**< The field specifies the page location of the bootloader settings address. */
-#define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x0007E000                  /**< The field specifies the page location of the mbr params page address. */
+  #define BOOTLOADER_REGION_START             0x00074000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
+  #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x0007E000                  /**< The field specifies the page location of the mbr params page address. */
+  #define BOOTLOADER_SETTINGS_ADDRESS         0x0007F000                  /**< The field specifies the page location of the bootloader settings address. */
 
 // Flash = 1024 KB
 #elif  defined(NRF52840_XXAA)
-
-#define BOOTLOADER_REGION_START             0x000F4000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
-#define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000                  /**< The field specifies the page location of the bootloader settings address. */
-#define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x000FE000                  /**< The field specifies the page location of the mbr params page address. */
+  #define BOOTLOADER_REGION_START             0x000F4000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
+  #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x000FE000                  /**< The field specifies the page location of the mbr params page address. */
+  #define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000                  /**< The field specifies the page location of the bootloader settings address. */
 
 #else
-
-#error No target defined
-
+  #error No target defined
 #endif
 
 #define DFU_REGION_TOTAL_SIZE           (BOOTLOADER_REGION_START - CODE_REGION_1_START)                 /**< Total size of the region between SD and Bootloader. */
@@ -67,7 +74,7 @@
 #define DFU_IMAGE_MAX_SIZE_BANKED       (((DFU_IMAGE_MAX_SIZE_FULL) - \
                                         (DFU_IMAGE_MAX_SIZE_FULL % (2 * CODE_PAGE_SIZE)))/2)            /**< Maximum size of an application, excluding save data from the application. */
 
-#define DFU_BL_IMAGE_MAX_SIZE           (BOOTLOADER_SETTINGS_ADDRESS - BOOTLOADER_REGION_START)         /**< Maximum size of a bootloader, excluding save data from the current bootloader. */
+#define DFU_BL_IMAGE_MAX_SIZE           (BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS - BOOTLOADER_REGION_START)         /**< Maximum size of a bootloader, excluding save data from the current bootloader. */
 
 #define DFU_BANK_0_REGION_START         CODE_REGION_1_START                                             /**< Bank 0 region start. */
 #define DFU_BANK_1_REGION_START         (DFU_BANK_0_REGION_START + DFU_IMAGE_MAX_SIZE_BANKED)           /**< Bank 1 region start. */
@@ -131,7 +138,8 @@ typedef enum
     DFU_UPDATE_BOOT_COMPLETE,                                                                           /**< Status update complete.*/
     DFU_BANK_0_ERASED,                                                                                  /**< Status bank 0 erased.*/
     DFU_TIMEOUT,                                                                                        /**< Status timeout.*/
-    DFU_RESET                                                                                           /**< Status Reset to indicate current update procedure has been aborted and system should reset. */
+    DFU_RESET,                                                                                           /**< Status Reset to indicate current update procedure has been aborted and system should reset. */
+    DFU_UF2_BOOTLOADER_COMPLETE
 } dfu_update_status_code_t;
 
 /**@brief Structure holding DFU complete event.

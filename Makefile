@@ -17,8 +17,10 @@ SD_VERSION   = 6.1.1
 SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
-# linker by MCU and SoftDevice eg. nrf52840_s140_v6.ld
-LD_FILE      = linker/$(MCU_SUB_VARIANT)_$(SD_NAME)_v$(word 1, $(subst ., ,$(SD_VERSION))).ld
+MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
+
+# linker by MCU eg. nrf52840.ld
+LD_FILE      = linker/$(MCU_SUB_VARIANT).ld
 
 GIT_VERSION = $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
@@ -93,6 +95,9 @@ endif
 # all files in src
 C_SRC += $(wildcard src/*.c)
 
+# all files in boards
+C_SRC += $(wildcard src/boards/*.c)
+
 # all sources files in specific board
 C_SRC += $(wildcard src/boards/$(BOARD)/*.c)
 
@@ -162,11 +167,10 @@ ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
 
 # src
 IPATH += src
+IPATH += src/boards
 IPATH += src/boards/$(BOARD)
-
 IPATH += src/cmsis/include
 IPATH += src/usb
-IPATH += src/boards
 IPATH += $(TUSB_PATH)
 
 # nrfx
@@ -196,17 +200,17 @@ IPATH += $(SDK_PATH)/drivers_nrf/delay
 IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include
 IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
 
-INC_PATHS = $(addprefix -I,$(IPATH))
-
 #------------------------------------------------------------------------------
 # Compiler Flags
 #------------------------------------------------------------------------------
 
-# Debugging/Optimization
+# Debug option use RTT for printf
 ifeq ($(DEBUG), 1)
-	CFLAGS += -Og -ggdb
-else
-	CFLAGS += -Os
+	RTT_SRC = lib/SEGGER_RTT
+	
+	CFLAGS += -ggdb -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+	IPATH += $(RTT_SRC)/RTT
+  C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
 endif
 
 #flags common to all targets
@@ -216,6 +220,7 @@ CFLAGS += \
 	-mcpu=cortex-m4 \
 	-mfloat-abi=hard \
 	-mfpu=fpv4-sp-d16 \
+	-Os \
 	-ffunction-sections \
 	-fdata-sections \
 	-fno-builtin \
@@ -249,7 +254,7 @@ CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
-CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS) $(SD_NAME) $(SD_VERSION)"'
+CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
@@ -289,6 +294,8 @@ vpath %.S $(ASM_PATHS)
 
 OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
 
+INC_PATHS = $(addprefix -I,$(IPATH))
+
 #------------------------------------------------------------------------------
 # BUILD TARGETS
 #------------------------------------------------------------------------------
@@ -306,40 +313,11 @@ endif
 .PHONY: all clean flash dfu-flash sd gdbflash gdb
 
 # default target to build
-all: $(BUILD)/$(OUT_FILE)-nosd.out $(BUILD)/$(MERGED_FILE).hex
-
-#------------------- Flash target -------------------
-
-check_defined = \
-    $(strip $(foreach 1,$1, \
-    $(call __check_defined,$1,$(strip $(value 2)))))
-__check_defined = \
-    $(if $(value $1),, \
-    $(error Undefined make flag: $1$(if $2, ($2))))
-
-# Flash the compiled
-flash: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@echo Flashing: $<
-	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
-
-dfu-flash: $(BUILD)/$(MERGED_FILE).zip
-	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
-
-sd:
-	@echo Flashing: $(SD_HEX)
-	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --chiperase  --reset
-
-gdbflash: $(BUILD)/$(MERGED_FILE).hex
-	@echo Flashing: $<
-	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
-
-gdb: $(BUILD)/$(OUT_FILE)-nosd.out
-	$(GDB_BMP) $<
+all: $(BUILD)/$(OUT_FILE).out $(BUILD)/$(OUT_FILE)-nosd.hex $(BUILD)/$(OUT_FILE)-nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
 
 #------------------- Compile rules -------------------
 
-## Create build directories
+# Create build directories
 $(BUILD):
 	@$(MK) $@
 
@@ -357,26 +335,73 @@ $(BUILD)/%.o: %.S
 	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUT_FILE)-nosd.out: $(BUILD) $(OBJECTS)
-	@echo LD $(OUT_FILE)-nosd.out
+$(BUILD)/$(OUT_FILE).out: $(BUILD) $(OBJECTS)
+	@echo LD $(notdir $@)
 	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 	@$(SIZE) $@
 
 #------------------- Binary generator -------------------
 
-## Create binary .hex file from the .out file
-$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE)-nosd.out
-	@echo CR $(OUT_FILE)-nosd.hex
+# Create hex file (no sd, no mbr)
+$(BUILD)/$(OUT_FILE).hex: $(BUILD)/$(OUT_FILE).out
+	@echo Create $(notdir $@)
 	@$(OBJCOPY) -O ihex $< $@
 
+# Hex file with mbr (still no SD)
+$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE).hex
+	@echo Create $(notdir $@)
+	@python3 tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
+
+# Bootolader only uf2
+$(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
+	@echo Create $(notdir $@)
+	@python3 lib/uf2/utils/uf2conv.py -f 0xd663823c -c -o $@ $^
+
 # merge bootloader and sd hex together
-$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@echo CR $(MERGED_FILE).hex
-	@mergehex -q -m $< $(SD_HEX) -o $@
+$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE).hex
+	@echo Create $(notdir $@)
+	@python3 tools/hexmerge.py -o $@ $< $(SD_HEX)
 
-## Create pkg zip file for bootloader+SD combo to use with DFU Serial
-.PHONY: genpkg
-genpkg: $(BUILD)/$(MERGED_FILE).zip
-
-$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE)-nosd.hex
+# Create pkg zip file for bootloader+SD combo to use with DFU CDC
+$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE).hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
+
+#------------------- Flash target -------------------
+
+check_defined = \
+    $(strip $(foreach 1,$1, \
+    $(call __check_defined,$1,$(strip $(value 2)))))
+__check_defined = \
+    $(if $(value $1),, \
+    $(error Undefined make flag: $1$(if $2, ($2))))
+
+# Flash the compiled
+flash: $(BUILD)/$(OUT_FILE)-nosd.hex
+	@echo Flashing: $(notdir $<)
+	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
+
+# dfu using CDC interface
+dfu-flash: $(BUILD)/$(MERGED_FILE).zip
+	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
+	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
+
+erase:
+	@echo Erasing flash
+	$(NRFJPROG) -f nrf52 --eraseall
+
+# flash SD only
+sd:
+	@echo Flashing: $(SD_HEX)
+	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --sectorerase --reset
+
+# flash MBR only
+mbr:
+	@echo Flashing: $(MBR_HEX)
+	$(NRFJPROG) --program $(MBR_HEX) -f nrf52 --sectorerase --reset
+
+gdbflash: $(BUILD)/$(MERGED_FILE).hex
+	@echo Flashing: $<
+	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
+
+gdb: $(BUILD)/$(OUT_FILE).out
+	$(GDB_BMP) $<

@@ -83,6 +83,10 @@ void usb_teardown(void);
 
 #endif
 
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+
 /*
  * Blinking patterns:
  * - DFU Serial     : LED Status blink
@@ -115,27 +119,16 @@ void usb_teardown(void);
 
 // Allow for using reset button essentially to swap between application and bootloader.
 // This is controlled by a flag in the app and is the behavior of CPX and all Arcade boards when using MakeCode.
-#define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(USER_FLASH_START + 0x200)) == 0x87eeb07c)
+#define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(DFU_BANK_0_REGION_START + 0x200)) == 0x87eeb07c)
 
 // These value must be the same with one in dfu_transport_ble.c
 #define BLEGAP_EVENT_LENGTH             6
 #define BLEGATT_ATT_MTU_MAX             247
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
-// Adafruit for factory reset
-#define APPDATA_ADDR_START              (BOOTLOADER_REGION_START-DFU_APP_DATA_RESERVED)
-
-#ifdef NRF52840_XXAA
-  // Flash 1024 KB
-  STATIC_ASSERT( APPDATA_ADDR_START == 0xED000);
-
-#else
-  // Flash 512 KB
-  STATIC_ASSERT( APPDATA_ADDR_START == 0x6D000);
-#endif
-
-
-void adafruit_factory_reset(void);
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 static uint32_t softdev_init(bool init_softdevice);
 
 uint32_t* dbl_reset_mem = ((uint32_t*)  DFU_DBL_RESET_MEM );
@@ -151,12 +144,23 @@ bool is_ota(void)
 
 void softdev_mbr_init(void)
 {
+  PRINTF("SD_MBR_COMMAND_INIT_SD\r\n");
   sd_mbr_command_t com = { .command = SD_MBR_COMMAND_INIT_SD };
   sd_mbr_command(&com);
 }
 
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 int main(void)
 {
+  PRINTF("Bootlaoder Start\r\n");
+
+  // Populate Boot Address and MBR Param into MBR if not already
+  // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
+  // Note: skip it for now since this will prevent us to change the size of bootloader in the future
+  // bootloader_mbr_addrs_populate();
+
   // SD is already Initialized in case of BOOTLOADER_DFU_OTA_MAGIC
   bool sd_inited = (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM);
 
@@ -174,10 +178,8 @@ int main(void)
   if (dfu_start) NRF_POWER->GPREGRET = 0;
 
   // Save bootloader version to pre-defined register, retrieved by application
+  // TODO move to CF2
   BOOTLOADER_VERSION_REGISTER = (MK_BOOTLOADER_VERSION);
-
-  // This check ensures that the defined fields in the bootloader corresponds with actual setting in the chip.
-  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
 
   board_init();
   bootloader_init();
@@ -202,7 +204,7 @@ int main(void)
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
 
-  bool const valid_app = bootloader_app_is_valid(DFU_BANK_0_REGION_START);
+  bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
   if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET())
@@ -259,53 +261,43 @@ int main(void)
     }
   }
 
-  // Adafruit Factory reset
-  if ( !button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) )
-  {
-    adafruit_factory_reset();
-  }
-
   // Reset Board
   board_teardown();
 
-  // Jump to application if valid
-  if (bootloader_app_is_valid(DFU_BANK_0_REGION_START) && !bootloader_dfu_sd_in_progress())
+  /* Jump to application if valid
+   * "Master Boot Record and SoftDevice initializaton procedure"
+   * - SD_MBR_COMMAND_INIT_SD (if not already)
+   * - sd_softdevice_disable()
+   * - sd_softdevice_vector_table_base_set(APP_ADDR)
+   * - jump to App reset
+   */
+
+  if (bootloader_app_is_valid() && !bootloader_dfu_sd_in_progress())
   {
-    // MBR must be init before start application
-    if ( !sd_inited ) softdev_mbr_init();
+    PRINTF("App is valid\r\n");
+    if ( is_sd_existed() )
+    {
+      // MBR forward IRQ to SD (if not already)
+      if ( !sd_inited ) softdev_mbr_init();
+
+      // Make sure SD is disabled
+      sd_softdevice_disable();
+    }
 
     // clear in case we kept DFU_DBL_RESET_APP there
     (*dbl_reset_mem) = 0;
 
-    // Select a bank region to use as application region.
-    // @note: Only applications running from DFU_BANK_0_REGION_START is supported.
-    bootloader_app_start(DFU_BANK_0_REGION_START);
+    // start application
+    bootloader_app_start();
   }
 
   NVIC_SystemReset();
 }
 
-
-// Perform factory reset to erase Application + Data
-void adafruit_factory_reset(void)
-{
-  led_state(STATE_FACTORY_RESET_STARTED);
-
-  // clear all App Data if any
-  if ( DFU_APP_DATA_RESERVED )
-  {
-    nrfx_nvmc_page_erase(APPDATA_ADDR_START);
-  }
-
-  // Only need to erase the 1st page of Application code to make it invalid
-  nrfx_nvmc_page_erase(DFU_BANK_0_REGION_START);
-
-  // back to normal
-  led_state(STATE_FACTORY_RESET_FINISHED);
-}
-
 /**
- * Initializes the SoftDevice and the BLE event interrupt.
+ * Initializes the SotdDevice by following SD specs section
+ * "Master Boot Record and SoftDevice initializaton procedure"
+ *
  * @param[in] init_softdevice  true if SoftDevice should be initialized. The SoftDevice must only
  *                             be initialized if a chip reset has occured. Soft reset (jump ) from
  *                             application must not reinitialize the SoftDevice.
@@ -314,7 +306,7 @@ static uint32_t softdev_init(bool init_softdevice)
 {
   if (init_softdevice) softdev_mbr_init();
 
-  // map vector table to bootloader address
+  // Forward vector table to bootloader address so that we can handle BLE events
   APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
 
   // Enable Softdevice, Use Internal OSC to compatible with all boards
@@ -473,3 +465,29 @@ void SD_EVT_IRQHandler(void)
   // Use App Scheduler to defer handling code in non-isr context
   app_sched_event_put(NULL, 0, ada_sd_task);
 }
+
+
+//--------------------------------------------------------------------+
+// RTT printf retarget for Debug
+//--------------------------------------------------------------------+
+#ifdef CFG_DEBUG
+
+#include "SEGGER_RTT.h"
+
+__attribute__ ((used))
+int _write (int fhdl, const void *buf, size_t count)
+{
+  (void) fhdl;
+  SEGGER_RTT_Write(0, (char*) buf, (int) count);
+  return count;
+}
+
+__attribute__ ((used))
+int _read (int fhdl, char *buf, size_t count)
+{
+  (void) fhdl;
+  return SEGGER_RTT_Read(0, buf, count);
+}
+
+
+#endif

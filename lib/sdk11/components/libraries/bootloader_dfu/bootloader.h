@@ -33,13 +33,10 @@
 uint32_t bootloader_init(void);
 
 /**@brief Function for validating application region in flash.
- * 
- * @param[in]  app_addr      Address to the region in flash where the application is stored.
- * 
  * @retval     true          If Application region is valid.
  * @retval     false         If Application region is not valid.
  */
-bool bootloader_app_is_valid(uint32_t app_addr);
+bool bootloader_app_is_valid(void);
 
 /**@brief Function for starting the Device Firmware Update.
  * 
@@ -55,7 +52,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms);
  *
  * @param[in]  app_addr      Address to the region where the application is stored.
  */
-void bootloader_app_start(uint32_t app_addr);
+void bootloader_app_start(void);
 
 /**@brief Function for retrieving the bootloader settings.
  *
@@ -91,6 +88,9 @@ uint32_t bootloader_dfu_sd_update_continue(void);
  * @retval     NRF_SUCCESS If the final stage of SoftDevice update was successful. 
  */
 uint32_t bootloader_dfu_sd_update_finalize(void);
+
+
+void bootloader_mbr_addrs_populate(void);
 
 #endif // BOOTLOADER_H__
 
