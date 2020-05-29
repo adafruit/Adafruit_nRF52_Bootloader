@@ -7,7 +7,7 @@
 // Family ID for updating Bootloader
 #define CFG_UF2_FAMILY_BOOT_ID    0xd663823c
 
-#define CFG_UF2_NUM_BLOCKS        8000        // at least 4,1 MB for FAT16
+#define CFG_UF2_NUM_BLOCKS        0x10109     // just under 32MB
 #define CFG_UF2_FLASH_SIZE        (1024*1024) // 1 MB
 
 // Application Address Space
