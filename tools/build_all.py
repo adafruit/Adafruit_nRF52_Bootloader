@@ -18,7 +18,8 @@ build_separator = '-' * 74
 # All supported boards
 all_boards = []
 for entry in os.scandir("src/boards"):
-    all_boards.append(entry.name)
+    if entry.is_dir():
+        all_boards.append(entry.name)
 all_boards.sort()
 
 #sha, version = build_info.get_version_info()
@@ -34,7 +35,7 @@ for board in all_boards:
     os.makedirs(bin_directory, exist_ok=True)
 
     start_time = time.monotonic()
-    make_result = subprocess.run("make -j 4 BOARD={} all genpkg".format(board), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    make_result = subprocess.run("make -j 4 BOARD={} all".format(board), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     build_duration = time.monotonic() - start_time
 
     flash_size = "-"
@@ -55,9 +56,10 @@ for board in all_boards:
         fail_count += 1
 
     for entry in os.scandir("_build/build-{}".format(board)):
-        for extension in ["zip", "hex"]:
-            if entry.name.endswith(extension) and "nosd" not in entry.name:
-                shutil.copy(entry.path, bin_directory)
+        for extension in ["zip", "hex", "uf2"]:
+            if entry.name.endswith(extension):
+                if ("nosd" in entry.name) or ("s140" in entry.name) or ("s132" in entry.name):
+                    shutil.copy(entry.path, bin_directory)
 
     print(build_format.format(board, success, "{:.2f}s".format(build_duration), flash_size, sram_size))
 

@@ -32,15 +32,18 @@
 static uint16_t                 service_handle;
 static ble_gatts_char_handles_t manufact_name_handles;
 static ble_gatts_char_handles_t model_num_handles;
+static ble_gatts_char_handles_t fw_rev_handles;
+static ble_gatts_char_handles_t pnp_id_handles;
+
+#if 0
 static ble_gatts_char_handles_t serial_num_handles;
 static ble_gatts_char_handles_t hw_rev_handles;
-static ble_gatts_char_handles_t fw_rev_handles;
 static ble_gatts_char_handles_t sw_rev_handles;
 static ble_gatts_char_handles_t sys_id_handles;
 static ble_gatts_char_handles_t reg_cert_data_list_handles;
-static ble_gatts_char_handles_t pnp_id_handles;
+#endif
 
-
+#if 0
 /**@brief Function for encoding a System ID.
  *
  * @param[out]  p_encoded_buffer   Buffer where the encoded data will be written.
@@ -61,6 +64,7 @@ static void sys_id_encode(uint8_t * p_encoded_buffer, const ble_dis_sys_id_t * p
     p_encoded_buffer[6] = (p_sys_id->organizationally_unique_id & 0x00FF00) >> 8;
     p_encoded_buffer[7] = (p_sys_id->organizationally_unique_id & 0xFF0000) >> 16;
 }
+#endif
 
 
 /**@brief Function for encoding a PnP ID.
@@ -182,6 +186,8 @@ uint32_t ble_dis_init(const ble_dis_init_t * p_dis_init)
             return err_code;
         }
     }
+
+#if 0
     if (p_dis_init->serial_num_str.length > 0)
     {
         err_code = char_add(BLE_UUID_SERIAL_NUMBER_STRING_CHAR,
@@ -206,6 +212,8 @@ uint32_t ble_dis_init(const ble_dis_init_t * p_dis_init)
             return err_code;
         }
     }
+#endif
+
     if (p_dis_init->fw_rev_str.length > 0)
     {
         err_code = char_add(BLE_UUID_FIRMWARE_REVISION_STRING_CHAR,
@@ -218,6 +226,8 @@ uint32_t ble_dis_init(const ble_dis_init_t * p_dis_init)
             return err_code;
         }
     }
+
+#if 0
     if (p_dis_init->sw_rev_str.length > 0)
     {
         err_code = char_add(BLE_UUID_SOFTWARE_REVISION_STRING_CHAR,
@@ -230,6 +240,7 @@ uint32_t ble_dis_init(const ble_dis_init_t * p_dis_init)
             return err_code;
         }
     }
+
     if (p_dis_init->p_sys_id != NULL)
     {
         uint8_t encoded_sys_id[BLE_DIS_SYS_ID_LEN];
@@ -257,6 +268,8 @@ uint32_t ble_dis_init(const ble_dis_init_t * p_dis_init)
             return err_code;
         }
     }
+#endif
+
     if (p_dis_init->p_pnp_id != NULL)
     {
         uint8_t encoded_pnp_id[BLE_DIS_PNP_ID_LEN];

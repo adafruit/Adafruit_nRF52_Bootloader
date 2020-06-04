@@ -36,6 +36,9 @@
 *.x86_64
 #*.hex
 
+# VSCode files
+.vscode/
+
 # Debug files
 *.dSYM/
 *.su
@@ -51,10 +54,11 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-src/segger/Output
-_build-*/
+segger/Output
+_build/
 bin/
 *.emSession
 *.jlink
+.idea/
 
 TAGS

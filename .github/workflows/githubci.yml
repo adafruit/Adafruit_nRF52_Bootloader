@@ -23,10 +23,7 @@ jobs:
         
     - name: Install Toolchains
       run: |
-        pip3 install adafruit-nrfutil uritemplate requests
-        wget https://www.nordicsemi.com/api/sitecore/Products/DownloadPlatform --post-data=fileid=8F19D314130548209E75EFFADD9348DB -O cli-tools.tar
-        tar -xv -f cli-tools.tar
-        echo "::add-path::$GITHUB_WORKSPACE/mergehex"
+        pip3 install adafruit-nrfutil uritemplate requests intelhex
         npm install --global xpm
         xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@latest
         echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"

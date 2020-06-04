@@ -33,6 +33,10 @@
 
 #include "board.h"
 
+#ifndef UF2_VOLUME_LABEL
+#define UF2_VOLUME_LABEL   "NRF52BOOT  "
+#endif
+
 #ifndef BUTTON_DFU
 #define BUTTON_DFU      BUTTON_1
 #endif
@@ -105,18 +109,17 @@ bool is_ota(void);
 //--------------------------------------------------------------------+
 // DEBUG
 //--------------------------------------------------------------------+
-//#define CFG_DEBUG
 
 #ifdef CFG_DEBUG
 
 #include <stdio.h>
 
+#define PRINTF                printf
 #define PRINT_LOCATION()      printf("%s: %d:\n", __PRETTY_FUNCTION__, __LINE__)
 #define PRINT_MESS(x)         printf("%s: %d: %s \n"   , __FUNCTION__, __LINE__, (char*)(x))
-#define PRTNT_HEAP()          if (CFG_DEBUG == 3) printf("\n%s: %d: Heap free: %d\n", __FUNCTION__, __LINE__, util_heap_get_free_size())
 #define PRINT_STR(x)          printf("%s: %d: " #x " = %s\n"   , __FUNCTION__, __LINE__, (char*)(x) )
 #define PRINT_INT(x)          printf("%s: %d: " #x " = %ld\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
-#define PRINT_HEX(x)          printf("%s: %d: " #x " = 0x%X\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
+#define PRINT_HEX(x)          printf("%s: %d: " #x " = 0x%lX\n"  , __FUNCTION__, __LINE__, (uint32_t) (x) )
 
 #define PRINT_BUFFER(buf, n) \
   do {\
@@ -126,24 +129,15 @@ bool is_ota(void);
     printf("\n");\
   }while(0)
 
-#define ADALOG(tag, ...) \
-  do { \
-    if ( tag ) printf("[%s] ", tag);\
-    printf(__VA_ARGS__);\
-    printf("\n");\
-  }while(0)
-
 #else
 
+#define PRINTF(...)
 #define PRINT_LOCATION()
 #define PRINT_MESS(x)
-#define PRTNT_HEAP()
 #define PRINT_STR(x)
 #define PRINT_INT(x)
 #define PRINT_HEX(x)
 #define PRINT_BUFFER(buf, n)
-
-#define ADALOG(...)
 
 #endif
 

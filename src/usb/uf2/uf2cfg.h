@@ -1,17 +1,24 @@
 #include "boards.h"
+#include "dfu_types.h"
 
-#define UF2_NUM_BLOCKS     8000   // at least 4,1 MB for FAT16
+// Family ID for updating Application
+#define CFG_UF2_FAMILY_APP_ID     0xADA52840
 
-#ifndef UF2_VOLUME_LABEL
-#define UF2_VOLUME_LABEL   "NRF52BOOT  "
-#endif
+// Family ID for updating Bootloader
+#define CFG_UF2_FAMILY_BOOT_ID    0xd663823c
 
-#define FLASH_SIZE         (USER_FLASH_END-USER_FLASH_START) // Max flash size
+#define CFG_UF2_NUM_BLOCKS        0x10109     // just under 32MB
+#define CFG_UF2_FLASH_SIZE        (1024*1024) // 1 MB
 
-// Only allow to write application TODO dynamic depending on SD size
-#define USER_FLASH_START   0x26000
-#define USER_FLASH_END     0xAD000 // Fat Fs start here
+// Application Address Space
+#define USER_FLASH_START          MBR_SIZE // skip MBR included in SD hex
+#define USER_FLASH_END            0xAD000
 
-#define FLASH_PAGE_SIZE    4096
+// Bootloader start address
+#define BOOTLOADER_ADDR_START         BOOTLOADER_REGION_START
 
-#define UF2_FAMILY_ID      0xADA52840
+// Bootloader end address
+#define BOOTLOADER_ADDR_END           BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS
+
+// Address where new bootloader is written before activation (skip application data)
+#define BOOTLOADER_ADDR_NEW_RECIEVED  (USER_FLASH_END-DFU_BL_IMAGE_MAX_SIZE)

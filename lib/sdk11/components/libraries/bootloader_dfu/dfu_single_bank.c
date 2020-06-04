@@ -140,8 +140,7 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
   if ( is_ota() )
   {
-    uint32_t err_code;
-    err_code    = pstorage_clear(&m_storage_handle_app, m_image_size);
+    uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
     APP_ERROR_CHECK(err_code);
   }
   else
@@ -151,7 +150,9 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
     for ( uint32_t i = 0; i < page_count; i++ )
     {
-      nrfx_nvmc_page_erase(DFU_BANK_0_REGION_START + i * CODE_PAGE_SIZE);
+      uint32_t const addr = DFU_BANK_0_REGION_START + i * CODE_PAGE_SIZE;
+      PRINTF("Erase 0x%08lX\r\n", addr);
+      nrfx_nvmc_page_erase(addr);
     }
 
     // invoke complete callback

@@ -132,11 +132,6 @@ void SysTick_Handler(void)
 }
 
 
-uint32_t tusb_hal_millis(void)
-{
-  return ( ( ((uint64_t)app_timer_cnt_get())*1000*(APP_TIMER_CONFIG_RTC_FREQUENCY+1)) / APP_TIMER_CLOCK_FREQ );
-}
-
 void pwm_teardown(NRF_PWM_Type* pwm )
 {
   pwm->TASKS_SEQSTART[0] = 0;
