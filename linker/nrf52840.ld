@@ -41,6 +41,9 @@ MEMORY
   
   /** Location in UICR where mbr params page address is stored. */
   UICR_MBR_PARAM_PAGE(r) : ORIGIN = 0x10001018, LENGTH = 0x04
+
+  /** Location in UICR of REGOUT0 (used to set voltage levels for VCC at boot) */
+  UICR_REGOUT0(r) : ORIGIN = 0x10001304, LENGTH = 0x04
 }
 
 SECTIONS
@@ -80,6 +83,12 @@ SECTIONS
   {
     KEEP(*(.uicrMbrParamsPageAddress))
   } > UICR_MBR_PARAM_PAGE
+
+  /* Write REGOUT0 in UICR. */
+  .uicrREGOUT0 :
+  {
+    KEEP(*(.uicrREGOUT0))
+  } > UICR_REGOUT0
 
   .dbl_reset(NOLOAD) :
   {
