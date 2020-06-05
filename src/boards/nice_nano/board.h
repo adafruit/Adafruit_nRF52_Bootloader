@@ -52,8 +52,8 @@
 // USB
 //--------------------------------------------------------------------+
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x0029
+#define USB_DESC_UF2_PID       0x00B3
+#define USB_DESC_CDC_ONLY_PID  0x00B3
 
 #define UF2_PRODUCT_NAME  "nice!nano"
 #define UF2_VOLUME_LABEL  "NICENANO"
