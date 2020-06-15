@@ -154,7 +154,7 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
-  PRINTF("Bootlaoder Start\r\n");
+  PRINTF("Bootloader Start\r\n");
 
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
@@ -210,6 +210,9 @@ int main(void)
   if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET())
     dfu_start = 1;
 
+  // kevinh temp hack
+  dfu_start = 0;
+  
   // App mode: register 1st reset and DFU startup (nrf52832)
   if ( ! (just_start_app || dfu_start || !valid_app) )
   {
@@ -235,6 +238,7 @@ int main(void)
   else
     (*dbl_reset_mem) = 0;
 
+  PRINTF("flags dfu_start=%d, valid_app=%d, just_start=%d\r\n", dfu_start, valid_app, just_start_app);
   if ( dfu_start || !valid_app )
   {
     if ( _ota_dfu )
