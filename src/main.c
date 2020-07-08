@@ -223,7 +223,7 @@ int main(void)
      * Note: Supposedly during this time if RST is press, it will count as double reset.
      * However Double Reset WONT work with nrf52832 since its SRAM got cleared anyway.
      */
-    bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL);
+    bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL, false);
 #else
     // if RST is pressed during this delay --> if will enter dfu
     NRFX_DELAY_MS(DFU_DBL_RESET_DELAY);
@@ -250,7 +250,14 @@ int main(void)
     }
 
     // Initiate an update of the firmware.
-    APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0) );
+    if (APP_ASKS_FOR_SINGLE_TAP_RESET())
+    {
+      APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 3000, true) );
+    }
+    else
+    {
+      APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0, false) );
+    }
 
     if ( _ota_dfu )
     {
