@@ -252,10 +252,12 @@ int main(void)
     // Initiate an update of the firmware.
     if (APP_ASKS_FOR_SINGLE_TAP_RESET())
     {
+      // If USB is not enumerated in 3s (eg. because we're running on battery), we restart into app.
       APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 3000, true) );
     }
     else
     {
+      // No timeout if bootloader requires user action (double-reset).
       APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0, false) );
     }
 

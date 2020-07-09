@@ -49,8 +49,7 @@ typedef enum
 
 static pstorage_handle_t        m_bootsettings_handle;  /**< Pstorage handle to use for registration and identifying the bootloader module on subsequent calls to the pstorage module for load and store of bootloader setting in flash. */
 static bootloader_status_t      m_update_status;        /**< Current update status for the bootloader module to ensure correct behaviour when updating settings and when update completes. */
-
-static bool m_cancel_timeout_on_usb;
+static bool m_cancel_timeout_on_usb; /**< If set the timeout is cancelled when USB is enumerated. Otherwise, the timeout is only cancelled when DFU update is started. */
 
 APP_TIMER_DEF( _dfu_startup_timer );
 volatile bool dfu_startup_packet_received = false;
@@ -326,7 +325,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
 {
     uint32_t err_code;
 
-    m_cancel_timeout_on_usb = cancel_timeout_on_usb;
+    m_cancel_timeout_on_usb = cancel_timeout_on_usb && !ota;
 
     // Clear swap if banked update is used.
     err_code = dfu_init();
