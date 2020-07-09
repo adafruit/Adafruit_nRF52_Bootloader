@@ -49,6 +49,7 @@ typedef enum
 
 static pstorage_handle_t        m_bootsettings_handle;  /**< Pstorage handle to use for registration and identifying the bootloader module on subsequent calls to the pstorage module for load and store of bootloader setting in flash. */
 static bootloader_status_t      m_update_status;        /**< Current update status for the bootloader module to ensure correct behaviour when updating settings and when update completes. */
+static bool m_cancel_timeout_on_usb; /**< If set the timeout is cancelled when USB is enumerated. Otherwise, the timeout is only cancelled when DFU update is started. */
 
 APP_TIMER_DEF( _dfu_startup_timer );
 volatile bool dfu_startup_packet_received = false;
@@ -79,6 +80,13 @@ static void pstorage_callback_handler(pstorage_handle_t * p_handle,
  */
 static void dfu_startup_timer_handler(void * p_context)
 {
+#ifdef NRF_USBD
+  if (m_cancel_timeout_on_usb && tud_mounted())
+  {
+    return;
+  }
+#endif
+
   // No packets are received within timeout, terminal and DFU mode
   // dfu_startup_packet_received is set by process_dfu_packet() in dfu_transport_serial.c
   if (!dfu_startup_packet_received)
@@ -313,9 +321,11 @@ uint32_t bootloader_init(void)
 }
 
 
-uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms)
+uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout_on_usb)
 {
     uint32_t err_code;
+
+    m_cancel_timeout_on_usb = cancel_timeout_on_usb && !ota;
 
     // Clear swap if banked update is used.
     err_code = dfu_init();

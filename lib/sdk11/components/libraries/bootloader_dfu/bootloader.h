@@ -42,7 +42,7 @@ bool bootloader_app_is_valid(void);
  * 
  * @retval     NRF_SUCCESS If new application image was successfully transferred.
  */
-uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms);
+uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout_on_usb);
 
 /**@brief Function for exiting bootloader and booting into application.
  *
