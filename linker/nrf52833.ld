@@ -39,6 +39,16 @@ MEMORY
     
   /** Location in UICR where mbr params page address is stored. */
   UICR_MBR_PARAM_PAGE(r) : ORIGIN = 0x10001018, LENGTH = 0x04
+
+  /** Location in UICR of REGOUT0 (used to set voltage levels for VCC at boot)
+   *
+   * IMPORTANT NOTE: This controls the voltage provided on the VCC output of the CPU. Changing this value from the default
+   * can physically damage parts on your board.  If using a SWD debugger you should consider connecting the Vref input
+   * for that debugger to the VCC rail. Think carefully before using this feature.
+   * Example usage:
+   * __attribute__ ((section(".uicrREGOUT0"))) volatile uint32_t m_uicr_regout0 = 0xfffffff4;
+   */
+  UICR_REGOUT0(r) : ORIGIN = 0x10001304, LENGTH = 0x04
 }
 
 SECTIONS
@@ -73,6 +83,12 @@ SECTIONS
   {
     KEEP(*(.uicrMbrParamsPageAddress))
   } > UICR_MBR_PARAM_PAGE
+
+  /* Write REGOUT0 in UICR. */
+  .uicrREGOUT0 :
+  {
+    KEEP(*(.uicrREGOUT0))
+  } > UICR_REGOUT0
 
   .dbl_reset(NOLOAD) :
   {
