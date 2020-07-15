@@ -23,7 +23,7 @@ MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 LD_FILE      = linker/$(MCU_SUB_VARIANT).ld
 
 GIT_VERSION = $(shell git describe --dirty --always --tags)
-GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d' ' -f3,4 | paste -s -d" " -)
+GIT_SUBMODULE_VERSIONS = $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 
 # compiled file name
 OUT_FILE = $(BOARD)_bootloader-$(GIT_VERSION)
