@@ -97,9 +97,10 @@ void usb_teardown(void);
  */
 
 /* Magic that written to NRF_POWER->GPREGRET by application when it wish to go into DFU
- * - BOOTLOADER_DFU_OTA_MAGIC used by BLEDfu service : SD is already init
- * - BOOTLOADER_DFU_OTA_FULLRESET_MAGIC entered by soft reset : SD is not init
- * - BOOTLOADER_DFU_SERIAL_MAGIC entered by soft reset : SD is not init
+ * - DFU_MAGIC_OTA_APPJUM used by BLEDfu service : SD is already init
+ * - DFU_MAGIC_OTA_RESET entered by soft reset : SD is not init
+ * - DFU_MAGIC_SERIAL_ONLY_RESET with CDC interface only
+ * - DFU_MAGIC_UF2_RESET with CDC and MSC interfaces
  *
  * Note: for DFU_MAGIC_OTA_APPJUM Softdevice must not initialized.
  * since it is already in application. In all other case of OTA SD must be initialized
