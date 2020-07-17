@@ -49,12 +49,12 @@ NRFJPROG = nrfjprog
 
 # Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
 ifneq ($(OS), Windows_NT)
-MK = mkdir -p
+  MK = mkdir -p
 else
-MK = mkdir
+  MK = mkdir
 endif
 
-RM := rm -rf
+RM = rm -rf
 
 # auto-detect BMP on macOS, otherwise have to specify
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
