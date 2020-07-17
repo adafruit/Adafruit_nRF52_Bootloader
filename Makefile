@@ -47,8 +47,14 @@ GDB     = $(CROSS_COMPILE)gdb
 NRFUTIL = adafruit-nrfutil
 NRFJPROG = nrfjprog
 
-MK = mkdir -p
-RM = rm -rf
+# Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
+ifneq ($(OS), Windows_NT)
+MK := mkdir -p
+else
+MK := mkdir
+endif
+
+RM := rm -rf
 
 # auto-detect BMP on macOS, otherwise have to specify
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
@@ -324,7 +330,7 @@ print-%:
 
 # Create build directories
 $(BUILD):
-	@$(MK) $@
+	@$(MK) "$@"
 
 clean:
 	@$(RM) $(BUILD)
