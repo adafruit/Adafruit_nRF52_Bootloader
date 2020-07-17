@@ -49,9 +49,9 @@ NRFJPROG = nrfjprog
 
 # Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
 ifneq ($(OS), Windows_NT)
-MK := mkdir -p
+MK = mkdir -p
 else
-MK := mkdir
+MK = mkdir
 endif
 
 RM := rm -rf
