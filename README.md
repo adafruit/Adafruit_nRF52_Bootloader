@@ -67,7 +67,7 @@ For other boards, please check the board definition for details.
 
 ### Making your own UF2
 
-To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000 
+To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000
 
 To create a UF2 image from a .bin file:
 ```
@@ -109,25 +109,25 @@ Prerequisites
 To build:
 
 ```
-make BOARD=feather_nrf52840_express all
+make BOARD=feather_nrf52840_express PROTOCOL=BLE all
 ```
 
 To flash the bootloader with JLink:
 
 ```
-make BOARD=feather_nrf52840_express flash
+make BOARD=feather_nrf52840_express PROTOCOL=BLE flash
 ```
 
 To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
 
 ```
-make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 dfu-flash
+make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 PROTOCOL=BLE dfu-flash
 ```
 
 To flash SoftDevice (and chip erase):
 
 ```
-make BOARD=feather_nrf52840_express sd
+make BOARD=feather_nrf52840_express PROTOCOL=BLE sd
 ```
 
 For the list of supported boards, run `make` without `BOARD=` :
@@ -139,6 +139,26 @@ Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
 Makefile:90: *** BOARD not defined.  Stop
 ```
 
+The supported protocols are currently BLE and BOTH (ANT + BLE).
+
+### Building with an ANT softdevice
+
+Currently, the bootloader can be built against the dualstack softdevice headers for
+use of both ANT and BLE simultaneously. To do this:
+
+1. Download either s332 or s340 from thisisant.com. Note that this softdevice is
+   freely available for evaluation use only. Garmin Canada must be contacted to obtain
+   ANT licenses for commercial use.
+2. Place the contents of the softdevice package in the appropriate lib/softdevice folder.
+3. Rename the API folder to <SD name>_nrf52_6.1.1_API.
+4. Rename the softdevice hex to <SD name>_nrf52_6.1.1_softdevice.hex.
+5. When building make sure to set PROTOCOL=BOTH
+
+All bootloader features available in the single-stack BLE softdevice are also available in the
+dualstack softdevice, including OTA-DFU updates using BLE.
+
+Note that single stack ANT softdevices are not currently supported (s2xx series softdevices).
+
 ### Common makefile problems
 
 #### 1. `arm-none-eabi-gcc`: No such file or directory
@@ -146,7 +166,7 @@ Makefile:90: *** BOARD not defined.  Stop
 If you get the following error ...
 
 ```
-$ make BOARD=feather_nrf52840_express all 
+$ make BOARD=feather_nrf52840_express all
 Compiling file: main.c
 /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
 make: *** [_build/main.o] Error 127
