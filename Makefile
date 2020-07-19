@@ -71,6 +71,25 @@ ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(error Invalid BOARD specified)
 endif
 
+#---------------------------------
+# Select the supported protocols
+#---------------------------------
+ifeq ($(PROTOCOL),BOTH)
+  $(info Build specified supporting both ANT and BLE)
+  $(warning Ensure you download a dualstack softdevice from thisisant.com)
+  $(warning Make sure to compile against the dualstack softdevice headers)
+else ifeq ($(PROTOCOL),BLE)
+  $(info Build specified supporting only BLE)
+  $(warning Make sure to compile against the BLE softdevice headers)
+else
+  $(error Invalid protocol supported. Supported protocols are: BLE BOTH)
+  $(info BLE: Select for S1xx softdevices. You will need to compile against the S1xx headers)
+  $(info BOTH: Select for S3xx softdevices. You will need to compile against the S3xx headers)
+endif
+
+# Append the selected protocol to the compile flags
+CFLAGS += -D$(PROTOCOL)
+
 # Build directory
 BUILD = _build/build-$(BOARD)
 
