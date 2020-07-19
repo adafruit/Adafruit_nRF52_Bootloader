@@ -98,17 +98,35 @@ BUILD = _build/build-$(BOARD)
 
 # MCU_SUB_VARIANT can be nrf52 (nrf52832), nrf52833, nrf52840
 ifeq ($(MCU_SUB_VARIANT),nrf52)
-  SD_NAME = s132
+  ifeq ($(PROTOCOL),BLE)
+    SD_NAME = s132
+    CFLAGS += -DS132
+  else
+    SD_NAME = s332
+    CFLAGS += -DS332
+  endif
   DFU_DEV_REV = 0xADAF
-  CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132
+  CFLAGS += -DNRF52 -DNRF52832_XXAA
 else ifeq ($(MCU_SUB_VARIANT),nrf52833)
-  SD_NAME = s140
+  ifeq ($(PROTOCOL),BLE)
+    SD_NAME = s140
+    CFLAGS += -DS140
+  else
+    SD_NAME = s340
+    CFLAGS += -DS340
+  endif
   DFU_DEV_REV = 52840
-  CFLAGS += -DNRF52833_XXAA -DS140
+  CFLAGS += -DNRF52833_XXAA
 else ifeq ($(MCU_SUB_VARIANT),nrf52840)
-  SD_NAME = s140
+  ifeq ($(PROTOCOL),BLE)
+    SD_NAME = s140
+    CFLAGS += -DS140
+  else
+    SD_NAME = s340
+    CFLAGS += -DS340
+  endif
   DFU_DEV_REV = 52840
-  CFLAGS += -DNRF52840_XXAA -DS140
+  CFLAGS += -DNRF52840_XXAA
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif

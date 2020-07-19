@@ -1,0 +1,1 @@
+Obtain the 6.1.1 s332 softdevice from thisisant.com and place the API folder and softdevice hex here.
