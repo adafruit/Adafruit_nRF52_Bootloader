@@ -155,7 +155,7 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
-  PRINTF("Bootlaoder Start\r\n");
+  PRINTF("Bootloader Start\r\n");
 
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
