@@ -2,7 +2,7 @@
 # CONFIGURE
 # - SDK_PATH   : path to SDK directory
 #
-# - SD_NAME    : e.g s132, s140
+# - SD         : e.g s132, s140
 # - SD_VERSION : SoftDevice version e.g 6.0.0
 # - SD_HEX     : to bootloader hex binary
 #------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ NRFX_PATH    = lib/nrfx
 SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
 SD_VERSION   = 6.1.1
-SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
+SD_FILENAME  = $(SD)_nrf52_$(SD_VERSION)
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
@@ -29,7 +29,7 @@ GIT_SUBMODULE_VERSIONS != git submodule status | cut -d" " -f3,4 | paste -s -d" 
 OUT_FILE = $(BOARD)_bootloader-$(GIT_VERSION)
 
 # merged file = compiled + sd
-MERGED_FILE = $(OUT_FILE)_$(SD_NAME)_$(SD_VERSION)
+MERGED_FILE = $(OUT_FILE)_$(SD)_$(SD_VERSION)
 
 #------------------------------------------------------------------------------
 # Tool configure
@@ -71,64 +71,77 @@ ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(error Invalid BOARD specified)
 endif
 
-#---------------------------------
-# Select the supported protocols
-#---------------------------------
-ifeq ($(PROTOCOL),BOTH)
-  $(info Build specified supporting both ANT and BLE)
-  $(warning Ensure you download a dualstack softdevice from thisisant.com)
-  $(warning Make sure to compile against the dualstack softdevice headers)
-else ifeq ($(PROTOCOL),BLE)
-  $(info Build specified supporting only BLE)
-  $(warning Make sure to compile against the BLE softdevice headers)
-else
-  $(error Invalid protocol supported. Supported protocols are: BLE BOTH)
-  $(info BLE: Select for S1xx softdevices. You will need to compile against the S1xx headers)
-  $(info BOTH: Select for S3xx softdevices. You will need to compile against the S3xx headers)
-endif
-
-# Append the selected protocol to the compile flags
-CFLAGS += -D$(PROTOCOL)
-
 # Build directory
 BUILD = _build/build-$(BOARD)
 
 # Board specific
 -include src/boards/$(BOARD)/board.mk
 
-# MCU_SUB_VARIANT can be nrf52 (nrf52832), nrf52833, nrf52840
-ifeq ($(MCU_SUB_VARIANT),nrf52)
-  ifeq ($(PROTOCOL),BLE)
-    SD_NAME = s132
-    CFLAGS += -DS132
+#---------------------------------
+# Select the softdevice to build for
+#---------------------------------
+ifeq ($(SD),s140)
+  CFLAGS += -DS140 -DBLE
+  DFU_DEV_REV = 52840
+  ifeq ($(MCU_SUB_VARIANT),nrf52833)
+    CFLAGS += -DNRF52833_XXAA
+  else ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    CFLAGS += -DNRF52840_XXAA
   else
-    SD_NAME = s332
-    CFLAGS += -DS332
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
   endif
+else ifeq ($(SD),s340)
+  $(info Build specified supporting both ANT and BLE)
+  $(warning Ensure you download a dualstack softdevice from thisisant.com)
+  $(warning Make sure to compile against the dualstack softdevice headers)
+  CFLAGS += -DS340 -DBOTH
+  DFU_DEV_REV = 52840
+  ifeq ($(MCU_SUB_VARIANT),nrf52833)
+    CFLAGS += -DNRF52833_XXAA
+  else ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    CFLAGS += -DNRF52840_XXAA
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
+  endif
+else ifeq ($(SD),s132)
+  CFLAGS += -DS132 -DBLE
   DFU_DEV_REV = 0xADAF
-  CFLAGS += -DNRF52 -DNRF52832_XXAA
-else ifeq ($(MCU_SUB_VARIANT),nrf52833)
-  ifeq ($(PROTOCOL),BLE)
-    SD_NAME = s140
-    CFLAGS += -DS140
+  ifeq ($(MCU_SUB_VARIANT),nrf52)
+    CFLAGS += -DNRF52832_XXAA
   else
-    SD_NAME = s340
-    CFLAGS += -DS340
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
   endif
-  DFU_DEV_REV = 52840
-  CFLAGS += -DNRF52833_XXAA
-else ifeq ($(MCU_SUB_VARIANT),nrf52840)
-  ifeq ($(PROTOCOL),BLE)
-    SD_NAME = s140
-    CFLAGS += -DS140
+else ifeq ($SD, s332)
+  $(info Build specified supporting both ANT and BLE)
+  $(warning Ensure you download a dualstack softdevice from thisisant.com)
+  $(warning Make sure to compile against the dualstack softdevice headers)
+  CFLAGS += -DS332 -DBOTH
+  DFU_DEV_REV = 0xADAF
+  ifeq ($(MCU_SUB_VARIANT),nrf52)
+    CFLAGS += -DNRF52832_XXAA
   else
-    SD_NAME = s340
-    CFLAGS += -DS340
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
   endif
-  DFU_DEV_REV = 52840
-  CFLAGS += -DNRF52840_XXAA
+else ifeq ($SD,)
+  # SD not specified, default to BLE SDs
+  ifeq ($(MCU_SUB_VARIANT),nrf52)
+    SD = s132
+    DFU_DEV_REV = 0xADAF
+    CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132 -DBLE
+  else ifeq ($(MCU_SUB_VARIANT),nrf52833)
+    SD = s140
+    DFU_DEV_REV = 52840
+    CFLAGS += -DNRF52833_XXAA -DS140 -DBLE
+  else ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    SD = s140
+    DFU_DEV_REV = 52840
+    CFLAGS += -DNRF52840_XXAA -DS140 -DBLE
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
+  endif
 else
-  $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
+  # Invalid SD was specified
+  $(error softdevice $(SD) is unknown)
 endif
 
 #------------------------------------------------------------------------------
@@ -298,7 +311,7 @@ CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
-CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
+CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD) $(SD_VERSION)"'
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
 CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'

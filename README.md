@@ -109,25 +109,25 @@ Prerequisites
 To build:
 
 ```
-make BOARD=feather_nrf52840_express PROTOCOL=BLE all
+make BOARD=feather_nrf52840_express SD=s140 all
 ```
 
 To flash the bootloader with JLink:
 
 ```
-make BOARD=feather_nrf52840_express PROTOCOL=BLE flash
+make BOARD=feather_nrf52840_express SD=s140 flash
 ```
 
 To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
 
 ```
-make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 PROTOCOL=BLE dfu-flash
+make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 SD=s140 dfu-flash
 ```
 
 To flash SoftDevice (and chip erase):
 
 ```
-make BOARD=feather_nrf52840_express PROTOCOL=BLE sd
+make BOARD=feather_nrf52840_express SD=s140 sd
 ```
 
 For the list of supported boards, run `make` without `BOARD=` :
@@ -152,7 +152,7 @@ use of both ANT and BLE simultaneously. To do this:
 2. Place the contents of the softdevice package in the appropriate lib/softdevice folder.
 3. Rename the API folder to <SD name>_nrf52_6.1.1_API.
 4. Rename the softdevice hex to <SD name>_nrf52_6.1.1_softdevice.hex.
-5. When building make sure to set PROTOCOL=BOTH
+5. When building make sure to set SD=s340 or SD=s332
 
 All bootloader features available in the single-stack BLE softdevice are also available in the
 dualstack softdevice, including OTA-DFU updates using BLE.
