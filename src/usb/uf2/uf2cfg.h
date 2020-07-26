@@ -1,8 +1,11 @@
 #include "boards.h"
 #include "dfu_types.h"
 
-// Family ID for updating Application
+// Legacy Family ID for updating Application
 #define CFG_UF2_FAMILY_APP_ID     0xADA52840
+
+// Family ID for board-specific Application
+#define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
 
 // Family ID for updating Bootloader
 #define CFG_UF2_FAMILY_BOOT_ID    0xd663823c
