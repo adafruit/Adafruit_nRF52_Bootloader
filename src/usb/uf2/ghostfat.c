@@ -364,12 +364,11 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->payloadSize = UF2_FIRMWARE_BYTES_PER_SECTOR;
                 bl->flags = UF2_FLAG_FAMILYID;
 
-                bool useBoardId = false; // BUGBUG -- how to detect which familyID to use?
-                if (useBoardId) {
-                  bl->familyID = CFG_UF2_BOARD_APP_ID;
-                } else {
-                  bl->familyID = CFG_UF2_FAMILY_APP_ID;
-                }
+#if defined(CFG_UF2_BOARD_APP_ID) && CFG_UF2_BOARD_APP_ID
+                bl->familyID = CFG_UF2_BOARD_APP_ID;
+#else
+                bl->familyID = CFG_UF2_FAMILY_APP_ID;
+#endif
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
@@ -396,7 +395,11 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   switch ( bl->familyID )
   {
+
+#if defined(CFG_UF2_BOARD_APP_ID) && CFG_UF2_BOARD_APP_ID
     case CFG_UF2_BOARD_APP_ID:  // board-specific app ... may not be usable on other nrf52 boards
+#endif
+
     case CFG_UF2_FAMILY_APP_ID: // legacy, or where app uses bootloader configuration to discover pins
       /* Upgrading Application
        *

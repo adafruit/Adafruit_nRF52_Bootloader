@@ -5,7 +5,10 @@
 #define CFG_UF2_FAMILY_APP_ID     0xADA52840
 
 // Family ID for board-specific Application
-#define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
+#if defined(USB_DESC_VID) && defined(USB_DESC_UF2_PID) && USB_DESC_VID && USB_DESC_UF2_PID
+    #define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
+#endif
+
 
 // Family ID for updating Bootloader
 #define CFG_UF2_FAMILY_BOOT_ID    0xd663823c
