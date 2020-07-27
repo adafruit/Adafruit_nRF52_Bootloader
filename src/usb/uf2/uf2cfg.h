@@ -1,15 +1,13 @@
 #include "boards.h"
 #include "dfu_types.h"
 
-#if !defined(USB_DESC_VID) || !defined(USB_DESC_UF2_PID) || !USB_DESC_VID || !USB_DESC_UF2_PID
-    #error "Per @hathach, 'This repo doesn't accept nrf52840/833 that doesn't have VID/PID'"
-#endif
-
-
-// Family ID for updating Application
+// Legacy Family ID for updating Application
 #define CFG_UF2_FAMILY_APP_ID     0xADA52840
-// Board ID for board-specific Application
-#define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
+
+// Family ID for board-specific Application
+#if defined(USB_DESC_VID) && defined(USB_DESC_UF2_PID) && USB_DESC_VID && USB_DESC_UF2_PID
+    #define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
+#endif
 
 
 // Family ID for updating Bootloader
