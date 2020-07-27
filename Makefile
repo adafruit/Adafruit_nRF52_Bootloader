@@ -63,7 +63,8 @@ GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan
 #---------------------------------
 # Select the board to build
 #---------------------------------
-BOARD_LIST = $(sort $(subst src/boards/,,$(wildcard src/boards/*)))
+# Note: whitespace is not allowed in the filenames... it WILL break this part of the script
+BOARD_LIST = $(sort $(filter-out boards.h boards.c,$(notdir $(wildcard src/boards/*))))
 
 ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
