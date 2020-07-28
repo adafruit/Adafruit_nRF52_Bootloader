@@ -363,12 +363,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->targetAddr = addr;
                 bl->payloadSize = UF2_FIRMWARE_BYTES_PER_SECTOR;
                 bl->flags = UF2_FLAG_FAMILYID;
-
-#if defined(CFG_UF2_BOARD_APP_ID) && CFG_UF2_BOARD_APP_ID
                 bl->familyID = CFG_UF2_BOARD_APP_ID;
-#else
-                bl->familyID = CFG_UF2_FAMILY_APP_ID;
-#endif
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }

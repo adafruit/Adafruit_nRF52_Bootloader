@@ -1,10 +1,10 @@
 #include "boards.h"
 #include "dfu_types.h"
 
-// Legacy Family ID for updating Application
+// Family ID for updating generic Application
 #define CFG_UF2_FAMILY_APP_ID     0xADA52840
 
-// Family ID for board-specific Application
+// Board-specific ID for board-specific Application
 #if defined(USB_DESC_VID) && defined(USB_DESC_UF2_PID) && USB_DESC_VID && USB_DESC_UF2_PID
     #define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
 #endif
