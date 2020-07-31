@@ -391,10 +391,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
   switch ( bl->familyID )
   {
 
-#if defined(CFG_UF2_BOARD_APP_ID) && CFG_UF2_BOARD_APP_ID
     case CFG_UF2_BOARD_APP_ID:  // board-specific app ... may not be usable on other nrf52 boards
-#endif
-
     case CFG_UF2_FAMILY_APP_ID: // legacy, or where app uses bootloader configuration to discover pins
       /* Upgrading Application
        *
