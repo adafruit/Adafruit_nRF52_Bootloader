@@ -257,8 +257,17 @@ CFLAGS += -Wno-cast-function-type
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
-CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
-CFLAGS += -DSOFTDEVICE_PRESENT
+
+# Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
+ifneq ($(USES_NFCT),yes)
+  CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
+endif
+
+# Skip defining SOFTDEVICE_PRESENT if the device doesn't use a soft device.
+ifneq ($(NO_SOFT_DEVICE),yes)
+  CFLAGS += -DSOFTDEVICE_PRESENT
+endif
+
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
