@@ -160,7 +160,7 @@ bool bootloader_app_is_valid(void)
   {
     return false;
   }
-
+#if !defined(DISABLE_APPLICATION_CRC_CHECK)
   // The application in CODE region 1 is flagged as valid during update.
   if ( p_bootloader_settings->bank_0 == BANK_VALID_APP )
   {
@@ -176,6 +176,10 @@ bool bootloader_app_is_valid(void)
 
     success = (image_crc == p_bootloader_settings->bank_0_crc);
   }
+#else
+  // DISABLE_APPLICATION_CRC_CHECK was defined, assume CRC check passed.
+  success = true;
+#endif
 
   return success;
 }
