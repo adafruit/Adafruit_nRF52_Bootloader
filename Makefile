@@ -259,7 +259,7 @@ CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 
 # Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
-ifneq ($(USES_NFCT),yes)
+ifneq ($(USE_NFCT),yes)
   CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
 endif
 
