@@ -48,11 +48,18 @@ GDB     = $(CROSS_COMPILE)gdb
 NRFUTIL = adafruit-nrfutil
 NRFJPROG = nrfjprog
 FLASHER ?= nrfjprog
+PYOCD ?= pyocd
 
 # Flasher will default to nrfjprog,
 # Check for pyocd, error on unexpected value.
-ifeq ($(FLASHER),pyocd)
-  PYOCD ?= pyocd
+ifeq ($(FLASHER),nrfjprog)
+  FLASH_CMD = $(NRFJPROG) --program $1 --sectoranduicrerase -f nrf52 --reset
+  FLASH_NOUICR_CMD = $(NRFJPROG) --program $1 -f nrf52 --sectorerase --reset
+  FLASH_ERASE_CMD = $(NRFJPROG) -f nrf52 --eraseall
+else ifeq ($(FLASHER),pyocd)
+  FLASH_CMD = $(PYOCD) flash -t $(MCU_SUB_VARIANT) $1
+  FLASH_NOUICR_CMD = $(PYOCD) flash -t $(MCU_SUB_VARIANT) $1
+  FLASH_ERASE_CMD = $(PYOCD) erase -t $(MCU_SUB_VARIANT) --chip
 else
   $(error Unsupported flash utility: "$(FLASHER)")
 endif
@@ -397,51 +404,24 @@ __check_defined = \
     $(if $(value $1),, \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
-#------------------- Flash with NRFJPROG -------------------
-ifeq ($(FLASHER),nrfjprog)
-
 # Flash the compiled
 flash: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo Flashing: $(notdir $<)
-	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
+	$(call FLASH_CMD,$<)
 
 erase:
 	@echo Erasing flash
-	$(NRFJPROG) -f nrf52 --eraseall
+	$(call FLASH_ERASE_CMD)
 
 # flash SD only
 sd:
 	@echo Flashing: $(SD_HEX)
-	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --sectorerase --reset
+	$(call FLASH_NOUICR_CMD,$(SD_HEX))
 
 # flash MBR only
 mbr:
 	@echo Flashing: $(MBR_HEX)
-	$(NRFJPROG) --program $(MBR_HEX) -f nrf52 --sectorerase --reset
-
-#------------------- Flash with PYOCD -------------------
-else ifeq ($(FLASHER),pyocd)
-
-# Flash the compiled
-flash: $(BUILD)/$(OUT_FILE)-nosd.hex
-	@echo Flashing: $(notdir $<)
-	$(PYOCD) flash -t $(MCU_SUB_VARIANT) $<
-
-erase:
-	@echo Erasing flash
-	$(PYOCD) erase -t $(MCU_SUB_VARIANT) --chip
-
-# flash SD only
-sd:
-	@echo Flashing: $(SD_HEX)
-	$(PYOCD) flash -t $(MCU_SUB_VARIANT) $(SD_HEX)
-
-# flash MBR only
-mbr:
-	@echo Flashing: $(MBR_HEX)
-	$(PYOCD) flash -t $(MCU_SUB_VARIANT) $(MBR_HEX)
-
-endif
+	$(call FLASH_NOUICR_CMD,$(MBR_HEX))
 
 #------------------- Flash with NRFUTIL via DFU -------------------
 
