@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _M2_H_
-#define _M2_H_
+#ifndef _MAKERDIARY_NRF52840_M2_H_
+#define _MAKERDIARY_NRF52840_M2_H_
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -50,8 +50,8 @@
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "cmd.wtf"
-#define BLEDIS_MODEL          "PowerOverwhelmiing"
+#define BLEDIS_MANUFACTURER   "Makerdiary"
+#define BLEDIS_MODEL          "nRF52840 M.2"
 
 //--------------------------------------------------------------------+
 // USB
@@ -60,11 +60,13 @@
 #define USB_DESC_UF2_PID        0x0029
 #define USB_DESC_CDC_ONLY_PID   0x002A
 
-//------------- UF2 -------------//
-#define UF2_PRODUCT_NAME      "Power Overwhelmiing by cmd.wtf"
-#define UF2_VOLUME_LABEL      "POWBOOT"
-#define UF2_BOARD_ID          "Power Overwhelmiing"
-#define UF2_INDEX_URL         "https://cmd.wtf"
+//--------------------------------------------------------------------+
+// UF2
+//--------------------------------------------------------------------+
+#define UF2_PRODUCT_NAME        "MakerDiary nRF52840 M.2 Module"
+#define UF2_VOLUME_LABEL        "nRF52840M2"
+#define UF2_BOARD_ID            "nRF52840M2"
+#define UF2_INDEX_URL           "https://wiki.makerdiary.com/nrf52840-m2"
 
 
-#endif /* _M2_H_ */
+#endif /* _MAKERDIARY_NRF52840_M2_H_ */
