@@ -47,12 +47,11 @@ GDB     = $(CROSS_COMPILE)gdb
 # Flasher utility options
 NRFUTIL = adafruit-nrfutil
 NRFJPROG = nrfjprog
-FLASHER ?=
+FLASHER ?= nrfjprog
 
-# default to nrf
-ifeq ($(FLASHER),)
-  FLASHER = nrf
-else ifeq ($(FLASHER),pyocd)
+# Flasher will default to nrfjprog,
+# Check for pyocd, error on unexpected value.
+ifeq ($(FLASHER),pyocd)
   PYOCD ?= pyocd
 else
   $(error Unsupported flash utility: "$(FLASHER)")
@@ -398,8 +397,8 @@ __check_defined = \
     $(if $(value $1),, \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
-#------------------- Flash with NRFUTIL -------------------
-ifeq ($(FLASHER),nrf)
+#------------------- Flash with NRFJPROG -------------------
+ifeq ($(FLASHER),nrfjprog)
 
 # Flash the compiled
 flash: $(BUILD)/$(OUT_FILE)-nosd.hex
