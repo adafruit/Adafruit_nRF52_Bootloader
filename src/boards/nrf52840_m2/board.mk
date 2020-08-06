@@ -1,0 +1,2 @@
+MCU_SUB_VARIANT = nrf52840
+USE_NFCT = yes
