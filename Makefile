@@ -405,11 +405,6 @@ flash: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo Flashing: $(notdir $<)
 	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
 
-  # dfu using CDC interface
-  dfu-flash: $(BUILD)/$(MERGED_FILE).zip
-	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
-
 erase:
 	@echo Erasing flash
 	$(NRFJPROG) -f nrf52 --eraseall
@@ -432,11 +427,7 @@ flash: $(BUILD)/$(OUT_FILE)-nosd.hex
 	@echo Flashing: $(notdir $<)
 	$(PYOCD) flash -t $(MCU_SUB_VARIANT) $<
 
-  # dfu unsupported with pyocd
-  dfu-flash: $(BUILD)/$(MERGED_FILE).zip
-	$(error dfu-flash is not implemented with pyocd as the FLASHER)
-
-  erase:
+erase:
 	@echo Erasing flash
 	$(PYOCD) erase -t $(MCU_SUB_VARIANT) --chip
 
@@ -451,6 +442,13 @@ mbr:
 	$(PYOCD) flash -t $(MCU_SUB_VARIANT) $(MBR_HEX)
 
 endif
+
+#------------------- Flash with NRFUTIL via DFU -------------------
+
+# dfu using CDC interface
+dfu-flash: $(BUILD)/$(MERGED_FILE).zip
+	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
+	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
 #------------------- Debugging -------------------
 
