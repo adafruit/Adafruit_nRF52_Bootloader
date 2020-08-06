@@ -56,9 +56,9 @@
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID            0x1915
-#define USB_DESC_UF2_PID        0x0029
-#define USB_DESC_CDC_ONLY_PID   0x002A
+#define USB_DESC_VID            0x2886
+#define USB_DESC_UF2_PID        0xF00F
+#define USB_DESC_CDC_ONLY_PID   0xF00F
 
 //--------------------------------------------------------------------+
 // UF2
