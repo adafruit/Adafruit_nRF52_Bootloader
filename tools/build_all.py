@@ -35,7 +35,8 @@ for board in all_boards:
     os.makedirs(bin_directory, exist_ok=True)
 
     start_time = time.monotonic()
-    make_result = subprocess.run("make -j 4 BOARD={} all".format(board), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    subprocess.run("make -j BOARD={} clean".format(board), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    make_result = subprocess.run("make -j BOARD={} all".format(board), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     build_duration = time.monotonic() - start_time
 
     flash_size = "-"
