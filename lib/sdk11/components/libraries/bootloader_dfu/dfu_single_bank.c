@@ -260,8 +260,6 @@ void dfu_register_callback(dfu_callback_t callback_handler)
 
 uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
 {
-    uint32_t err_code;
-
     m_start_packet = *(p_packet->params.start_packet);
 
     // Check that the requested update procedure is supported.
@@ -313,18 +311,11 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
         m_functions.activate = dfu_activate_app;
     }
 
-    switch (m_dfu_state)
-    {
-        case DFU_STATE_IDLE:
-            m_functions.prepare(m_image_size);
-            break;
+    if ( DFU_STATE_IDLE != m_dfu_state ) return NRF_ERROR_INVALID_STATE;
 
-        default:
-            err_code = NRF_ERROR_INVALID_STATE;
-            break;
-    }
+    m_functions.prepare(m_image_size);
 
-    return err_code;
+    return NRF_SUCCESS;
 }
 
 
@@ -431,7 +422,6 @@ uint32_t dfu_init_pkt_complete(void)
 
 uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
 {
-    uint32_t err_code = NRF_SUCCESS;
     uint32_t length;
 
     switch (m_dfu_state)
@@ -463,11 +453,10 @@ uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
 
         default:
             // Either the start packet was not received or dfu_init function was not called before.
-            err_code = NRF_ERROR_INVALID_STATE;
-            break;
+            return NRF_ERROR_INVALID_STATE;
     }
 
-    return err_code;
+    return NRF_SUCCESS;
 }
 
 

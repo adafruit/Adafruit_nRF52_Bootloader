@@ -232,7 +232,7 @@ IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
 ifeq ($(DEBUG), 1)
 	RTT_SRC = lib/SEGGER_RTT
 	
-	CFLAGS += -ggdb -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+	CFLAGS += -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 	IPATH += $(RTT_SRC)/RTT
   C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
 endif
@@ -263,7 +263,8 @@ CFLAGS += \
 	-Wsign-compare \
 	-Wmissing-format-attribute \
 	-Wno-endif-labels \
-	-Wunreachable-code	
+	-Wunreachable-code \
+	-ggdb
 
 # Suppress warning caused by SDK
 CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
@@ -306,7 +307,6 @@ LIBS += -lm -lc
 #------------------------------------------------------------------------------
 ASFLAGS += $(CFLAGS)
 
-
 #function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
 
@@ -328,16 +328,6 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 #------------------------------------------------------------------------------
 # BUILD TARGETS
 #------------------------------------------------------------------------------
-
-# Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
-ifeq ("$(V)","1")
-$(info CFLAGS   $(CFLAGS))
-$(info )
-$(info LDFLAGS  $(LDFLAGS))
-$(info )
-$(info ASFLAGS $(ASFLAGS))
-$(info )
-endif
 
 .PHONY: all clean flash dfu-flash sd gdbflash gdb
 
