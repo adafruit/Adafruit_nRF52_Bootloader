@@ -29,19 +29,18 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER 2
-#define LED_PRIMARY_PIN 13
-#define LED_SECONDARY_PIN 14
+#define LED_PRIMARY_PIN 13   // red
+#define LED_SECONDARY_PIN 15 // blue
 #define LED_STATE_ON 0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER 2
-#define BUTTON_1 (32 + 3)
-#define BUTTON_2 (32 + 7) // FIXME: no second button lie and say not connected
-#define BUTTON_PULL                                                            \
-  NRF_GPIO_PIN_PULLUP // really should be NOPULL but the bootloader code only
-                      // checks for PULLUP vs PULLDOWN
+#define BUTTON_1 (32 + 10)
+#define BUTTON_2 (0 + 18) // We repurpose the RESET button as button 2
+#define BUTTON_PULL NRF_GPIO_PIN_NOPULL 
+#define BUTTON_SENSE NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA

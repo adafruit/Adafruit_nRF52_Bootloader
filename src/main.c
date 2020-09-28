@@ -210,9 +210,6 @@ int main(void)
   if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET())
     dfu_start = 1;
 
-  // kevinh temp hack
-  dfu_start = 0;
-  
   // App mode: register 1st reset and DFU startup (nrf52832)
   if ( ! (just_start_app || dfu_start || !valid_app) )
   {
