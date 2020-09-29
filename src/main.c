@@ -197,6 +197,11 @@ int main(void)
     led_state(STATE_WRITING_FINISHED);
   }
 
+  // Delay 20ms so that the button capacitors can charge up before
+  // reading the buttons.  Avoids:
+  // https://devzone.nordicsemi.com/f/nordic-q-a/20698/bootloader-doesn-t-load-application-on-power-on/80742#80742
+  NRFX_DELAY_MS(20); 
+
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
   dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
