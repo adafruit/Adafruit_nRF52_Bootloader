@@ -22,7 +22,7 @@ MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 # linker by MCU eg. nrf52840.ld
 LD_FILE      = linker/$(MCU_SUB_VARIANT).ld
 
-GIT_VERSION != git describe --dirty --always --tags
+GIT_VERSION := $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS != git submodule status | cut -d" " -f3,4 | paste -s -d" " -
 
 # compiled file name
