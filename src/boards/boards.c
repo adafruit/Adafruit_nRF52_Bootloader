@@ -71,6 +71,11 @@ void board_init(void)
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
+#ifdef FORCE_HIGH
+  nrf_gpio_cfg_output(FORCE_HIGH);
+  nrf_gpio_pin_write(FORCE_HIGH, 1);
+#endif
+
   button_init(BUTTON_DFU);
   button_init(BUTTON_FRESET);
   NRFX_DELAY_US(100); // wait for the pin state is stable
