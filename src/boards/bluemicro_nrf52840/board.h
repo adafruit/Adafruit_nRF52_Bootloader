@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _BLUEMICRO_H
-#define _BLUEMICRO_H
+#ifndef _BLUEMICRO_NRF52840_H
+#define _BLUEMICRO_NRF52840_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
