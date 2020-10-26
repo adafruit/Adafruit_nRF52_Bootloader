@@ -40,8 +40,8 @@
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER  2
 
-#define BUTTON_1       _PINNUM(1, 10)
-#define BUTTON_2       _PINNUM(1, 11)
+#define BUTTON_1       _PINNUM(0, 11)
+#define BUTTON_2       _PINNUM(0, 12)
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
