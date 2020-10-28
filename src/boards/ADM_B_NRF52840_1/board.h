@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef HOLYIOT_NRF52840_H
-#define HOLYIOT_NRF52840_H
+#ifndef ADM_B_NRF52840_1_H
+#define ADM_B_NRF52840_1_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -48,19 +48,20 @@
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER  "Atelier-Du-Maker"
-#define BLEDIS_MODEL         "HOLY_NRF52840"
+#define BLEDIS_MODEL         "ADM_B_NRF52840_1"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
 
-// Shared VID/PID with Feather nRF52840, will be disabled for building in the future
 #define USB_DESC_VID           0x239A
 #define USB_DESC_UF2_PID       0x009F
 #define USB_DESC_CDC_ONLY_PID  0x009F
 
-#define UF2_PRODUCT_NAME  "Holyiot_nRF52840"
-#define UF2_BOARD_ID      "holyiot-nRF52840"
+//------------- UF2 -------------//
+#define UF2_PRODUCT_NAME  "AtelierDuMaker NRF52840 Breakout"
+#define UF2_VOLUME_LABEL   "ADM52840BOOT"
+#define UF2_BOARD_ID      "ADM_B_NRF52840_1"
 #define UF2_INDEX_URL     "https://github.com/Atelier-Du-Maker/HolyIoT_NRF52840"
 
-#endif // PCA10059_H
+#endif // ADM_B_NRF52840_1_H
