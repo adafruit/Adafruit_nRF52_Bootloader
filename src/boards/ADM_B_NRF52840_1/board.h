@@ -60,7 +60,7 @@
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME  "AtelierDuMaker NRF52840 Breakout"
-#define UF2_VOLUME_LABEL   "ADM52840BOOT"
+#define UF2_VOLUME_LABEL   "ADM840BOOT"
 #define UF2_BOARD_ID      "ADM_B_NRF52840_1"
 #define UF2_INDEX_URL     "https://github.com/Atelier-Du-Maker/HolyIoT_NRF52840"
 
