@@ -31,6 +31,7 @@ jobs:
         # 9.3.1-1.2.1 is xpack modified version which significantly increased compiled size to 6-7KB and cause flash overflow.
         # Skip this version for now, we will try again with next official release from ARM
         xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@9.3.1-1.1.1
+        whereis arm-none-eabi-gcc
         echo "/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin" >> $GITHUB_PATH
     
     - name: Build
