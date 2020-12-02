@@ -82,6 +82,31 @@ void board_init(void)
   neopixel_init();
 #endif
 
+#if ENABLE_DCDC_0 == 1
+  NRF_POWER->DCDCEN0 = 1;
+#endif
+#if ENABLE_DCDC_1 == 1
+  NRF_POWER->DCDCEN = 1;
+#endif
+
+// When board is supplied on VDDH (and not VDD), this specifies what voltage the GPIO should run at
+// and what voltage is output at VDD. The default (0xffffffff) is 1.8V; typically you'll want
+//     #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
+// in board.h when using that power configuration.
+#ifdef UICR_REGOUT0_VALUE
+  if (NRF_UICR->REGOUT0 != UICR_REGOUT0_VALUE) 
+  {
+      NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
+      while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+      NRF_UICR->REGOUT0 = UICR_REGOUT0_VALUE;
+
+      NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+      while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+
+      NVIC_SystemReset();
+  }
+#endif
+
   // Init scheduler
   APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
 
