@@ -1,0 +1,4 @@
+make GNU_INSTALL_ROOT="C:/Program Files (x86)/GNU Tools Arm Embedded/9 2019-q4-major/bin/"  NRFUTIL="C:\Users\Gábor\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.7_qbz5n2kfra8p0\LocalCache\local-packages\Python37\Scripts\adafruit-nrfutil" BOARD=feather_nrf52840_express_s340 V=1 SERIAL=COM4 dfu-flash
+
+
+make BOARD=feather_nrf52840_express all 
