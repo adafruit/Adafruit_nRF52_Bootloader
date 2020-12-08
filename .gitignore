@@ -64,3 +64,4 @@ bin/
 TAGS
 
 .DS_Store
+Makefile.user

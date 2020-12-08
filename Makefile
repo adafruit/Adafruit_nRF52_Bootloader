@@ -7,6 +7,8 @@
 # - SD_HEX     : to bootloader hex binary
 #------------------------------------------------------------------------------
 
+-include Makefile.user
+
 SDK_PATH     = lib/sdk/components
 SDK11_PATH   = lib/sdk11/components
 TUSB_PATH    = lib/tinyusb/src
