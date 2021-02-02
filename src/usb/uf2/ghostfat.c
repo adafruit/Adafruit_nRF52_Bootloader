@@ -363,7 +363,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->targetAddr = addr;
                 bl->payloadSize = UF2_FIRMWARE_BYTES_PER_SECTOR;
                 bl->flags = UF2_FLAG_FAMILYID;
-                bl->familyID = CFG_UF2_FAMILY_APP_ID;
+                bl->familyID = CFG_UF2_BOARD_APP_ID;
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
@@ -390,7 +390,9 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   switch ( bl->familyID )
   {
-    case CFG_UF2_FAMILY_APP_ID:
+
+    case CFG_UF2_BOARD_APP_ID:  // board-specific app
+    case CFG_UF2_FAMILY_APP_ID: // family app
       /* Upgrading Application
        *
        * SoftDevice is considered as part of application and can be (or not) included in uf2.
@@ -428,9 +430,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       /* Upgrading Bootloader
        *
        * - For simplicity, the Bootloader Start Address is fixed for now.
-       *
        * - Since SoftDevice is not part of Bootloader, it MUST NOT be included as part of uf2 file.
-       *
        * - To prevent corruption/disconnection while transferring we don't directly write over Bootloader.
        * Instead it is written to highest possible address in Application region. Once everything is received
        * and verified, it is safely activated using MBR COPY BL command.
@@ -514,7 +514,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
               }
               else
               {
-                PRINTF("DOES NOT mismatches our VID/PID\r\n");
+                PRINTF("DOES NOT match our VID/PID\r\n");
                 state->aborted = true;
                 return -1;
               }

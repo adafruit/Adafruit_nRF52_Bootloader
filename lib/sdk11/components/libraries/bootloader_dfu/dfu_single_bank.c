@@ -35,9 +35,6 @@ static uint8_t                      m_init_packet[64];          /**< Init packet
 static uint8_t                      m_init_packet_length;       /**< Length of init packet received. */
 static uint16_t                     m_image_crc;                /**< Calculated CRC of the image received. */
 
-APP_TIMER_DEF(m_dfu_timer_id);                                  /**< Application timer id. */
-static bool                         m_dfu_timed_out = false;    /**< Boolean flag value for tracking DFU timer timeout state. */
-
 static pstorage_handle_t            m_storage_handle_app;       /**< Pstorage handle for the application area (bank 0). Bank used when updating a SoftDevice w/wo bootloader. Handle also used when swapping received application from bank 1 to bank 0. */
 static pstorage_handle_t          * mp_storage_handle_active;   /**< Pointer to the pstorage handle for the active bank for receiving of data packets. */
 
@@ -82,47 +79,6 @@ static void pstorage_callback_handler(pstorage_handle_t * p_handle,
     }
     APP_ERROR_CHECK(result);
 }
-
-
-/**@brief Function for handling the DFU timeout.
- *
- * @param[in] p_context The timeout context.
- */
-static void dfu_timeout_handler(void * p_context)
-{
-    UNUSED_PARAMETER(p_context);
-    dfu_update_status_t update_status;
-
-    m_dfu_timed_out           = true;
-    update_status.status_code = DFU_TIMEOUT;
-
-    bootloader_dfu_update_process(update_status);
-}
-
-
-/**@brief   Function for restarting the DFU Timer.
- *
- * @details This function will stop and restart the DFU timer. This function will be called by the
- *          functions handling any DFU packet received from the peer that is transferring a firmware
- *          image.
- */
-static uint32_t dfu_timer_restart(void)
-{
-    if (m_dfu_timed_out)
-    {
-        // The DFU timer had already timed out.
-        return NRF_ERROR_INVALID_STATE;
-    }
-
-    uint32_t err_code = app_timer_stop(m_dfu_timer_id);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = app_timer_start(m_dfu_timer_id, DFU_TIMEOUT_INTERVAL, NULL);
-    APP_ERROR_CHECK(err_code);
-
-    return err_code;
-}
-
 
 /**@brief   Function for preparing of flash before receiving SoftDevice image.
  *
@@ -289,16 +245,6 @@ uint32_t dfu_init(void)
 
     m_storage_handle_app.block_id  = DFU_BANK_0_REGION_START;
 
-    // Create the timer to monitor the activity by the peer doing the firmware update.
-    err_code = app_timer_create(&m_dfu_timer_id,
-                                APP_TIMER_MODE_SINGLE_SHOT,
-                                dfu_timeout_handler);
-    APP_ERROR_CHECK(err_code);
-
-    // Start the DFU timer.
-    err_code = app_timer_start(m_dfu_timer_id, DFU_TIMEOUT_INTERVAL, NULL);
-    APP_ERROR_CHECK(err_code);
-
     m_data_received = 0;
     m_dfu_state     = DFU_STATE_IDLE;
 
@@ -314,8 +260,6 @@ void dfu_register_callback(dfu_callback_t callback_handler)
 
 uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
 {
-    uint32_t err_code;
-
     m_start_packet = *(p_packet->params.start_packet);
 
     // Check that the requested update procedure is supported.
@@ -367,22 +311,11 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
         m_functions.activate = dfu_activate_app;
     }
 
-    switch (m_dfu_state)
-    {
-        case DFU_STATE_IDLE:
-            // Valid peer activity detected. Hence restart the DFU timer.
-            err_code = dfu_timer_restart();
-            VERIFY_SUCCESS(err_code);
-            m_functions.prepare(m_image_size);
+    if ( DFU_STATE_IDLE != m_dfu_state ) return NRF_ERROR_INVALID_STATE;
 
-            break;
+    m_functions.prepare(m_image_size);
 
-        default:
-            err_code = NRF_ERROR_INVALID_STATE;
-            break;
-    }
-
-    return err_code;
+    return NRF_SUCCESS;
 }
 
 
@@ -421,10 +354,6 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
                 return NRF_ERROR_DATA_SIZE;
             }
-
-            // Valid peer activity detected. Hence restart the DFU timer.
-            err_code = dfu_timer_restart();
-            VERIFY_SUCCESS(err_code);
 
             p_data = (uint32_t *)p_packet->params.data_packet.p_data_packet;
 
@@ -493,7 +422,6 @@ uint32_t dfu_init_pkt_complete(void)
 
 uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
 {
-    uint32_t err_code = NRF_SUCCESS;
     uint32_t length;
 
     switch (m_dfu_state)
@@ -511,10 +439,6 @@ uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
                 return NRF_ERROR_INVALID_STATE;
             }
 
-            // Valid peer activity detected. Hence restart the DFU timer.
-            err_code = dfu_timer_restart();
-            VERIFY_SUCCESS(err_code);
-
             length = p_packet->params.data_packet.packet_length * sizeof(uint32_t);
             if ((m_init_packet_length + length) > sizeof(m_init_packet))
             {
@@ -529,11 +453,10 @@ uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
 
         default:
             // Either the start packet was not received or dfu_init function was not called before.
-            err_code = NRF_ERROR_INVALID_STATE;
-            break;
+            return NRF_ERROR_INVALID_STATE;
     }
 
-    return err_code;
+    return NRF_SUCCESS;
 }
 
 
@@ -555,16 +478,9 @@ uint32_t dfu_image_validate()
             {
                 m_dfu_state = DFU_STATE_VALIDATE;
 
-                // Valid peer activity detected. Hence restart the DFU timer.
-                err_code = dfu_timer_restart();
-                if (err_code == NRF_SUCCESS)
-                {
-                    err_code = dfu_init_postvalidate((uint8_t *)mp_storage_handle_active->block_id,
-                                                     m_image_size);
-                    VERIFY_SUCCESS(err_code);
-
-                    m_dfu_state = DFU_STATE_WAIT_4_ACTIVATE;
-                }
+                err_code = dfu_init_postvalidate((uint8_t *)mp_storage_handle_active->block_id, m_image_size);
+                VERIFY_SUCCESS(err_code);
+                m_dfu_state = DFU_STATE_WAIT_4_ACTIVATE;
             }
             break;
 
@@ -584,11 +500,6 @@ uint32_t dfu_image_activate()
     switch (m_dfu_state)
     {
         case DFU_STATE_WAIT_4_ACTIVATE:
-
-            // Stop the DFU Timer because the peer activity need not be monitored any longer.
-            err_code = app_timer_stop(m_dfu_timer_id);
-            APP_ERROR_CHECK(err_code);
-
             err_code = m_functions.activate();
             break;
 

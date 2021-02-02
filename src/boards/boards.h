@@ -61,6 +61,14 @@
 #define BOARD_RGB_BRIGHTNESS 0x101010
 #endif
 
+// Power configuration - should we enable DC/DC converters? (requires inductors on board)
+#ifndef ENABLE_DCDC_0
+#define ENABLE_DCDC_0 0
+#endif
+#ifndef ENABLE_DCDC_1
+#define ENABLE_DCDC_1 0
+#endif
+
 // Helper function
 #define memclr(buffer, size)                memset(buffer, 0, size)
 #define varclr(_var)                        memclr(_var, sizeof(*(_var)))

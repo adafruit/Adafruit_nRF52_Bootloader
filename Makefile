@@ -2,10 +2,12 @@
 # CONFIGURE
 # - SDK_PATH   : path to SDK directory
 #
-# - SD         : e.g s132, s140
+# - SD_NAME    : e.g s132, s140
 # - SD_VERSION : SoftDevice version e.g 6.0.0
 # - SD_HEX     : to bootloader hex binary
 #------------------------------------------------------------------------------
+
+-include Makefile.user
 
 SDK_PATH     = lib/sdk/components
 SDK11_PATH   = lib/sdk11/components
@@ -14,7 +16,7 @@ NRFX_PATH    = lib/nrfx
 SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
 SD_VERSION   = 6.1.1
-SD_FILENAME  = $(SD)_nrf52_$(SD_VERSION)
+SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
@@ -22,14 +24,14 @@ MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 # linker by MCU eg. nrf52840.ld
 LD_FILE      = linker/$(MCU_SUB_VARIANT).ld
 
-GIT_VERSION != git describe --dirty --always --tags
-GIT_SUBMODULE_VERSIONS != git submodule status | cut -d" " -f3,4 | paste -s -d" " -
+GIT_VERSION := $(shell git describe --dirty --always --tags)
+GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 
 # compiled file name
-OUT_FILE = $(BOARD)_bootloader-$(GIT_VERSION)
+OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
 
 # merged file = compiled + sd
-MERGED_FILE = $(OUT_FILE)_$(SD)_$(SD_VERSION)
+MERGED_FILE = $(OUT_NAME)_$(SD_NAME)_$(SD_VERSION)
 
 #------------------------------------------------------------------------------
 # Tool configure
@@ -44,17 +46,35 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 SIZE    = $(CROSS_COMPILE)size
 GDB     = $(CROSS_COMPILE)gdb
 
-NRFUTIL = adafruit-nrfutil
-NRFJPROG = nrfjprog
-
 # Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
 ifneq ($(OS), Windows_NT)
-  MK = mkdir -p
+  MKDIR = mkdir -p
 else
-  MK = mkdir
+  MKDIR = mkdir
 endif
 
 RM = rm -rf
+CP = cp
+
+# Flasher utility options
+NRFUTIL = adafruit-nrfutil
+NRFJPROG = nrfjprog
+FLASHER ?= nrfjprog
+PYOCD ?= pyocd
+
+# Flasher will default to nrfjprog,
+# Check for pyocd, error on unexpected value.
+ifeq ($(FLASHER),nrfjprog)
+  FLASH_CMD = $(NRFJPROG) --program $1 --sectoranduicrerase -f nrf52 --reset
+  FLASH_NOUICR_CMD = $(NRFJPROG) --program $1 -f nrf52 --sectorerase --reset
+  FLASH_ERASE_CMD = $(NRFJPROG) -f nrf52 --eraseall
+else ifeq ($(FLASHER),pyocd)
+  FLASH_CMD = $(PYOCD) flash -t $(MCU_SUB_VARIANT) $1
+  FLASH_NOUICR_CMD = $(PYOCD) flash -t $(MCU_SUB_VARIANT) $1
+  FLASH_ERASE_CMD = $(PYOCD) erase -t $(MCU_SUB_VARIANT) --chip
+else
+  $(error Unsupported flash utility: "$(FLASHER)")
+endif
 
 # auto-detect BMP on macOS, otherwise have to specify
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
@@ -63,7 +83,8 @@ GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan
 #---------------------------------
 # Select the board to build
 #---------------------------------
-BOARD_LIST = $(sort $(subst src/boards/,,$(wildcard src/boards/*)))
+# Note: whitespace is not allowed in the filenames... it WILL break this part of the script
+BOARD_LIST = $(sort $(filter-out boards.h boards.c,$(notdir $(wildcard src/boards/*))))
 
 ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
   $(info You must provide a BOARD parameter with 'BOARD='. Supported boards are:)
@@ -73,6 +94,7 @@ endif
 
 # Build directory
 BUILD = _build/build-$(BOARD)
+BIN = _bin/$(BOARD)
 
 # Board specific
 -include src/boards/$(BOARD)/board.mk
@@ -264,7 +286,7 @@ IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
 ifeq ($(DEBUG), 1)
 	RTT_SRC = lib/SEGGER_RTT
 	
-	CFLAGS += -ggdb -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+	CFLAGS += -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 	IPATH += $(RTT_SRC)/RTT
   C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
 endif
@@ -295,7 +317,8 @@ CFLAGS += \
 	-Wsign-compare \
 	-Wmissing-format-attribute \
 	-Wno-endif-labels \
-	-Wunreachable-code	
+	-Wunreachable-code \
+	-ggdb
 
 # Suppress warning caused by SDK
 CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
@@ -306,7 +329,12 @@ CFLAGS += -Wno-cast-function-type
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
-CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
+
+# Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
+ifneq ($(USE_NFCT),yes)
+  CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
+endif
+
 CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
@@ -333,7 +361,6 @@ LIBS += -lm -lc
 #------------------------------------------------------------------------------
 ASFLAGS += $(CFLAGS)
 
-
 #function for removing duplicates in a list
 remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
 
@@ -356,20 +383,10 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 # BUILD TARGETS
 #------------------------------------------------------------------------------
 
-# Verbose mode (V=). 0: default, 1: print out CFLAG, LDFLAG 2: print all compile command
-ifeq ("$(V)","1")
-$(info CFLAGS   $(CFLAGS))
-$(info )
-$(info LDFLAGS  $(LDFLAGS))
-$(info )
-$(info ASFLAGS $(ASFLAGS))
-$(info )
-endif
-
 .PHONY: all clean flash dfu-flash sd gdbflash gdb
 
 # default target to build
-all: $(BUILD)/$(OUT_FILE).out $(BUILD)/$(OUT_FILE)-nosd.hex $(BUILD)/$(OUT_FILE)-nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
+all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
 
 # Print out the value of a make variable.
 # https://stackoverflow.com/questions/16467718/how-to-print-out-a-variable-in-makefile
@@ -380,10 +397,11 @@ print-%:
 
 # Create build directories
 $(BUILD):
-	@$(MK) "$@"
+	@$(MKDIR) "$@"
 
 clean:
 	@$(RM) $(BUILD)
+	@$(RM) $(BIN)
 
 # Create objects from C SRC files
 $(BUILD)/%.o: %.c
@@ -396,7 +414,7 @@ $(BUILD)/%.o: %.S
 	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUT_FILE).out: $(BUILD) $(OBJECTS)
+$(BUILD)/$(OUT_NAME).out: $(BUILD) $(OBJECTS)
 	@echo LD $(notdir $@)
 	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 	@$(SIZE) $@
@@ -404,28 +422,37 @@ $(BUILD)/$(OUT_FILE).out: $(BUILD) $(OBJECTS)
 #------------------- Binary generator -------------------
 
 # Create hex file (no sd, no mbr)
-$(BUILD)/$(OUT_FILE).hex: $(BUILD)/$(OUT_FILE).out
+$(BUILD)/$(OUT_NAME).hex: $(BUILD)/$(OUT_NAME).out
 	@echo Create $(notdir $@)
 	@$(OBJCOPY) -O ihex $< $@
 
 # Hex file with mbr (still no SD)
-$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE).hex
+$(BUILD)/$(OUT_NAME)_nosd.hex: $(BUILD)/$(OUT_NAME).hex
 	@echo Create $(notdir $@)
 	@python3 tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
 
-# Bootolader only uf2
-$(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
+# Bootolader self-update uf2
+$(BUILD)/update-$(OUT_NAME)_nosd.uf2: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Create $(notdir $@)
 	@python3 lib/uf2/utils/uf2conv.py -f 0xd663823c -c -o $@ $^
 
 # merge bootloader and sd hex together
-$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE).hex
+$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_NAME).hex
 	@echo Create $(notdir $@)
 	@python3 tools/hexmerge.py -o $@ $< $(SD_HEX)
 
 # Create pkg zip file for bootloader+SD combo to use with DFU CDC
-$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE).hex
+$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_NAME).hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
+
+#-------------- Artifacts --------------
+$(BIN):
+	@$(MKDIR) -p $@
+
+copy-artifact: $(BIN)
+	@$(CP) $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BIN)
+	@$(CP) $(BUILD)/$(MERGED_FILE).hex $(BIN)
+	@$(CP) $(BUILD)/$(MERGED_FILE).zip $(BIN)
 
 #------------------- Flash target -------------------
 
@@ -437,32 +464,36 @@ __check_defined = \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
 # Flash the compiled
-flash: $(BUILD)/$(OUT_FILE)-nosd.hex
+flash: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Flashing: $(notdir $<)
-	$(NRFJPROG) --program $< --sectoranduicrerase -f nrf52 --reset
+	$(call FLASH_CMD,$<)
+
+erase:
+	@echo Erasing flash
+	$(call FLASH_ERASE_CMD)
+
+# flash SD only
+sd:
+	@echo Flashing: $(SD_HEX)
+	$(call FLASH_NOUICR_CMD,$(SD_HEX))
+
+# flash MBR only
+mbr:
+	@echo Flashing: $(MBR_HEX)
+	$(call FLASH_NOUICR_CMD,$(MBR_HEX))
+
+#------------------- Flash with NRFUTIL via DFU -------------------
 
 # dfu using CDC interface
 dfu-flash: $(BUILD)/$(MERGED_FILE).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
 	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
-erase:
-	@echo Erasing flash
-	$(NRFJPROG) -f nrf52 --eraseall
-
-# flash SD only
-sd:
-	@echo Flashing: $(SD_HEX)
-	$(NRFJPROG) --program $(SD_HEX) -f nrf52 --sectorerase --reset
-
-# flash MBR only
-mbr:
-	@echo Flashing: $(MBR_HEX)
-	$(NRFJPROG) --program $(MBR_HEX) -f nrf52 --sectorerase --reset
+#------------------- Debugging -------------------
 
 gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<
 	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
 
-gdb: $(BUILD)/$(OUT_FILE).out
+gdb: $(BUILD)/$(OUT_NAME).out
 	$(GDB_BMP) $<
