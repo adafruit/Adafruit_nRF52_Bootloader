@@ -87,7 +87,8 @@ static void dfu_startup_timer_handler(void * p_context)
   }
 #endif
 
-  // No packets are received within timeout, terminal and DFU mode
+  // nRF52832 forced DFU on startup
+  // No packets are received within timeout, exit DFU mode
   // dfu_startup_packet_received is set by process_dfu_packet() in dfu_transport_serial.c
   if (!dfu_startup_packet_received)
   {
@@ -336,7 +337,9 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
       err_code = dfu_transport_ble_update_start();
     }else
     {
-      // timeout_ms > 0 is forced startup DFU
+      // DFU mode with timeout can be
+      // - Forced startup DFU for nRF52832 or
+      // - Makecode single tap reset but no enumerated (battery power)
       if ( timeout_ms )
       {
         dfu_startup_packet_received = false;

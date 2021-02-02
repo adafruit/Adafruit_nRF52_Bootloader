@@ -1,5 +1,16 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.4.0 - 2021.01.19
+
+- Decouple bootloader and softdevice i.e bootloader will always work with and/or without softdevice present. This allows application to pack firmware + softdevice into an uf2/serial for DFU.
+- Add self-update feature with update-{board}.uf2. This allow bootloader to update itself easily (requires running bootloader with at least 0.4.0)
+- Enlarge the fake FAT disk to ~ 32MB to allow piggy-pack multiple application (different family ID) within the same uf2.
+- Support uf2 with family ID = vendor ID + product ID
+- Reset into application if there is no USB connection in ~3 seconds.
+- Remove DFU idle 300 seconds timeout
+- Support power supply configuration with `ENABLE_DCDC_0` and `ENABLE_DCDC_1`
+- Add new boards support: nice nano, bast ble, ikigaisense vita, nrf52840 M2, Pitaya Go, AE-BL652-BO, BlueMicro, ADM_B_NRF52840_1
+
 ## 0.3.2 - 2020.03.12
 
 - Make sure all pins are in reset state when jumping to app mode.
