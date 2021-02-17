@@ -170,9 +170,10 @@ int main(void)
 
   // Serial only mode
   bool serial_only_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_SERIAL_ONLY_RESET);
+  bool uf2_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_UF2_RESET);
 
   // start either serial, uf2 or ble
-  bool dfu_start = _ota_dfu || serial_only_dfu || (NRF_POWER->GPREGRET == DFU_MAGIC_UF2_RESET) ||
+  bool dfu_start = _ota_dfu || serial_only_dfu || uf2_dfu ||
                     (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk));
 
   // Clear GPREGRET if it is our values
@@ -251,7 +252,7 @@ int main(void)
     }
 
     // Initiate an update of the firmware.
-    if (APP_ASKS_FOR_SINGLE_TAP_RESET())
+    if (APP_ASKS_FOR_SINGLE_TAP_RESET() || uf2_dfu || serial_only_dfu)
     {
       // If USB is not enumerated in 3s (eg. because we're running on battery), we restart into app.
       APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 3000, true) );
