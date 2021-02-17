@@ -1,5 +1,10 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.4.1 - 2021.02.17
+
+- Add USB connect timeout for app reset to UF2 or Serial via GPREGRET
+- Fix pollution of REGOUT0 reserved bits
+
 ## 0.4.0 - 2021.01.19
 
 - Decouple bootloader and softdevice i.e bootloader will always work with and/or without softdevice present. This allows application to pack firmware + softdevice into an uf2/serial for DFU.
