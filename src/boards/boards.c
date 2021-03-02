@@ -24,6 +24,8 @@
 
 #include "boards.h"
 #include "nrf_pwm.h"
+#include "nrf_spim.h"
+#include "nrf_clock.h"
 #include "app_scheduler.h"
 #include "app_timer.h"
 
@@ -33,7 +35,7 @@
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
   void neopixel_init(void);
   void neopixel_write(uint8_t *pixels);
   void neopixel_teardown(void);
@@ -71,14 +73,15 @@ void board_init(void)
   button_init(BUTTON_FRESET);
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
+#if LEDS_NUMBER > 0
   // use PMW0 for LED RED
   led_pwm_init(LED_PRIMARY, LED_PRIMARY_PIN);
   #if LEDS_NUMBER > 1
   led_pwm_init(LED_SECONDARY, LED_SECONDARY_PIN);
   #endif
-
+#endif
   // use neopixel for use enumeration
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
   neopixel_init();
 #endif
 
@@ -126,7 +129,9 @@ void board_teardown(void)
   SysTick->CTRL = 0;
 
   // Disable and reset PWM for LEDs
+#if LEDS_NUMBER > 0
   led_pwm_teardown();
+#endif
 
 #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
   neopixel_teardown();
@@ -317,7 +322,7 @@ void led_state(uint32_t state)
     } else if (temp_color_active) {
         final_color = (uint8_t*)&rgb_color;
     }
-    #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
+    #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
     if (final_color != NULL) {
         neopixel_write(final_color);
     }
@@ -431,6 +436,90 @@ void neopixel_write (uint8_t *pixels)
   nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
 }
 #endif
+
+#ifdef LED_APA102
+#define BYTE_PER_PIXEL  4
+
+// 4 zero bytes are required to initiate update
+#define PATTERN_SIZE() ((APA102_NUMBER*BYTE_PER_PIXEL) + 4)
+// N/2 * 1 bits are required at the end
+static uint8_t pixels_pattern[PATTERN_SIZE() + 4];
+
+// use SPIM1 for dotstar
+void neopixel_init(void)
+{
+  NRF_SPIM_Type* spi = NRF_SPIM1;
+
+  nrf_spim_disable(spi);
+
+  nrf_gpio_pin_set(LED_APA102_CLK);
+
+  nrf_gpio_cfg(LED_APA102_CLK,
+                NRF_GPIO_PIN_DIR_OUTPUT,
+                NRF_GPIO_PIN_INPUT_CONNECT,
+                NRF_GPIO_PIN_NOPULL,
+                NRF_GPIO_PIN_S0S1,
+                NRF_GPIO_PIN_NOSENSE);
+
+  nrf_gpio_pin_clear(LED_APA102_DATA);
+  nrf_gpio_cfg_output(LED_APA102_DATA);
+
+  nrf_spim_pins_set(spi, LED_APA102_CLK, LED_APA102_DATA, 0xFFFFFFFF);
+  nrf_spim_frequency_set(spi, NRF_SPIM_FREQ_4M);
+  nrf_spim_configure(spi, NRF_SPIM_MODE_3, NRF_SPIM_BIT_ORDER_MSB_FIRST);
+
+  nrf_spim_orc_set(spi, 0);
+  nrf_spim_tx_list_disable(spi);
+
+  // Enable the spi
+  nrf_spim_enable(spi);
+
+  uint8_t rgb[3] = {0, 0, 0 };
+  neopixel_write(rgb);
+}
+
+void neopixel_teardown(void)
+{
+  uint8_t rgb[3] = {0, 0, 0 };
+  neopixel_write(rgb);
+
+  NRF_SPIM_Type* spi = NRF_SPIM1;
+  nrf_spim_disable(spi);
+}
+
+// write 3 bytes color RGB to built-in neopixel
+void neopixel_write (uint8_t *pixels)
+{
+  NRF_SPIM_Type*  spi = NRF_SPIM1;
+
+  //brightness, blue, green, red
+  uint8_t bbgr[BYTE_PER_PIXEL] = {0xE0 | LED_APA102_BRIGHTNESS, pixels[0], pixels[1], pixels[2]};
+  pixels_pattern[0] = 0;
+  pixels_pattern[1] = 0;
+  pixels_pattern[2] = 0;
+  pixels_pattern[3] = 0;
+
+  for (uint8_t i = 4; i < PATTERN_SIZE(); i+=4) {
+      pixels_pattern[i] = bbgr[0];
+      pixels_pattern[i+1] = bbgr[1];
+      pixels_pattern[i+2] = bbgr[2];
+      pixels_pattern[i+3] = bbgr[3];
+  }
+
+  pixels_pattern[PATTERN_SIZE()] = 0xff;
+  pixels_pattern[PATTERN_SIZE()+1] = 0xff;
+  pixels_pattern[PATTERN_SIZE()+2] = 0xff;
+  pixels_pattern[PATTERN_SIZE()+3] = 0xff;
+
+  nrf_spim_tx_buffer_set(spi, pixels_pattern, PATTERN_SIZE() + 4);
+  nrf_spim_event_clear(spi, NRF_SPIM_EVENT_ENDTX);
+
+  nrf_spim_task_trigger(spi, NRF_SPIM_TASK_START);
+
+  while(!nrf_spim_event_check(spi, NRF_SPIM_EVENT_ENDTX));
+}
+#endif
+
 
 #if defined(LED_RGB_RED_PIN) && defined(LED_RGB_GREEN_PIN) && defined(LED_RGB_BLUE_PIN)
 
