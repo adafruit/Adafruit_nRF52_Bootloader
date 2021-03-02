@@ -24,10 +24,12 @@
 
 #include "boards.h"
 #include "nrf_pwm.h"
-#include "nrf_spim.h"
-#include "nrf_clock.h"
 #include "app_scheduler.h"
 #include "app_timer.h"
+
+#ifdef LED_APA102
+#include "nrf_spim.h"
+#endif
 
 //--------------------------------------------------------------------+
 // MACRO TYPEDEF CONSTANT ENUM DECLARATION
