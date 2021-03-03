@@ -135,7 +135,7 @@ void board_teardown(void)
   led_pwm_teardown();
 #endif
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
   neopixel_teardown();
 #endif
 
