@@ -115,6 +115,13 @@ static void wait_for_events(void)
 //    uint32_t err_code = sd_app_evt_wait();
 //    APP_ERROR_CHECK(err_code);
 
+#ifdef SOFTWARE_RESET_BUTTON
+    if (button_pressed(SOFTWARE_RESET_BUTTON)) {
+        while(button_pressed(SOFTWARE_RESET_BUTTON)) { NRFX_DELAY_MS(10); }
+        NVIC_SystemReset();
+    }
+#endif
+
     // Feed all Watchdog just in case application enable it
     // WDT cannot be disabled once started. It even last through NVIC soft reset
     if ( nrf_wdt_started(NRF_WDT) )

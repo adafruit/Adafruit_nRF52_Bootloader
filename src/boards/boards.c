@@ -73,6 +73,9 @@ void board_init(void)
 
   button_init(BUTTON_DFU);
   button_init(BUTTON_FRESET);
+#ifdef SOFTWARE_RESET_BUTTON
+  button_init(SOFTWARE_RESET_BUTTON);
+#endif
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
 #if LEDS_NUMBER > 0
