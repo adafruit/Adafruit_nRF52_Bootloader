@@ -53,8 +53,8 @@
 // USB
 //--------------------------------------------------------------------+
 #define USB_DESC_VID           0x1B4F
-#define USB_DESC_UF2_PID       0x0001
-#define USB_DESC_CDC_ONLY_PID  0x0002
+#define USB_DESC_UF2_PID       0x0022
+#define USB_DESC_CDC_ONLY_PID  0x0023
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME       "SparkFun MicroMod nRF52840"
