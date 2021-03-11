@@ -109,6 +109,7 @@ void usb_teardown(void);
 #define DFU_MAGIC_OTA_RESET             0xA8
 #define DFU_MAGIC_SERIAL_ONLY_RESET     0x4e
 #define DFU_MAGIC_UF2_RESET             0x57
+#define DFU_MAGIC_SKIP                  0x6d
 
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
 #define DFU_DBL_RESET_APP               0x4ee5677e
@@ -176,8 +177,10 @@ int main(void)
   bool dfu_start = _ota_dfu || serial_only_dfu || uf2_dfu ||
                     (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk));
 
+  bool dfu_skip = (NRF_POWER->GPREGRET == DFU_MAGIC_SKIP);
+
   // Clear GPREGRET if it is our values
-  if (dfu_start) NRF_POWER->GPREGRET = 0;
+  if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
   // Save bootloader version to pre-defined register, retrieved by application
   // TODO move to CF2
@@ -201,7 +204,7 @@ int main(void)
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
-  dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
+  dfu_start  = dfu_start || (button_pressed(BUTTON_DFU) && !dfu_skip);
 
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
