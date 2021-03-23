@@ -45,6 +45,7 @@ jobs:
           - 'pca10100'
           - 'pitaya_go'
           - 'raytac_mdbt50q_rx'
+          - 'sparkfun_nrf52840_micromod'
           - 'waveshare_nrf52840_eval'
 
     steps:

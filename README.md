@@ -20,6 +20,7 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - Particle Argon
 - Particle Boron
 - Particle Xenon
+- [SparkFun MicroMod nRF52840](https://www.sparkfun.com/products/16984)
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware. See https://github.com/Microsoft/uf2 and https://github.com/adafruit/uf2-samdx1 for more information.
