@@ -59,7 +59,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME       "SparkFun MicroMod nRF52840"
 #define UF2_VOLUME_LABEL       "SFMM852BOOT"
-#define UF2_BOARD_ID           "micromod-nRF52840"
+#define UF2_BOARD_ID           "nRF52840-micromod-v10"
 
 #define UF2_INDEX_URL          "https://www.sparkfun.com/products/16984"
 
