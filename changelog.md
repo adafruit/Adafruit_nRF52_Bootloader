@@ -1,5 +1,12 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.5.0 - 2021.04.04
+
+- Update tinyusb to latest to fix the race condition causing cdc out dropping packet. Which cause DFU failed occasionally
+- Add support for Dotstar LED (APA102)
+- Add sparkfun_nrf52840_micromod board
+- Allow skipping DFU entirely when reset or wakeup from deep sleep
+
 ## 0.4.1 - 2021.02.17
 
 - Add USB connect timeout for app reset to UF2 or Serial via GPREGRET
