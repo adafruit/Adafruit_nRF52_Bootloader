@@ -148,6 +148,7 @@ static uint32_t service_change_indicate()
 
         err_code = sd_ble_gatts_service_changed(m_conn_handle, DFU_SERVICE_HANDLE, BLE_HANDLE_MAX);
         if ((err_code == BLE_ERROR_INVALID_CONN_HANDLE) ||
+            (err_code == BLE_ERROR_INVALID_ATTR_HANDLE) ||
             (err_code == NRF_ERROR_INVALID_STATE) ||
             (err_code == NRF_ERROR_BUSY))
         {
