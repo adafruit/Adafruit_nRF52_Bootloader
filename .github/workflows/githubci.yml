@@ -24,7 +24,7 @@ jobs:
           - 'itsybitsy_nrf52840_express'
           - 'metro_nrf52840_express'
           # Alphabetical order
-          - 'ADM_B_NRF52840_1'
+          - 'adm_b_nrf52840_1'
           - 'ae_bl652_bo'
           - 'aramcon_badge_2019'
           - 'arcade_feather_nrf52840_express'
