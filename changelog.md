@@ -6,6 +6,7 @@
 - Add support for Dotstar LED (APA102)
 - Add sparkfun_nrf52840_micromod board
 - Allow skipping DFU entirely when reset or wakeup from deep sleep
+- Fix an issue with OTA when using shared bond with application
 
 ## 0.4.1 - 2021.02.17
 
