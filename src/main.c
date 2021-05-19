@@ -207,7 +207,7 @@ int main(void)
   if ( !dfu_skip )
   {
     // DFU button pressed
-    dfu_start  = dfu_start || (button_pressed(BUTTON_DFU) && !dfu_skip);
+    dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
 
     // DFU + FRESET are pressed --> OTA
     _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
