@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _BT60_H
-#define _BT60_H
+#ifndef _ROTR_H
+#define _ROTR_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -46,7 +46,7 @@
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER  "Polarity Works"
-#define BLEDIS_MODEL         "BT60"
+#define BLEDIS_MODEL         "ROTR"
 
 //--------------------------------------------------------------------+
 // USB
@@ -55,9 +55,9 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "BT60"
-#define UF2_VOLUME_LABEL  "BT60"
-#define UF2_BOARD_ID      "nRF52840-bt60-v1"
+#define UF2_PRODUCT_NAME  "ROTR"
+#define UF2_VOLUME_LABEL  "ROTR"
+#define UF2_BOARD_ID      "nRF52840-rotr-v1"
 #define UF2_INDEX_URL     "https://polarityworks.com"
 
-#endif // _BT60_H
+#endif // _ROTR_H
