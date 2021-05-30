@@ -49,8 +49,8 @@
 /*------------------------------------------------------------------*/
 /* UART (only used by nRF52832)
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      6
-#define TX_PIN_NUMBER      8
+#define RX_PIN_NUMBER      8
+#define TX_PIN_NUMBER      6
 #define CTS_PIN_NUMBER     5
 #define RTS_PIN_NUMBER     7
 #define HWFC               false  // leaving it false to make GPIO available
