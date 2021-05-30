@@ -36,7 +36,7 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     1
+#define BUTTONS_NUMBER     2
 #define BUTTON_1           29 // Actual Button - DISC
 #define BUTTON_2           28 // No button - WKP pin
 #define BUTTON_PULL        NRF_GPIO_PIN_PULLUP
