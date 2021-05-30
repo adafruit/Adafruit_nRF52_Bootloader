@@ -97,18 +97,20 @@ void usb_teardown(void);
  */
 
 /* Magic that written to NRF_POWER->GPREGRET by application when it wish to go into DFU
- * - DFU_MAGIC_OTA_APPJUM used by BLEDfu service : SD is already init
- * - DFU_MAGIC_OTA_RESET entered by soft reset : SD is not init
- * - DFU_MAGIC_SERIAL_ONLY_RESET with CDC interface only
- * - DFU_MAGIC_UF2_RESET with CDC and MSC interfaces
+ * - DFU_MAGIC_OTA_APPJUM        : used by BLEDfu service, SD is already inited
+ * - DFU_MAGIC_OTA_RESET         : entered by soft reset, SD is not inited yet
+ * - DFU_MAGIC_SERIAL_ONLY_RESET : with CDC interface only
+ * - DFU_MAGIC_UF2_RESET         : with CDC and MSC interfaces
+ * - DFU_MAGIC_SKIP              : skip DFU entirely including double reset delay
  *
  * Note: for DFU_MAGIC_OTA_APPJUM Softdevice must not initialized.
  * since it is already in application. In all other case of OTA SD must be initialized
  */
-#define DFU_MAGIC_OTA_APPJUM            BOOTLOADER_DFU_START             // 0xB1
+#define DFU_MAGIC_OTA_APPJUM            BOOTLOADER_DFU_START  // 0xB1
 #define DFU_MAGIC_OTA_RESET             0xA8
 #define DFU_MAGIC_SERIAL_ONLY_RESET     0x4e
 #define DFU_MAGIC_UF2_RESET             0x57
+#define DFU_MAGIC_SKIP                  0x6d
 
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
 #define DFU_DBL_RESET_APP               0x4ee5677e
@@ -170,13 +172,16 @@ int main(void)
 
   // Serial only mode
   bool serial_only_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_SERIAL_ONLY_RESET);
+  bool uf2_dfu = (NRF_POWER->GPREGRET == DFU_MAGIC_UF2_RESET);
 
   // start either serial, uf2 or ble
-  bool dfu_start = _ota_dfu || serial_only_dfu || (NRF_POWER->GPREGRET == DFU_MAGIC_UF2_RESET) ||
+  bool dfu_start = _ota_dfu || serial_only_dfu || uf2_dfu ||
                     (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk));
 
+  bool const dfu_skip = (NRF_POWER->GPREGRET == DFU_MAGIC_SKIP);
+
   // Clear GPREGRET if it is our values
-  if (dfu_start) NRF_POWER->GPREGRET = 0;
+  if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
   // Save bootloader version to pre-defined register, retrieved by application
   // TODO move to CF2
@@ -199,79 +204,85 @@ int main(void)
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  // DFU button pressed
-  dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
-
-  // DFU + FRESET are pressed --> OTA
-  _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
-
-  bool const valid_app = bootloader_app_is_valid();
-  bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
-
-  if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET())
-    dfu_start = 1;
-
-  // App mode: register 1st reset and DFU startup (nrf52832)
-  if ( ! (just_start_app || dfu_start || !valid_app) )
+  if ( !dfu_skip )
   {
-    // Register our first reset for double reset detection
-    (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
+    // DFU button pressed
+    dfu_start  = dfu_start || button_pressed(BUTTON_DFU);
+
+    // DFU + FRESET are pressed --> OTA
+    _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
+
+    bool const valid_app = bootloader_app_is_valid();
+    bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
+
+    if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET()) dfu_start = 1;
+
+    // App mode: register 1st reset and DFU startup (nrf52832)
+    if ( ! (just_start_app || dfu_start || !valid_app) )
+    {
+      // Register our first reset for double reset detection
+      (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
 
 #ifdef NRF52832_XXAA
-    /* Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
-     * to support auto programming from Arduino IDE
-     *
-     * Note: Supposedly during this time if RST is press, it will count as double reset.
-     * However Double Reset WONT work with nrf52832 since its SRAM got cleared anyway.
-     */
-    bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL, false);
+      /* Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
+       * to support auto programming from Arduino IDE
+       *
+       * Note: Supposedly during this time if RST is press, it will count as double reset.
+       * However Double Reset WONT work with nrf52832 since its SRAM got cleared anyway.
+       */
+      bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL, false);
 #else
-    // if RST is pressed during this delay --> if will enter dfu
-    NRFX_DELAY_MS(DFU_DBL_RESET_DELAY);
+      // if RST is pressed during this delay --> if will enter dfu
+      NRFX_DELAY_MS(DFU_DBL_RESET_DELAY);
 #endif
-  }
-
-  if (APP_ASKS_FOR_SINGLE_TAP_RESET())
-    (*dbl_reset_mem) = DFU_DBL_RESET_APP;
-  else
-    (*dbl_reset_mem) = 0;
-
-  if ( dfu_start || !valid_app )
-  {
-    if ( _ota_dfu )
-    {
-      led_state(STATE_BLE_DISCONNECTED);
-      softdev_init(!sd_inited);
-      sd_inited = true;
-    }
-    else
-    {
-      led_state(STATE_USB_UNMOUNTED);
-      usb_init(serial_only_dfu);
     }
 
-    // Initiate an update of the firmware.
     if (APP_ASKS_FOR_SINGLE_TAP_RESET())
     {
-      // If USB is not enumerated in 3s (eg. because we're running on battery), we restart into app.
-      APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 3000, true) );
+      (*dbl_reset_mem) = DFU_DBL_RESET_APP;
     }
     else
     {
-      // No timeout if bootloader requires user action (double-reset).
-      APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0, false) );
+      (*dbl_reset_mem) = 0;
     }
 
-    if ( _ota_dfu )
+    if ( dfu_start || !valid_app )
     {
-      sd_softdevice_disable();
-    }else
-    {
-      usb_teardown();
+      if ( _ota_dfu )
+      {
+        led_state(STATE_BLE_DISCONNECTED);
+        softdev_init(!sd_inited);
+        sd_inited = true;
+      }
+      else
+      {
+        led_state(STATE_USB_UNMOUNTED);
+        usb_init(serial_only_dfu);
+      }
+
+      // Initiate an update of the firmware.
+      if (APP_ASKS_FOR_SINGLE_TAP_RESET() || uf2_dfu || serial_only_dfu)
+      {
+        // If USB is not enumerated in 3s (eg. because we're running on battery), we restart into app.
+        APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 3000, true) );
+      }
+      else
+      {
+        // No timeout if bootloader requires user action (double-reset).
+        APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0, false) );
+      }
+
+      if ( _ota_dfu )
+      {
+        sd_softdevice_disable();
+      }else
+      {
+        usb_teardown();
+      }
     }
   }
 
-  // Reset Board
+  // Reset peripherals
   board_teardown();
 
   /* Jump to application if valid

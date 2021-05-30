@@ -1,23 +1,60 @@
 name: Build
 
 on:
-  push:
   pull_request:
+  push:
+  repository_dispatch:
   release:
-    types: [published]
+    types:
+      - created
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          # Adafruit Boards
+          - 'circuitplayground_nrf52840'
+          - 'clue_nrf52840'
+          - 'feather_nrf52832'
+          - 'feather_nrf52840_express'
+          - 'feather_nrf52840_sense'
+          - 'itsybitsy_nrf52840_express'
+          - 'metro_nrf52840_express'
+          # Alphabetical order
+          - 'adm_b_nrf52840_1'
+          - 'ae_bl652_bo'
+          - 'aramcon_badge_2019'
+          - 'aramcon2_badge'
+          - 'arcade_feather_nrf52840_express'
+          - 'arduino_nano_33_ble'
+          - 'bast_ble'
+          - 'bluemicro_nrf52840'
+          - 'electronut_labs_papyr'
+          - 'ikigaisense_vita'
+          - 'mdk_nrf52840_dongle'
+          - 'nice_nano'
+          - 'nrf52840_m2'
+          - 'ohs2020_badge'
+          - 'particle_argon'
+          - 'particle_boron'
+          - 'particle_xenon'
+          - 'pca10056'
+          - 'pca10059'
+          - 'pca10100'
+          - 'pitaya_go'
+          - 'raytac_mdbt50q_rx'
+          - 'sparkfun_nrf52840_micromod'
+          - 'waveshare_nrf52840_eval'
+
     steps:
     - name: Setup Python
       uses: actions/setup-python@v2
-      with:
-        # 3.9 has issue with intelhex https://github.com/python-intelhex/intelhex/issues/45
-        python-version: '3.8'
 
     - name: Setup Node.js
-      uses: actions/setup-node@v1.4.4
+      uses: actions/setup-node@v1
       
     - name: Checkout Code
       uses: actions/checkout@v1
@@ -31,17 +68,40 @@ jobs:
         # 9.3.1-1.2.1 is xpack modified version which significantly increased compiled size to 6-7KB and cause flash overflow.
         # Skip this version for now, we will try again with next official release from ARM
         xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@9.3.1-1.1.1
-        whereis arm-none-eabi-gcc
-        echo "/home/runner/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/9.3.1-1.1.1/.content/bin" >> $GITHUB_PATH
+        echo `echo $HOME/.local/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin` >> $GITHUB_PATH
     
     - name: Build
-      run: python3 tools/build_all.py
+      run: |
+        make BOARD=${{ matrix.board }} all
+        make BOARD=${{ matrix.board }} copy-artifact
       
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.board }}
+        path: _bin/${{ matrix.board }}
+
+    - name: Create Release Asset
+      if: ${{ github.event_name == 'release' }}
+      run: zip -jr ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip _bin/${{ matrix.board }}
+
     - name: Upload Release Asset
-      if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
-      working-directory: tools
+      uses: actions/upload-release-asset@v1
       env:
-        UPLOAD_URL: ${{ github.event.release.upload_url }}
-        ADABOT_GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: "[ -z \"$ADABOT_GITHUB_ACCESS_TOKEN\" ] || python3 -u upload_release_files.py"
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: ${{ github.event_name == 'release' }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
+        asset_name: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
+        asset_content_type: application/zip
       
+    - name: Upload Release Asset for Self-Update
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: ${{ github.event_name == 'release' }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
+        asset_name: update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
+        asset_content_type: application/x-binary

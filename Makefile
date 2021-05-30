@@ -7,6 +7,8 @@
 # - SD_HEX     : to bootloader hex binary
 #------------------------------------------------------------------------------
 
+-include Makefile.user
+
 SDK_PATH     = lib/sdk/components
 SDK11_PATH   = lib/sdk11/components
 TUSB_PATH    = lib/tinyusb/src
@@ -26,10 +28,10 @@ GIT_VERSION := $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 
 # compiled file name
-OUT_FILE = $(BOARD)_bootloader-$(GIT_VERSION)
+OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
 
 # merged file = compiled + sd
-MERGED_FILE = $(OUT_FILE)_$(SD_NAME)_$(SD_VERSION)
+MERGED_FILE = $(OUT_NAME)_$(SD_NAME)_$(SD_VERSION)
 
 #------------------------------------------------------------------------------
 # Tool configure
@@ -43,6 +45,16 @@ AS      = $(CROSS_COMPILE)as
 OBJCOPY = $(CROSS_COMPILE)objcopy
 SIZE    = $(CROSS_COMPILE)size
 GDB     = $(CROSS_COMPILE)gdb
+
+# Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
+ifneq ($(OS), Windows_NT)
+  MKDIR = mkdir -p
+else
+  MKDIR = mkdir
+endif
+
+RM = rm -rf
+CP = cp
 
 # Flasher utility options
 NRFUTIL = adafruit-nrfutil
@@ -64,15 +76,6 @@ else
   $(error Unsupported flash utility: "$(FLASHER)")
 endif
 
-# Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
-ifneq ($(OS), Windows_NT)
-  MK = mkdir -p
-else
-  MK = mkdir
-endif
-
-RM = rm -rf
-
 # auto-detect BMP on macOS, otherwise have to specify
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
 GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
@@ -91,6 +94,7 @@ endif
 
 # Build directory
 BUILD = _build/build-$(BOARD)
+BIN = _bin/$(BOARD)
 
 # Board specific
 -include src/boards/$(BOARD)/board.mk
@@ -332,7 +336,7 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 .PHONY: all clean flash dfu-flash sd gdbflash gdb
 
 # default target to build
-all: $(BUILD)/$(OUT_FILE).out $(BUILD)/$(OUT_FILE)-nosd.hex $(BUILD)/$(OUT_FILE)-nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
+all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
 
 # Print out the value of a make variable.
 # https://stackoverflow.com/questions/16467718/how-to-print-out-a-variable-in-makefile
@@ -343,10 +347,11 @@ print-%:
 
 # Create build directories
 $(BUILD):
-	@$(MK) "$@"
+	@$(MKDIR) "$@"
 
 clean:
 	@$(RM) $(BUILD)
+	@$(RM) $(BIN)
 
 # Create objects from C SRC files
 $(BUILD)/%.o: %.c
@@ -359,7 +364,7 @@ $(BUILD)/%.o: %.S
 	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
 
 # Link
-$(BUILD)/$(OUT_FILE).out: $(BUILD) $(OBJECTS)
+$(BUILD)/$(OUT_NAME).out: $(BUILD) $(OBJECTS)
 	@echo LD $(notdir $@)
 	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
 	@$(SIZE) $@
@@ -367,28 +372,37 @@ $(BUILD)/$(OUT_FILE).out: $(BUILD) $(OBJECTS)
 #------------------- Binary generator -------------------
 
 # Create hex file (no sd, no mbr)
-$(BUILD)/$(OUT_FILE).hex: $(BUILD)/$(OUT_FILE).out
+$(BUILD)/$(OUT_NAME).hex: $(BUILD)/$(OUT_NAME).out
 	@echo Create $(notdir $@)
 	@$(OBJCOPY) -O ihex $< $@
 
 # Hex file with mbr (still no SD)
-$(BUILD)/$(OUT_FILE)-nosd.hex: $(BUILD)/$(OUT_FILE).hex
+$(BUILD)/$(OUT_NAME)_nosd.hex: $(BUILD)/$(OUT_NAME).hex
 	@echo Create $(notdir $@)
 	@python3 tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
 
-# Bootolader only uf2
-$(BUILD)/$(OUT_FILE)-nosd.uf2: $(BUILD)/$(OUT_FILE)-nosd.hex
+# Bootolader self-update uf2
+$(BUILD)/update-$(OUT_NAME)_nosd.uf2: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Create $(notdir $@)
 	@python3 lib/uf2/utils/uf2conv.py -f 0xd663823c -c -o $@ $^
 
 # merge bootloader and sd hex together
-$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_FILE).hex
+$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_NAME).hex
 	@echo Create $(notdir $@)
 	@python3 tools/hexmerge.py -o $@ $< $(SD_HEX)
 
 # Create pkg zip file for bootloader+SD combo to use with DFU CDC
-$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_FILE).hex
+$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_NAME).hex
 	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
+
+#-------------- Artifacts --------------
+$(BIN):
+	@$(MKDIR) -p $@
+
+copy-artifact: $(BIN)
+	@$(CP) $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BIN)
+	@$(CP) $(BUILD)/$(MERGED_FILE).hex $(BIN)
+	@$(CP) $(BUILD)/$(MERGED_FILE).zip $(BIN)
 
 #------------------- Flash target -------------------
 
@@ -400,7 +414,7 @@ __check_defined = \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
 # Flash the compiled
-flash: $(BUILD)/$(OUT_FILE)-nosd.hex
+flash: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Flashing: $(notdir $<)
 	$(call FLASH_CMD,$<)
 
@@ -431,5 +445,5 @@ gdbflash: $(BUILD)/$(MERGED_FILE).hex
 	@echo Flashing: $<
 	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
 
-gdb: $(BUILD)/$(OUT_FILE).out
+gdb: $(BUILD)/$(OUT_NAME).out
 	$(GDB_BMP) $<
