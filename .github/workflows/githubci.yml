@@ -33,6 +33,7 @@ jobs:
           - 'bast_ble'
           - 'bluemicro_nrf52840'
           - 'ebyte_e104_bt5032a'
+          - 'ebyte_e73_tbb'
           - 'electronut_labs_papyr'
           - 'ikigaisense_vita'
           - 'mdk_nrf52840_dongle'
