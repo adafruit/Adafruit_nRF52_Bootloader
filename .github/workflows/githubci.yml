@@ -32,6 +32,7 @@ jobs:
           - 'arduino_nano_33_ble'
           - 'bast_ble'
           - 'bluemicro_nrf52840'
+          - 'ebyte_e104_bt5032a'
           - 'electronut_labs_papyr'
           - 'ikigaisense_vita'
           - 'mdk_nrf52840_dongle'
