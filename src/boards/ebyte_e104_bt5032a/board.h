@@ -31,7 +31,7 @@
 #define LEDS_NUMBER        2
 #define LED_PRIMARY_PIN    31 // Red  - named "Data"
 #define LED_SECONDARY_PIN  30 // Blue - named "Link" (also a red one on the Test Board)
-#define LED_STATE_ON       1
+#define LED_STATE_ON       0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
