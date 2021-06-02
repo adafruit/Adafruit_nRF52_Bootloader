@@ -1,5 +1,9 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.5.1 - 2021.06.02
+
+- more boards support 
+
 ## 0.5.0 - 2021.04.04
 
 - Update tinyusb to latest to fix the race condition causing cdc out dropping packet. Which cause DFU failed occasionally
