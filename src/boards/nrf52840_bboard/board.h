@@ -56,8 +56,8 @@
 // USB
 //--------------------------------------------------------------------+
 #define USB_DESC_VID           0x1d50
-#define USB_DESC_UF2_PID       0x0515
-#define USB_DESC_CDC_ONLY_PID  0x0516
+#define USB_DESC_UF2_PID       0x6158
+#define USB_DESC_CDC_ONLY_PID  0x6157
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   "nRF52840 BBoard"
