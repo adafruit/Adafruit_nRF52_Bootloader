@@ -36,6 +36,7 @@ jobs:
           - 'ebyte_e73_tbb'
           - 'electronut_labs_papyr'
           - 'ikigaisense_vita'
+          - 'm60_keyboard'
           - 'mdk_nrf52840_dongle'
           - 'nice_nano'
           - 'nrf52840_m2'
