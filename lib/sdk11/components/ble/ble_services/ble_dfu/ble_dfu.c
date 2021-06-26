@@ -463,7 +463,7 @@ uint32_t ble_dfu_init(ble_dfu_t * p_dfu, ble_dfu_init_t * p_dfu_init)
 
     p_dfu->conn_handle = BLE_CONN_HANDLE_INVALID;
 
-    ble_uuid_t service_uuid;
+    ble_uuid_t service_uuid = {0};
     uint32_t   err_code;
 
     const ble_uuid128_t base_uuid128 =

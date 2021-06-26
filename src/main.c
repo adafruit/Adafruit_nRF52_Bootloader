@@ -411,7 +411,7 @@ void assert_nrf_callback (uint16_t line_num, uint8_t const * p_file_name)
 // Process BLE event from SD
 uint32_t proc_ble(void)
 {
-  __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
+  __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ] = {0};
   uint16_t ev_len = BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX);
 
   // Get BLE Event
@@ -448,7 +448,7 @@ uint32_t proc_ble(void)
 // process SOC event from SD
 uint32_t proc_soc(void)
 {
-  uint32_t soc_evt;
+  uint32_t soc_evt = 0;
   uint32_t err = sd_evt_get(&soc_evt);
 
   if (NRF_SUCCESS == err)
