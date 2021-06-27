@@ -411,8 +411,12 @@ void assert_nrf_callback (uint16_t line_num, uint8_t const * p_file_name)
 // Process BLE event from SD
 uint32_t proc_ble(void)
 {
-  __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ] = {0};
+  __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
   uint16_t ev_len = BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX);
+
+  // Init header
+  ble_evt_t* evt = (ble_evt_t*) ev_buf;
+  evt->header.evt_id = 0;
 
   // Get BLE Event
   uint32_t err = sd_ble_evt_get(ev_buf, &ev_len);
@@ -420,8 +424,6 @@ uint32_t proc_ble(void)
   // Handle valid event, ignore error
   if( NRF_SUCCESS == err)
   {
-    ble_evt_t* evt = (ble_evt_t*) ev_buf;
-
     switch (evt->header.evt_id)
     {
       case BLE_GAP_EVT_CONNECTED:
