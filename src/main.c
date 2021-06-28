@@ -157,7 +157,7 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
-  PRINTF("Bootlaoder Start\r\n");
+  PRINTF("Bootloader Start\r\n");
 
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
@@ -339,7 +339,13 @@ static uint32_t softdev_init(bool init_softdevice)
       .accuracy     = NRF_CLOCK_LF_ACCURACY_250_PPM
   };
 
+#ifdef BLE
   APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler) );
+#elif defined(BOTH)
+  APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler, ANT_LICENSE_KEY ) );
+#else
+  #error "No valid protocol was selected"
+#endif // BLE
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/

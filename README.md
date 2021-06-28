@@ -129,25 +129,25 @@ brew link --overwrite arm-none-eabi-gcc # if a prior version was present
 To build:
 
 ```
-make BOARD=feather_nrf52840_express all
+make BOARD=feather_nrf52840_express SD=s140 all
 ```
 
 To flash the bootloader with JLink:
 
 ```
-make BOARD=feather_nrf52840_express flash
+make BOARD=feather_nrf52840_express SD=s140 flash
 ```
 
 To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
 
 ```
-make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 dfu-flash
+make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 SD=s140 dfu-flash
 ```
 
 To flash SoftDevice (and chip erase):
 
 ```
-make BOARD=feather_nrf52840_express sd
+make BOARD=feather_nrf52840_express SD=s140 sd
 ```
 
 For the list of supported boards, run `make` without `BOARD=` :
@@ -158,6 +158,26 @@ You must provide a BOARD parameter with 'BOARD='
 Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
 Makefile:90: *** BOARD not defined.  Stop
 ```
+
+The supported protocols are currently BLE and BOTH (ANT + BLE).
+
+### Building with an ANT softdevice
+
+Currently, the bootloader can be built against the dualstack softdevice headers for
+use of both ANT and BLE simultaneously. To do this:
+
+1. Download either s332 or s340 from thisisant.com. Note that this softdevice is
+   freely available for evaluation use only. Garmin Canada must be contacted to obtain
+   ANT licenses for commercial use.
+2. Place the contents of the softdevice package in the appropriate lib/softdevice folder.
+3. Rename the API folder to <SD name>_nrf52_6.1.1_API.
+4. Rename the softdevice hex to <SD name>_nrf52_6.1.1_softdevice.hex.
+5. When building make sure to set SD=s340 or SD=s332
+
+All bootloader features available in the single-stack BLE softdevice are also available in the
+dualstack softdevice, including OTA-DFU updates using BLE.
+
+Note that single stack ANT softdevices are not currently supported (s2xx series softdevices).
 
 ### Common makefile problems
 
