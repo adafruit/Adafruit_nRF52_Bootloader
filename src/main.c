@@ -416,7 +416,7 @@ uint32_t proc_ble(void)
 
   // Init header
   ble_evt_t* evt = (ble_evt_t*) ev_buf;
-  evt->header.evt_id = 0;
+  evt->header.evt_id = BLE_EVT_INVALID;
 
   // Get BLE Event
   uint32_t err = sd_ble_evt_get(ev_buf, &ev_len);
