@@ -414,14 +414,16 @@ uint32_t proc_ble(void)
   __ALIGN(4) uint8_t ev_buf[ BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX) ];
   uint16_t ev_len = BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX);
 
+  // Init header
+  ble_evt_t* evt = (ble_evt_t*) ev_buf;
+  evt->header.evt_id = BLE_EVT_INVALID;
+
   // Get BLE Event
   uint32_t err = sd_ble_evt_get(ev_buf, &ev_len);
 
   // Handle valid event, ignore error
   if( NRF_SUCCESS == err)
   {
-    ble_evt_t* evt = (ble_evt_t*) ev_buf;
-
     switch (evt->header.evt_id)
     {
       case BLE_GAP_EVT_CONNECTED:
@@ -448,7 +450,7 @@ uint32_t proc_ble(void)
 // process SOC event from SD
 uint32_t proc_soc(void)
 {
-  uint32_t soc_evt;
+  uint32_t soc_evt = 0;
   uint32_t err = sd_evt_get(&soc_evt);
 
   if (NRF_SUCCESS == err)
