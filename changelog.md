@@ -1,5 +1,9 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.6.0 - 2021.06.19
+
+- Update tinyusb to latest to fix the race condition with control transfer, which could cause failed to connect to DFU Serial occasionally.
+
 ## 0.5.1 - 2021.06.02
 
 - more boards support 
