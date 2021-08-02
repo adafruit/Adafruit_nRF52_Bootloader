@@ -99,21 +99,71 @@ BIN = _bin/$(BOARD)
 # Board specific
 -include src/boards/$(BOARD)/board.mk
 
-# MCU_SUB_VARIANT can be nrf52 (nrf52832), nrf52833, nrf52840
-ifeq ($(MCU_SUB_VARIANT),nrf52)
-  SD_NAME = s132
+#---------------------------------
+# Select the softdevice to build for
+#---------------------------------
+ifeq ($(SD),s140)
+  CFLAGS += -DS140 -DBLE
+  DFU_DEV_REV = 52840
+  ifeq ($(MCU_SUB_VARIANT),nrf52833)
+    CFLAGS += -DNRF52833_XXAA
+  else ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    CFLAGS += -DNRF52840_XXAA
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
+  endif
+else ifeq ($(SD),s340)
+  $(info Build specified supporting both ANT and BLE)
+  $(warning Ensure you download a dualstack softdevice from thisisant.com)
+  $(warning Make sure to compile against the dualstack softdevice headers)
+  CFLAGS += -DS340 -DBOTH
+  DFU_DEV_REV = 52840
+  ifeq ($(MCU_SUB_VARIANT),nrf52833)
+    CFLAGS += -DNRF52833_XXAA
+  else ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    CFLAGS += -DNRF52840_XXAA
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
+  endif
+else ifeq ($(SD),s132)
+  CFLAGS += -DS132 -DBLE
   DFU_DEV_REV = 0xADAF
-  CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132
-else ifeq ($(MCU_SUB_VARIANT),nrf52833)
-  SD_NAME = s140
-  DFU_DEV_REV = 52840
-  CFLAGS += -DNRF52833_XXAA -DS140
-else ifeq ($(MCU_SUB_VARIANT),nrf52840)
-  SD_NAME = s140
-  DFU_DEV_REV = 52840
-  CFLAGS += -DNRF52840_XXAA -DS140
+  ifeq ($(MCU_SUB_VARIANT),nrf52)
+    CFLAGS += -DNRF52832_XXAA
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
+  endif
+else ifeq ($SD, s332)
+  $(info Build specified supporting both ANT and BLE)
+  $(warning Ensure you download a dualstack softdevice from thisisant.com)
+  $(warning Make sure to compile against the dualstack softdevice headers)
+  CFLAGS += -DS332 -DBOTH
+  DFU_DEV_REV = 0xADAF
+  ifeq ($(MCU_SUB_VARIANT),nrf52)
+    CFLAGS += -DNRF52832_XXAA
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is invalid for softdevice $(SD))
+  endif
+else ifeq ($SD,)
+  # SD not specified, default to BLE SDs
+  ifeq ($(MCU_SUB_VARIANT),nrf52)
+    SD = s132
+    DFU_DEV_REV = 0xADAF
+    CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132 -DBLE
+  else ifeq ($(MCU_SUB_VARIANT),nrf52833)
+    SD = s140
+    DFU_DEV_REV = 52840
+    CFLAGS += -DNRF52833_XXAA -DS140 -DBLE
+  else ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    SD = s140
+    DFU_DEV_REV = 52840
+    CFLAGS += -DNRF52840_XXAA -DS140 -DBLE
+  else
+    $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
+  endif
 else
-  $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
+  # Invalid SD was specified
+  $(error softdevice $(SD) is unknown)
 endif
 
 #------------------------------------------------------------------------------
@@ -289,7 +339,7 @@ CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
 
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
-CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
+CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD) $(SD_VERSION)"'
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
 CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'
