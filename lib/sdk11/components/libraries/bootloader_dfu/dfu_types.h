@@ -66,18 +66,12 @@ static inline bool is_sd_existed(void)
 #define DFU_REGION_TOTAL_SIZE           (BOOTLOADER_REGION_START - CODE_REGION_1_START)                 /**< Total size of the region between SD and Bootloader. */
 
 #ifndef DFU_APP_DATA_RESERVED
-#define DFU_APP_DATA_RESERVED           CODE_PAGE_SIZE*7                                                /**< Size of Application Data that must be preserved between application updates. This value must be a multiple of page size. Page size is 0x400 (1024d) bytes, thus this value must be 0x0000, 0x0400, 0x0800, 0x0C00, 0x1000, etc. */
+  #define DFU_APP_DATA_RESERVED         CODE_PAGE_SIZE*7                                                /**< Size of Application Data that must be preserved between application updates. This value must be a multiple of page size. Page size is 0x400 (1024d) bytes, thus this value must be 0x0000, 0x0400, 0x0800, 0x0C00, 0x1000, etc. */
 #endif
 
 #define DFU_IMAGE_MAX_SIZE_FULL         (DFU_REGION_TOTAL_SIZE - DFU_APP_DATA_RESERVED)                 /**< Maximum size of an application, excluding save data from the application. */
-                                          
-#define DFU_IMAGE_MAX_SIZE_BANKED       (((DFU_IMAGE_MAX_SIZE_FULL) - \
-                                        (DFU_IMAGE_MAX_SIZE_FULL % (2 * CODE_PAGE_SIZE)))/2)            /**< Maximum size of an application, excluding save data from the application. */
-
-#define DFU_BL_IMAGE_MAX_SIZE           (BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS - BOOTLOADER_REGION_START)         /**< Maximum size of a bootloader, excluding save data from the current bootloader. */
-
+#define DFU_BL_IMAGE_MAX_SIZE           (BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS - BOOTLOADER_REGION_START)  /**< Maximum size of a bootloader, excluding save data from the current bootloader. */
 #define DFU_BANK_0_REGION_START         CODE_REGION_1_START                                             /**< Bank 0 region start. */
-#define DFU_BANK_1_REGION_START         (DFU_BANK_0_REGION_START + DFU_IMAGE_MAX_SIZE_BANKED)           /**< Bank 1 region start. */
 
 #define EMPTY_FLASH_MASK                0xFFFFFFFF                                                      /**< Bit mask that defines an empty address in flash. */
 
