@@ -47,14 +47,14 @@ static inline bool is_sd_existed(void)
 #define SOFTDEVICE_REGION_START             MBR_SIZE                    /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
 #define CODE_PAGE_SIZE                      0x1000                      /**< Size of a flash codepage. Used for size of the reserved flash space in the bootloader region. Will be runtime checked against NRF_UICR->CODEPAGESIZE to ensure the region is correct. */
 
-// Flash = 512 KB
 #if defined(NRF52832_XXAA) || defined(NRF52833_XXAA)
+  // Flash = 512 KB
   #define BOOTLOADER_REGION_START             0x00074000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
   #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x0007E000                  /**< The field specifies the page location of the mbr params page address. */
   #define BOOTLOADER_SETTINGS_ADDRESS         0x0007F000                  /**< The field specifies the page location of the bootloader settings address. */
 
-// Flash = 1024 KB
 #elif  defined(NRF52840_XXAA)
+  // Flash = 1024 KB
   #define BOOTLOADER_REGION_START             0x000F4000                  /**< This field should correspond to start address of the bootloader, found in UICR.RESERVED, 0x10001014, register. This value is used for sanity check, so the bootloader will fail immediately if this value differs from runtime value. The value is used to determine max application size for updating. */
   #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x000FE000                  /**< The field specifies the page location of the mbr params page address. */
   #define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000                  /**< The field specifies the page location of the bootloader settings address. */
@@ -66,7 +66,7 @@ static inline bool is_sd_existed(void)
 #define DFU_REGION_TOTAL_SIZE           (BOOTLOADER_REGION_START - CODE_REGION_1_START)                 /**< Total size of the region between SD and Bootloader. */
 
 #ifndef DFU_APP_DATA_RESERVED
-  #define DFU_APP_DATA_RESERVED         CODE_PAGE_SIZE*7                                                /**< Size of Application Data that must be preserved between application updates. This value must be a multiple of page size. Page size is 0x400 (1024d) bytes, thus this value must be 0x0000, 0x0400, 0x0800, 0x0C00, 0x1000, etc. */
+  #error "DFU_APP_DATA_RESERVED is not defined"
 #endif
 
 #define DFU_IMAGE_MAX_SIZE_FULL         (DFU_REGION_TOTAL_SIZE - DFU_APP_DATA_RESERVED)                 /**< Maximum size of an application, excluding save data from the application. */

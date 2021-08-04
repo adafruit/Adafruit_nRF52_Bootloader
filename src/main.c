@@ -197,8 +197,8 @@ int main(void)
   {
     led_state(STATE_WRITING_STARTED);
 
-    APP_ERROR_CHECK( bootloader_dfu_sd_update_continue() );
-    APP_ERROR_CHECK( bootloader_dfu_sd_update_finalize() );
+    bootloader_dfu_sd_update_continue();
+    bootloader_dfu_sd_update_finalize();
 
     led_state(STATE_WRITING_FINISHED);
   }
@@ -264,12 +264,12 @@ int main(void)
       if (APP_ASKS_FOR_SINGLE_TAP_RESET() || uf2_dfu || serial_only_dfu)
       {
         // If USB is not enumerated in 3s (eg. because we're running on battery), we restart into app.
-        APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 3000, true) );
+         bootloader_dfu_start(_ota_dfu, 3000, true);
       }
       else
       {
         // No timeout if bootloader requires user action (double-reset).
-        APP_ERROR_CHECK( bootloader_dfu_start(_ota_dfu, 0, false) );
+         bootloader_dfu_start(_ota_dfu, 0, false);
       }
 
       if ( _ota_dfu )
@@ -328,7 +328,7 @@ static uint32_t softdev_init(bool init_softdevice)
   if (init_softdevice) softdev_mbr_init();
 
   // Forward vector table to bootloader address so that we can handle BLE events
-  APP_ERROR_CHECK( sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START) );
+  sd_softdevice_vector_table_base_set(BOOTLOADER_REGION_START);
 
   // Enable Softdevice, Use Internal OSC to compatible with all boards
   nrf_clock_lf_cfg_t clock_cfg =
@@ -339,7 +339,7 @@ static uint32_t softdev_init(bool init_softdevice)
       .accuracy     = NRF_CLOCK_LF_ACCURACY_250_PPM
   };
 
-  APP_ERROR_CHECK( sd_softdevice_enable(&clock_cfg, app_error_fault_handler) );
+  sd_softdevice_enable(&clock_cfg, app_error_fault_handler);
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/
@@ -354,35 +354,35 @@ static uint32_t softdev_init(bool init_softdevice)
   blecfg.gap_cfg.role_count_cfg.periph_role_count  = 1;
   blecfg.gap_cfg.role_count_cfg.central_role_count = 0;
   blecfg.gap_cfg.role_count_cfg.central_sec_count  = 0;
-  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_GAP_CFG_ROLE_COUNT, &blecfg, ram_start) );
+  sd_ble_cfg_set(BLE_GAP_CFG_ROLE_COUNT, &blecfg, ram_start);
 
   // NRF_DFU_BLE_REQUIRES_BONDS
   varclr(&blecfg);
   blecfg.gatts_cfg.service_changed.service_changed = 1;
-  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_GATTS_CFG_SERVICE_CHANGED, &blecfg, ram_start) );
+   sd_ble_cfg_set(BLE_GATTS_CFG_SERVICE_CHANGED, &blecfg, ram_start) ;
 
   // ATT MTU
   varclr(&blecfg);
   blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
   blecfg.conn_cfg.params.gatt_conn_cfg.att_mtu = BLEGATT_ATT_MTU_MAX;
-  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GATT, &blecfg, ram_start) );
+  sd_ble_cfg_set(BLE_CONN_CFG_GATT, &blecfg, ram_start);
 
   // Event Length + HVN queue + WRITE CMD queue setting affecting bandwidth
   varclr(&blecfg);
   blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
   blecfg.conn_cfg.params.gap_conn_cfg.conn_count   = 1;
   blecfg.conn_cfg.params.gap_conn_cfg.event_length = BLEGAP_EVENT_LENGTH;
-  APP_ERROR_CHECK( sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start) );
+  sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start);
 
   // Enable BLE stack.
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
-  APP_ERROR_CHECK( sd_ble_enable(&ram_start) );
+  sd_ble_enable(&ram_start);
 
 #if 0
   ble_opt_t  opt;
   varclr(&opt);
   opt.common_opt.conn_evt_ext.enable = 1; // enable Data Length Extension
-  APP_ERROR_CHECK( sd_ble_opt_set(BLE_COMMON_OPT_CONN_EVT_EXT, &opt) );
+  sd_ble_opt_set(BLE_COMMON_OPT_CONN_EVT_EXT, &opt);
 #endif
 
   return NRF_SUCCESS;
