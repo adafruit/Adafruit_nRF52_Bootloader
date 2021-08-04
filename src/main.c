@@ -157,8 +157,6 @@ void softdev_mbr_init(void)
 //--------------------------------------------------------------------+
 int main(void)
 {
-  PRINTF("Bootlaoder Start\r\n");
-
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
   // Note: skip it for now since this will prevent us to change the size of bootloader in the future
@@ -189,6 +187,8 @@ int main(void)
 
   board_init();
   bootloader_init();
+
+  PRINTF("Bootloader Start\r\n");
 
   led_state(STATE_BOOTLOADER_STARTED);
 
@@ -320,7 +320,7 @@ int main(void)
  * "Master Boot Record and SoftDevice initializaton procedure"
  *
  * @param[in] init_softdevice  true if SoftDevice should be initialized. The SoftDevice must only
- *                             be initialized if a chip reset has occured. Soft reset (jump ) from
+ *                             be initialized if a chip reset has occurred. Soft reset (jump ) from
  *                             application must not reinitialize the SoftDevice.
  */
 static uint32_t softdev_init(bool init_softdevice)
@@ -359,7 +359,7 @@ static uint32_t softdev_init(bool init_softdevice)
   // NRF_DFU_BLE_REQUIRES_BONDS
   varclr(&blecfg);
   blecfg.gatts_cfg.service_changed.service_changed = 1;
-   sd_ble_cfg_set(BLE_GATTS_CFG_SERVICE_CHANGED, &blecfg, ram_start) ;
+  sd_ble_cfg_set(BLE_GATTS_CFG_SERVICE_CHANGED, &blecfg, ram_start);
 
   // ATT MTU
   varclr(&blecfg);
@@ -471,7 +471,7 @@ uint32_t proc_soc(void)
   return err;
 }
 
-void ada_sd_task(void* evt_data, uint16_t evt_size)
+void proc_sd_task(void* evt_data, uint16_t evt_size)
 {
   (void) evt_data;
   (void) evt_size;
@@ -486,7 +486,7 @@ void ada_sd_task(void* evt_data, uint16_t evt_size)
 void SD_EVT_IRQHandler(void)
 {
   // Use App Scheduler to defer handling code in non-isr context
-  app_sched_event_put(NULL, 0, ada_sd_task);
+  app_sched_event_put(NULL, 0, proc_sd_task);
 }
 
 
