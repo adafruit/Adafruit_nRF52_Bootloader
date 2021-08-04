@@ -324,13 +324,14 @@ void led_state(uint32_t state)
     } else if (temp_color_active) {
         final_color = (uint8_t*)&rgb_color;
     }
-    #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
     if (final_color != NULL) {
         neopixel_write(final_color);
     }
-    #else
+#else
     (void) final_color;
-    #endif
+#endif
 }
 
 #ifdef LED_NEOPIXEL
