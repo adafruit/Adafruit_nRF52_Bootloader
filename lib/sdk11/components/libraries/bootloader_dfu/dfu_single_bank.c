@@ -101,8 +101,8 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
   }
   else
   {
-    uint32_t page_count = m_image_size / CODE_PAGE_SIZE;
-    if ( m_image_size % CODE_PAGE_SIZE ) page_count++;
+    // ceil div
+    uint32_t const page_count = NRFX_CEIL_DIV(m_image_size, CODE_PAGE_SIZE);
 
     for ( uint32_t i = 0; i < page_count; i++ )
     {

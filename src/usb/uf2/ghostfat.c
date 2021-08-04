@@ -587,6 +587,5 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     }
   }
 
-  STATIC_ASSERT(BPB_SECTOR_SIZE == 512); // if sector size changes, may need to re-validate this code
   return BPB_SECTOR_SIZE;
 }
