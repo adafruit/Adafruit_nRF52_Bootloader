@@ -50,6 +50,7 @@ jobs:
           - 'pitaya_go'
           - 'raytac_mdbt50q_rx'
           - 'sparkfun_nrf52840_micromod'
+          - 'warmbit_bluepixel'
           - 'waveshare_nrf52840_eval'
 
     steps:
