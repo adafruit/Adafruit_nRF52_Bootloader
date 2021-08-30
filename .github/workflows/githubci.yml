@@ -23,6 +23,7 @@ jobs:
           - 'feather_nrf52840_sense'
           - 'itsybitsy_nrf52840_express'
           - 'metro_nrf52840_express'
+          - 'ledglasses_nrf52840'
           # Alphabetical order
           - 'adm_b_nrf52840_1'
           - 'ae_bl652_bo'
