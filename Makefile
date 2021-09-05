@@ -270,6 +270,18 @@ CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
 # TinyUSB tusb_hal_nrf_power_event
 CFLAGS += -Wno-cast-function-type
 
+# Nordic Softdevice SDK header files contains inline assembler that has
+# broken constraints. As a result the IPA-modref pass, introduced in gcc-11,
+# is able to "prove" that arguments to wrapper functions generated with
+# the SVCALL() macro are unused and, as a result, the optimizer will remove
+# code within the callers that sets up these arguments (which results in
+# a broken bootloader). The broken headers come from Nordic-supplied zip
+# files and are not trivial to patch so, for now, we'll simply disable the
+# new gcc-11 inter-procedural optimizations.
+ifeq (,$(findstring unrecognized,$(shell $(CC) $(CFLAGS) -fno-ipa-modref 2>&1)))
+CFLAGS += -fno-ipa-modref
+endif
+
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
