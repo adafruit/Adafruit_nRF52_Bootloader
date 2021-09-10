@@ -1,5 +1,9 @@
 # Adafruit nRF52 Bootloader Changelog
 
+## 0.6.2 - 2021.09.10
+
+- Add new board "LED Glasses Driver nRF52840"
+
 ## 0.6.1 - 2021.08.04
 
 - Fix failed to upgrade ssue when flashing uf2 with more than 512KB payload
