@@ -124,13 +124,14 @@ endif
 #------------------------------------------------------------------------------
 
 # all files in src
-C_SRC += $(wildcard src/*.c)
+C_SRC += \
+  src/dfu_ble_svc.c \
+  src/dfu_init.c \
+  src/flash_nrf5x.c \
+  src/main.c \
 
 # all files in boards
-C_SRC += $(wildcard src/boards/*.c)
-
-# all sources files in specific board
-C_SRC += $(wildcard src/boards/$(BOARD)/*.c)
+C_SRC += src/boards/boards.c
 
 # nrfx
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_power.c
@@ -172,18 +173,25 @@ IPATH += $(SDK_PATH)/drivers_nrf/uart
 
 else
 
+# pinconfig is required for 840 for CF2
+C_SRC += src/boards/$(BOARD)/pinconfig.c
+
 # USB Application ( MSC + UF2 )
-C_SRC += $(wildcard src/usb/*.c)
-C_SRC += $(wildcard src/usb/uf2/*.c)
+C_SRC += \
+	src/usb/msc_uf2.c \
+	src/usb/usb_desc.c \
+	src/usb/usb.c \
+	src/usb/uf2/ghostfat.c
 
 # TinyUSB stack
-C_SRC += $(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c
-C_SRC += $(TUSB_PATH)/common/tusb_fifo.c
-C_SRC += $(TUSB_PATH)/device/usbd.c
-C_SRC += $(TUSB_PATH)/device/usbd_control.c
-C_SRC += $(TUSB_PATH)/class/cdc/cdc_device.c
-C_SRC += $(TUSB_PATH)/class/msc/msc_device.c
-C_SRC += $(TUSB_PATH)/tusb.c
+C_SRC += \
+	$(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c \
+	$(TUSB_PATH)/common/tusb_fifo.c \
+	$(TUSB_PATH)/device/usbd.c \
+	$(TUSB_PATH)/device/usbd_control.c \
+	$(TUSB_PATH)/class/cdc/cdc_device.c \
+	$(TUSB_PATH)/class/msc/msc_device.c \
+	$(TUSB_PATH)/tusb.c
 
 endif
 
