@@ -84,7 +84,7 @@ enum {
     ITF_NUM_TOTAL
 };
 
-uint8_t const desc_configuration_cdc_msc[] =
+uint8_t desc_configuration_cdc_msc[] =
 {
   // Interface count, string index, total length, attribute, power in mA
   TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN, 0, 100),
@@ -96,7 +96,7 @@ uint8_t const desc_configuration_cdc_msc[] =
   TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, STRID_MSC, 0x03, 0x83, 64),
 };
 
-uint8_t const desc_configuration_cdc_only[] =
+uint8_t desc_configuration_cdc_only[] =
 {
   // Interface count, string index, total length, attribute, power in mA
   TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL-1, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0, 100),
