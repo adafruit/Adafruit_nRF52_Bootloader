@@ -238,14 +238,15 @@ static void check_dfu_mode(void)
   _ota_dfu = (gpregret == DFU_MAGIC_OTA_APPJUM) || (gpregret == DFU_MAGIC_OTA_RESET);
 
   // Serial only mode
-  bool serial_only_dfu = (gpregret == DFU_MAGIC_SERIAL_ONLY_RESET);
-  bool uf2_dfu = (gpregret == DFU_MAGIC_UF2_RESET);
+  bool const serial_only_dfu = (gpregret == DFU_MAGIC_SERIAL_ONLY_RESET);
+  bool const uf2_dfu         = (gpregret == DFU_MAGIC_UF2_RESET);
+  bool const dfu_skip        = (gpregret == DFU_MAGIC_SKIP);
+
+  bool const reason_reset_pin = (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk) ? true : false;
 
   // start either serial, uf2 or ble
   bool dfu_start = _ota_dfu || serial_only_dfu || uf2_dfu ||
-                    (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk));
-
-  bool const dfu_skip = (gpregret == DFU_MAGIC_SKIP);
+                    (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin);
 
   // Clear GPREGRET if it is our values
   if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
@@ -265,12 +266,9 @@ static void check_dfu_mode(void)
 
   if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET()) dfu_start = 1;
 
-  // App mode: register 1st reset or DFU startup for nrf52832
+  // App mode: Double Reset detection or DFU startup for nrf52832
   if ( ! (just_start_app || dfu_start || !valid_app) )
   {
-    // Register our first reset for double reset detection
-    (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
-
 #ifdef NRF52832_XXAA
     /* Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
      * to support auto programming from Arduino IDE
@@ -279,8 +277,15 @@ static void check_dfu_mode(void)
      */
     bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL, false);
 #else
-    // if RST is pressed during this delay (double reset)--> if will enter dfu
-    NRFX_DELAY_MS(DFU_DBL_RESET_DELAY);
+    // Note: RESETREAS is not clear by bootloader, it should be cleared by application upon init()
+    if (reason_reset_pin)
+    {
+      // Register our first reset for double reset detection
+      (*dbl_reset_mem) = DFU_DBL_RESET_MAGIC;
+
+      // if RST is pressed during this delay (double reset)--> if will enter dfu
+      NRFX_DELAY_MS(DFU_DBL_RESET_DELAY);
+    }
 #endif
   }
 
