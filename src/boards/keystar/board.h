@@ -33,6 +33,7 @@
 #define LED_SECONDARY_PIN   _PINNUM(0, 10)
 #define LED_STATE_ON        0
 
+#ifndef UF2_VOLUME_LABEL   "KEYSTAR-ORION  "
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
