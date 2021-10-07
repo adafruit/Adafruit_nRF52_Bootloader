@@ -25,15 +25,15 @@
 #ifndef PCA10056_H
 #define PCA10056_H
 
+#define _PINNUM(port, pin)    ((port)*32 + (pin))
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER         2
-#define LED_PRIMARY_PIN     _PINNUM(0, 09)
+#define LED_PRIMARY_PIN     _PINNUM(0, 9)
 #define LED_SECONDARY_PIN   _PINNUM(0, 10)
 #define LED_STATE_ON        0
 
-#ifndef UF2_VOLUME_LABEL   "KEYSTAR-ORION  "
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
@@ -56,6 +56,7 @@
 #define USB_DESC_VID           0x239A
 #define USB_DESC_UF2_PID       0x0029
 #define USB_DESC_CDC_ONLY_PID  0x0029
+#define UF2_VOLUME_LABEL   "KSTARORION"
 
 #define UF2_PRODUCT_NAME    "KEYSTAR"
 #define UF2_BOARD_ID        "Orion"
