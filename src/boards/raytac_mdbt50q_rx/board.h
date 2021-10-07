@@ -53,15 +53,14 @@
 // USB
 //--------------------------------------------------------------------+
 
-// Shared VID/PID with Feather nRF52840, will be disabled for building in the future
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x0029
+#define USB_DESC_UF2_PID       0x010B
+#define USB_DESC_CDC_ONLY_PID  0x010B
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME        "Raytac MDBT50Q-RX"
 #define UF2_VOLUME_LABEL        "MDBT50QBOOT"
 #define UF2_BOARD_ID            "nRF52840-MDBT50Q_RX-verD"
-#define UF2_INDEX_URL           "https://www.raytac.com/product/ins.php?index_id=89"
+#define UF2_INDEX_URL           "https://www.adafruit.com/product/5199"
 
 #endif // RAYTAC_MDBT50Q_RX_H

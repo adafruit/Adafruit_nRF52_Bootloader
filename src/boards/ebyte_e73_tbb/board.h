@@ -22,45 +22,46 @@
  * THE SOFTWARE.
  */
 
-#ifndef _EBYTE_E104_BT5032A_H
-#define _EBYTE_E104_BT5032A_H
+#ifndef _EBYTE_E73_TBB_H
+#define _EBYTE_E73_TBB_H
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER        2
-#define LED_PRIMARY_PIN    31 // Red  - named "Data"
-#define LED_SECONDARY_PIN  30 // Blue - named "Link" (also a red one on the Test Board)
+#define LED_PRIMARY_PIN    17 // Red  - named "LED1"
+#define LED_SECONDARY_PIN  18 // Blue - named "LED2" (also a red one on the Test Board)
 #define LED_STATE_ON       0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER     2
-#define BUTTON_1           29 // DISC Button on E104-BT5032A-TB Test Board
-                              // BUTTON_1 is DFU.  The module does not have reset circuitry.
-                              // The Test Board from Ebyte (E104-BT5032A-TB) also does not have reset circuitry
+#define BUTTON_1           14 // BUTTON_1 is DFU.  SW1 on E73-TBB Test Board. 
+                              // This Test board uses the E73-2G4M04S1B module which contains a nrf52832. 
+                              // The module does not have reset circuitry. 
+                              // The Test Board from Ebyte (E73-TBB) also does not have reset circuitry
                               // To be able to upload using the Arduino IDE, (To enter DFU mode)
-                              // Press "DISC", press and release "RST", then release "DISC"
-#define BUTTON_2           28 // No button - WKP pin
+                              // Press "SW1", momentarily ground "RST/P0.21", then release "SW1"
+#define BUTTON_2           13 // SW2 on board
 #define BUTTON_PULL        NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART (only used by nRF52832)
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      14
-#define TX_PIN_NUMBER      18
-#define CTS_PIN_NUMBER     20
-#define RTS_PIN_NUMBER     19
+#define RX_PIN_NUMBER      8
+#define TX_PIN_NUMBER      6
+#define CTS_PIN_NUMBER     5
+#define RTS_PIN_NUMBER     7
 #define HWFC               false  // leaving it false to make GPIO available
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER "CDEBYTE"
-#define BLEDIS_MODEL        "E104-BT5032A"
+#define BLEDIS_MODEL        "E73-TBB"
 
-#define UF2_PRODUCT_NAME    "Ebyte E104-BT5032A nRF52832"
-#define UF2_INDEX_URL       "https://www.ebyte.com/en/product-view-news.html?id=756"
+#define UF2_PRODUCT_NAME    "Ebyte E73-TBB nRF52832"
+#define UF2_INDEX_URL       "https://www.ebyte.com/en/product-view-news.aspx?id=889"
 
-#endif // _EBYTE_E104_BT5032A_H
+#endif // _EBYTE_E73_TBB_H

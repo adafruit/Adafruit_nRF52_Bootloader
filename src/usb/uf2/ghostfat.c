@@ -31,6 +31,7 @@
 #include "flash_nrf5x.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "bootloader_settings.h"
 #include "bootloader.h"
@@ -119,7 +120,8 @@ STATIC_ASSERT(FAT_ENTRIES_PER_SECTOR                       ==       256); // FAT
 char infoUf2File[128*3] =
     "UF2 Bootloader " UF2_VERSION "\r\n"
     "Model: " UF2_PRODUCT_NAME "\r\n"
-    "Board-ID: " UF2_BOARD_ID "\r\n";
+    "Board-ID: " UF2_BOARD_ID "\r\n"
+    "Date: " __DATE__ "\r\n";
 
 const char indexFile[] =
     "<!doctype html>\n"
@@ -250,17 +252,33 @@ void uf2_init(void)
     uint32_t const sd_id      = SD_ID_GET(MBR_SIZE);
     uint32_t const sd_version = SD_VERSION_GET(MBR_SIZE);
 
-    uint32_t const ver1 = sd_version / 1000000;
-    uint32_t const ver2 = (sd_version % 1000000)/1000;
-    uint32_t const ver3 = sd_version % 1000;
+    uint32_t ver[3];
+    ver[0] = sd_version / 1000000;
+    ver[1] = (sd_version - ver[0]*1000000)/1000;
+    ver[2] = (sd_version - ver[0]*1000000 - ver[1]*1000);
 
-    sprintf(infoUf2File + strlen(infoUf2File), "S%lu version %lu.%lu.%lu\r\n", sd_id, ver1, ver2, ver3);
+    char str[10];
+    utoa(sd_id, str, 10);
+
+    strcat(infoUf2File, "S");
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, " ");
+
+    utoa(ver[0], str, 10);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, ".");
+
+    utoa(ver[1], str, 10);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, ".");
+
+    utoa(ver[2], str, 10);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, "\r\n");
   }else
   {
     strcat(infoUf2File, "not found\r\n");
   }
-
-  strcat(infoUf2File, "Date: " __DATE__ "\r\n");
 }
 
 /*------------------------------------------------------------------*/
@@ -587,6 +605,5 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     }
   }
 
-  STATIC_ASSERT(BPB_SECTOR_SIZE == 512); // if sector size changes, may need to re-validate this code
   return BPB_SECTOR_SIZE;
 }
