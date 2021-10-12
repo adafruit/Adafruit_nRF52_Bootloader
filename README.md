@@ -10,6 +10,7 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062)
 - [Adafruit Feather nRF52840 Sense](https://www.adafruit.com/product/4516)
 - [Adafruit ItsyBitsy nRF52840 Express](https://www.adafruit.com/product/4481)
+- [Adafruit LED Glasses Driver nRF52840](https://www.adafruit.com/product/5217)
 - Adafruit Metro nRF52840 Express
 - [Akizukidenshi AE-BL652-BO](https://akizukidenshi.com/catalog/g/gK-15567/)
 - [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
