@@ -83,6 +83,7 @@ jobs:
     
     - name: Build
       run: |
+        git describe --dirty --always --tags
         make BOARD=${{ matrix.board }} print-_VER print-GIT_VERSION print-CFLAGS
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
