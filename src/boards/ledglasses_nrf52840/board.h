@@ -63,6 +63,6 @@
 #define UF2_PRODUCT_NAME   "Adafruit LED Glasses Driver nRF52840"
 #define UF2_VOLUME_LABEL   "GLASSESBOOT"
 #define UF2_BOARD_ID       "nRF52840-LedGlasses-revA"
-#define UF2_INDEX_URL      "https://www.adafruit.com/"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/5217"
 
 #endif // _LEDGLASSES_NRF52840_H

@@ -373,6 +373,10 @@ clean:
 	@$(RM) $(BUILD)
 	@$(RM) $(BIN)
 
+# linkermap must be install previously at https://github.com/hathach/linkermap
+linkermap: $(BUILD)/$(OUT_NAME).out
+	@linkermap -v $<.map
+
 # Create objects from C SRC files
 $(BUILD)/%.o: %.c
 	@echo CC $(notdir $<)
