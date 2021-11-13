@@ -15,7 +15,7 @@ TUSB_PATH    = lib/tinyusb/src
 NRFX_PATH    = lib/nrfx
 SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
-SD_VERSION   = 6.1.1
+SD_VERSION   = 7.2.0
 SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
