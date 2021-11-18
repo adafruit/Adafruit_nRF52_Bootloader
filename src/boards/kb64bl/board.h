@@ -53,6 +53,7 @@
 #define USB_DESC_VID           0x1915
 #define USB_DESC_UF2_PID       0x521F
 #define USB_DESC_CDC_ONLY_PID  0x521F
+#define UF2_VOLUME_LABEL   "keyboardBL"
 
 #define UF2_PRODUCT_NAME    "Nordic nRF52833 DK"
 #define UF2_BOARD_ID        "nRF52833-pca10100-v1"
