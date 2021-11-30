@@ -69,7 +69,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME        "Raytac MDBT50Q Demo Board 40"
 #define UF2_VOLUME_LABEL        "MDBT50QBOOT"
-#define UF2_BOARD_ID            "RAYTAC-MDBT50Q-DB-40"
+#define UF2_BOARD_ID            "nRF52840-MDBT50Q-1MV2"
 #define UF2_INDEX_URL           "https://www.raytac.com/product/ins.php?index_id=81"
 
 #endif // RAYTAC_MDBT50Q_DB_40_H
