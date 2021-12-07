@@ -59,7 +59,7 @@
 
 #define UF2_PRODUCT_NAME  "Mikoto nRF52840"
 #define UF2_VOLUME_LABEL  "MIKOTO-BOOT"
-#define UF2_BOARD_ID      "nRF52840-mikoto"
+#define UF2_BOARD_ID      "nRF52840-mikoto-rev520"
 #define UF2_INDEX_URL     "https://github.com/zhiayang/mikoto"
 
 #endif // _MIKOTO_H
