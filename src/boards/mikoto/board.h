@@ -47,17 +47,17 @@
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER  "zhiayang ft mrninhvn"
+#define BLEDIS_MANUFACTURER  "zhiayang"
 #define BLEDIS_MODEL         "mikoto"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x7A79
-#define USB_DESC_UF2_PID       0x0520
-#define USB_DESC_CDC_ONLY_PID  0x0520
+#define USB_DESC_VID           0x1209
+#define USB_DESC_UF2_PID       0x7A01
+#define USB_DESC_CDC_ONLY_PID  0x7A01
 
-#define UF2_PRODUCT_NAME  "mikoto"
+#define UF2_PRODUCT_NAME  "Mikoto nRF52840"
 #define UF2_VOLUME_LABEL  "MIKOTO-BOOT"
 #define UF2_BOARD_ID      "nRF52840-mikoto"
 #define UF2_INDEX_URL     "https://github.com/zhiayang/mikoto"
