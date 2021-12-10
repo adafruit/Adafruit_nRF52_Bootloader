@@ -32,6 +32,7 @@ jobs:
           - 'arcade_feather_nrf52840_express'
           - 'arduino_nano_33_ble'
           - 'bast_ble'
+          - 'bluemicro_nrf52833'
           - 'bluemicro_nrf52840'
           - 'ebyte_e104_bt5032a'
           - 'ebyte_e73_tbb'
@@ -49,6 +50,7 @@ jobs:
           - 'pca10059'
           - 'pca10100'
           - 'pitaya_go'
+          - 'raytac_mdbt50q_db_40'
           - 'raytac_mdbt50q_rx'
           - 'sparkfun_nrf52840_micromod'
           - 'waveshare_nrf52840_eval'
@@ -63,11 +65,18 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v1
       with:
-        submodules: true      
+        submodules: true
+
+    - name: Checkout linkermap
+      uses: actions/checkout@v2
+      with:
+         repository: hathach/linkermap
+         path: linkermap
         
     - name: Install Toolchains
       run: |
         pip3 install adafruit-nrfutil uritemplate requests intelhex
+        pip3 install linkermap/
         npm install --global xpm
         # 9.3.1-1.2.1 is xpack modified version which significantly increased compiled size to 6-7KB and cause flash overflow.
         # Skip this version for now, we will try again with next official release from ARM
@@ -78,6 +87,9 @@ jobs:
       run: |
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
+
+    - name: Linker Map
+      run: make BOARD=${{ matrix.board }} linkermap
       
     - uses: actions/upload-artifact@v2
       with:
