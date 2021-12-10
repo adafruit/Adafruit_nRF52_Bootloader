@@ -14,11 +14,19 @@
 #define CFG_UF2_FAMILY_BOOT_ID    0xd663823c
 
 #define CFG_UF2_NUM_BLOCKS        0x10109     // just under 32MB
-#define CFG_UF2_FLASH_SIZE        (1024*1024) // 1 MB
+#if defined(NRF52833_XXAA)
+    #define CFG_UF2_FLASH_SIZE        0x80000 // 512 kB
+#else
+    #define CFG_UF2_FLASH_SIZE        (1024*1024) // 1 MB
+#endif
 
 // Application Address Space
 #define USER_FLASH_START          MBR_SIZE // skip MBR included in SD hex
-#define USER_FLASH_END            (BOOTLOADER_REGION_START - DFU_APP_DATA_RESERVED)
+#if defined(NRF52833_XXAA)
+    #define USER_FLASH_END            0x2D000
+#else
+    #define USER_FLASH_END            0xAD000
+#endif
 
 // Bootloader start address
 #define BOOTLOADER_ADDR_START         BOOTLOADER_REGION_START
