@@ -24,7 +24,7 @@ jobs:
           - 'itsybitsy_nrf52840_express'
           - 'metro_nrf52840_express'
           - 'ledglasses_nrf52840'
-          # Alphabetical order
+          # Other Makers (Alphabetical order)
           - 'adm_b_nrf52840_1'
           - 'ae_bl652_bo'
           - 'aramcon_badge_2019'
@@ -96,28 +96,11 @@ jobs:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
 
-    - name: Create Release Asset
-      if: ${{ github.event_name == 'release' }}
-      run: zip -jr ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip _bin/${{ matrix.board }}
-
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       if: ${{ github.event_name == 'release' }}
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
-        asset_name: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
-      
-    - name: Upload Release Asset for Self-Update
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ github.event_name == 'release' }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
-        asset_name: update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
-        asset_content_type: application/x-binary
+        files: |
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.zip
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.hex
+          _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-*.uf2
