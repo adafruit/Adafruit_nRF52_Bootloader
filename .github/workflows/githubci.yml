@@ -101,6 +101,6 @@ jobs:
       if: ${{ github.event_name == 'release' }}
       with:
         files: |
-          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}*.zip
-          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}*.hex
-          _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.zip
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.hex
+          _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-*.uf2
