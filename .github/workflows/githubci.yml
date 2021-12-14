@@ -96,36 +96,11 @@ jobs:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
 
-    - name: Create Release Asset
-      if: ${{ github.event_name == 'release' }}
-      run: zip -jr ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip _bin/${{ matrix.board }}
-
     - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ github.event_name == 'release' }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
-        asset_name: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
-        asset_content_type: application/zip
-      
-    - name: Release Asset for UF2
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      if: ${{ github.event_name == 'release' }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
-        asset_name: update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
-        asset_content_type: application/x-binary
-
-    - name: Release Asset
       uses: softprops/action-gh-release@v1
       if: ${{ github.event_name == 'release' }}
       with:
         files: |
-          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_s140_6.1.1.zip
-          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_s140_6.1.1.hex
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}*.zip
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}*.hex
+          _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
