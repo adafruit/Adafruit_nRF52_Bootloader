@@ -24,7 +24,7 @@ jobs:
           - 'itsybitsy_nrf52840_express'
           - 'metro_nrf52840_express'
           - 'ledglasses_nrf52840'
-          # Alphabetical order
+          # Other Makers (Alphabetical order)
           - 'adm_b_nrf52840_1'
           - 'ae_bl652_bo'
           - 'aramcon_badge_2019'
@@ -111,7 +111,7 @@ jobs:
         asset_name: ${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}.zip
         asset_content_type: application/zip
       
-    - name: Upload Release Asset for Self-Update
+    - name: Release Asset for UF2
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -121,3 +121,11 @@ jobs:
         asset_path: _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
         asset_name: update-${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_nosd.uf2
         asset_content_type: application/x-binary
+
+    - name: Release Asset
+      uses: softprops/action-gh-release@v1
+      if: ${{ github.event_name == 'release' }}
+      with:
+        files: |
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_s140_6.1.1.zip
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-${{ github.event.release.tag_name }}_s140_6.1.1.hex
