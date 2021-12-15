@@ -8,11 +8,14 @@ import time
 subprocess.run("rm -rf _build/", shell=True)
 subprocess.run("rm -rf bin/", shell=True)
 
+SUCCEEDED = "\033[32msucceeded\033[0m"
+FAILED = "\033[31mfailed\033[0m"
+
 success_count = 0
 fail_count = 0
 exit_status = 0
 
-build_format = '| {:32} | {:9} | {:5} | {:6} | {:6} |'
+build_format = '| {:32} | {:18} | {:5} | {:6} | {:6} |'
 build_separator = '-' * 74
 
 # All supported boards
@@ -27,7 +30,7 @@ all_boards.sort()
 total_time = time.monotonic()
 
 print(build_separator)
-print(build_format.format('Board', 'Result', 'Time', 'Flash', 'SRAM'))
+print(build_format.format('Board', '\033[39mResult\033[0m', 'Time', 'Flash', 'SRAM'))
 print(build_separator)
 
 for board in all_boards:
@@ -42,7 +45,7 @@ for board in all_boards:
     sram_size = "-"
 
     if make_result.returncode == 0:
-        success = "\033[32msucceeded\033[0m"
+        success = SUCCEEDED
         success_count += 1
         
         out_file = glob.glob('_build/build-{}/*.out'.format(board))[0]
@@ -52,7 +55,7 @@ for board in all_boards:
         sram_size = int(size_list[1]) + int(size_list[2])
     else:
         exit_status = make_result.returncode
-        success = "\033[31mfailed\033[0m   "
+        success = FAILED
         fail_count += 1
 
     for entry in os.scandir("_build/build-{}".format(board)):
@@ -69,7 +72,7 @@ for board in all_boards:
 # Build Summary
 total_time = time.monotonic() - total_time
 print(build_separator)
-print("Build Sumamary: {} \033[32msucceeded\033[0m, {} \033[31mfailed\033[0m and took {:.2f}s".format(success_count, fail_count, total_time))
+print("Build Sumamary: {} {}, {} {} and took {:.2f}s".format(success_count, SUCCEEDED, fail_count, FAILED, total_time))
 print(build_separator)
 
 sys.exit(exit_status)

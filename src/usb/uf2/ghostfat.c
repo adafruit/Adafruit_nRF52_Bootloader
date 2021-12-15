@@ -1,3 +1,29 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) Microsoft Corporation
+ * Copyright (c) 2020 Ha Thach for Adafruit Industries
+ * Copyright (c) 2020 Henry Gabryjelski
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 #include "compile_date.h"
 
 #include "uf2.h"
@@ -5,6 +31,7 @@
 #include "flash_nrf5x.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "bootloader_settings.h"
 #include "bootloader.h"
@@ -93,7 +120,8 @@ STATIC_ASSERT(FAT_ENTRIES_PER_SECTOR                       ==       256); // FAT
 char infoUf2File[128*3] =
     "UF2 Bootloader " UF2_VERSION "\r\n"
     "Model: " UF2_PRODUCT_NAME "\r\n"
-    "Board-ID: " UF2_BOARD_ID "\r\n";
+    "Board-ID: " UF2_BOARD_ID "\r\n"
+    "Date: " __DATE__ "\r\n";
 
 const char indexFile[] =
     "<!doctype html>\n"
@@ -224,17 +252,33 @@ void uf2_init(void)
     uint32_t const sd_id      = SD_ID_GET(MBR_SIZE);
     uint32_t const sd_version = SD_VERSION_GET(MBR_SIZE);
 
-    uint32_t const ver1 = sd_version / 1000000;
-    uint32_t const ver2 = (sd_version % 1000000)/1000;
-    uint32_t const ver3 = sd_version % 1000;
+    uint32_t ver[3];
+    ver[0] = sd_version / 1000000;
+    ver[1] = (sd_version - ver[0]*1000000)/1000;
+    ver[2] = (sd_version - ver[0]*1000000 - ver[1]*1000);
 
-    sprintf(infoUf2File + strlen(infoUf2File), "S%lu version %lu.%lu.%lu\r\n", sd_id, ver1, ver2, ver3);
+    char str[10];
+    utoa(sd_id, str, 10);
+
+    strcat(infoUf2File, "S");
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, " ");
+
+    utoa(ver[0], str, 10);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, ".");
+
+    utoa(ver[1], str, 10);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, ".");
+
+    utoa(ver[2], str, 10);
+    strcat(infoUf2File, str);
+    strcat(infoUf2File, "\r\n");
   }else
   {
     strcat(infoUf2File, "not found\r\n");
   }
-
-  strcat(infoUf2File, "Date: " __DATE__ "\r\n");
 }
 
 /*------------------------------------------------------------------*/
@@ -337,7 +381,7 @@ void read_block(uint32_t block_no, uint8_t *data) {
                 bl->targetAddr = addr;
                 bl->payloadSize = UF2_FIRMWARE_BYTES_PER_SECTOR;
                 bl->flags = UF2_FLAG_FAMILYID;
-                bl->familyID = CFG_UF2_FAMILY_APP_ID;
+                bl->familyID = CFG_UF2_BOARD_APP_ID;
                 memcpy(bl->data, (void *)addr, bl->payloadSize);
             }
         }
@@ -364,7 +408,9 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   switch ( bl->familyID )
   {
-    case CFG_UF2_FAMILY_APP_ID:
+
+    case CFG_UF2_BOARD_APP_ID:  // board-specific app
+    case CFG_UF2_FAMILY_APP_ID: // family app
       /* Upgrading Application
        *
        * SoftDevice is considered as part of application and can be (or not) included in uf2.
@@ -402,9 +448,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
       /* Upgrading Bootloader
        *
        * - For simplicity, the Bootloader Start Address is fixed for now.
-       *
        * - Since SoftDevice is not part of Bootloader, it MUST NOT be included as part of uf2 file.
-       *
        * - To prevent corruption/disconnection while transferring we don't directly write over Bootloader.
        * Instead it is written to highest possible address in Application region. Once everything is received
        * and verified, it is safely activated using MBR COPY BL command.
@@ -488,7 +532,7 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
               }
               else
               {
-                PRINTF("DOES NOT mismatches our VID/PID\r\n");
+                PRINTF("DOES NOT match our VID/PID\r\n");
                 state->aborted = true;
                 return -1;
               }
@@ -561,6 +605,5 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
     }
   }
 
-  STATIC_ASSERT(BPB_SECTOR_SIZE == 512); // if sector size changes, may need to re-validate this code
   return BPB_SECTOR_SIZE;
 }

@@ -148,6 +148,7 @@ static uint32_t service_change_indicate()
 
         err_code = sd_ble_gatts_service_changed(m_conn_handle, DFU_SERVICE_HANDLE, BLE_HANDLE_MAX);
         if ((err_code == BLE_ERROR_INVALID_CONN_HANDLE) ||
+            (err_code == BLE_ERROR_INVALID_ATTR_HANDLE) ||
             (err_code == NRF_ERROR_INVALID_STATE) ||
             (err_code == NRF_ERROR_BUSY))
         {
@@ -735,8 +736,8 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     ble_gatts_rw_authorize_reply_params_t auth_reply;
 
 #ifdef CFG_DEBUG
-    extern const char* dbg_ble_event_str(uint16_t evt_id);
-    PRINTF("BLE %s\r\n", dbg_ble_event_str(p_ble_evt->header.evt_id));
+    extern void print_ble_event(uint16_t evt_id);
+    print_ble_event(p_ble_evt->header.evt_id);
 #endif
 
     switch (p_ble_evt->header.evt_id)
@@ -1084,6 +1085,7 @@ uint32_t dfu_transport_ble_close()
 
 #ifdef CFG_DEBUG
 
+#if 0
 typedef struct
 {
   uint32_t key;
@@ -1172,18 +1174,22 @@ lookup_table_t const _strevt_table =
   .items = _strevt_lookup
 };
 
-const char* dbg_ble_event_str(uint16_t evt_id)
-{
-  const char * str = (const char *) lookup_find(&_strevt_table, evt_id);
-  static char unknown_str[7] = {0};
+#endif
 
+void print_ble_event(uint16_t evt_id)
+{
+  // const char * str = (const char *) lookup_find(&_strevt_table, evt_id);
+  const char * str = NULL;
+  PRINTF("BLE event: ");
   if ( str == NULL )
   {
-    sprintf(unknown_str, "0x%04X", evt_id);
-    str = unknown_str;
+    PRINTF("0x%04X", evt_id);
+  }else
+  {
+    PRINTF(str);
   }
-
-  return str;
+  PRINTF("\r\n");
 }
+
 
 #endif

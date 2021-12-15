@@ -201,55 +201,55 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
     extern bool dfu_startup_packet_received;
     dfu_startup_packet_received = true;
 
-        while (false == DATA_QUEUE_EMPTY())
+    while (false == DATA_QUEUE_EMPTY())
+    {
+        // Fetch the element to be processed.
+        for (index = 0; index < MAX_BUFFERS ; index++)
         {
-            // Fetch the element to be processed.
-            for (index = 0; index < MAX_BUFFERS ; index++)
+            packet = &m_data_queue.data_packet[index];
+            if (INVALID_PACKET != packet->packet_type)
             {
-                packet = &m_data_queue.data_packet[index];
-                if (INVALID_PACKET != packet->packet_type)
+                switch (DATA_QUEUE_ELEMENT_GET_PTYPE(index))
                 {
-                    switch (DATA_QUEUE_ELEMENT_GET_PTYPE(index))
-                    {
-                        case DATA_PACKET:
-                            (void)dfu_data_pkt_handle(packet);
-                            break;
+                    case DATA_PACKET:
+                        (void)dfu_data_pkt_handle(packet);
+                        break;
 
-                        case START_PACKET:
-                            packet->params.start_packet =
-                                (dfu_start_packet_t*)packet->params.data_packet.p_data_packet;
-                            retval = dfu_start_pkt_handle(packet);
-                            APP_ERROR_CHECK(retval);
-                            break;
+                    case START_PACKET:
+                        packet->params.start_packet =
+                            (dfu_start_packet_t*)packet->params.data_packet.p_data_packet;
+                        retval = dfu_start_pkt_handle(packet);
+                        APP_ERROR_CHECK(retval);
+                        break;
 
-                        case INIT_PACKET:
-                            (void)dfu_init_pkt_handle(packet);
-                            retval = dfu_init_pkt_complete();
-                            APP_ERROR_CHECK(retval);
+                    case INIT_PACKET:
+                        (void)dfu_init_pkt_handle(packet);
+                        retval = dfu_init_pkt_complete();
+                        APP_ERROR_CHECK(retval);
 
-                            led_state(STATE_WRITING_STARTED);
-                            break;
+                        led_state(STATE_WRITING_STARTED);
+                        break;
 
-                        case STOP_DATA_PACKET:
-                            (void)dfu_image_validate();
-                            (void)dfu_image_activate();
+                    case STOP_DATA_PACKET:
+                        (void)dfu_image_validate();
+                        (void)dfu_image_activate();
 
-                            led_state(STATE_WRITING_FINISHED);
+                        led_state(STATE_WRITING_FINISHED);
 
-                            // Break the loop by returning.
-                            return;
+                        // Break the loop by returning.
+                        return;
 
-                        default:
-                            // No implementation needed.
-                            break;
-                    }
-
-                    // Free the processed element.
-                    retval = data_queue_element_free(index);
-                    APP_ERROR_CHECK(retval);
+                    default:
+                        // No implementation needed.
+                        break;
                 }
+
+                // Free the processed element.
+                retval = data_queue_element_free(index);
+                APP_ERROR_CHECK(retval);
             }
         }
+    }
 }
 
 

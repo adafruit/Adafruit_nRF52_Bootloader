@@ -1,41 +1,106 @@
 name: Build
 
 on:
-  push:
   pull_request:
+  push:
+  repository_dispatch:
   release:
-    types: [published]
+    types:
+      - created
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          # Adafruit Boards
+          - 'circuitplayground_nrf52840'
+          - 'clue_nrf52840'
+          - 'feather_nrf52832'
+          - 'feather_nrf52840_express'
+          - 'feather_nrf52840_sense'
+          - 'itsybitsy_nrf52840_express'
+          - 'metro_nrf52840_express'
+          - 'ledglasses_nrf52840'
+          # Other Makers (Alphabetical order)
+          - 'adm_b_nrf52840_1'
+          - 'ae_bl652_bo'
+          - 'aramcon_badge_2019'
+          - 'aramcon2_badge'
+          - 'arcade_feather_nrf52840_express'
+          - 'arduino_nano_33_ble'
+          - 'bast_ble'
+          - 'bluemicro_nrf52833'
+          - 'bluemicro_nrf52840'
+          - 'ebyte_e104_bt5032a'
+          - 'ebyte_e73_tbb'
+          - 'electronut_labs_papyr'
+          - 'ikigaisense_vita'
+          - 'm60_keyboard'
+          - 'mdk_nrf52840_dongle'
+          - 'nice_nano'
+          - 'nrf52840_m2'
+          - 'ohs2020_badge'
+          - 'particle_argon'
+          - 'particle_boron'
+          - 'particle_xenon'
+          - 'pca10056'
+          - 'pca10059'
+          - 'pca10100'
+          - 'pitaya_go'
+          - 'raytac_mdbt50q_db_40'
+          - 'raytac_mdbt50q_rx'
+          - 'sparkfun_nrf52840_micromod'
+          - 'waveshare_nrf52840_eval'
+
     steps:
     - name: Setup Python
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v2
 
     - name: Setup Node.js
-      uses: actions/setup-node@v1.1.0
+      uses: actions/setup-node@v1
       
     - name: Checkout Code
       uses: actions/checkout@v1
       with:
-        submodules: true      
+        submodules: true
+
+    - name: Checkout linkermap
+      uses: actions/checkout@v2
+      with:
+         repository: hathach/linkermap
+         path: linkermap
         
     - name: Install Toolchains
       run: |
         pip3 install adafruit-nrfutil uritemplate requests intelhex
+        pip3 install linkermap/
         npm install --global xpm
-        xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@latest
-        echo "::add-path::`echo $HOME/opt/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin`"
+        # 9.3.1-1.2.1 is xpack modified version which significantly increased compiled size to 6-7KB and cause flash overflow.
+        # Skip this version for now, we will try again with next official release from ARM
+        xpm install --global @xpack-dev-tools/arm-none-eabi-gcc@9.3.1-1.1.1
+        echo `echo $HOME/.local/xPacks/@xpack-dev-tools/arm-none-eabi-gcc/*/.content/bin` >> $GITHUB_PATH
     
     - name: Build
-      run: python3 tools/build_all.py
+      run: |
+        make BOARD=${{ matrix.board }} all
+        make BOARD=${{ matrix.board }} copy-artifact
+
+    - name: Linker Map
+      run: make BOARD=${{ matrix.board }} linkermap
       
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.board }}
+        path: _bin/${{ matrix.board }}
+
     - name: Upload Release Asset
-      if: github.event_name == 'release' && (github.event.action == 'published' || github.event.action == 'rerequested')
-      working-directory: tools
-      env:
-        UPLOAD_URL: ${{ github.event.release.upload_url }}
-        ADABOT_GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: "[ -z \"$ADABOT_GITHUB_ACCESS_TOKEN\" ] || python3 -u upload_release_files.py"
-      
+      uses: softprops/action-gh-release@v1
+      if: ${{ github.event_name == 'release' }}
+      with:
+        files: |
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.zip
+          _bin/${{ matrix.board }}/${{ matrix.board }}_bootloader-*.hex
+          _bin/${{ matrix.board }}/update-${{ matrix.board }}_bootloader-*.uf2
