@@ -10,14 +10,18 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - [Adafruit Feather nRF52840 Express](https://www.adafruit.com/product/4062)
 - [Adafruit Feather nRF52840 Sense](https://www.adafruit.com/product/4516)
 - [Adafruit ItsyBitsy nRF52840 Express](https://www.adafruit.com/product/4481)
+- [Adafruit LED Glasses Driver nRF52840](https://www.adafruit.com/product/5217)
 - Adafruit Metro nRF52840 Express
+- [Akizukidenshi AE-BL652-BO](https://akizukidenshi.com/catalog/g/gK-15567/)
 - [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
-- MakerDiary MDK nRF52840 USB Dongle
+- [MakerDiary MDK nRF52840 USB Dongle](https://makerdiary.com/products/nrf52840-mdk-usb-dongle)
+- [MakerDiary nRF52840 M.2 Module](https://makerdiary.com/products/nrf52840-m2-module)
 - [Nordic nRF52840DK PCA10056](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-DK)
 - [Nordic nRF52840DK PCA10059 ("Dongle")](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-Dongle)
 - Particle Argon
 - Particle Boron
 - Particle Xenon
+- [SparkFun MicroMod nRF52840](https://www.sparkfun.com/products/16984)
 
 UF2 is an easy-to-use bootloader that appears as a flash drive. You can just copy `.uf2`-format
 application images to the flash drive to load new firmware. See https://github.com/Microsoft/uf2 and https://github.com/adafruit/uf2-samdx1 for more information.
@@ -55,6 +59,14 @@ There are two pins, `DFU` and `FRST` that bootloader will check upon reset/power
 - The `GPREGRET` register can also be set to force the bootloader can enter any of above modes (plus a CDC-only mode for Arduino).
 `GPREGRET` is set by the application before performing a soft reset.
 
+```c
+#include "nrf_nvic.h"
+void reset_to_uf2(void) {
+  NRF_POWER->GPREGRET = 0x57; // 0xA8 OTA, 0x4e Serial
+  NVIC_SystemReset();         // or sd_nvic_SystemReset();
+}
+```
+
 On the Nordic PCA10056 DK board, `DFU` is connected to **Button1**, and `FRST` is connected to **Button2**.
 So holding down **Button1** while clicking **RESET** will put the board into USB bootloader mode, with UF2 and CDC support.
 Holding down **Button2** while clicking **RESET** will put the board into OTA (over-the-air) bootloader mode.
@@ -67,7 +79,7 @@ For other boards, please check the board definition for details.
 
 ### Making your own UF2
 
-To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000 
+To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000
 
 To create a UF2 image from a .bin file:
 ```
@@ -103,6 +115,15 @@ You must have have a J-Link available to "unbrick" your device.
 Prerequisites
 
 - ARM GCC
+
+To install for macos
+
+```bash
+brew tap ArmMbed/homebrew-formulae
+brew install arm-none-eabi-gcc
+brew link --overwrite arm-none-eabi-gcc # if a prior version was present
+```
+
 - Nordic's [nRF5x Command Line Tools](https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF-Command-Line-Tools)
 - [Python IntelHex](https://pypi.org/project/IntelHex/)
 
@@ -146,7 +167,7 @@ Makefile:90: *** BOARD not defined.  Stop
 If you get the following error ...
 
 ```
-$ make BOARD=feather_nrf52840_express all 
+$ make BOARD=feather_nrf52840_express all
 Compiling file: main.c
 /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
 make: *** [_build/main.o] Error 127
@@ -158,6 +179,8 @@ the variable `CROSS_COMPILE` as below:
 $ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
 ```
 
+For other compile errors, check the gcc version with `arm-none-eabi-gcc --version` to insure it is at least 9.x.
+
 #### 2. `ModuleNotFoundError: No module named 'intelhex'`
 
 Install python-intelhex with
@@ -165,9 +188,6 @@ Install python-intelhex with
 ```
 pip install intelhex
 ```
-
-
-
 
 
 #### 3. `make: nrfjprog: No such file or directory`

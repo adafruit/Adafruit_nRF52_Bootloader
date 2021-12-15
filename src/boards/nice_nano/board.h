@@ -27,6 +27,8 @@
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
+#define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
+
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
@@ -57,7 +59,7 @@
 
 #define UF2_PRODUCT_NAME  "nice!nano"
 #define UF2_VOLUME_LABEL  "NICENANO"
-#define UF2_BOARD_ID      "nRF52840-nicenano-v1"
-#define UF2_INDEX_URL     "https://docs.nicekeyboards.com/#/nice!nano/"
+#define UF2_BOARD_ID      "nRF52840-nicenano"
+#define UF2_INDEX_URL     "https://nicekeyboards.com/docs/nice-nano"
 
 #endif // _NICENANO_H
