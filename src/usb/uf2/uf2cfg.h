@@ -2,7 +2,11 @@
 #include "dfu_types.h"
 
 // Family ID for updating generic Application
-#define CFG_UF2_FAMILY_APP_ID     0xADA52840
+#if defined(NRF52833_XXAA)
+    #define CFG_UF2_FAMILY_APP_ID     0x621E937A
+#else
+    #define CFG_UF2_FAMILY_APP_ID     0xADA52840
+#endif
 
 // Board-specific ID for board-specific Application
 #if defined(USB_DESC_VID) && defined(USB_DESC_UF2_PID) && USB_DESC_VID && USB_DESC_UF2_PID
