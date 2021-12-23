@@ -4,7 +4,7 @@
 // Family ID for updating generic Application
 #if defined(NRF52833_XXAA)
     #define CFG_UF2_FAMILY_APP_ID     0x621E937A
-#else
+#elif defined(NRF52840_XXAA)
     #define CFG_UF2_FAMILY_APP_ID     0xADA52840
 #endif
 
