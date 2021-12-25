@@ -79,16 +79,24 @@ For other boards, please check the board definition for details.
 
 ### Making your own UF2
 
-To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840**. If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000
+To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840** (nRF52840) or **0x621E937A** (nRF52833). 
 
-To create a UF2 image from a .bin file:
 ```
-uf2conv.py firmware.bin -c -b 0x26000 -f 0xADA52840
-```
-
-To create a UF2 image from a .hex file:
-```
+nRF52840
 uf2conv.py firmware.hex -c -f 0xADA52840
+
+nRF52833
+uf2conv.py firmware.hex -c -f 0x621E937A
+```
+
+If using a .bin file with the conversion script you must specify application address with the -b switch, this address depend on the SoftDevice size/version e.g S140 v6 is 0x26000, v7 is 0x27000
+
+```
+nRF52840
+uf2conv.py firmware.bin -c -b 0x26000 -f 0xADA52840
+
+nRF52833
+uf2conv.py firmware.bin -c -b 0x27000 -f 0x621E937A
 ```
 
 To create a UF2 image for bootloader from a .hex file using separated family of **0xd663823c**
