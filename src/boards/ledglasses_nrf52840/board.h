@@ -22,45 +22,47 @@
  * THE SOFTWARE.
  */
 
-#ifndef RAYTAC_MDBT50Q_RX_H
-#define RAYTAC_MDBT50Q_RX_H
+#ifndef _LEDGLASSES_NRF52840_H
+#define _LEDGLASSES_NRF52840_H
 
-#define _PINNUM(port, pin)      ((port)*32 + (pin))
+#define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER             1
-#define LED_PRIMARY_PIN         _PINNUM(1, 13)
-#define LED_STATE_ON            0
+#define LEDS_NUMBER           1
+#define LED_PRIMARY_PIN       _PINNUM(0, 31)
+#define LED_STATE_ON          1
+
+#define LED_NEOPIXEL           _PINNUM(1, 15)
+#define NEOPIXELS_NUMBER      1
+#define BOARD_RGB_BRIGHTNESS  0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER          2
-
-#define BUTTON_1                _PINNUM(0, 15)
-#define BUTTON_2                _PINNUM(0, 10)
-#define BUTTON_PULL             NRF_GPIO_PIN_PULLUP
+#define BUTTONS_NUMBER        2
+#define BUTTON_1              _PINNUM(0, 30)  // user switch
+#define BUTTON_2              _PINNUM(0, 28)  // NC
+#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER     "Raytac"
-#define BLEDIS_MODEL            "MDBT50Q-RX"
+#define BLEDIS_MANUFACTURER   "Adafruit Industries"
+#define BLEDIS_MODEL          "LED Glasses Driver nRF52840"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x010B
-#define USB_DESC_CDC_ONLY_PID  0x010B
+#define USB_DESC_UF2_PID       0x010D
+#define USB_DESC_CDC_ONLY_PID  0x010E
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME        "Raytac MDBT50Q-RX"
-#define UF2_VOLUME_LABEL        "MDBT50QBOOT"
-#define UF2_BOARD_ID            "nRF52840-MDBT50Q_RX-verD"
-#define UF2_INDEX_URL           "https://www.adafruit.com/product/5199"
+#define UF2_PRODUCT_NAME   "Adafruit LED Glasses Driver nRF52840"
+#define UF2_VOLUME_LABEL   "GLASSESBOOT"
+#define UF2_BOARD_ID       "nRF52840-LedGlasses-revA"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/5217"
 
-#endif // RAYTAC_MDBT50Q_RX_H
+#endif // _LEDGLASSES_NRF52840_H

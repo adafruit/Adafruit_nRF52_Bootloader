@@ -25,12 +25,12 @@
 #include "usb_desc.h"
 
 enum {
-    ITF_STR_LANGUAGE = 0 ,
-    ITF_STR_MANUFACTURER ,
-    ITF_STR_PRODUCT      ,
-    ITF_STR_SERIAL       ,
-    ITF_STR_CDC          ,
-    ITF_STR_MSC
+    STRID_LANGUAGE = 0 ,
+    STRID_MANUFACTURER ,
+    STRID_PRODUCT      ,
+    STRID_SERIAL       ,
+    STRID_CDC          ,
+    STRID_MSC
 };
 
 // CDC + MSC or CDC only mode
@@ -84,25 +84,25 @@ enum {
     ITF_NUM_TOTAL
 };
 
-uint8_t const desc_configuration_cdc_msc[] =
+uint8_t desc_configuration_cdc_msc[] =
 {
   // Interface count, string index, total length, attribute, power in mA
-  TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
+  TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN, 0, 100),
 
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
-  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, ITF_STR_CDC, 0x81, 8, 0x02, 0x82, 64),
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, STRID_CDC, 0x81, 8, 0x02, 0x82, 64),
 
   // Interface number, string index, EP Out & EP In address, EP size
-  TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, ITF_STR_MSC, 0x03, 0x83, 64),
+  TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, STRID_MSC, 0x03, 0x83, 64),
 };
 
-uint8_t const desc_configuration_cdc_only[] =
+uint8_t desc_configuration_cdc_only[] =
 {
   // Interface count, string index, total length, attribute, power in mA
-  TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL-1, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
+  TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL-1, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN, 0, 100),
 
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
-  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, ITF_STR_CDC, 0x81, 8, 0x02, 0x82, 64),
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, STRID_CDC, 0x81, 8, 0x02, 0x82, 64),
 };
 
 
@@ -127,7 +127,19 @@ void usb_desc_init(bool cdc_only)
   }
 
   // Create Serial string descriptor
-  sprintf(desc_str_serial, "%08lX%08lX", NRF_FICR->DEVICEID[1], NRF_FICR->DEVICEID[0]);
+  uint8_t const* device_id = (uint8_t const*) &NRF_FICR->DEVICEID;
+
+  for ( uint8_t i = 0; i < 8; i++ )
+  {
+    for ( uint8_t j = 0; j < 2; j++ )
+    {
+      const char nibble_to_hex[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+      uint8_t nibble = (device_id[i] >> (j * 4)) & 0xf;
+      desc_str_serial[15 - (i * 2 + j)] = nibble_to_hex[nibble]; // memory is little endian
+    }
+  }
+  desc_str_serial[16] = 0;
 }
 
 //--------------------------------------------------------------------+
@@ -156,7 +168,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 
   uint8_t chr_count;
 
-  if ( index == 0)
+  if ( index == STRID_LANGUAGE )
   {
     memcpy(&_desc_str[1], string_desc_arr[0], 2);
     chr_count = 1;
