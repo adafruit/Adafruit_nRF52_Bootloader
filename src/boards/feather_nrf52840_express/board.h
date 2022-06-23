@@ -47,6 +47,10 @@
 #define BUTTON_2              _PINNUM(0, 10)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+// use the same pin as BUTTON_2/NRST which disables the NRST functionality
+#define PIN_DFU_ACTIVATE        BUTTON_2
+#define PIN_DFU_ACTIVATE_PULL   NRF_GPIO_PIN_PULLDOWN
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+

@@ -44,25 +44,19 @@
 #endif
 
 //------------- IMPLEMENTATION -------------//
-void button_init(uint32_t pin)
+void button_init(uint32_t pin, uint32_t pull)
 {
-  if ( BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN )
-  {
-    nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
-  }
-  else
-  {
-    nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
-  }
+    nrf_gpio_cfg_sense_input(pin, pull,  pull == NRF_GPIO_PIN_PULLDOWN ? NRF_GPIO_PIN_SENSE_HIGH : NRF_GPIO_PIN_SENSE_LOW);
 }
 
-bool button_pressed(uint32_t pin)
+bool button_pressed(uint32_t pin, uint32_t pull)
 {
-  uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
+  uint32_t const active_state = (pull == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
   return nrf_gpio_pin_read(pin) == active_state;
 }
 
 void board_init(void)
+
 {
   // stop LF clock just in case we jump from application without reset
   NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
@@ -71,8 +65,11 @@ void board_init(void)
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
-  button_init(BUTTON_DFU);
-  button_init(BUTTON_FRESET);
+  button_init(BUTTON_DFU, BUTTON_DFU_PULL);
+  button_init(BUTTON_FRESET, BUTTON_DFU_PULL);
+#if defined(PIN_DFU_ACTIVATE)
+  button_init(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
+#endif
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
 #if LEDS_NUMBER > 0

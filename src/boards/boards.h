@@ -45,6 +45,33 @@
 #define BUTTON_FRESET   BUTTON_2
 #endif
 
+#ifndef BUTTON_1_PULL
+#define BUTTON_1_PULL   BUTTON_PULL
+#endif
+
+#ifndef BUTTON_2_PULL
+#define BUTTON_2_PULL   BUTTON_PULL
+#endif
+
+#ifndef BUTTON_DFU_PULL
+#define BUTTON_DFU_PULL BUTTON_1_PULL
+#endif
+
+#ifndef BUTTON_RESET_PULL
+#define BUTTON_RESET_PULL BUTTON_2_PULL
+#endif
+
+#if defined(PIN_DFU_ACTIVATE) != defined(PIN_DFU_ACTIVATE_PULL)
+#error "both PIN_DFU_ACTIVATE and PIN_DFU_ACTIVATE_PULL should be defined to use an additional pin for DFU activation."
+#endif
+
+#if defined(PIN_DFU_ACTIVATE) && defined(PIN_DFU_ACTIVATE_PULL)
+#define PIN_DFU_ACTIVATE_PRESENT 1
+#pragma message "board supports DFU activate pin"
+#else
+#define PIN_DFU_ACTIVATE_PRESENT 0
+#endif
+
 // The primary LED is usually Red but not in all cases.
 #define LED_PRIMARY 0
 // The secondary LED, when available, is usually blue.
@@ -109,8 +136,8 @@ void led_tick(void);
 #error "At least two buttons required in the BSP (see 'BUTTONS_NUMBER')"
 #endif
 
-void button_init(uint32_t pin);
-bool button_pressed(uint32_t pin);
+void button_init(uint32_t pin, uint32_t pull);
+bool button_pressed(uint32_t pin, uint32_t pull);
 
 bool is_ota(void);
 

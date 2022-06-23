@@ -251,16 +251,36 @@ static void check_dfu_mode(void)
   // Clear GPREGRET if it is our values
   if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
-  // skip dfu entirely
-  if (dfu_skip) return;
+  // dfu activation pin for external control of DFU
+  bool dfu_activate = false;
+  bool dfu_activate_present = false;
+  bool frst_skip = false;
 
-  /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  // DFU button pressed
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+#if PIN_DFU_ACTIVATE_PRESENT
+  dfu_activate = button_pressed(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
+  dfu_activate_present = true;
+  // when the FRST button is defined the same as the DFU activation line, FRST is not used.
+  frst_skip = (PIN_DFU_ACTIVATE == BUTTON_FRESET);
+  #pragma message "FRST is overridden by the DFU activate setting"
+#endif
+  
+  dfu_start = dfu_start || dfu_activate;
 
-  // DFU + FRESET are pressed --> OTA
-  _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
+  // DFU activation via the designated pin takes precedence
+  if (!dfu_activate_present || !dfu_activate) {
+    // skip dfu entirely
+    if (dfu_skip) return;
 
+    /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
+    // DFU button pressed
+    dfu_start = dfu_start || button_pressed(BUTTON_DFU, BUTTON_DFU_PULL);
+
+    // DFU + FRESET are pressed --> OTA
+    if (!frst_skip) {   // skip button sense if on the same pin as DFU activation
+      _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU, BUTTON_DFU_PULL) && button_pressed(BUTTON_FRESET, BUTTON_RESET_PULL) ) ;
+    }
+  }
+  
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
