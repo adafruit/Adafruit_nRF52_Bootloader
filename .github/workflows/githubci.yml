@@ -62,7 +62,6 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v3
 
-      
     - name: Checkout Code
       uses: actions/checkout@v3
       with:
@@ -100,7 +99,6 @@ jobs:
         pip3 install adafruit-nrfutil uritemplate requests intelhex
         pip3 install linkermap/
 
-    
     - name: Build
       run: |
         make BOARD=${{ matrix.board }} all
@@ -109,7 +107,6 @@ jobs:
     - name: Linker Map
       run: make BOARD=${{ matrix.board }} linkermap
 
-      
     - uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.board }}
