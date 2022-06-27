@@ -73,25 +73,10 @@ jobs:
          repository: hathach/linkermap
          path: linkermap
 
-    - name: Set Toolchain URL
-      run: echo >> $GITHUB_ENV TOOLCHAIN_URL=https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v10.2.1-1.1/xpack-arm-none-eabi-gcc-10.2.1-1.1-linux-x64.tar.gz
-
-    - name: Cache Toolchain
-      uses: actions/cache@v3
-      id: cache-toolchain
+    - name: Install ARM GCC
+      uses: carlosperate/arm-none-eabi-gcc-action@v1
       with:
-        path: ~/cache/
-        key: ${{ runner.os }}-22-05-17-${{ env.TOOLCHAIN_URL }}
-
-    - name: Install Toolchain
-      if: steps.cache-toolchain.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p ~/cache/toolchain
-        wget --progress=dot:mega $TOOLCHAIN_URL -O toolchain.tar.gz
-        tar -C ~/cache/toolchain -xaf toolchain.tar.gz
-
-    - name: Set Toolchain Path
-      run: echo >> $GITHUB_PATH `echo ~/cache/toolchain/*/bin`
+        release: '10-2020-q4'
 
     - name: Install Tools
       run: |
@@ -100,6 +85,7 @@ jobs:
     
     - name: Build
       run: |
+        arm-none-eabi-gcc --version
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
 
