@@ -34,6 +34,7 @@ jobs:
           - 'bast_ble'
           - 'bluemicro_nrf52833'
           - 'bluemicro_nrf52840'
+          - 'challenger_840_ble'
           - 'ebyte_e104_bt5032a'
           - 'ebyte_e73_tbb'
           - 'electronut_labs_papyr'
@@ -60,7 +61,7 @@ jobs:
     steps:
     - name: Setup Python
       uses: actions/setup-python@v3
-      
+
     - name: Checkout Code
       uses: actions/checkout@v3
       with:
@@ -97,7 +98,7 @@ jobs:
       run: |
         pip3 install adafruit-nrfutil uritemplate requests intelhex
         pip3 install linkermap/
-    
+
     - name: Build
       run: |
         make BOARD=${{ matrix.board }} all
@@ -105,7 +106,7 @@ jobs:
 
     - name: Linker Map
       run: make BOARD=${{ matrix.board }} linkermap
-      
+
     - uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.board }}

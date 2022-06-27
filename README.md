@@ -14,6 +14,7 @@ This is a CDC/DFU/UF2 bootloader for nRF52 boards.
 - Adafruit Metro nRF52840 Express
 - [Akizukidenshi AE-BL652-BO](https://akizukidenshi.com/catalog/g/gK-15567/)
 - [Electronut Labs Papyr](https://docs.electronut.in/papyr/)
+- [iLabs Challenger 840 BLE](https://ilabs.se/challenger-840-ble-datasheet/)
 - [MakerDiary MDK nRF52840 USB Dongle](https://makerdiary.com/products/nrf52840-mdk-usb-dongle)
 - [MakerDiary nRF52840 M.2 Module](https://makerdiary.com/products/nrf52840-m2-module)
 - [Nordic nRF52840DK PCA10056](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52840-DK)
@@ -79,7 +80,7 @@ For other boards, please check the board definition for details.
 
 ### Making your own UF2
 
-To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840** (nRF52840) or **0x621E937A** (nRF52833). 
+To create your own UF2 DFU update image, simply use the [Python conversion script](https://github.com/Microsoft/uf2/blob/master/utils/uf2conv.py) on a .bin file or .hex file, specifying the family as **0xADA52840** (nRF52840) or **0x621E937A** (nRF52833).
 
 ```
 nRF52840
@@ -202,4 +203,3 @@ pip install intelhex
 
 Make sure that `nrfjprog` is available from the command-line. This binary is
 part of Nordic's nRF5x Command Line Tools.
-

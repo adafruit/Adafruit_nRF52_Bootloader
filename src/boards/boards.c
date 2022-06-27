@@ -62,6 +62,8 @@ bool button_pressed(uint32_t pin)
   return nrf_gpio_pin_read(pin) == active_state;
 }
 
+// This is declared so that a board specific init can be called from here.
+void __attribute__((weak)) board_init_extra(void) { }
 void board_init(void)
 {
   // stop LF clock just in case we jump from application without reset
@@ -93,6 +95,8 @@ void board_init(void)
 #if ENABLE_DCDC_1 == 1
   NRF_POWER->DCDCEN = 1;
 #endif
+  // Make sure any custom inits are performed
+  board_init_extra();
 
 // When board is supplied on VDDH (and not VDD), this specifies what voltage the GPIO should run at
 // and what voltage is output at VDD. The default (0xffffffff) is 1.8V; typically you'll want
