@@ -19,7 +19,7 @@ const uint32_t bootloaderConfig[] =
   /* CF2 END */
 };
 
-void extern_board_init(void)
+void board_init_extra(void)
 {
   // Turn LDO on
   nrf_gpio_cfg_output(LDO_CONTROL_PIN);
