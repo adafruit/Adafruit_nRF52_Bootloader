@@ -43,9 +43,22 @@
 #include <stdlib.h>
 #include "app_uart.h"
 #include "nrf_error.h"
+#include "board.h"
+
+#if USE_RUNTIME_SELECTION
+static bool selectSerial = false;      // use USB by default
+
+void useSerialTransport() {
+    selectSerial = true;
+}
+
+bool usingSerialTransport() {
+    return selectSerial;
+}
+#endif
 
 // nRF has native usb peripheral
-#ifdef NRF_USBD
+#ifdef USE_USB
 #include "tusb.h"
 #endif
 
@@ -122,16 +135,24 @@ static uint32_t send_tx_byte_end(void);
  */
 uint32_t (*send_tx_byte) (void) = send_tx_byte_default;
 
-#ifdef NRF_USBD
+
+#if USE_USB && !USE_RUNTIME_SELECTION
 
 static uint32_t serial_put(char ch)
 {
   return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
 }
 
-#else
+#elif USE_SERIAL && !USE_RUNTIME_SELECTION
 
 #define serial_put    app_uart_put
+
+#else
+
+static uint32_t serial_put(char ch)
+{
+  return selectSerial ? app_uart_put(ch) : (tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM);
+}
 
 #endif
 
@@ -350,9 +371,8 @@ static bool rx_buffer_overflowed(void)
     return false;
 }
 
-#ifdef NRF_USBD
-
-static uint32_t slip_uart_open(void)
+#if USE_USB
+static uint32_t slip_uart_open_usb_cdc(void)
 {
   m_current_state = SLIP_READY;
   return NRF_SUCCESS;
@@ -367,7 +387,9 @@ void tud_cdc_rx_cb(uint8_t port)
   }
 }
 
-#else
+#endif
+
+#if USE_SERIAL
 
 /** @brief Function for handling the UART module event. It parses events from the UART when
  *         bytes are received/transmitted.
@@ -390,7 +412,7 @@ static void slip_uart_eventhandler(app_uart_evt_t * uart_event)
 
 /** @brief Function for enabling the UART module when the SLIP layer is opened.
  */
-static uint32_t slip_uart_open(void)
+static uint32_t slip_uart_open_serial(void)
 {
     uint32_t err_code;
 
@@ -418,6 +440,27 @@ static uint32_t slip_uart_open(void)
 }
 
 #endif
+
+#if !USE_SERIAL && !USE_USB
+#error at least one of USE_SERIAL and USE_USB must be enabled
+#endif
+
+static uint32_t slip_uart_open(void) {
+    #if USE_RUNTIME_SELECTION
+        if (selectSerial) {
+            return slip_uart_open_serial();
+        }
+        else {
+            return slip_uart_open_usb_cdc();
+        }
+    #elif USE_USB
+        return slip_uart_open_serial();
+    #else
+        return slip_uart_open_usb_cdc();
+    #endif
+
+}
+
 
 uint32_t hci_slip_evt_handler_register(hci_slip_event_handler_t event_handler)
 {
@@ -447,7 +490,7 @@ uint32_t hci_slip_close()
 {
     m_current_state   = SLIP_OFF;
 
-#ifdef NRF_USBD
+#if USE_USB
     return NRF_SUCCESS;
 #else
     uint32_t err_code = app_uart_close();

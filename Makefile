@@ -164,8 +164,8 @@ C_SRC += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SRC += $(SDK_PATH)/libraries/util/nrf_assert.c
 
 # UART or USB Serial
-ifeq ($(MCU_SUB_VARIANT),nrf52)
-
+ifdef USE_USART
+$(info nrF52 UART)
 C_SRC += $(SDK_PATH)/libraries/uart/app_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
@@ -174,7 +174,7 @@ IPATH += $(SDK11_PATH)/libraries/util
 IPATH += $(SDK_PATH)/drivers_nrf/common
 IPATH += $(SDK_PATH)/drivers_nrf/uart
 
-else
+# else
 
 # pinconfig is required for 840 for CF2
 C_SRC += src/boards/$(BOARD)/pinconfig.c
@@ -196,6 +196,7 @@ C_SRC += \
 	$(TUSB_PATH)/class/msc/msc_device.c \
 	$(TUSB_PATH)/tusb.c
 
+# 
 endif
 
 #------------------------------------------------------------------------------

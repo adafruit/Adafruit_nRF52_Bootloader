@@ -66,7 +66,11 @@ void board_init(void)
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
   button_init(BUTTON_DFU, BUTTON_DFU_PULL);
-  button_init(BUTTON_FRESET, BUTTON_DFU_PULL);
+#if defined(PIN_DFU_ACTIVATE)
+#if PIN_DFU_ACTIVATE!=BUTTON_FRESET
+  button_init(BUTTON_FRESET, BUTTON_FRESET_PULL);
+#endif
+#endif
 #if defined(PIN_DFU_ACTIVATE)
   button_init(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
 #endif
@@ -268,18 +272,31 @@ void led_state(uint32_t state)
     uint32_t temp_color = 0;
     switch (state) {
         case STATE_USB_MOUNTED:
-          new_rgb_color = 0x00ff00;
+          new_rgb_color = 0x00ff00;     // green
+          primary_cycle_length = 3000;
+          break;
+
+        case STATE_UART_ACTIVE:
+          new_rgb_color = 0x00ffff;     // cyan
           primary_cycle_length = 3000;
           break;
 
         case STATE_BOOTLOADER_STARTED:
+          new_rgb_color = 0x000001;     // red
+          primary_cycle_length = 300;
+          break;
+        case STATE_UART_TIMEOUT:
+          new_rgb_color = 0x202020;     // grey
+          primary_cycle_length = 300;
+          break;
+
         case STATE_USB_UNMOUNTED:
-          new_rgb_color = 0xff0000;
+          new_rgb_color = 0x200000;     // dark red
           primary_cycle_length = 300;
           break;
 
         case STATE_WRITING_STARTED:
-          temp_color = 0xff0000;
+          temp_color = 0xffff00;        // yellow
           primary_cycle_length = 100;
           break;
 
@@ -289,7 +306,7 @@ void led_state(uint32_t state)
           break;
 
         case STATE_BLE_CONNECTED:
-          new_rgb_color = 0x0000ff;
+          new_rgb_color = 0xff00ff;     // purple
           #ifdef LED_SECONDARY_PIN
           secondary_cycle_length = 3000;
           #else
@@ -298,7 +315,7 @@ void led_state(uint32_t state)
           break;
 
         case STATE_BLE_DISCONNECTED:
-          new_rgb_color = 0xff00ff;
+          new_rgb_color = 0xff00ff;     // purple
           #ifdef LED_SECONDARY_PIN
           secondary_cycle_length = 300;
           #else
@@ -307,7 +324,7 @@ void led_state(uint32_t state)
           break;
 
         default:
-        break;
+          break;
     }
     uint8_t* final_color = NULL;
     new_rgb_color &= BOARD_RGB_BRIGHTNESS;

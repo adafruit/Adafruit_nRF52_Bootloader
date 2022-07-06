@@ -67,21 +67,49 @@
 #include "nrf_mbr.h"
 #include "pstorage.h"
 #include "nrfx_nvmc.h"
+#include "hci_slip.h"
 
-
-#ifdef NRF_USBD
+#if USE_USB
 #include "nrf_usbd.h"
 #include "tusb.h"
 
 void usb_init(bool cdc_only);
 void usb_teardown(void);
 
-#else
-
-#define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
-#define usb_teardown()
-
 #endif
+
+#if USE_SERIAL
+#define uart_init(x)       led_state(STATE_UART_ACTIVE) // mark nrf52832 as mounted
+#define uart_teardown()
+#endif
+
+void channel_init(bool cdc_only) {
+#if USE_RUNTIME_SELECTION
+  if (usingSerialTransport()) {
+      uart_init(cdc_only);
+  } else {
+      usb_init(cdc_only);
+  }
+#elif USE_USB
+  usb_cdc_init(cdc_only);
+#elif USE_SERIAL
+  uart_init(cdc_only);
+#endif
+}
+
+void channel_teardown(void) {
+#if USE_RUNTIME_SELECTION
+  if (usingSerialTransport()) {
+      uart_teardown();
+  } else {
+      usb_teardown();
+  }
+#elif USE_USB
+  usb_teardown();
+#else USE_SERIAL
+  uart_teardown();
+#endif
+}
 
 //--------------------------------------------------------------------+
 //
@@ -257,6 +285,8 @@ static void check_dfu_mode(void)
   bool frst_skip = false;
 
 #if PIN_DFU_ACTIVATE_PRESENT
+  NRFX_DELAY_US(50000); // wait for the pin state is stable
+
   dfu_activate = button_pressed(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
   dfu_activate_present = true;
   // when the FRST button is defined the same as the DFU activation line, FRST is not used.
@@ -318,6 +348,18 @@ static void check_dfu_mode(void)
     (*dbl_reset_mem) = 0;
   }
 
+  NRFX_DELAY_US(500); // wait for the pin state is stable
+
+  /*
+   * Enable UART for MCU to MCU transfers. 
+   */
+  if (dfu_activate) {
+    useSerialTransport();
+  }
+
+  NRFX_DELAY_US(500); // wait for the pin state is stable
+
+
   // Enter DFU mode accordingly to input
   if ( dfu_start || !valid_app )
   {
@@ -333,7 +375,8 @@ static void check_dfu_mode(void)
     else
     {
       led_state(STATE_USB_UNMOUNTED);
-      usb_init(serial_only_dfu);
+
+      channel_init(serial_only_dfu);
     }
 
     // Initiate an update of the firmware.
@@ -345,15 +388,16 @@ static void check_dfu_mode(void)
     else
     {
       // No timeout if bootloader requires user action (double-reset).
-       bootloader_dfu_start(_ota_dfu, 0, false);
+       bootloader_dfu_start(_ota_dfu, 100000, false);
     }
 
     if ( _ota_dfu )
     {
       sd_softdevice_disable();
-    }else
+    }
+    else
     {
-      usb_teardown();
+      channel_teardown();
     }
   }
 }

@@ -67,7 +67,6 @@
 
 #if defined(PIN_DFU_ACTIVATE) && defined(PIN_DFU_ACTIVATE_PULL)
 #define PIN_DFU_ACTIVATE_PRESENT 1
-#pragma message "board supports DFU activate pin"
 #else
 #define PIN_DFU_ACTIVATE_PRESENT 0
 #endif
@@ -118,7 +117,9 @@ enum {
   STATE_WRITING_STARTED,
   STATE_WRITING_FINISHED,
   STATE_BLE_CONNECTED,
-  STATE_BLE_DISCONNECTED
+  STATE_BLE_DISCONNECTED,
+  STATE_UART_ACTIVE,
+  STATE_UART_TIMEOUT
 };
 
 void led_pwm_init(uint32_t led_index, uint32_t led_pin);

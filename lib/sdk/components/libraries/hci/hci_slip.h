@@ -59,9 +59,29 @@
 #define HCI_SLIP_H__
 
 #include <stdint.h>
+#include "boards.h"
+
+// NRF_USBD
+#ifdef NRF_USBD
+#define USE_USB 1
+#else
+#define USE_USB 0
+#endif
+
+/**
+ * @brief Enable UART interface with DFU_ACTIVATION present for MCU to MCU transfers
+ */
+#define USE_SERIAL PIN_DFU_ACTIVATE_PRESENT
+#define USE_RUNTIME_SELECTION (USE_USB && USE_SERIAL)
+
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#if USE_RUNTIME_SELECTION
+void useSerialTransport(void);
+bool usingSerialTransport(void);
 #endif
 
 /**@brief Event types from the SLIP Layer. */
