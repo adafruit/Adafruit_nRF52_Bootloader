@@ -7,6 +7,7 @@
 # - SD_HEX     : to bootloader hex binary
 #------------------------------------------------------------------------------
 
+# local customization
 -include Makefile.user
 
 SDK_PATH     = lib/sdk/components
@@ -37,7 +38,7 @@ OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
 MERGED_FILE = $(OUT_NAME)_$(SD_NAME)_$(SD_VERSION)
 
 #------------------------------------------------------------------------------
-# Tool configure
+# Tool Configure
 #------------------------------------------------------------------------------
 
 # Toolchain commands
@@ -208,39 +209,46 @@ ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
 #------------------------------------------------------------------------------
 
 # src
-IPATH += src
-IPATH += src/boards
-IPATH += src/boards/$(BOARD)
-IPATH += src/cmsis/include
-IPATH += src/usb
-IPATH += $(TUSB_PATH)
+IPATH += \
+  src \
+  src/boards \
+  src/boards/$(BOARD) \
+  src/cmsis/include \
+  src/usb \
+  $(TUSB_PATH)
 
 # nrfx
-IPATH += $(NRFX_PATH)
-IPATH += $(NRFX_PATH)/mdk
-IPATH += $(NRFX_PATH)/hal
-IPATH += $(NRFX_PATH)/drivers/include
-IPATH += $(NRFX_PATH)/drivers/src
+IPATH += \
+  $(NRFX_PATH) \
+  $(NRFX_PATH)/mdk \
+  $(NRFX_PATH)/hal \
+  $(NRFX_PATH)/drivers/include \
+  $(NRFX_PATH)/drivers/src
 
-IPATH += $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport
-IPATH += $(SDK11_PATH)/libraries/bootloader_dfu
-IPATH += $(SDK11_PATH)/drivers_nrf/pstorage
-IPATH += $(SDK11_PATH)/ble/common
-IPATH += $(SDK11_PATH)/ble/ble_services/ble_dfu
-IPATH += $(SDK11_PATH)/ble/ble_services/ble_dis
+# sdk11 for cdc/ble dfu
+IPATH += \
+  $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport \
+  $(SDK11_PATH)/libraries/bootloader_dfu \
+  $(SDK11_PATH)/drivers_nrf/pstorage \
+  $(SDK11_PATH)/ble/common \
+  $(SDK11_PATH)/ble/ble_services/ble_dfu \
+  $(SDK11_PATH)/ble/ble_services/ble_dis
 
-IPATH += $(SDK_PATH)/libraries/timer
-IPATH += $(SDK_PATH)/libraries/scheduler
-IPATH += $(SDK_PATH)/libraries/crc16
-IPATH += $(SDK_PATH)/libraries/util
-IPATH += $(SDK_PATH)/libraries/hci/config
-IPATH += $(SDK_PATH)/libraries/uart
-IPATH += $(SDK_PATH)/libraries/hci
-IPATH += $(SDK_PATH)/drivers_nrf/delay
+# later sdk with updated drivers
+IPATH += \
+  $(SDK_PATH)/libraries/timer \
+  $(SDK_PATH)/libraries/scheduler \
+  $(SDK_PATH)/libraries/crc16 \
+  $(SDK_PATH)/libraries/util \
+  $(SDK_PATH)/libraries/hci/config \
+  $(SDK_PATH)/libraries/uart \
+  $(SDK_PATH)/libraries/hci \
+  $(SDK_PATH)/drivers_nrf/delay
 
-# Softdevice
-IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include
-IPATH += $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
+# SoftDevice
+IPATH += \
+  $(SD_PATH)/$(SD_FILENAME)_API/include \
+  $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
 
 #------------------------------------------------------------------------------
 # Compiler Flags
@@ -277,9 +285,6 @@ CFLAGS += \
 
 # Suppress warning caused by SDK
 CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
-
-# TinyUSB tusb_hal_nrf_power_event
-CFLAGS += -Wno-cast-function-type
 
 # Nordic Softdevice SDK header files contains inline assembler that has
 # broken constraints. As a result the IPA-modref pass, introduced in gcc-11,
@@ -332,6 +337,7 @@ LIBS += -lm -lc
 #------------------------------------------------------------------------------
 # Assembler flags
 #------------------------------------------------------------------------------
+
 ASFLAGS += $(CFLAGS)
 
 #function for removing duplicates in a list
@@ -356,7 +362,7 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 # BUILD TARGETS
 #------------------------------------------------------------------------------
 
-.PHONY: all clean flash dfu-flash sd gdbflash gdb
+.PHONY: all clean flash dfu-flash flash-dfu flash-sd flash-mbr gdbflash gdb
 
 # default target to build
 all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
@@ -431,7 +437,9 @@ copy-artifact: $(BIN)
 	@$(CP) $(BUILD)/$(MERGED_FILE).hex $(BIN)
 	@$(CP) $(BUILD)/$(MERGED_FILE).zip $(BIN)
 
-#------------------- Flash target -------------------
+#--------------------------------------
+# Flash Target
+#--------------------------------------
 
 check_defined = \
     $(strip $(foreach 1,$1, \
@@ -440,29 +448,29 @@ __check_defined = \
     $(if $(value $1),, \
     $(error Undefined make flag: $1$(if $2, ($2))))
 
+# erase chip
+erase:
+	@echo Erasing flash
+	$(call FLASH_ERASE_CMD)
+
 # Flash the compiled
 flash: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Flashing: $(notdir $<)
 	$(call FLASH_CMD,$<)
 
-erase:
-	@echo Erasing flash
-	$(call FLASH_ERASE_CMD)
-
 # flash SD only
-sd:
+flash-sd:
 	@echo Flashing: $(SD_HEX)
 	$(call FLASH_NOUICR_CMD,$(SD_HEX))
 
 # flash MBR only
-mbr:
+flash-mbr:
 	@echo Flashing: $(MBR_HEX)
 	$(call FLASH_NOUICR_CMD,$(MBR_HEX))
 
-#------------------- Flash with NRFUTIL via DFU -------------------
-
-# dfu using CDC interface
-dfu-flash: $(BUILD)/$(MERGED_FILE).zip
+# dfu with adafruit-nrfutil using CDC interface
+dfu-flash: flash-dfu
+flash-dfu: $(BUILD)/$(MERGED_FILE).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
 	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
