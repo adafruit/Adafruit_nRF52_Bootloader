@@ -16,8 +16,9 @@ TUSB_PATH    = lib/tinyusb/src
 NRFX_PATH    = lib/nrfx
 SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
+# SD_VERSION can be overwritten by board.mk
 ifndef SD_VERSION
-   SD_VERSION   = 6.1.1
+SD_VERSION   = 6.1.1
 endif
 
 SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)

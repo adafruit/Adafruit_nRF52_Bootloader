@@ -19,6 +19,7 @@ jobs:
           - 'circuitplayground_nrf52840'
           - 'clue_nrf52840'
           - 'feather_nrf52832'
+          - 'feather_nrf52833_express'
           - 'feather_nrf52840_express'
           - 'feather_nrf52840_sense'
           - 'itsybitsy_nrf52840_express'
