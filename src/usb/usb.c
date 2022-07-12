@@ -42,9 +42,13 @@
  * We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled. */
 extern void tusb_hal_nrf_power_event(uint32_t event);
 
-//--------------------------------------------------------------------+
+// power callback when SD is not enabled
+static void power_event_handler(nrfx_power_usb_evt_t event)
+{
+  tusb_hal_nrf_power_event((uint32_t) event);
+}
+
 // Forward USB interrupt events to TinyUSB IRQ Handler
-//--------------------------------------------------------------------+
 void USBD_IRQHandler(void)
 {
   tud_int_handler(0);
@@ -80,8 +84,8 @@ void usb_init(bool cdc_only)
     const nrfx_power_config_t pwr_cfg = { 0 };
     nrfx_power_init(&pwr_cfg);
 
-    // Register tusb function as USB power handler
-    const nrfx_power_usbevt_config_t config = { .handler = (nrfx_power_usb_event_handler_t) tusb_hal_nrf_power_event };
+    // Register USB power handler
+    const nrfx_power_usbevt_config_t config = { .handler = power_event_handler };
     nrfx_power_usbevt_init(&config);
 
     nrfx_power_usbevt_enable();

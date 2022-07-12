@@ -261,6 +261,7 @@ CFLAGS += \
 	-mcpu=cortex-m4 \
 	-mfloat-abi=hard \
 	-mfpu=fpv4-sp-d16 \
+	-ggdb \
 	-Os \
 	-ffunction-sections \
 	-fdata-sections \
@@ -280,8 +281,7 @@ CFLAGS += \
 	-Wsign-compare \
 	-Wmissing-format-attribute \
 	-Wno-endif-labels \
-	-Wunreachable-code \
-	-ggdb
+	-Wunreachable-code
 
 # Suppress warning caused by SDK
 CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
