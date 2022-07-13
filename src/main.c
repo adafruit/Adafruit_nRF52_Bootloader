@@ -61,15 +61,14 @@
 #include "nrf_error.h"
 
 #include "boards.h"
-#include "uf2/uf2.h"
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
 #include "pstorage.h"
 #include "nrfx_nvmc.h"
 
-
 #ifdef NRF_USBD
+#include "uf2/uf2.h"
 #include "nrf_usbd.h"
 #include "tusb.h"
 

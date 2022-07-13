@@ -13,12 +13,12 @@
 #endif
 
 // Family ID and size for updating generic Application
-#if defined(NRF52833_XXAA)
-  #define CFG_UF2_FAMILY_APP_ID       0x621E937A
-  #define CFG_UF2_FLASH_SIZE          (512*1024)  // 512 kB
-#elif defined(NRF52840_XXAA)
+#if defined(NRF52840_XXAA)
   #define CFG_UF2_FAMILY_APP_ID       0xADA52840
   #define CFG_UF2_FLASH_SIZE          (1024*1024) // 1 MB
+#elif defined(NRF52833_XXAA)
+  #define CFG_UF2_FAMILY_APP_ID       0x621E937A
+  #define CFG_UF2_FLASH_SIZE          (512*1024)  // 512 kB
 #endif
 
 // Application Address Space
