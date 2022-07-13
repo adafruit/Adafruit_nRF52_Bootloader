@@ -83,8 +83,10 @@
  */
 #define ADAFRUIT_DEVICE_TYPE         0x0052
 
-#if defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
+#if defined(NRF52840_XXAA)
   #define ADAFRUIT_DEV_REV           52840
+#elif defined(NRF52833_XXAA)
+  #define ADAFRUIT_DEV_REV           52833
 #elif defined NRF52832_XXAA
   #define ADAFRUIT_DEV_REV           0xADAF
 #else
