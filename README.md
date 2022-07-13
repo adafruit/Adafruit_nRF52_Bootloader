@@ -121,43 +121,16 @@ both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to a
 You should only continue if you are looking to develop bootloader for your own.
 You must have have a J-Link available to "unbrick" your device.
 
-Prerequisites
+### Prerequisites
 
 - ARM GCC
-
-To install for macos
-
-```bash
-brew tap ArmMbed/homebrew-formulae
-brew install arm-none-eabi-gcc
-brew link --overwrite arm-none-eabi-gcc # if a prior version was present
-```
-
 - Nordic's [nRF5x Command Line Tools](https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF-Command-Line-Tools)
 - [Python IntelHex](https://pypi.org/project/IntelHex/)
 
-To build:
+### Build:
 
 ```
 make BOARD=feather_nrf52840_express all
-```
-
-To flash the bootloader with JLink:
-
-```
-make BOARD=feather_nrf52840_express flash
-```
-
-To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
-
-```
-make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 dfu-flash
-```
-
-To flash SoftDevice (and chip erase):
-
-```
-make BOARD=feather_nrf52840_express sd
 ```
 
 For the list of supported boards, run `make` without `BOARD=` :
@@ -169,9 +142,41 @@ Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
 Makefile:90: *** BOARD not defined.  Stop
 ```
 
+### Flash
+
+To flash the bootloader (without softdevice/mbr) using JLink:
+
+```
+make BOARD=feather_nrf52840_express flash
+```
+
+If you are using pyocd as debugger, add `FLASHER=pyocd` to make command:
+
+```
+make BOARD=feather_nrf52840_express FLASHER=pyocd flash
+```
+
+To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
+
+```
+make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 flash-dfu
+```
+
+To flash SoftDevice (will also erase chip):
+
+```
+make BOARD=feather_nrf52840_express flash-sd
+```
+
+To flash MBR only
+
+```
+make BOARD=feather_nrf52840_express flash-mbr
+```
+
 ### Common makefile problems
 
-#### 1. `arm-none-eabi-gcc`: No such file or directory
+#### `arm-none-eabi-gcc`: No such file or directory
 
 If you get the following error ...
 
@@ -190,7 +195,7 @@ $ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- B
 
 For other compile errors, check the gcc version with `arm-none-eabi-gcc --version` to insure it is at least 9.x.
 
-#### 2. `ModuleNotFoundError: No module named 'intelhex'`
+#### `ModuleNotFoundError: No module named 'intelhex'`
 
 Install python-intelhex with
 
@@ -198,8 +203,7 @@ Install python-intelhex with
 pip install intelhex
 ```
 
-
-#### 3. `make: nrfjprog: No such file or directory`
+#### `make: nrfjprog: No such file or directory`
 
 Make sure that `nrfjprog` is available from the command-line. This binary is
 part of Nordic's nRF5x Command Line Tools.
