@@ -363,7 +363,7 @@ INC_PATHS = $(addprefix -I,$(IPATH))
 # BUILD TARGETS
 #------------------------------------------------------------------------------
 
-.PHONY: all clean flash dfu-flash flash-dfu flash-sd flash-mbr gdbflash gdb
+.PHONY: all clean flash flash-dfu flash-sd flash-mbr dfu-flash sd mbr gdbflash gdb
 
 # default target to build
 all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
@@ -460,11 +460,13 @@ flash: $(BUILD)/$(OUT_NAME)_nosd.hex
 	$(call FLASH_CMD,$<)
 
 # flash SD only
+sd: flash-sd
 flash-sd:
 	@echo Flashing: $(SD_HEX)
 	$(call FLASH_NOUICR_CMD,$(SD_HEX))
 
 # flash MBR only
+mbr: flash-mbr
 flash-mbr:
 	@echo Flashing: $(MBR_HEX)
 	$(call FLASH_NOUICR_CMD,$(MBR_HEX))
