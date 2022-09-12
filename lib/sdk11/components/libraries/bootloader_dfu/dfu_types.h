@@ -77,10 +77,11 @@ static inline bool is_sd_existed(void)
 
 #define INVALID_PACKET                  0x00                                                            /**< Invalid packet identifies. */
 #define INIT_PACKET                     0x01                                                            /**< Packet identifies for initialization packet. */
-#define STOP_INIT_PACKET                0x02                                                            /**< Packet identifies for stop initialization packet. Used when complete init packet has been received so that the init packet can be used for pre validaiton. */
+//#define STOP_INIT_PACKET                0x02         // unused                                                   /**< Packet identifies for stop initialization packet. Used when complete init packet has been received so that the init packet can be used for pre validaiton. */
 #define START_PACKET                    0x03                                                            /**< Packet identifies for the Data Start Packet. */
 #define DATA_PACKET                     0x04                                                            /**< Packet identifies for a Data Packet. */
 #define STOP_DATA_PACKET                0x05                                                            /**< Packet identifies for the Data Stop Packet. */
+#define PING_PACKET                     0x09          // used for synchronization and testing connectivity
 
 #define DFU_UPDATE_SD                   0x01                                                            /**< Bit field indicating update of SoftDevice is ongoing. */
 #define DFU_UPDATE_BL                   0x02                                                            /**< Bit field indicating update of bootloader is ongoing. */
@@ -88,6 +89,14 @@ static inline bool is_sd_existed(void)
 
 #define DFU_INIT_RX                     0x00                                                            /**< Op Code identifies for receiving init packet. */
 #define DFU_INIT_COMPLETE               0x01                                                            /**< Op Code identifies for transmission complete of init packet. */
+
+#ifdef DFU_EXTERNAL_FLASH
+#define EXTERNAL_FLASH_BEGIN_PACKET 0x10
+#define EXTERNAL_FLASH_ERASE_PACKET 0x11
+#define EXTERNAL_FLASH_CHECKSUM_PACKET  0x12
+#define EXTERNAL_FLASH_WRITE_PACKET 0x13
+#define EXTERNAL_FLASH_END_PACKET 0x14
+#endif
 
 // Safe guard to ensure during compile time that the DFU_APP_DATA_RESERVED is a multiple of page size.
 STATIC_ASSERT((((DFU_APP_DATA_RESERVED) & (CODE_PAGE_SIZE - 1)) == 0x00));
@@ -150,6 +159,55 @@ typedef struct
 
 /**@brief Update complete handler type. */
 typedef void (*dfu_complete_handler_t)(dfu_update_status_t dfu_update_status);
+
+#ifdef DFU_EXTERNAL_FLASH
+
+typedef enum
+{
+    DFU_MEMORY_INTERNAL_FLASH = 0, // unsupported
+    DFU_MEMORY_EXTERNAL_FLASH = 16,
+} dfu_memory_region_t;
+
+STATIC_ASSERT((sizeof(dfu_memory_region_t) == 1));
+
+
+typedef struct
+{
+    dfu_memory_region_t memory_region;
+    uint8_t reserved[3];
+    uint32_t length;
+    uint32_t address;
+} dfu_erase_packet_t;
+
+STATIC_ASSERT((sizeof(dfu_erase_packet_t) == 12));
+
+
+typedef struct
+{
+    dfu_memory_region_t memory_region;
+    uint8_t reserved[3];
+    uint32_t address; // must be 8 byte aligned
+    uint32_t length;  // the number of bytes of data to write
+    uint8_t data[];   // the data to write at the given address
+} dfu_write_packet_t;
+
+STATIC_ASSERT((sizeof(dfu_write_packet_t) == 12));
+
+typedef uint8_t md5_t[16];
+typedef struct
+{
+    dfu_memory_region_t memory_region;
+    uint8_t reserved[3];
+    uint32_t address;
+    uint32_t length;
+    md5_t   md5;
+} dfu_checksum_packet_t;
+
+STATIC_ASSERT((sizeof(dfu_checksum_packet_t) == 28));
+
+
+#endif
+
 
 #endif // DFU_TYPES_H__
 

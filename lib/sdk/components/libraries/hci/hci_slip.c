@@ -46,6 +46,7 @@
 #include "board.h"
 
 #if USE_RUNTIME_SELECTION
+#pragma message "USB and UART enabled"
 static bool selectSerial = false;      // use USB by default
 
 void useSerialTransport() {
@@ -137,8 +138,7 @@ uint32_t (*send_tx_byte) (void) = send_tx_byte_default;
 
 
 #if USE_USB && !USE_RUNTIME_SELECTION
-
-static uint32_t serial_put(char ch)
+uint32_t serial_put(char ch)
 {
   return tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM;
 }
@@ -149,7 +149,7 @@ static uint32_t serial_put(char ch)
 
 #else
 
-static uint32_t serial_put(char ch)
+uint32_t serial_put(char ch)
 {
   return selectSerial ? app_uart_put(ch) : (tud_cdc_write_char(ch) ? NRF_SUCCESS : NRF_ERROR_NO_MEM);
 }
@@ -498,7 +498,6 @@ uint32_t hci_slip_close()
 #endif
 
 }
-
 
 uint32_t hci_slip_write(const uint8_t * p_buffer, uint32_t length)
 {

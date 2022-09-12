@@ -79,4 +79,17 @@
 #define RTS_PIN_NUMBER     0
 #define HWFC               false
 
+/*------------------------------------------------------------------*/
+/* QSPI external flash
+ *------------------------------------------------------------------*/
+#define DFU_EXTERNAL_FLASH 1
+
+#define QSPI_DATA0                _PINNUM(0, 17)
+#define QSPI_DATA1                _PINNUM(0, 22)
+#define QSPI_DATA2                _PINNUM(0, 23)
+#define QSPI_DATA3                _PINNUM(0, 21)
+#define QSPI_SCK                  _PINNUM(0, 19)
+#define QSPI_CS                   _PINNUM(0, 20)
+
+
 #endif // _FEATHER_NRF52840_H

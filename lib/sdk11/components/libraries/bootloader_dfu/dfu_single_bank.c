@@ -24,6 +24,10 @@
 #include "nrf_mbr.h"
 #include "dfu_init.h"
 #include "sdk_common.h"
+#if DFU_EXTERNAL_FLASH
+#include "nrfx_qspi.h"
+//#include "amd5.h"
+#endif
 
 #include "boards.h"
 
@@ -40,7 +44,6 @@ static pstorage_handle_t          * mp_storage_handle_active;   /**< Pointer to 
 
 static dfu_callback_t               m_data_pkt_cb;              /**< Callback from DFU Bank module for notification of asynchronous operation such as flash prepare. */
 static dfu_bank_func_t              m_functions;                /**< Structure holding operations for the selected update process. */
-
 
 /**@brief Function for handling callbacks from pstorage module.
  *
@@ -101,7 +104,8 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
   }
   else
   {
-    uint32_t const page_count = NRFX_CEIL_DIV(m_image_size, CODE_PAGE_SIZE);
+    // MRFX_CEIL_DIV fails when the first operand is 0
+    uint32_t const page_count = m_image_size ? NRFX_CEIL_DIV(m_image_size, CODE_PAGE_SIZE) : 0;
 
     for ( uint32_t i = 0; i < page_count; i++ )
     {
@@ -520,6 +524,121 @@ void dfu_reset(void)
     bootloader_dfu_update_process(update_status);
 }
 
+
+#if DFU_EXTERNAL_FLASH
+static const nrfx_qspi_config_t qspi_config = NRFX_QSPI_DEFAULT_CONFIG(QSPI_SCK, QSPI_CS, QSPI_DATA0, QSPI_DATA1, QSPI_DATA2, QSPI_DATA3);
+
+nrfx_err_t dfu_init_qspi_flash(void) {
+    static bool inited = false;
+    uint32_t err_code = NRFX_SUCCESS;
+    if (!inited) {
+        // use blocking mode for simplicity
+        err_code = nrfx_qspi_init(&qspi_config, NULL, NULL);
+        if (err_code==NRFX_SUCCESS) {
+            inited = true;
+        }
+        NRFX_DELAY_MS(5);
+    }
+    return err_code;
+}
+
+uint32_t dfu_external_begin_pkt_handle(dfu_update_packet_t* p_packet) {
+    if (dfu_init_qspi_flash()!=NRFX_SUCCESS)
+        return NRF_ERROR_BUSY;
+    return NRF_SUCCESS;
+}
+
+uint32_t dfu_external_end_pkt_handle(dfu_update_packet_t* p_packet) {
+    // this crashes the device. reason unknown.
+    //nrfx_qspi_uninit();
+    return NRF_SUCCESS;
+}
+
+
+dfu_erase_packet_t* m_erase_pkt;
+uint32_t dfu_erase_pkt_handle(dfu_erase_packet_t * p_packet)
+{
+    VERIFY_PARAM_NOT_NULL(p_packet);
+    m_erase_pkt = p_packet;
+
+    if (m_erase_pkt->memory_region != DFU_MEMORY_EXTERNAL_FLASH) {
+        return NRF_ERROR_NOT_SUPPORTED;
+    }
+
+    while (m_erase_pkt->length) {
+        if (m_erase_pkt->length < 4096) {
+            return NRF_ERROR_INVALID_LENGTH;
+        }
+        if (nrfx_qspi_erase((m_erase_pkt->length>4096) ? NRF_QSPI_ERASE_LEN_64KB : NRF_QSPI_ERASE_LEN_4KB, m_erase_pkt->address)!=NRFX_SUCCESS)
+            return NRF_ERROR_NOT_FOUND;
+        const uint32_t block_size = (m_erase_pkt->length>4096) ? 64*1024 : 4*1024;
+        m_erase_pkt->length -= block_size;
+        m_erase_pkt->address += block_size;
+    }
+    return NRF_SUCCESS;
+}
+
+#define XIP_BASE (0x12000000)
+
+uint32_t dfu_write_pkt_handle(dfu_write_packet_t * p_packet)
+{
+    VERIFY_PARAM_NOT_NULL(p_packet);
+
+    if (p_packet->memory_region != DFU_MEMORY_EXTERNAL_FLASH) {
+        return NRF_ERROR_NOT_SUPPORTED;
+    }
+
+    unsigned retries = 5;
+
+    uint32_t remaining = p_packet->length;
+    uint32_t address = p_packet->address;
+    const char* data = (const char*)p_packet->data;
+    uint32_t error = NRF_ERROR_NOT_FOUND;
+
+    while (retries-->0 && error != NRF_SUCCESS) {
+        // the nrfx interface uses error codes in a different range of numbers, so these need to be mapped
+        // to regular nrf error codes
+        if (nrfx_qspi_write(data, remaining, address)!=NRFX_SUCCESS) {
+            error = NRF_ERROR_NOT_FOUND;
+        }
+        else {
+            // verify against the xip region
+            if (memcmp(data, (void*)(XIP_BASE+address), remaining))
+                error = NRF_ERROR_INVALID_DATA;
+            else
+                error = NRF_SUCCESS;
+        }
+    }
+    return error;
+}
+
+/*
+void compute_md5(uint8_t digest[16], uint32_t address, uint32_t length) {
+    struct MD5Context context;
+    MD5Init(&context);
+    MD5Update(&context, (const uint8_t*)(address+XIP_BASE), length);
+    MD5Final(digest, &context);
+}
+*/
+
+uint32_t dfu_checksum_pkt_handle(dfu_checksum_packet_t * p_packet)
+{
+    VERIFY_PARAM_NOT_NULL(p_packet);
+
+    if (p_packet->memory_region != DFU_MEMORY_EXTERNAL_FLASH) {
+        return NRF_ERROR_NOT_SUPPORTED;
+    }
+
+    // uint8_t computed_md5[16];
+    // compute_md5(computed_md5, p_packet->address, p_packet->length);
+    // if (memcmp(computed_md5, p_packet->md5, sizeof(computed_md5))) {
+    //     return NRF_ERROR_INVALID_DATA;
+    // }
+
+    return NRF_SUCCESS;
+}
+
+#endif
 
 static uint32_t dfu_compare_block(uint32_t * ptr1, uint32_t * ptr2, uint32_t len)
 {

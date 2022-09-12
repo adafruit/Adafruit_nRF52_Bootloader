@@ -129,6 +129,18 @@ uint32_t dfu_sd_image_swap(void);
  */
 uint32_t dfu_init_pkt_complete(void);
 
+
+#if DFU_EXTERNAL_FLASH
+uint32_t dfu_external_begin_pkt_handle(dfu_update_packet_t* p_packet);
+
+uint32_t dfu_erase_pkt_handle(dfu_erase_packet_t* p_packet);
+uint32_t dfu_write_pkt_handle(dfu_write_packet_t* p_packet);
+uint32_t dfu_checksum_pkt_handle(dfu_checksum_packet_t* p_packet);
+
+uint32_t dfu_external_end_pkt_handle(dfu_update_packet_t* p_packet);
+
+#endif
+
 #endif // DFU_H__
 
 /** @} */

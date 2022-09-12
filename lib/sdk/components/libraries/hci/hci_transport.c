@@ -39,6 +39,7 @@
  */
 #include "sdk_common.h"
 #if NRF_MODULE_ENABLED(HCI_TRANSPORT)
+#include "app_util_platform.h"
 #include "hci_transport.h"
 #include "hci_slip.h"
 #include "crc16.h"
@@ -285,6 +286,7 @@ static void rx_vendor_specific_pkt_type_handle(const uint8_t * p_buffer, uint32_
 
             err_code = hci_mem_pool_rx_produce(HCI_RX_BUF_SIZE, (void **)&mp_slip_used_rx_buffer);
             APP_ERROR_CHECK_BOOL((err_code == NRF_SUCCESS) || (err_code == NRF_ERROR_NO_MEM));
+
 
             // If memory pool RX buffer produce succeeded we register that buffer to slip layer
             // otherwise we register the internal acknowledgement buffer.
@@ -781,7 +783,9 @@ uint32_t hci_transport_rx_pkt_extract(uint8_t ** pp_buffer, uint16_t * p_length)
         if (m_is_slip_decode_ready)
         {
             m_is_slip_decode_ready = false;
+            CRITICAL_REGION_ENTER();
             err_code               = hci_mem_pool_rx_extract(pp_buffer, &length);
+            CRITICAL_REGION_EXIT();
             length                -= (PKT_HDR_SIZE + PKT_CRC_SIZE);
 
             *p_length              = (uint16_t)length;
@@ -800,9 +804,12 @@ uint32_t hci_transport_rx_pkt_extract(uint8_t ** pp_buffer, uint16_t * p_length)
     return err_code;
 }
 
-
 uint32_t hci_transport_rx_pkt_consume(uint8_t * p_buffer)
 {
-    return (hci_mem_pool_rx_consume(p_buffer - PKT_HDR_SIZE));
+    uint32_t r;
+    CRITICAL_REGION_ENTER();
+    r = hci_mem_pool_rx_consume(p_buffer - PKT_HDR_SIZE);
+    CRITICAL_REGION_EXIT();
+    return r;
 }
 #endif //NRF_MODULE_ENABLED(HCI_TRANSPORT)

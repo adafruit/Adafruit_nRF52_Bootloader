@@ -39,6 +39,7 @@
  */
 #include "sdk_common.h"
 #if NRF_MODULE_ENABLED(HCI_MEM_POOL)
+#include "app_util_platform.h"
 #include "hci_mem_pool.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -134,6 +135,7 @@ uint32_t hci_mem_pool_rx_produce(uint32_t length, void ** pp_buffer)
     }
     *pp_buffer = NULL;
 
+    NRFX_CRITICAL_SECTION_ENTER();
     if (m_rx_buffer_queue.free_window_count != 0)
     {
         if (length <= HCI_RX_BUF_SIZE)
@@ -163,6 +165,7 @@ uint32_t hci_mem_pool_rx_produce(uint32_t length, void ** pp_buffer)
     {
         err_code = NRF_ERROR_NO_MEM;
     }
+    NRFX_CRITICAL_SECTION_EXIT();
 
     return err_code;
 }

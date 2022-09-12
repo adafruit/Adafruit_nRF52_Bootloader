@@ -122,6 +122,10 @@ else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
 
+ifeq ($(DFU_EXTERNAL_FLASH),1)
+	CFLAGS += -DDFU_EXTERNAL_FLASH
+endif
+
 #------------------------------------------------------------------------------
 # SOURCE FILES
 #------------------------------------------------------------------------------
@@ -139,6 +143,12 @@ C_SRC += src/boards/boards.c
 # nrfx
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_power.c
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
+
+ifeq ($(DFU_EXTERNAL_FLASH),1)
+C_SRC += $(NRFX_PATH)/drivers/src/nrfx_qspi.c
+# C_SRC += src/amd5.c
+endif
+
 C_SRC += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
 
 # SDK 11 files: serial + OTA DFU

@@ -71,6 +71,10 @@
 #define PIN_DFU_ACTIVATE_PRESENT 0
 #endif
 
+#ifndef DFU_EXTERNAL_FLASH
+#define DFU_EXTERNAL_FLASH 0
+#endif
+
 // The primary LED is usually Red but not in all cases.
 #define LED_PRIMARY 0
 // The secondary LED, when available, is usually blue.

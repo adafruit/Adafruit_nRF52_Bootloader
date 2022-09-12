@@ -83,6 +83,8 @@ void usb_teardown(void);
 #define uart_teardown()
 #endif
 
+extern void serial_put(char c);
+
 void channel_init(bool cdc_only) {
 #if USE_RUNTIME_SELECTION
   if (usingSerialTransport()) {
@@ -174,7 +176,7 @@ bool is_ota(void)
   return _ota_dfu;
 }
 
-static void check_dfu_mode(void);
+static bool check_dfu_mode(void);
 static uint32_t ble_stack_init(void);
 
 // The SoftDevice must only be initialized if a chip reset has occurred.
@@ -220,7 +222,7 @@ int main(void)
 
   // Check all inputs and enter DFU if needed
   // Return when DFU process is complete (or not entered at all)
-  check_dfu_mode();
+  bool dfu_activate = check_dfu_mode();
 
   // Reset peripherals
   board_teardown();
@@ -248,14 +250,17 @@ int main(void)
     // clear in case we kept DFU_DBL_RESET_APP there
     (*dbl_reset_mem) = 0;
 
-    // start application
-    bootloader_app_start();
+    uint32_t app_addr = bootloader_app_register();
+    if (!dfu_activate) {
+        // jump to app
+        bootloader_util_app_start(app_addr);
+    }
   }
 
   NVIC_SystemReset();
 }
 
-static void check_dfu_mode(void)
+static bool check_dfu_mode(void)
 {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
 
@@ -293,13 +298,13 @@ static void check_dfu_mode(void)
   frst_skip = (PIN_DFU_ACTIVATE == BUTTON_FRESET);
   #pragma message "FRST is overridden by the DFU activate setting"
 #endif
-  
+
   dfu_start = dfu_start || dfu_activate;
 
   // DFU activation via the designated pin takes precedence
   if (!dfu_activate_present || !dfu_activate) {
     // skip dfu entirely
-    if (dfu_skip) return;
+    if (dfu_skip) return false;
 
     /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
     // DFU button pressed
@@ -357,8 +362,6 @@ static void check_dfu_mode(void)
     useSerialTransport();
   }
 
-  NRFX_DELAY_US(500); // wait for the pin state is stable
-
 
   // Enter DFU mode accordingly to input
   if ( dfu_start || !valid_app )
@@ -388,7 +391,7 @@ static void check_dfu_mode(void)
     else
     {
       // No timeout if bootloader requires user action (double-reset).
-       bootloader_dfu_start(_ota_dfu, 100000, false);
+       bootloader_dfu_start(_ota_dfu, 0, false);
     }
 
     if ( _ota_dfu )
@@ -400,6 +403,7 @@ static void check_dfu_mode(void)
       channel_teardown();
     }
   }
+  return dfu_activate;
 }
 
 

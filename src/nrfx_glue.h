@@ -175,12 +175,12 @@ static inline bool _NRFX_IRQ_IS_PENDING(IRQn_Type irq_number)
 /**
  * @brief Macro for entering into a critical section.
  */
-#define NRFX_CRITICAL_SECTION_ENTER()   // CRITICAL_REGION_ENTER()
+#define NRFX_CRITICAL_SECTION_ENTER()   CRITICAL_REGION_ENTER()
 
 /**
  * @brief Macro for exiting from a critical section.
  */
-#define NRFX_CRITICAL_SECTION_EXIT()    // CRITICAL_REGION_EXIT()
+#define NRFX_CRITICAL_SECTION_EXIT()    CRITICAL_REGION_EXIT()
 
 //------------------------------------------------------------------------------
 
