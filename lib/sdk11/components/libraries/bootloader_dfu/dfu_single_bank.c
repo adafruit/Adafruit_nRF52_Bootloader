@@ -565,6 +565,7 @@ uint32_t dfu_erase_pkt_handle(dfu_erase_packet_t * p_packet)
         return NRF_ERROR_NOT_SUPPORTED;
     }
 
+    dfu_init_qspi_flash();
     while (m_erase_pkt->length) {
         if (m_erase_pkt->length < 4096) {
             return NRF_ERROR_INVALID_LENGTH;
@@ -587,6 +588,7 @@ uint32_t dfu_write_pkt_handle(dfu_write_packet_t * p_packet)
     if (p_packet->memory_region != DFU_MEMORY_EXTERNAL_FLASH) {
         return NRF_ERROR_NOT_SUPPORTED;
     }
+    dfu_init_qspi_flash();
 
     unsigned retries = 5;
 
