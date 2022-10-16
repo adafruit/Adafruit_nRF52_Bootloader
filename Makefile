@@ -27,7 +27,11 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 
 # linker by MCU eg. nrf52840.ld
-LD_FILE      = linker/$(MCU_SUB_VARIANT).ld
+ifeq ($(DEBUG), 1)
+  LD_FILE    = linker/$(MCU_SUB_VARIANT)_debug.ld
+else
+  LD_FILE    = linker/$(MCU_SUB_VARIANT).ld
+endif
 
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
@@ -109,17 +113,17 @@ ifeq ($(MCU_SUB_VARIANT),nrf52)
   SD_NAME = s132
   DFU_DEV_REV = 0xADAF
   CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132
-  CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
+  DFU_APP_DATA_RESERVED=7*4096
 else ifeq ($(MCU_SUB_VARIANT),nrf52833)
   SD_NAME = s140
   DFU_DEV_REV = 52833
   CFLAGS += -DNRF52833_XXAA -DS140
-  CFLAGS += -DDFU_APP_DATA_RESERVED=7*4096
+  DFU_APP_DATA_RESERVED=7*4096
 else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   SD_NAME = s140
   DFU_DEV_REV = 52840
   CFLAGS += -DNRF52840_XXAA -DS140
-  CFLAGS += -DDFU_APP_DATA_RESERVED=10*4096
+  DFU_APP_DATA_RESERVED=10*4096
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
@@ -321,7 +325,17 @@ ifeq ($(DEBUG), 1)
   RTT_SRC = lib/SEGGER_RTT
   IPATH += $(RTT_SRC)/RTT
   C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
+  DFU_APP_DATA_RESERVED = 0
+
+	# expand bootloader address to 28KB of reserved app
+  ifeq ($(MCU_SUB_VARIANT),nrf52840)
+    CFLAGS += -DBOOTLOADER_REGION_START=0xED000
+  else
+    CFLAGS += -DBOOTLOADER_REGION_START=0x6D000
+  endif
 endif
+
+CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
 
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 ifneq ($(findstring 12.,$(shell $(CC) --version 2>/dev/null)),)
@@ -481,6 +495,12 @@ dfu-flash: flash-dfu
 flash-dfu: $(BUILD)/$(MERGED_FILE).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
 	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
+	
+# flash skip crc magic ( app valid = 0x0001, crc = 0x0000 )
+#flash-skip-crc:
+# nrfjprog --memwr $(BOOT_SETTING_ADDR) --val 0x00000001 -f nrf52
+#	nrfjprog --memwr 0xFF000 --val 0x00000001 -f nrf52
+#	nrfjprog --memwr 0x7F000 --val 0x00000001 -f nrf52
 
 #------------------- Debugging -------------------
 
