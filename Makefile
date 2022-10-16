@@ -337,6 +337,11 @@ endif
 
 CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
 
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
+ifneq ($(findstring 12.,$(shell $(CC) --version 2>/dev/null)),)
+	CFLAGS += --param=min-pagesize=0
+endif
+
 #------------------------------------------------------------------------------
 # Linker Flags
 #------------------------------------------------------------------------------
