@@ -26,7 +26,6 @@
 #include "sdk_common.h"
 #if DFU_EXTERNAL_FLASH
 #include "nrfx_qspi.h"
-//#include "amd5.h"
 #endif
 
 #include "boards.h"
@@ -614,15 +613,6 @@ uint32_t dfu_write_pkt_handle(dfu_write_packet_t * p_packet)
     return error;
 }
 
-/*
-void compute_md5(uint8_t digest[16], uint32_t address, uint32_t length) {
-    struct MD5Context context;
-    MD5Init(&context);
-    MD5Update(&context, (const uint8_t*)(address+XIP_BASE), length);
-    MD5Final(digest, &context);
-}
-*/
-
 uint32_t dfu_checksum_pkt_handle(dfu_checksum_packet_t * p_packet)
 {
     VERIFY_PARAM_NOT_NULL(p_packet);
@@ -630,12 +620,6 @@ uint32_t dfu_checksum_pkt_handle(dfu_checksum_packet_t * p_packet)
     if (p_packet->memory_region != DFU_MEMORY_EXTERNAL_FLASH) {
         return NRF_ERROR_NOT_SUPPORTED;
     }
-
-    // uint8_t computed_md5[16];
-    // compute_md5(computed_md5, p_packet->address, p_packet->length);
-    // if (memcmp(computed_md5, p_packet->md5, sizeof(computed_md5))) {
-    //     return NRF_ERROR_INVALID_DATA;
-    // }
 
     return NRF_SUCCESS;
 }

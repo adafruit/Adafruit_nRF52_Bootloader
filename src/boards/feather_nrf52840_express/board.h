@@ -82,8 +82,6 @@
 /*------------------------------------------------------------------*/
 /* QSPI external flash
  *------------------------------------------------------------------*/
-#define DFU_EXTERNAL_FLASH 1
-
 #define QSPI_DATA0                _PINNUM(0, 17)
 #define QSPI_DATA1                _PINNUM(0, 22)
 #define QSPI_DATA2                _PINNUM(0, 23)

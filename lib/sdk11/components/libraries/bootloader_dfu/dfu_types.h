@@ -90,7 +90,7 @@ static inline bool is_sd_existed(void)
 #define DFU_INIT_RX                     0x00                                                            /**< Op Code identifies for receiving init packet. */
 #define DFU_INIT_COMPLETE               0x01                                                            /**< Op Code identifies for transmission complete of init packet. */
 
-#ifdef DFU_EXTERNAL_FLASH
+#if DFU_EXTERNAL_FLASH
 #define EXTERNAL_FLASH_BEGIN_PACKET 0x10
 #define EXTERNAL_FLASH_ERASE_PACKET 0x11
 #define EXTERNAL_FLASH_CHECKSUM_PACKET  0x12
@@ -160,7 +160,7 @@ typedef struct
 /**@brief Update complete handler type. */
 typedef void (*dfu_complete_handler_t)(dfu_update_status_t dfu_update_status);
 
-#ifdef DFU_EXTERNAL_FLASH
+#if DFU_EXTERNAL_FLASH
 
 typedef enum
 {

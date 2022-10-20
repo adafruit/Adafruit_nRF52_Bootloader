@@ -122,9 +122,8 @@ else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
 
-ifeq ($(DFU_EXTERNAL_FLASH),1)
-	CFLAGS += -DDFU_EXTERNAL_FLASH
-endif
+DFU_EXTERNAL_FLASH ?= 0
+CFLAGS += -DDFU_EXTERNAL_FLASH=$(DFU_EXTERNAL_FLASH)
 
 #------------------------------------------------------------------------------
 # SOURCE FILES
@@ -146,7 +145,6 @@ C_SRC += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
 
 ifeq ($(DFU_EXTERNAL_FLASH),1)
 C_SRC += $(NRFX_PATH)/drivers/src/nrfx_qspi.c
-# C_SRC += src/amd5.c
 endif
 
 C_SRC += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
@@ -173,9 +171,25 @@ C_SRC += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SRC += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SRC += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-# UART or USB Serial
-ifdef USE_USART
-$(info nrF52 UART)
+
+DFU_PIN_ACTIVATION ?= 0
+ifeq ($(DFU_PIN_ACTIVATION),1)
+	BOARD_USE_UART = 1
+endif
+
+ifneq ($(MCU_SUB_VARIANT),nrf52)
+	BOARD_USE_USB_CDC = 1
+endif
+
+ifeq ($(MCU_SUB_VARIANT),nrf52)
+	BOARD_USE_UART = 1
+endif
+
+BOARD_USE_UART ?= 0
+BOARD_USE_USB_CDC ?= 0
+CFLAGS += -DBOARD_USE_UART=$(BOARD_USE_UART)
+
+ifeq ($(BOARD_USE_UART),1)
 C_SRC += $(SDK_PATH)/libraries/uart/app_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
@@ -183,9 +197,9 @@ C_SRC += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
 IPATH += $(SDK11_PATH)/libraries/util
 IPATH += $(SDK_PATH)/drivers_nrf/common
 IPATH += $(SDK_PATH)/drivers_nrf/uart
+endif
 
-# else
-
+ifeq ($(BOARD_USE_USB_CDC),1)
 # pinconfig is required for 840 for CF2
 C_SRC += src/boards/$(BOARD)/pinconfig.c
 
@@ -206,7 +220,7 @@ C_SRC += \
 	$(TUSB_PATH)/class/msc/msc_device.c \
 	$(TUSB_PATH)/tusb.c
 
-# 
+#
 endif
 
 #------------------------------------------------------------------------------

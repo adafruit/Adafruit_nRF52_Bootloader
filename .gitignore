@@ -65,5 +65,3 @@ TAGS
 
 .DS_Store
 Makefile.user
-venv
-venv2

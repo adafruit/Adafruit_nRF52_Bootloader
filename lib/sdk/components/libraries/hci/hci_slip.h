@@ -71,7 +71,7 @@
 /**
  * @brief Enable UART interface with DFU_ACTIVATION present for MCU to MCU transfers
  */
-#define USE_SERIAL PIN_DFU_ACTIVATE_PRESENT
+#define USE_SERIAL (PIN_DFU_ACTIVATE_PRESENT || BOARD_USE_UART)
 #define USE_RUNTIME_SELECTION (USE_USB && USE_SERIAL)
 
 

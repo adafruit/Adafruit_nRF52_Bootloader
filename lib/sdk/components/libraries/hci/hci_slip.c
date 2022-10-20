@@ -453,7 +453,7 @@ static uint32_t slip_uart_open(void) {
         else {
             return slip_uart_open_usb_cdc();
         }
-    #elif USE_USB
+    #elif USE_SERIAL
         return slip_uart_open_serial();
     #else
         return slip_uart_open_usb_cdc();

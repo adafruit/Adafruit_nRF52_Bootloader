@@ -118,9 +118,6 @@ static uint32_t data_queue_element_free(uint8_t element_index)
             data_queue_element_init (element_index);
             m_data_queue.count--;
             retval = hci_transport_rx_pkt_consume((p_data - 4));
-            if (retval) {
-                retval = hci_transport_rx_pkt_consume((p_data - 4));
-            }
             APP_ERROR_CHECK(retval);
         }
         CRITICAL_REGION_EXIT();
