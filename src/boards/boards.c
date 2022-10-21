@@ -273,30 +273,16 @@ void led_state(uint32_t state)
     switch (state) {
         case STATE_USB_MOUNTED:
           new_rgb_color = 0x00ff00;     // green
-          primary_cycle_length = 3000;
-          break;
-
-        case STATE_UART_ACTIVE:
-          new_rgb_color = 0x00ffff;     // cyan
-          primary_cycle_length = 3000;
           break;
 
         case STATE_BOOTLOADER_STARTED:
-          new_rgb_color = 0x000001;     // red
-          primary_cycle_length = 300;
-          break;
-        case STATE_UART_TIMEOUT:
-          new_rgb_color = 0x202020;     // grey
-          primary_cycle_length = 300;
-          break;
-
         case STATE_USB_UNMOUNTED:
-          new_rgb_color = 0x200000;     // dark red
+          new_rgb_color = 0xff0000;     // red
           primary_cycle_length = 300;
           break;
 
         case STATE_WRITING_STARTED:
-          temp_color = 0xffff00;        // yellow
+          temp_color = 0xff0000;        // red
           primary_cycle_length = 100;
           break;
 
@@ -306,7 +292,7 @@ void led_state(uint32_t state)
           break;
 
         case STATE_BLE_CONNECTED:
-          new_rgb_color = 0xff00ff;     // purple
+          new_rgb_color = 0x0000ff;     // green
           #ifdef LED_SECONDARY_PIN
           secondary_cycle_length = 3000;
           #else
@@ -321,6 +307,14 @@ void led_state(uint32_t state)
           #else
           primary_cycle_length = 300;
           #endif
+          break;
+
+        case STATE_UART_ACTIVE:
+          new_rgb_color = 0x00ffff;     // cyan
+          break;
+
+        case STATE_UART_TIMEOUT:
+          new_rgb_color = 0x202020;     // grey
           break;
 
         default:
