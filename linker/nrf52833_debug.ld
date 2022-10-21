@@ -11,7 +11,8 @@ MEMORY
    *  those values do not match. The check is performed in main.c, see
    *  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
    */
-  FLASH (rx) : ORIGIN = 0x74000, LENGTH = 0x7E000-0x74000-2K /* 38 KB */
+  /* due to lack of flash for debug, we will use reserved app to extend bootloader size */
+  FLASH (rx) : ORIGIN = 0x74000-28K, LENGTH = 0x7E000-0x74000-2K + 28K
 
   BOOTLOADER_CONFIG (r): ORIGIN = 0x7E000 - 2K, LENGTH = 2K
 

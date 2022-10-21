@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _FEATHER_NRF52840_H
-#define _FEATHER_NRF52840_H
+#ifndef _FEATHER_NRF52833_H
+#define _FEATHER_NRF52833_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -47,47 +47,23 @@
 #define BUTTON_2              _PINNUM(0, 10)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-// use the same pin as BUTTON_2/NRST which disables the NRST functionality
-#define PIN_DFU_ACTIVATE        BUTTON_2
-#define PIN_DFU_ACTIVATE_PULL   NRF_GPIO_PIN_PULLDOWN
-
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "Feather nRF52840 Express"
+#define BLEDIS_MODEL          "Feather nRF52833 Express"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x002A
+#define USB_DESC_UF2_PID       0x0029 // TODO change later
+#define USB_DESC_CDC_ONLY_PID  0x002A // TODO change later
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 Express"
-#define UF2_VOLUME_LABEL      "FTHR840BOOT"
-#define UF2_BOARD_ID          "nRF52840-Feather-revD"
-#define UF2_INDEX_URL         "https://www.adafruit.com/product/4062"
+#define UF2_PRODUCT_NAME      "Adafruit Feather nRF52833 Express"
+#define UF2_VOLUME_LABEL      "FTHR833BOOT"
+#define UF2_BOARD_ID          "nRF52833-Feather-revD"
+#define UF2_INDEX_URL         "https://www.adafruit.com/product/4062" // TODO change later
 
-/*------------------------------------------------------------------*/
-/* UART
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      24
-#define TX_PIN_NUMBER      25
-#define CTS_PIN_NUMBER     0
-#define RTS_PIN_NUMBER     0
-#define HWFC               false
-
-/*------------------------------------------------------------------*/
-/* QSPI external flash
- *------------------------------------------------------------------*/
-#define QSPI_DATA0                _PINNUM(0, 17)
-#define QSPI_DATA1                _PINNUM(0, 22)
-#define QSPI_DATA2                _PINNUM(0, 23)
-#define QSPI_DATA3                _PINNUM(0, 21)
-#define QSPI_SCK                  _PINNUM(0, 19)
-#define QSPI_CS                   _PINNUM(0, 20)
-
-
-#endif // _FEATHER_NRF52840_H
+#endif

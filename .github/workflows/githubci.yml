@@ -19,6 +19,7 @@ jobs:
           - 'circuitplayground_nrf52840'
           - 'clue_nrf52840'
           - 'feather_nrf52832'
+          - 'feather_nrf52833_express'
           - 'feather_nrf52840_express'
           - 'feather_nrf52840_sense'
           - 'itsybitsy_nrf52840_express'
@@ -34,6 +35,7 @@ jobs:
           - 'bast_ble'
           - 'bluemicro_nrf52833'
           - 'bluemicro_nrf52840'
+          - 'challenger_840_ble'
           - 'ebyte_e104_bt5032a'
           - 'ebyte_e73_tbb'
           - 'electronut_labs_papyr'
@@ -60,7 +62,7 @@ jobs:
     steps:
     - name: Setup Python
       uses: actions/setup-python@v3
-      
+
     - name: Checkout Code
       uses: actions/checkout@v3
       with:
@@ -73,39 +75,25 @@ jobs:
          repository: hathach/linkermap
          path: linkermap
 
-    - name: Set Toolchain URL
-      run: echo >> $GITHUB_ENV TOOLCHAIN_URL=https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v10.2.1-1.1/xpack-arm-none-eabi-gcc-10.2.1-1.1-linux-x64.tar.gz
-
-    - name: Cache Toolchain
-      uses: actions/cache@v3
-      id: cache-toolchain
+    - name: Install ARM GCC
+      uses: carlosperate/arm-none-eabi-gcc-action@v1
       with:
-        path: ~/cache/
-        key: ${{ runner.os }}-22-05-17-${{ env.TOOLCHAIN_URL }}
-
-    - name: Install Toolchain
-      if: steps.cache-toolchain.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p ~/cache/toolchain
-        wget --progress=dot:mega $TOOLCHAIN_URL -O toolchain.tar.gz
-        tar -C ~/cache/toolchain -xaf toolchain.tar.gz
-
-    - name: Set Toolchain Path
-      run: echo >> $GITHUB_PATH `echo ~/cache/toolchain/*/bin`
+        release: '10-2020-q4'
 
     - name: Install Tools
       run: |
         pip3 install adafruit-nrfutil uritemplate requests intelhex
         pip3 install linkermap/
-    
+
     - name: Build
       run: |
+        arm-none-eabi-gcc --version
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
 
     - name: Linker Map
       run: make BOARD=${{ matrix.board }} linkermap
-      
+
     - uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.board }}

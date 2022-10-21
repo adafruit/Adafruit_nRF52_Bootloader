@@ -11,34 +11,35 @@ MEMORY
    *  those values do not match. The check is performed in main.c, see
    *  APP_ERROR_CHECK_BOOL(*((uint32_t *)NRF_UICR_BOOT_START_ADDRESS) == BOOTLOADER_REGION_START);
    */
-  FLASH (rx) : ORIGIN = 0x74000, LENGTH = 0x7E000-0x74000-2K /* 38 KB */
+  /* due to lack of flash for debug, we will use reserved app to extend bootloader size */
+  FLASH (rx) : ORIGIN = 0xF4000-28K, LENGTH = 0xFE000-0xF4000 - 2K + 28K /* 38 KB */
 
-  BOOTLOADER_CONFIG (r): ORIGIN = 0x7E000 - 2K, LENGTH = 2K
+  BOOTLOADER_CONFIG (r): ORIGIN = 0xFE000 - 2K, LENGTH = 2K
 
   /** Location of mbr params page in flash. */
-  MBR_PARAMS_PAGE (rw) : ORIGIN = 0x0007E000, LENGTH = 0x1000
+  MBR_PARAMS_PAGE (rw) : ORIGIN = 0xFE000, LENGTH = 0x1000
   
   /** Location of bootloader setting in flash. */
-  BOOTLOADER_SETTINGS (rw) : ORIGIN = 0x0007F000, LENGTH = 0x1000
-  
-  
-  
+  BOOTLOADER_SETTINGS (rw) : ORIGIN = 0xFF000, LENGTH = 0x1000
+
+
+
   /** RAM Region for bootloader. */
   /* Avoid conflict with NOINIT for OTA bond sharing */
-  RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20020000-0x20008000
+  RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20040000-0x20008000
 
   /* Location for double reset detection, no init */
   DBL_RESET (rwx) :  ORIGIN = 0x20007F7C, LENGTH = 0x04
   
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
    *  from application to bootloader when using buttonless DFU OTA. */
-  NOINIT (rwx) :  ORIGIN = 0x20007F80, LENGTH = 0x80  
-
-
-
+  NOINIT (rwx) :  ORIGIN = 0x20007F80, LENGTH = 0x80
+  
+  
+  
   /** Location in UICR where bootloader start address is stored. */
   UICR_BOOTLOADER (r) : ORIGIN = 0x10001014, LENGTH = 0x04
-    
+  
   /** Location in UICR where mbr params page address is stored. */
   UICR_MBR_PARAM_PAGE(r) : ORIGIN = 0x10001018, LENGTH = 0x04
 }

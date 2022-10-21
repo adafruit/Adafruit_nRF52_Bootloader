@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2018 Ha Thach for Adafruit Industries
+ * Copyright (c) 2018 Ha Thach for Adafruit Industries, 2022 Invector Labs
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,20 +22,19 @@
  * THE SOFTWARE.
  */
 
-#ifndef _FEATHER_NRF52840_H
-#define _FEATHER_NRF52840_H
+#ifndef _CHALLENGER_840_BLE_H
+#define _CHALLENGER_840_BLE_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 15)
-#define LED_SECONDARY_PIN     _PINNUM(1, 10)
+#define LEDS_NUMBER           1
+#define LED_PRIMARY_PIN       _PINNUM(0, 12)
 #define LED_STATE_ON          1
 
-#define LED_NEOPIXEL          _PINNUM(0, 16)
+#define LED_NEOPIXEL           _PINNUM(1, 8)
 #define NEOPIXELS_NUMBER      1
 #define BOARD_RGB_BRIGHTNESS  0x040404
 
@@ -43,51 +42,32 @@
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(1, 02)
-#define BUTTON_2              _PINNUM(0, 10)
+#define BUTTON_1              _PINNUM(0, 19)
+#define BUTTON_2              _PINNUM(0, 8)  // Pulls flash cs high
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
-// use the same pin as BUTTON_2/NRST which disables the NRST functionality
-#define PIN_DFU_ACTIVATE        BUTTON_2
-#define PIN_DFU_ACTIVATE_PULL   NRF_GPIO_PIN_PULLDOWN
+/*------------------------------------------------------------------*/
+/* On board LDO control
+ *------------------------------------------------------------------*/
+#define LDO_CONTROL_PIN       _PINNUM(1, 9)  // Enables external pwr
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "Feather nRF52840 Express"
+#define BLEDIS_MANUFACTURER   "Invector Labs"
+#define BLEDIS_MODEL          "Challenger 840 BLE"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x002A
+#define USB_DESC_VID           0x1209
+#define USB_DESC_UF2_PID       0x7380
+#define USB_DESC_CDC_ONLY_PID  0x7381
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 Express"
-#define UF2_VOLUME_LABEL      "FTHR840BOOT"
-#define UF2_BOARD_ID          "nRF52840-Feather-revD"
-#define UF2_INDEX_URL         "https://www.adafruit.com/product/4062"
+#define UF2_PRODUCT_NAME      "ILabs Challenger 840"
+#define UF2_VOLUME_LABEL      "CH840BOOT"
+#define UF2_BOARD_ID          "nRF52840-Challenger-840"
+#define UF2_INDEX_URL         "https://www.ilabs.se"
 
-/*------------------------------------------------------------------*/
-/* UART
- *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      24
-#define TX_PIN_NUMBER      25
-#define CTS_PIN_NUMBER     0
-#define RTS_PIN_NUMBER     0
-#define HWFC               false
-
-/*------------------------------------------------------------------*/
-/* QSPI external flash
- *------------------------------------------------------------------*/
-#define QSPI_DATA0                _PINNUM(0, 17)
-#define QSPI_DATA1                _PINNUM(0, 22)
-#define QSPI_DATA2                _PINNUM(0, 23)
-#define QSPI_DATA3                _PINNUM(0, 21)
-#define QSPI_SCK                  _PINNUM(0, 19)
-#define QSPI_CS                   _PINNUM(0, 20)
-
-
-#endif // _FEATHER_NRF52840_H
+#endif // _CHALLENGER_840_BLE_H
