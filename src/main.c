@@ -96,7 +96,7 @@ void channel_init(bool cdc_only) {
       usb_init(cdc_only);
   }
 #elif USE_USB
-  usb_cdc_init(cdc_only);
+  usb_init(cdc_only);
 #elif USE_SERIAL
   uart_init(cdc_only);
 #endif
