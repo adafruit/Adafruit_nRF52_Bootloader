@@ -69,3 +69,5 @@ TAGS
 bootloader/feather_nrf52840_express/feather_nrf52840_express_bootloader-*_s340_6.1.1.*
 cores/nRF5/nordic/softdevice/s340_nrf52_6.1.1_API/*
 _build-feather_nrf52840_express/*
+_build/*
+lib/softdevice/s340_nrf52_6.1.1/*
