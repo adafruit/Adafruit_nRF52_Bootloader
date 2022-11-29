@@ -12,7 +12,6 @@
     #define CFG_UF2_BOARD_APP_ID      ((USB_DESC_VID << 16) | USB_DESC_UF2_PID)
 #endif
 
-<<<<<<< HEAD
 // Family ID and size for updating generic Application
 #if defined(NRF52840_XXAA)
   #define CFG_UF2_FAMILY_APP_ID       0xADA52840
@@ -24,7 +23,7 @@
 
 // Application Address Space
 #ifdef S340 //S340 uses more flash
-#define USER_FLASH_START   MBR_SIZE+0xB000 
+#define USER_FLASH_START              MBR_SIZE+0xB000 // skip MBR included in SD hex
 #else
 #define USER_FLASH_START              MBR_SIZE // skip MBR included in SD hex
 #endif
