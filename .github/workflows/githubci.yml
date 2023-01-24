@@ -37,6 +37,7 @@ jobs:
           - 'bluemicro_nrf52840'
           - 'challenger_840_ble'
           - 'ebyte_e104_bt5032a'
+          - 'ebyte_e104_bt5040u'
           - 'ebyte_e73_tbb'
           - 'electronut_labs_papyr'
           - 'ikigaisense_vita'
