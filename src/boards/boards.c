@@ -44,6 +44,9 @@
 #endif
 
 //------------- IMPLEMENTATION -------------//
+
+#if defined(BUTTON_DFU) || defined(BUTTON_FRESET)
+
 void button_init(uint32_t pin)
 {
   if ( BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN )
@@ -62,6 +65,8 @@ bool button_pressed(uint32_t pin)
   return nrf_gpio_pin_read(pin) == active_state;
 }
 
+#endif
+
 // This is declared so that a board specific init can be called from here.
 void __attribute__((weak)) board_init_extra(void) { }
 void board_init(void)
@@ -73,8 +78,12 @@ void board_init(void)
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
+#ifdef BUTTON_DFU
   button_init(BUTTON_DFU);
+#endif
+#ifdef BUTTON_FRESET
   button_init(BUTTON_FRESET);
+#endif
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
 #if LEDS_NUMBER > 0
