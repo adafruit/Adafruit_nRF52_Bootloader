@@ -62,7 +62,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   "Seeed XIAO nRF52840"
 #define UF2_VOLUME_LABEL   "XIAO-SENSE"
-#define UF2_BOARD_ID       "Seeed_XIAO_nRF52840_Sense"
+#define UF2_BOARD_ID       "nRF52840-SeeedXiaoSense-v1"
 #define UF2_INDEX_URL      "https://www.seeedstudio.com/"
 
 #endif // _XIAO_BLE_SENSE
