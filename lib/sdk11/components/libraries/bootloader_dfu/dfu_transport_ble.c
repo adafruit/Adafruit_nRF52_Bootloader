@@ -37,7 +37,7 @@
 
 
 #define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             247
+#define BLEGATT_ATT_MTU_MAX             23
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 #define DFU_REV_MAJOR                        0x00                                                    /** DFU Major revision number to be exposed. */
