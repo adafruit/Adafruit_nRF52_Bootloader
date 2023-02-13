@@ -131,7 +131,7 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 
 // These value must be the same with one in dfu_transport_ble.c
 #define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             247
+#define BLEGATT_ATT_MTU_MAX             23
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 //--------------------------------------------------------------------+
