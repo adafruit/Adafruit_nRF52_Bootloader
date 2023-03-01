@@ -114,22 +114,34 @@ ifeq ($(MCU_SUB_VARIANT),nrf52)
   DFU_DEV_REV = 0xADAF
   CFLAGS += -DNRF52 -DNRF52832_XXAA -DS132
   DFU_APP_DATA_RESERVED=7*4096
+  BOARD_USE_USB = 0
+  BOARD_USE_UART = 1
 else ifeq ($(MCU_SUB_VARIANT),nrf52833)
   SD_NAME = s140
   DFU_DEV_REV = 52833
   CFLAGS += -DNRF52833_XXAA -DS140
   DFU_APP_DATA_RESERVED=7*4096
+  BOARD_USE_USB = 1
 else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   SD_NAME = s140
   DFU_DEV_REV = 52840
   CFLAGS += -DNRF52840_XXAA -DS140
   DFU_APP_DATA_RESERVED=10*4096
+  BOARD_USE_USB = 1
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
 endif
 
 DFU_EXTERNAL_FLASH ?= 0
 CFLAGS += -DDFU_EXTERNAL_FLASH=$(DFU_EXTERNAL_FLASH)
+
+DFU_PIN_ACTIVATION ?= 0
+ifeq ($(DFU_PIN_ACTIVATION),1)
+	BOARD_USE_UART = 1
+endif
+
+BOARD_USE_UART ?= 0
+CFLAGS += -DBOARD_USE_UART=$(BOARD_USE_UART)
 
 #------------------------------------------------------------------------------
 # SOURCE FILES
@@ -177,24 +189,6 @@ C_SRC += $(SDK_PATH)/libraries/hci/hci_slip.c
 C_SRC += $(SDK_PATH)/libraries/hci/hci_transport.c
 C_SRC += $(SDK_PATH)/libraries/util/nrf_assert.c
 
-
-DFU_PIN_ACTIVATION ?= 0
-ifeq ($(DFU_PIN_ACTIVATION),1)
-	BOARD_USE_UART = 1
-endif
-
-ifneq ($(MCU_SUB_VARIANT),nrf52)
-	BOARD_USE_USB_CDC = 1
-endif
-
-ifeq ($(MCU_SUB_VARIANT),nrf52)
-	BOARD_USE_UART = 1
-endif
-
-BOARD_USE_UART ?= 0
-BOARD_USE_USB_CDC ?= 0
-CFLAGS += -DBOARD_USE_UART=$(BOARD_USE_UART)
-
 ifeq ($(BOARD_USE_UART),1)
 C_SRC += $(SDK_PATH)/libraries/uart/app_uart.c
 C_SRC += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
@@ -205,8 +199,8 @@ IPATH += $(SDK_PATH)/drivers_nrf/common
 IPATH += $(SDK_PATH)/drivers_nrf/uart
 endif
 
-ifeq ($(BOARD_USE_USB_CDC),1)
-# pinconfig is required for 840 for CF2
+ifeq ($(BOARD_USE_USB),1)
+# pinconfig is required for CF2
 C_SRC += src/boards/$(BOARD)/pinconfig.c
 
 # USB Application ( MSC + UF2 )
@@ -225,13 +219,9 @@ C_SRC += \
 	$(TUSB_PATH)/class/cdc/cdc_device.c \
 	$(TUSB_PATH)/class/msc/msc_device.c \
 	$(TUSB_PATH)/tusb.c
-
-#
 endif
 
-#------------------------------------------------------------------------------
 # Assembly Files
-#------------------------------------------------------------------------------
 ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
 
 #------------------------------------------------------------------------------

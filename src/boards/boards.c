@@ -68,14 +68,17 @@ void board_init(void)
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
   button_init(BUTTON_DFU, BUTTON_DFU_PULL);
+
 #if defined(PIN_DFU_ACTIVATE)
 #if PIN_DFU_ACTIVATE!=BUTTON_FRESET
   button_init(BUTTON_FRESET, BUTTON_FRESET_PULL);
 #endif
 #endif
+
 #if defined(PIN_DFU_ACTIVATE)
   button_init(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
 #endif
+
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
 #if LEDS_NUMBER > 0

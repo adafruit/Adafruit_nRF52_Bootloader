@@ -51,7 +51,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
  *          address.
  *
  */
-uint32_t bootloader_app_register(void);
+void bootloader_app_start(void);
 
 /**@brief Function for retrieving the bootloader settings.
  *

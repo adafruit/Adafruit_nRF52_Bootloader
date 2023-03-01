@@ -179,12 +179,7 @@ bool is_ota(void)
   return _ota_dfu;
 }
 
-/**
- * @brief Perform DFU if requested via flags, button pushes or the DFU activation pin.
- * 
- * @return true DFU was requested via the activation pin.
- */
-static bool check_dfu_mode(void);
+static void check_dfu_mode(void);
 static uint32_t ble_stack_init(void);
 
 // The SoftDevice must only be initialized if a chip reset has occurred.
@@ -230,7 +225,7 @@ int main(void)
 
   // Check all inputs and enter DFU if needed
   // Return when DFU process is complete (or not entered at all)
-  bool dfu_activate = check_dfu_mode();
+  check_dfu_mode();
 
   // Reset peripherals
   board_teardown();
@@ -258,27 +253,15 @@ int main(void)
     // clear in case we kept DFU_DBL_RESET_APP there
     (*dbl_reset_mem) = 0;
 
-    // register the app
-    uint32_t app_addr = bootloader_app_register();
-    if (!dfu_activate) {
-        // jump to app when DFU not enabled via the activation pin (preserving previous behavior)
-        // otherwise, simply reset, allowing the host MCU to control the behavior on boot via the activation pin.
-        // The host MCU may keep the device in bootloader mode via the DFU activation pin when there are more
-        // binaries to flash (e.g. QSPI flash data)
-        bootloader_util_app_start(app_addr);
-    }
+    // start application
+    bootloader_app_start();
   }
 
   NVIC_SystemReset();
 }
 
-/**
- * @brief Runs DFU if requested by flags, or via the DFU activation pin.
- * 
- * @return true   DFU was requested via the activation pin
- * @return false  DFU was not requested, or if it was, not via the activation pin.
- */
-static bool check_dfu_mode(void)
+// Perform DFU if requested via flags, button pushes or the DFU activation pin.
+static void check_dfu_mode(void)
 {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
 
@@ -302,16 +285,15 @@ static bool check_dfu_mode(void)
   // Clear GPREGRET if it is our values
   if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
 
+  // skip dfu entirely
+  if (dfu_skip) return;
+
   // dfu activation pin for external control of DFU
   bool dfu_activate = false;
-  bool dfu_activate_present = false;
   bool frst_skip = false;
 
 #if PIN_DFU_ACTIVATE_PRESENT
-  NRFX_DELAY_US(50000); // wait for the pin state is stable
-
   dfu_activate = button_pressed(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
-  dfu_activate_present = true;
   // when the FRST button is defined the same as the DFU activation line, FRST is not used.
   frst_skip = (PIN_DFU_ACTIVATE == BUTTON_FRESET);
   #pragma message "FRST is overridden by the DFU activate setting"
@@ -320,10 +302,7 @@ static bool check_dfu_mode(void)
   dfu_start = dfu_start || dfu_activate;
 
   // DFU activation via the designated pin takes precedence
-  if (!dfu_activate_present || !dfu_activate) {
-    // skip dfu entirely
-    if (dfu_skip) return false;
-
+  if (!PIN_DFU_ACTIVATE_PRESENT || !dfu_activate) {
     /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
     // DFU button pressed
     dfu_start = dfu_start || button_pressed(BUTTON_DFU, BUTTON_DFU_PULL);
@@ -371,11 +350,7 @@ static bool check_dfu_mode(void)
     (*dbl_reset_mem) = 0;
   }
 
-  NRFX_DELAY_US(500); // wait for the pin state is stable
-
-  /*
-   * Enable UART for MCU to MCU transfers. 
-   */
+  // Enable UART for MCU to MCU transfers.
 #if PIN_DFU_ACTIVATE_PRESENT
   if (dfu_activate) {
     useSerialTransport();
@@ -422,7 +397,14 @@ static bool check_dfu_mode(void)
       channel_teardown();
     }
   }
-  return dfu_activate;
+
+  // Simply reset, allowing the host MCU to control the behavior on boot via the activation pin.
+  // The host MCU may keep the device in bootloader mode via the DFU activation pin when there are more
+  // binaries to flash (e.g. QSPI flash data)
+  if (PIN_DFU_ACTIVATE_PRESENT && dfu_activate)
+  {
+    NVIC_SystemReset();
+  }
 }
 
 

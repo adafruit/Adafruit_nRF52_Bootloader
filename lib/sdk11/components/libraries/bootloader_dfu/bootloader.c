@@ -354,7 +354,7 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
   return err_code;
 }
 
-uint32_t bootloader_app_register(void)
+void bootloader_app_start(void)
 {
   // Disable all interrupts
   NVIC->ICER[0]=0xFFFFFFFF;
@@ -396,7 +396,9 @@ uint32_t bootloader_app_register(void)
     // MBR use first 4-bytes of SRAM to store foward address
     *(uint32_t *)(0x20000000) = app_addr;
   }
-  return app_addr;
+
+  // jump to app
+  bootloader_util_app_start(app_addr);
 }
 
 
