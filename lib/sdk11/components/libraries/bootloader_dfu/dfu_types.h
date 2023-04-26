@@ -62,7 +62,12 @@ static inline bool is_sd_existed(void)
   #endif
   #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x000FE000                  /**< The field specifies the page location of the mbr params page address. */
   #define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000                  /**< The field specifies the page location of the bootloader settings address. */
-
+#elif  defined(NRF5340_XXAA_APPLICATION)
+  #ifndef BOOTLOADER_REGION_START
+  #define BOOTLOADER_REGION_START             0x000EE000
+  #endif
+  #define BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS  0x000FE000
+  #define BOOTLOADER_SETTINGS_ADDRESS         0x000FF000
 #else
   #error No target defined
 #endif

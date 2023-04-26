@@ -1,0 +1,464 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2018 Ha Thach for Adafruit Industries
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+#include "boards.h"
+#include "nrf_pwm.h"
+#include "app_scheduler.h"
+#include "app_timer.h"
+
+#ifdef LED_APA102
+#include "nrf_spim.h"
+#endif
+
+//--------------------------------------------------------------------+
+// MACRO TYPEDEF CONSTANT ENUM DECLARATION
+//--------------------------------------------------------------------+
+#define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
+#define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
+
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+  void neopixel_init(void);
+  void neopixel_write(uint8_t *pixels);
+  void neopixel_teardown(void);
+#endif
+
+
+void button_init(uint32_t pin)
+{
+  if ( BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN )
+  {
+    nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
+  }
+  else
+  {
+    nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
+  }
+}
+
+bool button_pressed(uint32_t pin)
+{
+  uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
+  return nrf_gpio_pin_read(pin) == active_state;
+}
+
+void led_init(uint32_t led_pin)
+{
+  nrf_gpio_cfg_output(led_pin);
+  nrf_gpio_pin_write(led_pin, LED_STATE_OFF);
+}
+
+void led_control(uint32_t pin_number, uint32_t value)
+{
+  nrf_gpio_pin_write(pin_number, value);
+}
+
+// This is declared so that a board specific init can be called from here.
+void __attribute__((weak)) board_init_extra(void) { }
+void board_init(void)
+{
+  // stop LF clock just in case we jump from application without reset
+  NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
+
+  // Use Internal OSC to compatible with all boards
+  NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_LFRC;
+  NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
+
+  button_init(BUTTON_DFU);
+
+  led_init(LED_DFU);
+  
+  ///////////////////////////////////////
+  //  nrf_gpio_pin_set(LED_APA102_CLK);
+
+  //  nrf_gpio_cfg(LED_APA102_CLK,
+  //                NRF_GPIO_PIN_DIR_OUTPUT,
+  //                NRF_GPIO_PIN_INPUT_CONNECT,
+  //                NRF_GPIO_PIN_NOPULL,
+  //                NRF_GPIO_PIN_S0S1,
+  //                NRF_GPIO_PIN_NOSENSE);
+
+  //  nrf_gpio_pin_clear(LED_APA102_DATA);
+  //  nrf_gpio_cfg_output(LED_APA102_DATA);
+
+  //   nrf_gpio_cfg_output(LED_DFU);
+  //   nrf_gpio_pin_write(LED1_PIN, 1);
+
+  ///////////////////////////////////////
+  NRFX_DELAY_US(100); // wait for the pin state is stable
+
+
+
+#if ENABLE_DCDC_0 == 1
+  NRF_POWER->DCDCEN0 = 1;
+#endif
+#if ENABLE_DCDC_1 == 1
+  NRF_POWER->DCDCEN = 1;
+#endif
+  // Make sure any custom inits are performed
+  //board_init_extra();
+
+// When board is supplied on VDDH (and not VDD), this specifies what voltage the GPIO should run at
+// and what voltage is output at VDD. The default (0xffffffff) is 1.8V; typically you'll want
+//     #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
+// in board.h when using that power configuration.
+#ifdef UICR_REGOUT0_VALUE
+  if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) !=
+      (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos))
+  {
+      NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
+      while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+      NRF_UICR->REGOUT0 = (NRF_UICR->REGOUT0 & ~((uint32_t)UICR_REGOUT0_VOUT_Msk)) |
+                          (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos);
+
+      NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+      while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+
+      NVIC_SystemReset();
+  }
+#endif
+
+  // Init scheduler
+  APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
+
+  // Init app timer (use RTC1)
+  app_timer_init();
+
+  // Configure Systick for led blinky
+  NVIC_SetPriority(SysTick_IRQn, 7);
+  SysTick_Config(SystemCoreClock/1000);
+}
+
+void board_teardown(void)
+{
+  // Disable systick, turn off LEDs
+  SysTick->CTRL = 0;
+
+  // Disable and reset PWM for LEDs
+#if LEDS_NUMBER > 0
+  //led_pwm_teardown();
+#endif
+
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+  //neopixel_teardown();
+#endif
+
+  // Stop RTC1 used by app_timer
+  NVIC_DisableIRQ(RTC1_IRQn);
+  NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
+  NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
+  NRF_RTC1->TASKS_STOP  = 1;
+  NRF_RTC1->TASKS_CLEAR = 1;
+
+  // Stop LF clock
+  NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
+
+  // make sure all pins are back in reset state
+  // NUMBER_OF_PINS is defined in nrf_gpio.h
+  for (int i = 0; i < NUMBER_OF_PINS; ++i)
+  {
+    nrf_gpio_cfg_default(i);
+  }
+}
+
+static uint32_t _systick_count = 0;
+void SysTick_Handler(void)
+{
+  _systick_count++;
+
+  led_tick();
+}
+
+
+void pwm_teardown(NRF_PWM_Type* pwm )
+{
+  pwm->TASKS_SEQSTART[0] = 0;
+  pwm->ENABLE            = 0;
+
+  pwm->PSEL.OUT[0] = 0xFFFFFFFF;
+  pwm->PSEL.OUT[1] = 0xFFFFFFFF;
+  pwm->PSEL.OUT[2] = 0xFFFFFFFF;
+  pwm->PSEL.OUT[3] = 0xFFFFFFFF;
+
+  pwm->MODE        = 0;
+  pwm->COUNTERTOP  = 0x3FF;
+  pwm->PRESCALER   = 0;
+  pwm->DECODER     = 0;
+  pwm->LOOP        = 0;
+  pwm->SEQ[0].PTR  = 0;
+  pwm->SEQ[0].CNT  = 0;
+}
+
+
+
+#if LEDS_NUMBER > PWM0_CH_NUM
+#error "Only " PWM0_CH_NUM " concurrent status LEDs are supported."
+#endif
+
+void led_pwm_teardown(void)
+{
+  pwm_teardown(NRF_PWM0);
+}
+
+void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle)
+{
+
+}
+
+#ifdef LED_SECONDARY_PIN
+#endif
+void led_tick()
+{
+
+}
+
+void led_state(uint32_t state)
+{
+
+}
+
+#ifdef LED_NEOPIXEL
+
+// WS2812B (rev B) timing is 0.4 and 0.8 us
+#define MAGIC_T0H               6UL | (0x8000) // 0.375us
+#define MAGIC_T1H              13UL | (0x8000) // 0.8125us
+#define CTOPVAL                20UL            // 1.25us
+
+#define BYTE_PER_PIXEL  3
+
+static uint16_t pixels_pattern[NEOPIXELS_NUMBER*BYTE_PER_PIXEL * 8 + 2];
+
+// use PWM1 for neopixel
+void neopixel_init(void)
+{
+  // To support both the SoftDevice + Neopixels we use the EasyDMA
+  // feature from the NRF25. However this technique implies to
+  // generate a pattern and store it on the memory. The actual
+  // memory used in bytes corresponds to the following formula:
+  //              totalMem = numBytes*8*2+(2*2)
+  // The two additional bytes at the end are needed to reset the
+  // sequence.
+  NRF_PWM_Type* pwm = NRF_PWM1;
+
+  // Set the wave mode to count UP
+  // Set the PWM to use the 16MHz clock
+  // Setting of the maximum count
+  // but keeping it on 16Mhz allows for more granularity just
+  // in case someone wants to do more fine-tuning of the timing.
+  nrf_pwm_configure(pwm, NRF_PWM_CLK_16MHz, NRF_PWM_MODE_UP, CTOPVAL);
+
+  // Disable loops, we want the sequence to repeat only once
+  nrf_pwm_loop_set(pwm, 0);
+
+  // On the "Common" setting the PWM uses the same pattern for the
+  // for supported sequences. The pattern is stored on half-word of 16bits
+  nrf_pwm_decoder_set(pwm, PWM_DECODER_LOAD_Common, PWM_DECODER_MODE_RefreshCount);
+
+  // The following settings are ignored with the current config.
+  nrf_pwm_seq_refresh_set(pwm, 0, 0);
+  nrf_pwm_seq_end_delay_set(pwm, 0, 0);
+
+  // The Neopixel implementation is a blocking algorithm. DMA
+  // allows for non-blocking operation. To "simulate" a blocking
+  // operation we enable the interruption for the end of sequence
+  // and block the execution thread until the event flag is set by
+  // the peripheral.
+  //    pwm->INTEN |= (PWM_INTEN_SEQEND0_Enabled<<PWM_INTEN_SEQEND0_Pos);
+
+  // PSEL must be configured before enabling PWM
+  nrf_pwm_pins_set(pwm, (uint32_t[] ) { LED_NEOPIXEL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL });
+
+  // Enable the PWM
+  nrf_pwm_enable(pwm);
+}
+
+void neopixel_teardown(void)
+{
+  uint8_t rgb[3] = { 0, 0, 0 };
+
+  NRFX_DELAY_US(50);  // wait for previous write is complete
+
+  neopixel_write(rgb);
+  NRFX_DELAY_US(50);  // wait for this write
+
+  pwm_teardown(NRF_PWM1);
+}
+
+// write 3 bytes color RGB to built-in neopixel
+void neopixel_write (uint8_t *pixels)
+{
+  // convert RGB to GRB
+  uint8_t grb[BYTE_PER_PIXEL] = {pixels[1], pixels[2], pixels[0]};
+  uint16_t pos = 0;    // bit position
+
+  // Set all neopixel to same value
+  for (uint16_t n = 0; n < NEOPIXELS_NUMBER; n++ )
+  {
+    for(uint8_t c = 0; c < BYTE_PER_PIXEL; c++)
+    {
+      uint8_t const pix = grb[c];
+
+      for ( uint8_t mask = 0x80; mask > 0; mask >>= 1 )
+      {
+        pixels_pattern[pos] = (pix & mask) ? MAGIC_T1H : MAGIC_T0H;
+        pos++;
+      }
+    }
+  }
+
+  // Zero padding to indicate the end of sequence
+  pixels_pattern[pos++] = 0 | (0x8000);    // Seq end
+  pixels_pattern[pos++] = 0 | (0x8000);    // Seq end
+
+  NRF_PWM_Type* pwm = NRF_PWM1;
+
+  nrf_pwm_seq_ptr_set(pwm, 0, pixels_pattern);
+  nrf_pwm_seq_cnt_set(pwm, 0, sizeof(pixels_pattern)/2);
+  nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
+  nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
+
+  // blocking wait for sequence complete
+  while( !nrf_pwm_event_check(pwm, NRF_PWM_EVENT_SEQEND0) ) {}
+  nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
+}
+#endif
+
+#ifdef LED_APA102
+#define BYTE_PER_PIXEL  4
+
+// 4 zero bytes are required to initiate update
+#define PATTERN_SIZE() ((APA102_NUMBER*BYTE_PER_PIXEL) + 4)
+// N/2 * 1 bits are required at the end
+static uint8_t pixels_pattern[PATTERN_SIZE() + 4];
+
+// use SPIM1 for dotstar
+void neopixel_init(void)
+{
+#if 0  
+  NRF_SPIM_Type* spi = NRF_SPIM1;
+
+  nrf_spim_disable(spi);
+
+  nrf_gpio_pin_set(LED_APA102_CLK);
+
+  nrf_gpio_cfg(LED_APA102_CLK,
+                NRF_GPIO_PIN_DIR_OUTPUT,
+                NRF_GPIO_PIN_INPUT_CONNECT,
+                NRF_GPIO_PIN_NOPULL,
+                NRF_GPIO_PIN_S0S1,
+                NRF_GPIO_PIN_NOSENSE);
+
+  nrf_gpio_pin_clear(LED_APA102_DATA);
+  nrf_gpio_cfg_output(LED_APA102_DATA);
+
+  nrf_spim_pins_set(spi, LED_APA102_CLK, LED_APA102_DATA, 0xFFFFFFFF);
+  nrf_spim_frequency_set(spi, NRF_SPIM_FREQ_4M);
+  nrf_spim_configure(spi, NRF_SPIM_MODE_3, NRF_SPIM_BIT_ORDER_MSB_FIRST);
+
+  nrf_spim_orc_set(spi, 0);
+  nrf_spim_tx_list_disable(spi);
+
+  // Enable the spi
+  nrf_spim_enable(spi);
+
+  uint8_t rgb[3] = {0, 0, 0 };
+  neopixel_write(rgb);
+#endif
+}
+
+void neopixel_teardown(void)
+{
+  uint8_t rgb[3] = {0, 0, 0 };
+  neopixel_write(rgb);
+
+  NRF_SPIM_Type* spi = NRF_SPIM1;
+  nrf_spim_disable(spi);
+}
+
+// write 3 bytes color RGB to built-in neopixel
+void neopixel_write (uint8_t *pixels)
+{
+  NRF_SPIM_Type*  spi = NRF_SPIM1;
+
+  //brightness, blue, green, red
+  uint8_t bbgr[BYTE_PER_PIXEL] = {0xE0 | LED_APA102_BRIGHTNESS, pixels[0], pixels[1], pixels[2]};
+  pixels_pattern[0] = 0;
+  pixels_pattern[1] = 0;
+  pixels_pattern[2] = 0;
+  pixels_pattern[3] = 0;
+
+  for (uint8_t i = 4; i < PATTERN_SIZE(); i+=4) {
+      pixels_pattern[i] = bbgr[0];
+      pixels_pattern[i+1] = bbgr[1];
+      pixels_pattern[i+2] = bbgr[2];
+      pixels_pattern[i+3] = bbgr[3];
+  }
+
+  pixels_pattern[PATTERN_SIZE()] = 0xff;
+  pixels_pattern[PATTERN_SIZE()+1] = 0xff;
+  pixels_pattern[PATTERN_SIZE()+2] = 0xff;
+  pixels_pattern[PATTERN_SIZE()+3] = 0xff;
+
+  nrf_spim_tx_buffer_set(spi, pixels_pattern, PATTERN_SIZE() + 4);
+  nrf_spim_event_clear(spi, NRF_SPIM_EVENT_ENDTX);
+
+  nrf_spim_task_trigger(spi, NRF_SPIM_TASK_START);
+
+  while(!nrf_spim_event_check(spi, NRF_SPIM_EVENT_ENDTX));
+}
+#endif
+
+
+#if defined(LED_RGB_RED_PIN) && defined(LED_RGB_GREEN_PIN) && defined(LED_RGB_BLUE_PIN)
+
+#ifdef LED_SECONDARY_PIN
+#error "Cannot use secondary LED at the same time as an RGB status LED."
+#endif
+
+#define LED_RGB_RED   1
+#define LED_RGB_BLUE  2
+#define LED_RGB_GREEN 3
+
+void neopixel_init(void)
+{
+  led_pwm_init(LED_RGB_RED, LED_RGB_RED_PIN);
+  led_pwm_init(LED_RGB_GREEN, LED_RGB_GREEN_PIN);
+  led_pwm_init(LED_RGB_BLUE, LED_RGB_BLUE_PIN);
+}
+
+void neopixel_teardown(void)
+{
+  uint8_t rgb[3] = { 0, 0, 0 };
+  neopixel_write(rgb);
+  nrf_gpio_cfg_default(LED_RGB_RED_PIN);
+  nrf_gpio_cfg_default(LED_RGB_GREEN_PIN);
+  nrf_gpio_cfg_default(LED_RGB_BLUE_PIN);
+}
+
+// write 3 bytes color to a built-in neopixel
+void neopixel_write (uint8_t *pixels)
+{
+  led_pwm_duty_cycle(LED_RGB_RED, pixels[2]);
+  led_pwm_duty_cycle(LED_RGB_GREEN, pixels[1]);
+  led_pwm_duty_cycle(LED_RGB_BLUE, pixels[0]);
+}
+#endif
