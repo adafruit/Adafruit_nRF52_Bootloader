@@ -63,7 +63,8 @@ bool button_pressed(uint32_t pin)
 }
 
 // This is declared so that a board specific init can be called from here.
-void __attribute__((weak)) board_init_extra(void) { }
+void __attribute__((weak)) board_init2(void) { }
+
 void board_init(void)
 {
   // stop LF clock just in case we jump from application without reset
@@ -96,7 +97,7 @@ void board_init(void)
   NRF_POWER->DCDCEN = 1;
 #endif
   // Make sure any custom inits are performed
-  board_init_extra();
+  board_init2();
 
 // When board is supplied on VDDH (and not VDD), this specifies what voltage the GPIO should run at
 // and what voltage is output at VDD. The default (0xffffffff) is 1.8V; typically you'll want
@@ -129,6 +130,9 @@ void board_init(void)
   SysTick_Config(SystemCoreClock/1000);
 }
 
+// Actions at the end of board_teardown.
+void __attribute__((weak)) board_teardown2(void) { }
+
 void board_teardown(void)
 {
   // Disable systick, turn off LEDs
@@ -159,6 +163,9 @@ void board_teardown(void)
   {
     nrf_gpio_cfg_default(i);
   }
+
+  // board specific teardown actions
+  board_teardown2();
 }
 
 static uint32_t _systick_count = 0;
