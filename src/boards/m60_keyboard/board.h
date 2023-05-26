@@ -43,8 +43,13 @@
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(0, 27)
-#define BUTTON_2              _PINNUM(1, 7)
+#define BUTTON_2              _PINNUM(0, 19)  // ESC
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+
+/*------------------------------------------------------------------*/
+/* On board regulator control
+ *------------------------------------------------------------------*/
+#define LDO_CONTROL_PIN       _PINNUM(0, 28)  // Enables external pwr
 
 //--------------------------------------------------------------------+
 // BLE OTA
