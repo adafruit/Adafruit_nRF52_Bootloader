@@ -1,0 +1,9 @@
+<!DOCTYPE Board_Memory_Definition_File>
+<root name="nRF5340_xxAA">
+  <MemorySegment name="FLASH" start="0x01000000" size="0x40000" access="ReadOnly" />
+  <MemorySegment name="BOOTLOADER_SETTINGS" start="0x0103F800" size="0x1000" access="ReadOnly" />
+  <MemorySegment name="MBR_PARAMS_PAGE" start="0x0103F000" size="0x1000" access="ReadOnly" />
+  <MemorySegment name="RAM" start="0x21000000" size="0x10000" access="Read/Write" />
+  <MemorySegment name="NOINIT" start="0x21007F80" size="0x80" access="Read/Write" />
+  <MemorySegment name="UF2_FLIP" start="0x20007000" size="0xF00" access="Read/Write" />
+</root>

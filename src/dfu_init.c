@@ -89,6 +89,10 @@
   #define ADAFRUIT_DEV_REV           52833
 #elif defined NRF52832_XXAA
   #define ADAFRUIT_DEV_REV           0xADAF
+#elif defined NRF5340_XXAA_APPLICATION
+  #define ADAFRUIT_DEV_REV           5340
+#elif defined NRF5340_XXAA_NETWORK
+  #define ADAFRUIT_DEV_REV           5340
 #else
   #error Unknown MCU
 #endif
