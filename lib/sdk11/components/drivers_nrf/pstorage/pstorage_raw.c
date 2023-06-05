@@ -43,6 +43,10 @@
   #define SOC_MAX_WRITE_SIZE          1024    /**< Maximum write size allowed for a single call to \ref sd_flash_write as specified in the SoC API on the nRF51. */
 #elif defined(NRF52_SERIES)
   #define SOC_MAX_WRITE_SIZE          4096    /**< Maximum write size allowed for a single call to \ref sd_flash_write as specified in the SoC API on the nRF52. */
+#elif defined(NRF5340_XXAA_APPLICATION)
+  #define SOC_MAX_WRITE_SIZE          4096    /**< Maximum write size allowed for a single call to \ref sd_flash_write as specified in the SoC API on the nRF53. */
+#elif defined(NRF5340_XXAA_NETWORK)
+  #define SOC_MAX_WRITE_SIZE          2048    /**< Maximum write size allowed for a single call to \ref sd_flash_write as specified in the SoC API on the nRF53. */
 #else
   #error No target defined
 #endif

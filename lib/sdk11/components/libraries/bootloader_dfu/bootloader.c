@@ -377,8 +377,12 @@ void bootloader_app_start(void)
   {
     PRINTF("SoftDevice not exist\r\n");
 
-    // App starts right after MBR
+    // App starts right after MBR (except for networking core)
+    #if !defined(NRF5340_XXAA_NETWORK)
     app_addr = MBR_SIZE;
+    #else
+    app_addr = APP_START_ADDRESS;
+    #endif
     sd_mbr_command_t command =
     {
       .command = SD_MBR_COMMAND_IRQ_FORWARD_ADDRESS_SET,

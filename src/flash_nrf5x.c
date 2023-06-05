@@ -27,7 +27,12 @@
 #include "flash_nrf5x.h"
 #include "boards.h"
 
-#define FLASH_PAGE_SIZE           4096
+#if !defined(NRF5340_XXAA_NETWORK)
+ #define FLASH_PAGE_SIZE           4096
+#else
+ #define FLASH_PAGE_SIZE           2048
+#endif
+
 #define FLASH_CACHE_INVALID_ADDR  0xffffffff
 
 static uint32_t _fl_addr = FLASH_CACHE_INVALID_ADDR;

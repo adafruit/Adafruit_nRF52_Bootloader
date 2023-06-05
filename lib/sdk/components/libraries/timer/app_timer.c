@@ -64,16 +64,6 @@ STATIC_ASSERT(RTC1_IRQ_PRI == SWI_IRQ_PRI);
 
 #define MAX_RTC_TASKS_DELAY     47                                          /**< Maximum delay until an RTC task is executed. */
 
-#if (APP_TIMER_CONFIG_SWI_NUMBER == 0)
-#define SWI_IRQn SWI0_IRQn
-#define SWI_IRQHandler SWI0_IRQHandler
-#elif (APP_TIMER_CONFIG_SWI_NUMBER == 1)
-#define SWI_IRQn SWI1_IRQn
-#define SWI_IRQHandler SWI1_IRQHandler
-#else
-#error "Unsupported SWI number."
-#endif
-
 #define MODULE_INITIALIZED (m_op_queue.size != 0)                           /**< Macro designating whether the module has been initialized properly. */
 
 /**@brief Timer node type. The nodes will be used form a linked list of running timers. */
@@ -151,6 +141,10 @@ static bool                          m_rtc1_reset;                              
 static uint8_t                       m_max_user_op_queue_utilization;           /**< Maximum observed timer user operations queue utilization. */
 #endif
 
+/**@brief Function for handling changes to the timer list.
+ */
+static void timer_list_handler(void);
+
 /**@brief Function for initializing the RTC1 counter.
  *
  * @param[in] prescaler   Value of the RTC1 PRESCALER register. Set to 0 for no prescaling.
@@ -198,6 +192,25 @@ static void rtc1_stop(void)
     m_rtc1_running = false;
 }
 
+/**@brief Function suspends RTC1 timer.
+ */
+static void rtc1_suspend(void)
+{
+    if(m_rtc1_running == true)
+    {
+        NRF_RTC1->TASKS_STOP = 1;
+    }
+}
+
+/**@brief Function resumes RTC1 timer.
+ */
+static void rtc1_resume(void)
+{
+    if(m_rtc1_running == true)
+    {
+        NRF_RTC1->TASKS_START = 1;
+    }
+}
 
 /**@brief Function for returning the current value of the RTC1 counter.
  *
@@ -352,14 +365,6 @@ static void timer_timeouts_check_sched(void)
     NVIC_SetPendingIRQ(RTC1_IRQn);
 }
 
-
-/**@brief Function for scheduling a timer list update by generating a SWI interrupt.
- */
-static void timer_list_handler_sched(void)
-{
-    NVIC_SetPendingIRQ(SWI_IRQn);
-}
-
 #if APP_TIMER_CONFIG_USE_SCHEDULER
 static void timeout_handler_scheduled_exec(void * p_event_data, uint16_t event_size)
 {
@@ -455,7 +460,7 @@ static void timer_timeouts_check(void)
         // Queue the ticks expired.
         m_ticks_elapsed[m_ticks_elapsed_q_write_ind] = ticks_expired;
 
-        timer_list_handler_sched();
+        timer_list_handler();
     }
 }
 
@@ -727,6 +732,8 @@ static void timer_list_handler(void)
     bool           compare_update = false;
     timer_node_t * p_timer_id_head_old;
 
+    rtc1_suspend();
+
 #if APP_TIMER_WITH_PROFILER
     {
         uint8_t size = m_op_queue.size;
@@ -768,6 +775,8 @@ static void timer_list_handler(void)
         compare_reg_update(p_timer_id_head_old);
     }
     m_rtc1_reset = false;
+
+    rtc1_resume();
 }
 
 
@@ -850,7 +859,7 @@ static uint32_t timer_start_op_schedule(timer_node_t * p_node,
 
     if (err_code == NRF_SUCCESS)
     {
-        timer_list_handler_sched();
+        timer_list_handler();
     }
 
     return err_code;
@@ -888,7 +897,7 @@ static uint32_t timer_stop_op_schedule(timer_node_t * p_node,
 
     if (err_code == NRF_SUCCESS)
     {
-        timer_list_handler_sched();
+        timer_list_handler();
     }
 
     return err_code;
@@ -940,10 +949,6 @@ ret_code_t app_timer_init(void)
 #if APP_TIMER_WITH_PROFILER
     m_max_user_op_queue_utilization   = 0;
 #endif
-
-    NVIC_ClearPendingIRQ(SWI_IRQn);
-    NVIC_SetPriority(SWI_IRQn, SWI_IRQ_PRI);
-    NVIC_EnableIRQ(SWI_IRQn);
 
     rtc1_init(APP_TIMER_CONFIG_RTC_FREQUENCY);
 
