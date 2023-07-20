@@ -28,9 +28,9 @@ MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 
 # linker by MCU eg. nrf52840.ld
 ifeq ($(DEBUG), 1)
-  LD_FILE    = linker/$(MCU_SUB_VARIANT)_debug.ld
+  LD_FILE = linker/$(MCU_SUB_VARIANT)_debug.ld
 else
-  LD_FILE    = linker/$(MCU_SUB_VARIANT).ld
+  LD_FILE = linker/$(MCU_SUB_VARIANT).ld
 endif
 
 GIT_VERSION := $(shell git describe --dirty --always --tags)
@@ -123,6 +123,7 @@ else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   SD_NAME = s140
   DFU_DEV_REV = 52840
   CFLAGS += -DNRF52840_XXAA -DS140
+  # App reserved 40KB to match circuitpython for 840
   DFU_APP_DATA_RESERVED=10*4096
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
@@ -349,6 +350,7 @@ endif
 LDFLAGS += \
 	$(CFLAGS) \
 	-Wl,-L,linker -Wl,-T,$(LD_FILE) \
+	-Wl,--print-memory-usage \
 	-Wl,-Map=$@.map -Wl,-cref -Wl,-gc-sections \
 	-specs=nosys.specs -specs=nano.specs
 
