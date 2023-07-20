@@ -64,7 +64,7 @@
 //--------------------------------------------------------------------+
 #define UF2_PRODUCT_NAME        "nRF52840 Connect Kit"
 #define UF2_VOLUME_LABEL        "CONNECTKIT"
-#define UF2_BOARD_ID            "CONNECTKIT"
+#define UF2_BOARD_ID            "nRF52840-Connect-Kit"
 #define UF2_INDEX_URL           "https://wiki.makerdiary.com/nrf52840-connectkit/"
 
 
