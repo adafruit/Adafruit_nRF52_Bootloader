@@ -45,7 +45,7 @@ jobs:
           - 'mikoto'
           - 'nice_nano'
           - 'nrf52840_bboard'
-          - 'nrf52840-connectkit'
+          - 'nRF52840_connect_kit'
           - 'nrf52840_m2'
           - 'ohs2020_badge'
           - 'particle_argon'
