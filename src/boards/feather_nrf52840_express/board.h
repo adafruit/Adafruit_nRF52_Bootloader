@@ -47,6 +47,10 @@
 #define BUTTON_2              _PINNUM(0, 10)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
+// use the same pin as BUTTON_2/NRST which disables the NRST functionality
+#define PIN_DFU_ACTIVATE        BUTTON_2
+#define PIN_DFU_ACTIVATE_PULL   NRF_GPIO_PIN_PULLDOWN
+
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
@@ -65,5 +69,25 @@
 #define UF2_VOLUME_LABEL      "FTHR840BOOT"
 #define UF2_BOARD_ID          "nRF52840-Feather-revD"
 #define UF2_INDEX_URL         "https://www.adafruit.com/product/4062"
+
+/*------------------------------------------------------------------*/
+/* UART
+ *------------------------------------------------------------------*/
+#define RX_PIN_NUMBER      24
+#define TX_PIN_NUMBER      25
+#define CTS_PIN_NUMBER     0
+#define RTS_PIN_NUMBER     0
+#define HWFC               false
+
+/*------------------------------------------------------------------*/
+/* QSPI external flash
+ *------------------------------------------------------------------*/
+#define QSPI_DATA0                _PINNUM(0, 17)
+#define QSPI_DATA1                _PINNUM(0, 22)
+#define QSPI_DATA2                _PINNUM(0, 23)
+#define QSPI_DATA3                _PINNUM(0, 21)
+#define QSPI_SCK                  _PINNUM(0, 19)
+#define QSPI_CS                   _PINNUM(0, 20)
+
 
 #endif // _FEATHER_NRF52840_H

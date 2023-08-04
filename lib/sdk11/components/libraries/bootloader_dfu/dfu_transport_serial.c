@@ -11,6 +11,8 @@
  */
 
 #include "dfu_transport.h"
+#include "app_util_platform.h"
+#include <stdatomic.h>
 #include <stddef.h>
 #include "dfu.h"
 #include <dfu_types.h>
@@ -66,7 +68,7 @@
 typedef struct
 {
     dfu_update_packet_t   data_packet[MAX_BUFFERS];                                  /**< Bootloader data packets used when processing data from the UART. */
-    volatile uint8_t      count;                                                     /**< Counter to maintain number of elements in the queue. */
+_Atomic volatile uint8_t      count;                                                 /**< Counter to maintain number of elements in the queue. */
 } dfu_data_queue_t;
 
 static dfu_data_queue_t      m_data_queue;                                           /**< Received-data packet queue. */
@@ -109,14 +111,16 @@ static uint32_t data_queue_element_free(uint8_t element_index)
 
     if (MAX_BUFFERS > element_index)
     {
+        CRITICAL_REGION_ENTER();
         p_data = (uint8_t *)DATA_QUEUE_ELEMENT_GET_PDATA(element_index);
         if (INVALID_PACKET != DATA_QUEUE_ELEMENT_GET_PTYPE(element_index))
         {
-            m_data_queue.count--;
             data_queue_element_init (element_index);
+            m_data_queue.count--;
             retval = hci_transport_rx_pkt_consume((p_data - 4));
             APP_ERROR_CHECK(retval);
         }
+        CRITICAL_REGION_EXIT();
     }
     else
     {
@@ -190,6 +194,7 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
     APP_ERROR_CHECK(result);
 }
 
+extern void tud_cdc_write_str(const char* s);
 
 static void process_dfu_packet(void * p_event_data, uint16_t event_size)
 {
@@ -239,6 +244,35 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
                         // Break the loop by returning.
                         return;
 
+#if DFU_EXTERNAL_FLASH
+                    case EXTERNAL_FLASH_BEGIN_PACKET:
+                        retval = dfu_external_begin_pkt_handle(packet);
+                        APP_ERROR_CHECK(retval);
+                        break;
+
+                    case EXTERNAL_FLASH_ERASE_PACKET:
+                        retval = dfu_erase_pkt_handle((dfu_erase_packet_t*)&packet->params.data_packet.p_data_packet[0]);
+                        APP_ERROR_CHECK(retval);
+                        break;
+
+                    case EXTERNAL_FLASH_CHECKSUM_PACKET:
+                        retval = dfu_checksum_pkt_handle((dfu_checksum_packet_t*)&packet->params.data_packet.p_data_packet[0]);
+                        APP_ERROR_CHECK(retval);
+                        break;
+
+                    case EXTERNAL_FLASH_WRITE_PACKET:
+                        retval = dfu_write_pkt_handle((dfu_write_packet_t*)&packet->params.data_packet.p_data_packet[0]);
+                        APP_ERROR_CHECK(retval);
+                        break;
+
+                    case EXTERNAL_FLASH_END_PACKET:
+                        retval = dfu_external_end_pkt_handle(packet);
+                        APP_ERROR_CHECK(retval);
+                        break;
+
+#endif
+
+                    case PING_PACKET:
                     default:
                         // No implementation needed.
                         break;

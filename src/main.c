@@ -66,8 +66,9 @@
 #include "nrf_mbr.h"
 #include "pstorage.h"
 #include "nrfx_nvmc.h"
+#include "hci_slip.h"
 
-#ifdef NRF_USBD
+#if USE_USB
 #include "uf2/uf2.h"
 #include "nrf_usbd.h"
 #include "tusb.h"
@@ -78,13 +79,42 @@ void usb_teardown(void);
 // tinyusb function that handles power event (detected, ready, removed)
 // We must call it within SD's SOC event handler, or set it as power event handler if SD is not enabled.
 extern void tusb_hal_nrf_power_event(uint32_t event);
-
-#else
-
-#define usb_init(x)       led_state(STATE_USB_MOUNTED) // mark nrf52832 as mounted
-#define usb_teardown()
-
 #endif
+
+#if USE_SERIAL
+#define uart_init(x)       led_state(STATE_UART_ACTIVE) // mark nrf52832 as mounted
+#define uart_teardown()
+#endif
+
+extern void serial_put(char c);
+
+void channel_init(bool cdc_only) {
+#if USE_RUNTIME_SELECTION
+  if (usingSerialTransport()) {
+      uart_init(cdc_only);
+  } else {
+      usb_init(cdc_only);
+  }
+#elif USE_USB
+  usb_init(cdc_only);
+#elif USE_SERIAL
+  uart_init(cdc_only);
+#endif
+}
+
+void channel_teardown(void) {
+#if USE_RUNTIME_SELECTION
+  if (usingSerialTransport()) {
+      uart_teardown();
+  } else {
+      usb_teardown();
+  }
+#elif USE_USB
+  usb_teardown();
+#else USE_SERIAL
+  uart_teardown();
+#endif
+}
 
 //--------------------------------------------------------------------+
 //
@@ -230,6 +260,7 @@ int main(void)
   NVIC_SystemReset();
 }
 
+// Perform DFU if requested via flags, button pushes or the DFU activation pin.
 static void check_dfu_mode(void)
 {
   uint32_t const gpregret = NRF_POWER->GPREGRET;
@@ -257,13 +288,31 @@ static void check_dfu_mode(void)
   // skip dfu entirely
   if (dfu_skip) return;
 
-  /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  // DFU button pressed
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+  // dfu activation pin for external control of DFU
+  bool dfu_activate = false;
+  bool frst_skip = false;
 
-  // DFU + FRESET are pressed --> OTA
-  _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET) ) ;
+#if PIN_DFU_ACTIVATE_PRESENT
+  dfu_activate = button_pressed(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
+  // when the FRST button is defined the same as the DFU activation line, FRST is not used.
+  frst_skip = (PIN_DFU_ACTIVATE == BUTTON_FRESET);
+  #pragma message "FRST is overridden by the DFU activate setting"
+#endif
 
+  dfu_start = dfu_start || dfu_activate;
+
+  // DFU activation via the designated pin takes precedence
+  if (!PIN_DFU_ACTIVATE_PRESENT || !dfu_activate) {
+    /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
+    // DFU button pressed
+    dfu_start = dfu_start || button_pressed(BUTTON_DFU, BUTTON_DFU_PULL);
+
+    // DFU + FRESET are pressed --> OTA
+    if (!frst_skip) {   // skip button sense if on the same pin as DFU activation
+      _ota_dfu = _ota_dfu  || ( button_pressed(BUTTON_DFU, BUTTON_DFU_PULL) && button_pressed(BUTTON_FRESET, BUTTON_RESET_PULL) ) ;
+    }
+  }
+  
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
@@ -301,6 +350,13 @@ static void check_dfu_mode(void)
     (*dbl_reset_mem) = 0;
   }
 
+  // Enable UART for MCU to MCU transfers.
+#if PIN_DFU_ACTIVATE_PRESENT
+  if (dfu_activate) {
+    useSerialTransport();
+  }
+#endif
+
   // Enter DFU mode accordingly to input
   if ( dfu_start || !valid_app )
   {
@@ -316,7 +372,8 @@ static void check_dfu_mode(void)
     else
     {
       led_state(STATE_USB_UNMOUNTED);
-      usb_init(serial_only_dfu);
+
+      channel_init(serial_only_dfu);
     }
 
     // Initiate an update of the firmware.
@@ -334,10 +391,19 @@ static void check_dfu_mode(void)
     if ( _ota_dfu )
     {
       sd_softdevice_disable();
-    }else
-    {
-      usb_teardown();
     }
+    else
+    {
+      channel_teardown();
+    }
+  }
+
+  // Simply reset, allowing the host MCU to control the behavior on boot via the activation pin.
+  // The host MCU may keep the device in bootloader mode via the DFU activation pin when there are more
+  // binaries to flash (e.g. QSPI flash data)
+  if (PIN_DFU_ACTIVATE_PRESENT && dfu_activate)
+  {
+    NVIC_SystemReset();
   }
 }
 
@@ -476,7 +542,7 @@ uint32_t proc_soc(void)
   {
     pstorage_sys_event_handler(soc_evt);
 
-#ifdef NRF_USBD
+#if USE_USB
     /*------------- usb power event handler -------------*/
     int32_t usbevt = (soc_evt == NRF_EVT_POWER_USB_DETECTED   ) ? NRFX_POWER_USB_EVT_DETECTED:
                      (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY   :

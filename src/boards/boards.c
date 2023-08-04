@@ -44,21 +44,14 @@
 #endif
 
 //------------- IMPLEMENTATION -------------//
-void button_init(uint32_t pin)
+void button_init(uint32_t pin, uint32_t pull)
 {
-  if ( BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN )
-  {
-    nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
-  }
-  else
-  {
-    nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
-  }
+    nrf_gpio_cfg_sense_input(pin, pull,  pull == NRF_GPIO_PIN_PULLDOWN ? NRF_GPIO_PIN_SENSE_HIGH : NRF_GPIO_PIN_SENSE_LOW);
 }
 
-bool button_pressed(uint32_t pin)
+bool button_pressed(uint32_t pin, uint32_t pull)
 {
-  uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
+  uint32_t const active_state = (pull == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
   return nrf_gpio_pin_read(pin) == active_state;
 }
 
@@ -66,6 +59,7 @@ bool button_pressed(uint32_t pin)
 void __attribute__((weak)) board_init2(void) { }
 
 void board_init(void)
+
 {
   // stop LF clock just in case we jump from application without reset
   NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
@@ -74,8 +68,18 @@ void board_init(void)
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
 
-  button_init(BUTTON_DFU);
-  button_init(BUTTON_FRESET);
+  button_init(BUTTON_DFU, BUTTON_DFU_PULL);
+
+#if defined(PIN_DFU_ACTIVATE)
+#if PIN_DFU_ACTIVATE!=BUTTON_FRESET
+  button_init(BUTTON_FRESET, BUTTON_FRESET_PULL);
+#endif
+#endif
+
+#if defined(PIN_DFU_ACTIVATE)
+  button_init(PIN_DFU_ACTIVATE, PIN_DFU_ACTIVATE_PULL);
+#endif
+
   NRFX_DELAY_US(100); // wait for the pin state is stable
 
 #if LEDS_NUMBER > 0
@@ -282,18 +286,17 @@ void led_state(uint32_t state)
     uint32_t temp_color = 0;
     switch (state) {
         case STATE_USB_MOUNTED:
-          new_rgb_color = 0x00ff00;
-          primary_cycle_length = 3000;
+          new_rgb_color = 0x00ff00;     // green
           break;
 
         case STATE_BOOTLOADER_STARTED:
         case STATE_USB_UNMOUNTED:
-          new_rgb_color = 0xff0000;
+          new_rgb_color = 0xff0000;     // red
           primary_cycle_length = 300;
           break;
 
         case STATE_WRITING_STARTED:
-          temp_color = 0xff0000;
+          temp_color = 0xff0000;        // red
           primary_cycle_length = 100;
           break;
 
@@ -303,7 +306,7 @@ void led_state(uint32_t state)
           break;
 
         case STATE_BLE_CONNECTED:
-          new_rgb_color = 0x0000ff;
+          new_rgb_color = 0x0000ff;     // green
           #ifdef LED_SECONDARY_PIN
           secondary_cycle_length = 3000;
           #else
@@ -312,7 +315,7 @@ void led_state(uint32_t state)
           break;
 
         case STATE_BLE_DISCONNECTED:
-          new_rgb_color = 0xff00ff;
+          new_rgb_color = 0xff00ff;     // purple
           #ifdef LED_SECONDARY_PIN
           secondary_cycle_length = 300;
           #else
@@ -320,8 +323,16 @@ void led_state(uint32_t state)
           #endif
           break;
 
+        case STATE_UART_ACTIVE:
+          new_rgb_color = 0x00ffff;     // cyan
+          break;
+
+        case STATE_UART_TIMEOUT:
+          new_rgb_color = 0x202020;     // grey
+          break;
+
         default:
-        break;
+          break;
     }
     uint8_t* final_color = NULL;
     new_rgb_color &= BOARD_RGB_BRIGHTNESS;

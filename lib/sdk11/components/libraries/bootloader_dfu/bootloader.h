@@ -50,7 +50,6 @@ uint32_t bootloader_dfu_start(bool ota, uint32_t timeout_ms, bool cancel_timeout
  *          The SoftDevice vector table base for interrupt forwarding will be set the application
  *          address.
  *
- * @param[in]  app_addr      Address to the region where the application is stored.
  */
 void bootloader_app_start(void);
 
