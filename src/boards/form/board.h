@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _STP_H
-#define _STP_H
+#ifndef _FORM_H
+#define _FORM_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -50,7 +50,7 @@
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER  "Kinesis Corporation"
-#define BLEDIS_MODEL         "STP"
+#define BLEDIS_MODEL         "Form"
 
 //--------------------------------------------------------------------+
 // USB
@@ -59,9 +59,9 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "Kinesis STP"
-#define UF2_VOLUME_LABEL  "STP"
-#define UF2_BOARD_ID      "kinesis-stp"
+#define UF2_PRODUCT_NAME  "Kinesis Form"
+#define UF2_VOLUME_LABEL  "Kinesis Form"
+#define UF2_BOARD_ID      "kinesis-form"
 #define UF2_INDEX_URL     "https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dongle"
 
-#endif // _STP_H
+#endif // _FORM_H
