@@ -43,6 +43,10 @@
   void neopixel_teardown(void);
 #endif
 
+#ifndef BUTTON_SENSE
+#define BUTTON_SENSE BUTTON_PULL
+#endif
+
 //------------- IMPLEMENTATION -------------//
 void button_init(uint32_t pin)
 {
@@ -58,7 +62,7 @@ void button_init(uint32_t pin)
 
 bool button_pressed(uint32_t pin)
 {
-  uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
+  uint32_t const active_state = (BUTTON_SENSE == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
   return nrf_gpio_pin_read(pin) == active_state;
 }
 
@@ -73,6 +77,11 @@ void board_init(void)
   // Use Internal OSC to compatible with all boards
   NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_RC;
   NRF_CLOCK->TASKS_LFCLKSTART = 1UL;
+
+#ifdef FORCE_HIGH
+  nrf_gpio_cfg_output(FORCE_HIGH);
+  nrf_gpio_pin_write(FORCE_HIGH, 1);
+#endif
 
   button_init(BUTTON_DFU);
   button_init(BUTTON_FRESET);

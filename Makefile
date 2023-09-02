@@ -306,6 +306,8 @@ endif
 
 # Defined Symbol (MACROS)
 CFLAGS += -D__HEAP_SIZE=0
+
+# We don't want this on all boards
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 
 # Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
