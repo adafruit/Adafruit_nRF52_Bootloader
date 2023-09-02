@@ -58,6 +58,7 @@ jobs:
           - 'raytac_mdbt50q_db_40'
           - 'raytac_mdbt50q_rx'
           - 'sparkfun_nrf52840_micromod'
+          - 'warmbit_bluepixel'
           - 'waveshare_nrf52840_eval'
           - 'xiao_nrf52840_ble'
           - 'xiao_nrf52840_ble_sense'
