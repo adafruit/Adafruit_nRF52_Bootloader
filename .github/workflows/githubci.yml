@@ -86,7 +86,7 @@ jobs:
 
     - name: Install Tools
       run: |
-        pip3 install adafruit-nrfutil uritemplate requests intelhex
+        pip3 install adafruit-nrfutil uritemplate requests intelhex setuptools
         pip3 install linkermap/
 
     - name: Build
