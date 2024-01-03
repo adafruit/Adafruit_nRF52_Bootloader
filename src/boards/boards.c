@@ -38,35 +38,29 @@
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
 #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
-  void neopixel_init(void);
-  void neopixel_write(uint8_t *pixels);
-  void neopixel_teardown(void);
+void neopixel_init(void);
+void neopixel_write(uint8_t* pixels);
+void neopixel_teardown(void);
 #endif
 
 //------------- IMPLEMENTATION -------------//
-void button_init(uint32_t pin)
-{
-  if ( BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN )
-  {
+void button_init(uint32_t pin) {
+  if (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN) {
     nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
-  }
-  else
-  {
+  } else {
     nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_LOW);
   }
 }
 
-bool button_pressed(uint32_t pin)
-{
+bool button_pressed(uint32_t pin) {
   uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
   return nrf_gpio_pin_read(pin) == active_state;
 }
 
 // This is declared so that a board specific init can be called from here.
-void __attribute__((weak)) board_init2(void) { }
+void __attribute__((weak)) board_init2(void) {}
 
-void board_init(void)
-{
+void board_init(void) {
   // stop LF clock just in case we jump from application without reset
   NRF_CLOCK->TASKS_LFCLKSTOP = 1UL;
 
@@ -85,8 +79,14 @@ void board_init(void)
   led_pwm_init(LED_SECONDARY, LED_SECONDARY_PIN);
   #endif
 #endif
-  // use neopixel for use enumeration
+
 #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+  // use neopixel for use enumeration
+  #ifdef NEOPIXEL_POWER_PIN
+  nrf_gpio_cfg_output(NEOPIXEL_POWER_PIN);
+  nrf_gpio_pin_write(NEOPIXEL_POWER_PIN, 1);
+  #endif
+
   neopixel_init();
 #endif
 
@@ -99,23 +99,21 @@ void board_init(void)
   // Make sure any custom inits are performed
   board_init2();
 
-// When board is supplied on VDDH (and not VDD), this specifies what voltage the GPIO should run at
-// and what voltage is output at VDD. The default (0xffffffff) is 1.8V; typically you'll want
-//     #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
-// in board.h when using that power configuration.
+  // When board is supplied on VDDH (and not VDD), this specifies what voltage the GPIO should run at
+  // and what voltage is output at VDD. The default (0xffffffff) is 1.8V; typically you'll want
+  //     #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
+  // in board.h when using that power configuration.
 #ifdef UICR_REGOUT0_VALUE
-  if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) !=
-      (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos))
-  {
-      NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
-      while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
-      NRF_UICR->REGOUT0 = (NRF_UICR->REGOUT0 & ~((uint32_t)UICR_REGOUT0_VOUT_Msk)) |
-                          (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos);
+  if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) != (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos)){
+    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    NRF_UICR->REGOUT0 = (NRF_UICR->REGOUT0 & ~((uint32_t)UICR_REGOUT0_VOUT_Msk)) |
+                        (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos);
 
-      NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
-      while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
 
-      NVIC_SystemReset();
+    NVIC_SystemReset();
   }
 #endif
 
@@ -127,14 +125,13 @@ void board_init(void)
 
   // Configure Systick for led blinky
   NVIC_SetPriority(SysTick_IRQn, 7);
-  SysTick_Config(SystemCoreClock/1000);
+  SysTick_Config(SystemCoreClock / 1000);
 }
 
 // Actions at the end of board_teardown.
-void __attribute__((weak)) board_teardown2(void) { }
+void __attribute__((weak)) board_teardown2(void) {}
 
-void board_teardown(void)
-{
+void board_teardown(void) {
   // Disable systick, turn off LEDs
   SysTick->CTRL = 0;
 
@@ -149,9 +146,9 @@ void board_teardown(void)
 
   // Stop RTC1 used by app_timer
   NVIC_DisableIRQ(RTC1_IRQn);
-  NRF_RTC1->EVTENCLR    = RTC_EVTEN_COMPARE0_Msk;
-  NRF_RTC1->INTENCLR    = RTC_INTENSET_COMPARE0_Msk;
-  NRF_RTC1->TASKS_STOP  = 1;
+  NRF_RTC1->EVTENCLR = RTC_EVTEN_COMPARE0_Msk;
+  NRF_RTC1->INTENCLR = RTC_INTENSET_COMPARE0_Msk;
+  NRF_RTC1->TASKS_STOP = 1;
   NRF_RTC1->TASKS_CLEAR = 1;
 
   // Stop LF clock
@@ -159,8 +156,7 @@ void board_teardown(void)
 
   // make sure all pins are back in reset state
   // NUMBER_OF_PINS is defined in nrf_gpio.h
-  for (int i = 0; i < NUMBER_OF_PINS; ++i)
-  {
+  for (int i = 0; i < NUMBER_OF_PINS; ++i) {
     nrf_gpio_cfg_default(i);
   }
 
@@ -169,42 +165,38 @@ void board_teardown(void)
 }
 
 static uint32_t _systick_count = 0;
-void SysTick_Handler(void)
-{
-  _systick_count++;
 
+void SysTick_Handler(void) {
+  _systick_count++;
   led_tick();
 }
 
-
-void pwm_teardown(NRF_PWM_Type* pwm )
-{
+void pwm_teardown(NRF_PWM_Type* pwm) {
   pwm->TASKS_SEQSTART[0] = 0;
-  pwm->ENABLE            = 0;
+  pwm->ENABLE = 0;
 
   pwm->PSEL.OUT[0] = 0xFFFFFFFF;
   pwm->PSEL.OUT[1] = 0xFFFFFFFF;
   pwm->PSEL.OUT[2] = 0xFFFFFFFF;
   pwm->PSEL.OUT[3] = 0xFFFFFFFF;
 
-  pwm->MODE        = 0;
-  pwm->COUNTERTOP  = 0x3FF;
-  pwm->PRESCALER   = 0;
-  pwm->DECODER     = 0;
-  pwm->LOOP        = 0;
-  pwm->SEQ[0].PTR  = 0;
-  pwm->SEQ[0].CNT  = 0;
+  pwm->MODE = 0;
+  pwm->COUNTERTOP = 0x3FF;
+  pwm->PRESCALER = 0;
+  pwm->DECODER = 0;
+  pwm->LOOP = 0;
+  pwm->SEQ[0].PTR = 0;
+  pwm->SEQ[0].CNT = 0;
 }
 
-static uint16_t led_duty_cycles[PWM0_CH_NUM] = { 0 };
+static uint16_t led_duty_cycles[PWM0_CH_NUM] = {0};
 
 #if LEDS_NUMBER > PWM0_CH_NUM
 #error "Only " PWM0_CH_NUM " concurrent status LEDs are supported."
 #endif
 
-void led_pwm_init(uint32_t led_index, uint32_t led_pin)
-{
-  NRF_PWM_Type* pwm    = NRF_PWM0;
+void led_pwm_init(uint32_t led_index, uint32_t led_pin) {
+  NRF_PWM_Type* pwm = NRF_PWM0;
 
   pwm->ENABLE = 0;
 
@@ -213,15 +205,15 @@ void led_pwm_init(uint32_t led_index, uint32_t led_pin)
 
   pwm->PSEL.OUT[led_index] = led_pin;
 
-  pwm->MODE            = PWM_MODE_UPDOWN_Up;
-  pwm->COUNTERTOP      = 0xff;
-  pwm->PRESCALER       = PWM_PRESCALER_PRESCALER_DIV_16;
-  pwm->DECODER         = PWM_DECODER_LOAD_Individual;
-  pwm->LOOP            = 0;
+  pwm->MODE = PWM_MODE_UPDOWN_Up;
+  pwm->COUNTERTOP = 0xff;
+  pwm->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_16;
+  pwm->DECODER = PWM_DECODER_LOAD_Individual;
+  pwm->LOOP = 0;
 
-  pwm->SEQ[0].PTR      = (uint32_t) (led_duty_cycles);
-  pwm->SEQ[0].CNT      = 4; // default mode is Individual --> count must be 4
-  pwm->SEQ[0].REFRESH  = 0;
+  pwm->SEQ[0].PTR = (uint32_t) (led_duty_cycles);
+  pwm->SEQ[0].CNT = 4; // default mode is Individual --> count must be 4
+  pwm->SEQ[0].REFRESH = 0;
   pwm->SEQ[0].ENDDELAY = 0;
 
   pwm->ENABLE = 1;
@@ -230,13 +222,11 @@ void led_pwm_init(uint32_t led_index, uint32_t led_pin)
 //  pwm->TASKS_SEQSTART[0] = 1;
 }
 
-void led_pwm_teardown(void)
-{
+void led_pwm_teardown(void) {
   pwm_teardown(NRF_PWM0);
 }
 
-void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle)
-{
+void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
   led_duty_cycles[led_index] = duty_cycle;
   nrf_pwm_event_clear(NRF_PWM0, NRF_PWM_EVENT_SEQEND0);
   nrf_pwm_task_trigger(NRF_PWM0, NRF_PWM_TASK_SEQSTART0);
@@ -246,102 +236,103 @@ static uint32_t primary_cycle_length;
 #ifdef LED_SECONDARY_PIN
 static uint32_t secondary_cycle_length;
 #endif
+
 void led_tick() {
-    uint32_t millis = _systick_count;
+  uint32_t millis = _systick_count;
 
-    uint32_t cycle = millis % primary_cycle_length;
-    uint32_t half_cycle = primary_cycle_length / 2;
-    if (cycle > half_cycle) {
-        cycle = primary_cycle_length - cycle;
-    }
-    uint16_t duty_cycle = 0x4f * cycle / half_cycle;
-    #if LED_STATE_ON == 1
-    duty_cycle = 0xff - duty_cycle;
-    #endif
-    led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
+  uint32_t cycle = millis % primary_cycle_length;
+  uint32_t half_cycle = primary_cycle_length / 2;
+  if (cycle > half_cycle) {
+    cycle = primary_cycle_length - cycle;
+  }
+  uint16_t duty_cycle = 0x4f * cycle / half_cycle;
+  #if LED_STATE_ON == 1
+  duty_cycle = 0xff - duty_cycle;
+  #endif
+  led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
 
-    #ifdef LED_SECONDARY_PIN
-    cycle = millis % secondary_cycle_length;
-    half_cycle = secondary_cycle_length / 2;
-    if (cycle > half_cycle) {
-        cycle = secondary_cycle_length - cycle;
-    }
-    duty_cycle = 0x8f * cycle / half_cycle;
-    #if LED_STATE_ON == 1
-    duty_cycle = 0xff - duty_cycle;
-    #endif
-    led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
-    #endif
+  #ifdef LED_SECONDARY_PIN
+  cycle = millis % secondary_cycle_length;
+  half_cycle = secondary_cycle_length / 2;
+  if (cycle > half_cycle) {
+      cycle = secondary_cycle_length - cycle;
+  }
+  duty_cycle = 0x8f * cycle / half_cycle;
+  #if LED_STATE_ON == 1
+  duty_cycle = 0xff - duty_cycle;
+  #endif
+  led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
+  #endif
 }
 
 static uint32_t rgb_color;
 static bool temp_color_active = false;
-void led_state(uint32_t state)
-{
-    uint32_t new_rgb_color = rgb_color;
-    uint32_t temp_color = 0;
-    switch (state) {
-        case STATE_USB_MOUNTED:
-          new_rgb_color = 0x00ff00;
-          primary_cycle_length = 3000;
-          break;
 
-        case STATE_BOOTLOADER_STARTED:
-        case STATE_USB_UNMOUNTED:
-          new_rgb_color = 0xff0000;
-          primary_cycle_length = 300;
-          break;
+void led_state(uint32_t state) {
+  uint32_t new_rgb_color = rgb_color;
+  uint32_t temp_color = 0;
+  switch (state) {
+    case STATE_USB_MOUNTED:
+      new_rgb_color = 0x00ff00;
+      primary_cycle_length = 3000;
+      break;
 
-        case STATE_WRITING_STARTED:
-          temp_color = 0xff0000;
-          primary_cycle_length = 100;
-          break;
+    case STATE_BOOTLOADER_STARTED:
+    case STATE_USB_UNMOUNTED:
+      new_rgb_color = 0xff0000;
+      primary_cycle_length = 300;
+      break;
 
-        case STATE_WRITING_FINISHED:
-          // Empty means to unset any temp colors.
-          primary_cycle_length = 3000;
-          break;
+    case STATE_WRITING_STARTED:
+      temp_color = 0xff0000;
+      primary_cycle_length = 100;
+      break;
 
-        case STATE_BLE_CONNECTED:
-          new_rgb_color = 0x0000ff;
-          #ifdef LED_SECONDARY_PIN
-          secondary_cycle_length = 3000;
-          #else
-          primary_cycle_length = 3000;
-          #endif
-          break;
+    case STATE_WRITING_FINISHED:
+      // Empty means to unset any temp colors.
+      primary_cycle_length = 3000;
+      break;
 
-        case STATE_BLE_DISCONNECTED:
-          new_rgb_color = 0xff00ff;
-          #ifdef LED_SECONDARY_PIN
-          secondary_cycle_length = 300;
-          #else
-          primary_cycle_length = 300;
-          #endif
-          break;
+    case STATE_BLE_CONNECTED:
+      new_rgb_color = 0x0000ff;
+      #ifdef LED_SECONDARY_PIN
+      secondary_cycle_length = 3000;
+      #else
+      primary_cycle_length = 3000;
+      #endif
+      break;
 
-        default:
-        break;
-    }
-    uint8_t* final_color = NULL;
-    new_rgb_color &= BOARD_RGB_BRIGHTNESS;
-    if (temp_color != 0){
-        temp_color &= BOARD_RGB_BRIGHTNESS;
-        final_color = (uint8_t*)&temp_color;
-        temp_color_active = true;
-    } else if (new_rgb_color != rgb_color) {
-        final_color = (uint8_t*)&new_rgb_color;
-        rgb_color = new_rgb_color;
-    } else if (temp_color_active) {
-        final_color = (uint8_t*)&rgb_color;
-    }
+    case STATE_BLE_DISCONNECTED:
+      new_rgb_color = 0xff00ff;
+      #ifdef LED_SECONDARY_PIN
+      secondary_cycle_length = 300;
+      #else
+      primary_cycle_length = 300;
+      #endif
+      break;
+
+    default:
+      break;
+  }
+  uint8_t* final_color = NULL;
+  new_rgb_color &= BOARD_RGB_BRIGHTNESS;
+  if (temp_color != 0) {
+    temp_color &= BOARD_RGB_BRIGHTNESS;
+    final_color = (uint8_t*) &temp_color;
+    temp_color_active = true;
+  } else if (new_rgb_color != rgb_color) {
+    final_color = (uint8_t*) &new_rgb_color;
+    rgb_color = new_rgb_color;
+  } else if (temp_color_active) {
+    final_color = (uint8_t*) &rgb_color;
+  }
 
 #if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
-    if (final_color != NULL) {
-        neopixel_write(final_color);
-    }
+  if (final_color != NULL) {
+    neopixel_write(final_color);
+  }
 #else
-    (void) final_color;
+  (void) final_color;
 #endif
 }
 
@@ -354,11 +345,10 @@ void led_state(uint32_t state)
 
 #define BYTE_PER_PIXEL  3
 
-static uint16_t pixels_pattern[NEOPIXELS_NUMBER*BYTE_PER_PIXEL * 8 + 2];
+static uint16_t pixels_pattern[NEOPIXELS_NUMBER * BYTE_PER_PIXEL * 8 + 2];
 
 // use PWM1 for neopixel
-void neopixel_init(void)
-{
+void neopixel_init(void) {
   // To support both the SoftDevice + Neopixels we use the EasyDMA
   // feature from the NRF25. However this technique implies to
   // generate a pattern and store it on the memory. The actual
@@ -394,40 +384,33 @@ void neopixel_init(void)
   //    pwm->INTEN |= (PWM_INTEN_SEQEND0_Enabled<<PWM_INTEN_SEQEND0_Pos);
 
   // PSEL must be configured before enabling PWM
-  nrf_pwm_pins_set(pwm, (uint32_t[] ) { LED_NEOPIXEL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL });
+  nrf_pwm_pins_set(pwm, (uint32_t[]) {LED_NEOPIXEL, 0xFFFFFFFFUL, 0xFFFFFFFFUL, 0xFFFFFFFFUL});
 
   // Enable the PWM
   nrf_pwm_enable(pwm);
 }
 
-void neopixel_teardown(void)
-{
-  uint8_t rgb[3] = { 0, 0, 0 };
+void neopixel_teardown(void) {
+  uint8_t rgb[3] = {0, 0, 0};
 
   NRFX_DELAY_US(50);  // wait for previous write is complete
-
   neopixel_write(rgb);
   NRFX_DELAY_US(50);  // wait for this write
-
   pwm_teardown(NRF_PWM1);
 }
 
 // write 3 bytes color RGB to built-in neopixel
-void neopixel_write (uint8_t *pixels)
-{
+void neopixel_write(uint8_t* pixels) {
   // convert RGB to GRB
   uint8_t grb[BYTE_PER_PIXEL] = {pixels[1], pixels[2], pixels[0]};
   uint16_t pos = 0;    // bit position
 
   // Set all neopixel to same value
-  for (uint16_t n = 0; n < NEOPIXELS_NUMBER; n++ )
-  {
-    for(uint8_t c = 0; c < BYTE_PER_PIXEL; c++)
-    {
+  for (uint16_t n = 0; n < NEOPIXELS_NUMBER; n++) {
+    for (uint8_t c = 0; c < BYTE_PER_PIXEL; c++) {
       uint8_t const pix = grb[c];
 
-      for ( uint8_t mask = 0x80; mask > 0; mask >>= 1 )
-      {
+      for (uint8_t mask = 0x80; mask > 0; mask >>= 1) {
         pixels_pattern[pos] = (pix & mask) ? MAGIC_T1H : MAGIC_T0H;
         pos++;
       }
@@ -441,14 +424,15 @@ void neopixel_write (uint8_t *pixels)
   NRF_PWM_Type* pwm = NRF_PWM1;
 
   nrf_pwm_seq_ptr_set(pwm, 0, pixels_pattern);
-  nrf_pwm_seq_cnt_set(pwm, 0, sizeof(pixels_pattern)/2);
+  nrf_pwm_seq_cnt_set(pwm, 0, sizeof(pixels_pattern) / 2);
   nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
   nrf_pwm_task_trigger(pwm, NRF_PWM_TASK_SEQSTART0);
 
   // blocking wait for sequence complete
-  while( !nrf_pwm_event_check(pwm, NRF_PWM_EVENT_SEQEND0) ) {}
+  while (!nrf_pwm_event_check(pwm, NRF_PWM_EVENT_SEQEND0)) {}
   nrf_pwm_event_clear(pwm, NRF_PWM_EVENT_SEQEND0);
 }
+
 #endif
 
 #ifdef LED_APA102
@@ -460,8 +444,7 @@ void neopixel_write (uint8_t *pixels)
 static uint8_t pixels_pattern[PATTERN_SIZE() + 4];
 
 // use SPIM1 for dotstar
-void neopixel_init(void)
-{
+void neopixel_init(void) {
   NRF_SPIM_Type* spi = NRF_SPIM1;
 
   nrf_spim_disable(spi);
@@ -492,8 +475,7 @@ void neopixel_init(void)
   neopixel_write(rgb);
 }
 
-void neopixel_teardown(void)
-{
+void neopixel_teardown(void) {
   uint8_t rgb[3] = {0, 0, 0 };
   neopixel_write(rgb);
 
@@ -502,8 +484,7 @@ void neopixel_teardown(void)
 }
 
 // write 3 bytes color RGB to built-in neopixel
-void neopixel_write (uint8_t *pixels)
-{
+void neopixel_write (uint8_t *pixels) {
   NRF_SPIM_Type*  spi = NRF_SPIM1;
 
   //brightness, blue, green, red
@@ -514,10 +495,10 @@ void neopixel_write (uint8_t *pixels)
   pixels_pattern[3] = 0;
 
   for (uint8_t i = 4; i < PATTERN_SIZE(); i+=4) {
-      pixels_pattern[i] = bbgr[0];
-      pixels_pattern[i+1] = bbgr[1];
-      pixels_pattern[i+2] = bbgr[2];
-      pixels_pattern[i+3] = bbgr[3];
+    pixels_pattern[i] = bbgr[0];
+    pixels_pattern[i+1] = bbgr[1];
+    pixels_pattern[i+2] = bbgr[2];
+    pixels_pattern[i+3] = bbgr[3];
   }
 
   pixels_pattern[PATTERN_SIZE()] = 0xff;
@@ -545,15 +526,13 @@ void neopixel_write (uint8_t *pixels)
 #define LED_RGB_BLUE  2
 #define LED_RGB_GREEN 3
 
-void neopixel_init(void)
-{
+void neopixel_init(void) {
   led_pwm_init(LED_RGB_RED, LED_RGB_RED_PIN);
   led_pwm_init(LED_RGB_GREEN, LED_RGB_GREEN_PIN);
   led_pwm_init(LED_RGB_BLUE, LED_RGB_BLUE_PIN);
 }
 
-void neopixel_teardown(void)
-{
+void neopixel_teardown(void) {
   uint8_t rgb[3] = { 0, 0, 0 };
   neopixel_write(rgb);
   nrf_gpio_cfg_default(LED_RGB_RED_PIN);
@@ -562,8 +541,7 @@ void neopixel_teardown(void)
 }
 
 // write 3 bytes color to a built-in neopixel
-void neopixel_write (uint8_t *pixels)
-{
+void neopixel_write (uint8_t *pixels) {
   led_pwm_duty_cycle(LED_RGB_RED, pixels[2]);
   led_pwm_duty_cycle(LED_RGB_GREEN, pixels[1]);
   led_pwm_duty_cycle(LED_RGB_BLUE, pixels[0]);
