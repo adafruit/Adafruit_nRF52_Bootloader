@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _FEATHER_NRF52840_TFT_H
-#define _FEATHER_NRF52840_TFT_H
+#ifndef _FEATHER_NRF52840_SENSE_TFT_H
+#define _FEATHER_NRF52840_SENSE_TFT_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -44,26 +44,26 @@
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(1, 6)
-#define BUTTON_2              _PINNUM(1, 4) // not connected
+#define BUTTON_2              _PINNUM(1, 10) // DFU pin
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "Feather nRF52840 TFT"
+#define BLEDIS_MODEL          "Feather nRF52840 Sense TFT"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x002A
+#define USB_DESC_UF2_PID       0x0087
+#define USB_DESC_CDC_ONLY_PID  0x0088
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 TFT"
-#define UF2_VOLUME_LABEL      "FTHR840BOOT"
-#define UF2_BOARD_ID          "nRF52840-FeatherTFT-revA"
+#define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 Sense TFT"
+#define UF2_VOLUME_LABEL      "FTHRSNSBOOT"
+#define UF2_BOARD_ID          "nRF52840-FeatherSenseTFT-revA"
 #define UF2_INDEX_URL         "https://www.adafruit.com/product/"
 
 #endif
