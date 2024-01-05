@@ -181,6 +181,14 @@ void board_teardown(void) {
 //--------------------------------------------------------------------+
 #ifdef DISPLAY_PIN_SCK
 
+#define TFT_MADCTL_MY  0x80  ///< Page addr order: Bottom to top
+#define TFT_MADCTL_MX  0x40  ///< Column addr order: Right to left
+#define TFT_MADCTL_MV  0x20  ///< Page/Column order: Reverse Mode ( X <-> Y )
+#define TFT_MADCTL_ML  0x10  ///< LCD refresh Bottom to top
+#define TFT_MADCTL_MH  0x04  ///< LCD refresh right to left
+#define TFT_MADCTL_RGB 0x00  ///< Red-Green-Blue pixel order
+#define TFT_MADCTL_BGR 0x08  ///< Blue-Green-Red pixel order
+
 // Note don't use SPIM3 since it has lots of errata
 NRF_SPIM_Type* _spim = NRF_SPIM0;
 
@@ -199,19 +207,11 @@ static void spi_write(NRF_SPIM_Type *p_spim, uint8_t const *tx_buf, size_t tx_le
 static void tft_controller_init(void);
 
 static inline void tft_cs(bool state) {
-  if (state) {
-    nrf_gpio_pin_set(DISPLAY_PIN_CS);
-  } else {
-    nrf_gpio_pin_clear(DISPLAY_PIN_CS);
-  }
+  nrf_gpio_pin_write(DISPLAY_PIN_CS, state);
 }
 
 static inline void tft_dc(bool state) {
-  if (state) {
-    nrf_gpio_pin_set(DISPLAY_PIN_DC);
-  } else {
-    nrf_gpio_pin_clear(DISPLAY_PIN_DC);
-  }
+  nrf_gpio_pin_write(DISPLAY_PIN_DC, state);
 }
 
 static void tft_cmd(uint8_t cmd, uint8_t const* data, size_t narg) {
@@ -250,17 +250,17 @@ void board_display_init(void) {
   //------------- Display Init -------------//
   nrf_gpio_cfg_output(DISPLAY_PIN_DC);
 
-  #if defined(DISPLAY_PIN_RST) && DISPLAY_PIN_RST >= 0
+#if defined(DISPLAY_PIN_RST) && DISPLAY_PIN_RST >= 0
   nrf_gpio_cfg_output(DISPLAY_PIN_RST);
-  nrf_gpio_pin_write(DISPLAY_PIN_RST, 0);
+  nrf_gpio_pin_clear(DISPLAY_PIN_RST);
   NRFX_DELAY_MS(10);
-  nrf_gpio_pin_write(DISPLAY_PIN_RST, 1);
-  #endif
+  nrf_gpio_pin_set(DISPLAY_PIN_RST);
+#endif
 
-  #if defined(DISPLAY_PIN_BL) && DISPLAY_PIN_BL >= 0
+#if defined(DISPLAY_PIN_BL) && DISPLAY_PIN_BL >= 0
   nrf_gpio_cfg_output(DISPLAY_PIN_BL);
   nrf_gpio_pin_write(DISPLAY_PIN_BL, DISPLAY_BL_ON);
-  #endif
+#endif
 
   tft_controller_init();
 }
@@ -667,13 +667,9 @@ void neopixel_write (uint8_t *pixels) {
 }
 #endif
 
-#define TFT_MADCTL_MY  0x80  ///< Page addr order: Bottom to top
-#define TFT_MADCTL_MX  0x40  ///< Column addr order: Right to left
-#define TFT_MADCTL_MV  0x20  ///< Page/Column order: Reverse Mode ( X <-> Y )
-#define TFT_MADCTL_ML  0x10  ///< LCD refresh Bottom to top
-#define TFT_MADCTL_MH  0x04  ///< LCD refresh right to left
-#define TFT_MADCTL_RGB 0x00  ///< Red-Green-Blue pixel order
-#define TFT_MADCTL_BGR 0x08  ///< Blue-Green-Red pixel order
+//--------------------------------------------------------------------+
+// Display controller
+//--------------------------------------------------------------------+
 
 #ifdef DISPLAY_CONTROLLER_ST7789
 

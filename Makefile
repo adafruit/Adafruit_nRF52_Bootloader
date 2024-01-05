@@ -139,6 +139,8 @@ C_SRC += \
   src/dfu_init.c \
   src/flash_nrf5x.c \
   src/main.c \
+  src/screen.c \
+  src/images.c \
 
 # all files in boards
 C_SRC += src/boards/boards.c
@@ -314,6 +316,7 @@ ifneq ($(USE_NFCT),yes)
 endif
 
 CFLAGS += -DSOFTDEVICE_PRESENT
+CFLAGS += -DUF2_VERSION_BASE='"$(GIT_VERSION)"'
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
