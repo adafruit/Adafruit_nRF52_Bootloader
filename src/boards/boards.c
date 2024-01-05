@@ -24,7 +24,6 @@
 
 #include "boards.h"
 #include "nrf_pwm.h"
-#include "nrf_spim.h"
 #include "app_scheduler.h"
 #include "app_timer.h"
 
@@ -180,6 +179,7 @@ void board_teardown(void) {
 // Display
 //--------------------------------------------------------------------+
 #ifdef DISPLAY_PIN_SCK
+#include "nrf_spim.h"
 
 #define TFT_MADCTL_MY  0x80  ///< Page addr order: Bottom to top
 #define TFT_MADCTL_MX  0x40  ///< Column addr order: Right to left
