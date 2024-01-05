@@ -255,6 +255,7 @@ void board_display_init(void) {
   nrf_gpio_pin_clear(DISPLAY_PIN_RST);
   NRFX_DELAY_MS(10);
   nrf_gpio_pin_set(DISPLAY_PIN_RST);
+  NRFX_DELAY_MS(20);
 #endif
 
 #if defined(DISPLAY_PIN_BL) && DISPLAY_PIN_BL >= 0
@@ -698,6 +699,7 @@ void neopixel_write (uint8_t *pixels) {
 #define ST77XX_TEOFF 0x34
 #define ST77XX_TEON 0x35
 #define ST77XX_MADCTL 0x36
+#define ST77XX_VSCSAD 0x37
 #define ST77XX_COLMOD 0x3A
 
 #define ST77XX_MADCTL_MY 0x80
@@ -725,23 +727,27 @@ void neopixel_write (uint8_t *pixels) {
 static void tft_controller_init(void) {
   // Init commands for 7789 screens
   uint8_t cmdinit_st7789[] = {
-      //  1: Software reset, no args, w/delay ~150 ms delay
+      #if !defined(DISPLAY_PIN_RST) || (DISPLAY_PIN_RST < 0)
+      // Software reset if rst pin not available, no args, w/delay ~150 ms delay
       ST77XX_SWRESET, ST_CMD_DELAY, 150,
-      //  2: Out of sleep mode, no args, w/delay 10 ms delay
+      #endif
+      // Out of sleep mode, no args, w/delay 10 ms delay
       ST77XX_SLPOUT, ST_CMD_DELAY, 10,
-      //  3: Set color mode, 1 arg + delay: 16-bit color, 10 ms delay
+      // Set color mode, 1 arg + delay: 16-bit color, 10 ms delay
       ST77XX_COLMOD, 1 + ST_CMD_DELAY, 0x55, 10,
-      //  4: Mem access ctrl (directions), 1 arg: Row/col addr, bottom-top refresh
+      // Mem access ctrl (directions), 1 arg: Row/col addr, bottom-top refresh
       ST77XX_MADCTL, 1, DISPLAY_MADCTL,
-      //  5: Column addr set, 4 args, no delay: XSTART = 0, XEND = 240
+      // Vertical Scroll Start Address of RAM
+      // ST77XX_VSCSAD, 2, DISPLAY_VSCSAD >> 8, DISPLAY_VSCSAD & 0xFF,
+      // Column addr set, 4 args, no delay: XSTART = 0, XEND = 240
       ST77XX_CASET, 4, 0x00, 0, 0, 240,
-      //  6: Row addr set, 4 args, no delay: YSTART = 0 YEND = 320
+      // Row addr set, 4 args, no delay: YSTART = 0 YEND = 320
       ST77XX_RASET, 4, 0x00, 0, 320 >> 8, 320 & 0xFF,
-      //  7: hack
+      // Inversion on
       ST77XX_INVON, ST_CMD_DELAY, 10,
-      //  8: Normal display on, no args, w/delay 10 ms delay
+      // Normal display on, no args, w/delay 10 ms delay
       ST77XX_NORON, ST_CMD_DELAY, 10,
-      //  9: Main screen turn on, no args, delay 10 ms delay
+      // Main screen turn on, no args, delay 10 ms delay
       ST77XX_DISPON, ST_CMD_DELAY, 10
   };
 

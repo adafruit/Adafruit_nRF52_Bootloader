@@ -47,6 +47,32 @@
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
+// Display
+//--------------------------------------------------------------------+
+#define DISPLAY_CONTROLLER_ST7789
+
+#define DISPLAY_PIN_SCK       _PINNUM(0, 14)
+#define DISPLAY_PIN_MOSI      _PINNUM(0, 15)
+
+#define DISPLAY_PIN_CS        _PINNUM(0, 12)
+#define DISPLAY_PIN_DC        _PINNUM(0, 13)
+#define DISPLAY_PIN_RST       _PINNUM(1,  3)
+#define DISPLAY_PIN_BL        _PINNUM(1,  5)
+#define DISPLAY_BL_ON         1  // GPIO state to enable back light
+
+#define DISPLAY_WIDTH         240
+#define DISPLAY_HEIGHT        240
+
+#define DISPLAY_COL_OFFSET    0
+#define DISPLAY_ROW_OFFSET    80
+
+// Memory Data Access Control & // Vertical Scroll Start Address
+#define DISPLAY_MADCTL        (TFT_MADCTL_MY)
+#define DISPLAY_VSCSAD        0
+
+#define DISPLAY_TITLE         "CLUE"
+
+//--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"

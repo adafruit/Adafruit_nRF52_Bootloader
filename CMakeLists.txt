@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
+find_package(Python COMPONENTS Interpreter)
 
 if (NOT DEFINED BOARD)
   message(FATAL_ERROR "BOARD is not defined")
@@ -29,6 +30,9 @@ set(SDK11 ${CMAKE_CURRENT_LIST_DIR}/lib/sdk11/components)
 set(SDK ${CMAKE_CURRENT_LIST_DIR}/lib/sdk/components)
 set(SOFTDEVICE ${CMAKE_CURRENT_LIST_DIR}/lib/softdevice)
 set(TUSB ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb/src)
+
+set(UF2CONV_PY ${CMAKE_CURRENT_LIST_DIR}/lib/uf2/utils/uf2conv.py)
+set(UF2_FAMILY_ID_BOOTLOADER 0xd663823c)
 
 #-------------------
 # Bootloader
@@ -301,6 +305,8 @@ add_custom_command(TARGET bootloader POST_BUILD
 add_custom_command(TARGET bootloader POST_BUILD
   COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:bootloader> $<TARGET_FILE_DIR:bootloader>/bootloader.bin
   COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE:bootloader> $<TARGET_FILE_DIR:bootloader>/bootloader.hex
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py --overlap=replace -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex $<TARGET_FILE_DIR:bootloader>/bootloader.hex ${MBR_HEX}
+  COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} -c -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2 $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex
   VERBATIM)
 
 #----------------------------------
@@ -311,9 +317,14 @@ if (NOT DEFINED NRFJPROG)
   set(NRFJPROG nrfjprog)
 endif()
 
-add_custom_target(flash
+add_custom_target(flash-jlink
   DEPENDS bootloader
   COMMAND ${NRFJPROG} --program $<TARGET_FILE:bootloader> --verify --sectoranduicrerase -f nrf52 --reset
+  )
+
+add_custom_target(flash-uf2
+  DEPENDS bootloader
+  COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} --deploy $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2
   )
 
 add_custom_target(flash-sd

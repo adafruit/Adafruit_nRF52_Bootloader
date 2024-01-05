@@ -52,8 +52,8 @@
 //--------------------------------------------------------------------+
 #define DISPLAY_CONTROLLER_ST7789
 
-#define DISPLAY_PIN_MOSI      _PINNUM(0,  5)
 #define DISPLAY_PIN_SCK       _PINNUM(0, 26)
+#define DISPLAY_PIN_MOSI      _PINNUM(0,  5)
 
 #define DISPLAY_PIN_CS        _PINNUM(1,  5)
 #define DISPLAY_PIN_DC        _PINNUM(1,  1)
