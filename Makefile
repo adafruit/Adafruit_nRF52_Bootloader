@@ -123,7 +123,7 @@ else ifeq ($(MCU_SUB_VARIANT),nrf52840)
   SD_NAME = s140
   DFU_DEV_REV = 52840
   CFLAGS += -DNRF52840_XXAA -DS140
-  # App reserved 40KB to match circuitpython for 840
+  # App reserved 40KB (8+32) to match circuitpython for 840
   DFU_APP_DATA_RESERVED=10*4096
 else
   $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
@@ -328,9 +328,9 @@ ifeq ($(DEBUG), 1)
   C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
   DFU_APP_DATA_RESERVED = 0
 
-	# expand bootloader address to 28KB of reserved app
+	# expand bootloader address to 28KB/40KB of reserved app
   ifeq ($(MCU_SUB_VARIANT),nrf52840)
-    CFLAGS += -DBOOTLOADER_REGION_START=0xED000
+    CFLAGS += -DBOOTLOADER_REGION_START=0xEA000
   else
     CFLAGS += -DBOOTLOADER_REGION_START=0x6D000
   endif

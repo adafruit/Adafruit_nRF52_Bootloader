@@ -43,49 +43,41 @@
 extern void tusb_hal_nrf_power_event(uint32_t event);
 
 // power callback when SD is not enabled
-static void power_event_handler(nrfx_power_usb_evt_t event)
-{
+static void power_event_handler(nrfx_power_usb_evt_t event) {
   tusb_hal_nrf_power_event((uint32_t) event);
 }
 
 // Forward USB interrupt events to TinyUSB IRQ Handler
-void USBD_IRQHandler(void)
-{
+void USBD_IRQHandler(void) {
   tud_int_handler(0);
 }
 
 //------------- IMPLEMENTATION -------------//
-void usb_init(bool cdc_only)
-{
+void usb_init(bool cdc_only) {
   // 0, 1 is reserved for SD
   NVIC_SetPriority(USBD_IRQn, 2);
 
   // USB power may already be ready at this time -> no event generated
   // We need to invoke the handler based on the status initially
   uint32_t usb_reg;
-
   uint8_t sd_en = false;
 
-  if ( is_sd_existed() )
-  {
+  if (is_sd_existed()) {
     sd_softdevice_is_enabled(&sd_en);
   }
 
-  if ( sd_en )
-  {
+  if (sd_en) {
     sd_power_usbdetected_enable(true);
     sd_power_usbpwrrdy_enable(true);
     sd_power_usbremoved_enable(true);
-
     sd_power_usbregstatus_get(&usb_reg);
-  }else
-  {
+  } else {
     // Power module init
-    const nrfx_power_config_t pwr_cfg = { 0 };
+    const nrfx_power_config_t pwr_cfg = {0};
     nrfx_power_init(&pwr_cfg);
 
     // Register USB power handler
-    const nrfx_power_usbevt_config_t config = { .handler = power_event_handler };
+    const nrfx_power_usbevt_config_t config = {.handler = power_event_handler};
     nrfx_power_usbevt_init(&config);
 
     nrfx_power_usbevt_enable();
@@ -93,24 +85,25 @@ void usb_init(bool cdc_only)
     usb_reg = NRF_POWER->USBREGSTATUS;
   }
 
-  if ( usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk ) {
+  if (usb_reg & POWER_USBREGSTATUS_VBUSDETECT_Msk) {
     tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_DETECTED);
   }
 
-  if ( usb_reg & POWER_USBREGSTATUS_OUTPUTRDY_Msk ) {
+  if (usb_reg & POWER_USBREGSTATUS_OUTPUTRDY_Msk) {
     tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_READY);
   }
 
   usb_desc_init(cdc_only);
-
   uf2_init();
-
-  // Init TinyUSB stack
   tusb_init();
+
+  #ifdef DISPLAY_PIN_SCK
+  board_display_init();
+  screen_draw_drag();
+  #endif
 }
 
-void usb_teardown(void)
-{
+void usb_teardown(void) {
   // Simulate an disconnect which cause pullup disable, USB perpheral disable and hclk disable
   tusb_hal_nrf_power_event(NRFX_POWER_USB_EVT_REMOVED);
 }
@@ -118,12 +111,10 @@ void usb_teardown(void)
 //--------------------------------------------------------------------+
 // tinyusb callbacks
 //--------------------------------------------------------------------+
-void tud_mount_cb(void)
-{
+void tud_mount_cb(void) {
   led_state(STATE_USB_MOUNTED);
 }
 
-void tud_umount_cb(void)
-{
+void tud_umount_cb(void) {
   led_state(STATE_USB_UNMOUNTED);
 }

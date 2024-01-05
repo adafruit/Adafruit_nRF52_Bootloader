@@ -24,6 +24,7 @@
 
 #include "boards.h"
 #include "nrf_pwm.h"
+#include "nrf_spim.h"
 #include "app_scheduler.h"
 #include "app_timer.h"
 
@@ -31,9 +32,6 @@
 #include "nrf_spim.h"
 #endif
 
-//--------------------------------------------------------------------+
-// MACRO TYPEDEF CONSTANT ENUM DECLARATION
-//--------------------------------------------------------------------+
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
@@ -43,7 +41,16 @@ void neopixel_write(uint8_t* pixels);
 void neopixel_teardown(void);
 #endif
 
-//------------- IMPLEMENTATION -------------//
+//--------------------------------------------------------------------+
+// IMPLEMENTATION
+//--------------------------------------------------------------------+
+
+static uint32_t _systick_count = 0;
+void SysTick_Handler(void) {
+  _systick_count++;
+  led_tick();
+}
+
 void button_init(uint32_t pin) {
   if (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN) {
     nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
@@ -96,6 +103,7 @@ void board_init(void) {
 #if ENABLE_DCDC_1 == 1
   NRF_POWER->DCDCEN = 1;
 #endif
+
   // Make sure any custom inits are performed
   board_init2();
 
@@ -144,6 +152,10 @@ void board_teardown(void) {
   neopixel_teardown();
 #endif
 
+#ifdef DISPLAY_PIN_SCK
+  board_display_teardown();
+#endif
+
   // Stop RTC1 used by app_timer
   NVIC_DisableIRQ(RTC1_IRQn);
   NRF_RTC1->EVTENCLR = RTC_EVTEN_COMPARE0_Msk;
@@ -164,13 +176,134 @@ void board_teardown(void) {
   board_teardown2();
 }
 
-static uint32_t _systick_count = 0;
+//--------------------------------------------------------------------+
+// Display
+//--------------------------------------------------------------------+
+#ifdef DISPLAY_PIN_SCK
 
-void SysTick_Handler(void) {
-  _systick_count++;
-  led_tick();
+// Note don't use SPIM3 since it has lots of errata
+NRF_SPIM_Type* _spim = NRF_SPIM0;
+
+static void spi_write(NRF_SPIM_Type *p_spim, uint8_t const *tx_buf, size_t tx_len) {
+  nrf_spim_tx_buffer_set(p_spim, tx_buf, tx_len);
+  nrf_spim_rx_buffer_set(p_spim, NULL, 0);
+
+  nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_ENDTX);
+  nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_END);
+  nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_START);
+
+  // blocking wait until xfer complete
+  while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END)){}
 }
 
+static void tft_controller_init(void);
+
+static inline void tft_cs(bool state) {
+  if (state) {
+    nrf_gpio_pin_set(DISPLAY_PIN_CS);
+  } else {
+    nrf_gpio_pin_clear(DISPLAY_PIN_CS);
+  }
+}
+
+static inline void tft_dc(bool state) {
+  if (state) {
+    nrf_gpio_pin_set(DISPLAY_PIN_DC);
+  } else {
+    nrf_gpio_pin_clear(DISPLAY_PIN_DC);
+  }
+}
+
+static void tft_cmd(uint8_t cmd, uint8_t const* data, uint8_t narg) {
+  tft_cs(false);
+
+  // send command
+  tft_dc(false);
+  spi_write(_spim, &cmd, 1);
+
+  // send data
+  if (narg > 0) {
+    tft_dc(true);
+    spi_write(_spim, data, narg);
+  }
+
+  tft_cs(true);
+}
+
+void board_display_init(void) {
+  //------------- SPI init -------------//
+  // highspeed SPIM should set SCK and MOSI to high drive
+  nrf_gpio_cfg(DISPLAY_PIN_SCK, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_CONNECT,
+               NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_H0H1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg(DISPLAY_PIN_MOSI, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
+               NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_H0H1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg_output(DISPLAY_PIN_CS);
+  nrf_gpio_pin_set(DISPLAY_PIN_CS);
+
+  nrf_spim_pins_set(_spim, DISPLAY_PIN_SCK, DISPLAY_PIN_MOSI, NRF_SPIM_PIN_NOT_CONNECTED);
+  nrf_spim_frequency_set(_spim, NRF_SPIM_FREQ_4M);
+  nrf_spim_configure(_spim, NRF_SPIM_MODE_0, NRF_SPIM_BIT_ORDER_MSB_FIRST);
+  nrf_spim_orc_set(_spim, 0xFF);
+
+  nrf_spim_enable(_spim);
+
+  //------------- Display Init -------------//
+  nrf_gpio_cfg_output(DISPLAY_PIN_DC);
+
+  #if defined(DISPLAY_PIN_RST) && DISPLAY_PIN_RST >= 0
+  nrf_gpio_cfg_output(DISPLAY_PIN_RST);
+  nrf_gpio_pin_write(DISPLAY_PIN_RST, 0);
+  NRFX_DELAY_MS(10);
+  nrf_gpio_pin_write(DISPLAY_PIN_RST, 1);
+  #endif
+
+  #if defined(DISPLAY_PIN_BL) && DISPLAY_PIN_BL >= 0
+  nrf_gpio_cfg_output(DISPLAY_PIN_BL);
+  nrf_gpio_pin_write(DISPLAY_PIN_BL, DISPLAY_BL_ON);
+  #endif
+
+  tft_controller_init();
+}
+
+void board_display_teardown(void) {
+  nrf_spim_disable(_spim);
+}
+
+// Send the whole buffer data to display controller
+extern const uint16_t color_palette[];
+void board_display_draw_screen(uint8_t const* fb) {
+
+  tft_cs(false);
+
+  // command: memory write
+  uint8_t cmd = 0x2C;
+  tft_dc(false);
+  spi_write(_spim, &cmd, 1);
+
+  // data
+  tft_dc(true);
+
+  uint8_t const* p = fb;
+  for (int i = 0; i < DISPLAY_WIDTH; ++i) {
+    uint8_t cc[DISPLAY_HEIGHT * 2];
+    uint32_t dst = 0;
+    for (int j = 0; j < DISPLAY_HEIGHT; ++j) {
+      uint16_t color = color_palette[*p++ & 0xf];
+      cc[dst++] = color >> 8;
+      cc[dst++] = color & 0xff;
+    }
+
+    spi_write(_spim, cc, sizeof(cc));
+  }
+
+  tft_cs(true);
+}
+
+#endif
+
+//--------------------------------------------------------------------+
+// LED Indicator
+//--------------------------------------------------------------------+
 void pwm_teardown(NRF_PWM_Type* pwm) {
   pwm->TASKS_SEQSTART[0] = 0;
   pwm->ENABLE = 0;
@@ -546,4 +679,100 @@ void neopixel_write (uint8_t *pixels) {
   led_pwm_duty_cycle(LED_RGB_GREEN, pixels[1]);
   led_pwm_duty_cycle(LED_RGB_BLUE, pixels[0]);
 }
+#endif
+
+#ifdef DISPLAY_CONTROLLER_ST7789
+
+#define ST_CMD_DELAY 0x80 // special signifier for command lists
+
+#define ST77XX_NOP 0x00
+#define ST77XX_SWRESET 0x01
+#define ST77XX_RDDID 0x04
+#define ST77XX_RDDST 0x09
+
+#define ST77XX_SLPIN 0x10
+#define ST77XX_SLPOUT 0x11
+#define ST77XX_PTLON 0x12
+#define ST77XX_NORON 0x13
+
+#define ST77XX_INVOFF 0x20
+#define ST77XX_INVON 0x21
+#define ST77XX_DISPOFF 0x28
+#define ST77XX_DISPON 0x29
+#define ST77XX_CASET 0x2A
+#define ST77XX_RASET 0x2B
+#define ST77XX_RAMWR 0x2C
+#define ST77XX_RAMRD 0x2E
+
+#define ST77XX_PTLAR 0x30
+#define ST77XX_TEOFF 0x34
+#define ST77XX_TEON 0x35
+#define ST77XX_MADCTL 0x36
+#define ST77XX_COLMOD 0x3A
+
+#define ST77XX_MADCTL_MY 0x80
+#define ST77XX_MADCTL_MX 0x40
+#define ST77XX_MADCTL_MV 0x20
+#define ST77XX_MADCTL_ML 0x10
+#define ST77XX_MADCTL_RGB 0x00
+
+#define ST77XX_RDID1 0xDA
+#define ST77XX_RDID2 0xDB
+#define ST77XX_RDID3 0xDC
+#define ST77XX_RDID4 0xDD
+
+// Some ready-made 16-bit ('565') color settings:
+#define ST77XX_BLACK 0x0000
+#define ST77XX_WHITE 0xFFFF
+#define ST77XX_RED 0xF800
+#define ST77XX_GREEN 0x07E0
+#define ST77XX_BLUE 0x001F
+#define ST77XX_CYAN 0x07FF
+#define ST77XX_MAGENTA 0xF81F
+#define ST77XX_YELLOW 0xFFE0
+#define ST77XX_ORANGE 0xFC00
+
+static void tft_controller_init(void) {
+  // Init commands for 7789 screens
+  uint8_t cmdinit_st7789[] = {
+      //  1: Software reset, no args, w/delay ~150 ms delay
+      ST77XX_SWRESET, ST_CMD_DELAY, 150,
+      //  2: Out of sleep mode, no args, w/delay 10 ms delay
+      ST77XX_SLPOUT, ST_CMD_DELAY, 10,
+      //  3: Set color mode, 1 arg + delay: 16-bit color, 10 ms delay
+      ST77XX_COLMOD, 1 + ST_CMD_DELAY, 0x55, 10,
+      //  4: Mem access ctrl (directions), 1 arg: Row/col addr, bottom-top refresh
+      ST77XX_MADCTL, 1, 0x08,
+      //  5: Column addr set, 4 args, no delay: XSTART = 0, XEND = 240
+      ST77XX_CASET, 4, 0x00, 0, 0, 240,
+      //  6: Row addr set, 4 args, no delay: YSTART = 0 YEND = 320
+      ST77XX_RASET, 4, 0x00, 0, 320 >> 8, 320 & 0xFF,
+      //  7: hack
+      ST77XX_INVON, ST_CMD_DELAY, 10,
+      //  8: Normal display on, no args, w/delay 10 ms delay
+      ST77XX_NORON, ST_CMD_DELAY, 10,
+      //  9: Main screen turn on, no args, delay 10 ms delay
+      ST77XX_DISPON, ST_CMD_DELAY, 10
+  };
+
+  size_t count = 0;
+  while (count < sizeof(cmdinit_st7789)) {
+    uint8_t const cmd = cmdinit_st7789[count++];
+    uint8_t const cmd_arg = cmdinit_st7789[count++];
+    uint8_t const has_delay = cmd_arg & ST_CMD_DELAY;
+    uint8_t const narg = cmd_arg & ~ST_CMD_DELAY;
+
+    tft_cmd(cmd, cmdinit_st7789 + count, narg);
+    count += narg;
+
+    if (has_delay) {
+      uint16_t delay = (uint16_t) cmdinit_st7789[count++];
+      if (delay == 255) {
+        delay = 500; // If 255, delay for 500 ms
+      }
+      NRFX_DELAY_MS(delay);
+    }
+  }
+}
+
 #endif

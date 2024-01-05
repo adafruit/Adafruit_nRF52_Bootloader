@@ -115,6 +115,16 @@ bool button_pressed(uint32_t pin);
 bool is_ota(void);
 
 //--------------------------------------------------------------------+
+// Display
+//--------------------------------------------------------------------+
+#ifdef DISPLAY_PIN_SCK
+void board_display_init(void);
+void board_display_teardown(void);
+void board_display_draw_screen(uint8_t const* fb);
+void screen_draw_drag(void);
+#endif
+
+//--------------------------------------------------------------------+
 // DEBUG
 //--------------------------------------------------------------------+
 
