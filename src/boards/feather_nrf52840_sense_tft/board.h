@@ -48,6 +48,32 @@
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
+// Display
+//--------------------------------------------------------------------+
+#define DISPLAY_CONTROLLER_ST7789
+
+#define DISPLAY_PIN_SCK       _PINNUM(0, 26)
+#define DISPLAY_PIN_MOSI      _PINNUM(0,  5)
+
+#define DISPLAY_PIN_CS        _PINNUM(1,  5)
+#define DISPLAY_PIN_DC        _PINNUM(1,  1)
+#define DISPLAY_PIN_RST       _PINNUM(1,  3)
+#define DISPLAY_PIN_BL        _PINNUM(0, 27)
+#define DISPLAY_BL_ON         1  // GPIO state to enable back light
+
+#define DISPLAY_WIDTH         240
+#define DISPLAY_HEIGHT        135
+
+#define DISPLAY_COL_OFFSET    53
+#define DISPLAY_ROW_OFFSET    40
+
+// Memory Data Access Control & // Vertical Scroll Start Address
+#define DISPLAY_MADCTL        (TFT_MADCTL_MX)
+#define DISPLAY_VSCSAD        0
+
+#define DISPLAY_TITLE         "Sense TFT"
+
+//--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER   "Adafruit Industries"
@@ -62,7 +88,7 @@
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME      "Adafruit Feather nRF52840 Sense TFT"
-#define UF2_VOLUME_LABEL      "FTHRSNSBOOT"
+#define UF2_VOLUME_LABEL      "SENSTFTBOOT"
 #define UF2_BOARD_ID          "nRF52840-FeatherSenseTFT-revA"
 #define UF2_INDEX_URL         "https://www.adafruit.com/product/"
 
