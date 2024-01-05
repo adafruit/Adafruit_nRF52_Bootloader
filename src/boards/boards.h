@@ -120,7 +120,7 @@ bool is_ota(void);
 #ifdef DISPLAY_PIN_SCK
 void board_display_init(void);
 void board_display_teardown(void);
-void board_display_draw_screen(uint8_t const* fb);
+void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes);
 void screen_draw_drag(void);
 #endif
 

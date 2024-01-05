@@ -53,7 +53,7 @@ enum {
 };
 
 // 16-bit 565 color from 24-bit 888 format
-const uint16_t color_palette[] = {
+const uint16_t palette[] = {
     COL(0x000000), // 0
     COL(0xffffff), // 1
     COL(0xff2121), // 2
@@ -214,6 +214,21 @@ static void print4(int x, int y, int color, const char* text) {
 //
 //--------------------------------------------------------------------+
 
+static void draw_screen(uint8_t const* fb) {
+  uint8_t const* p = fb;
+  for (int y = 0; y < DISPLAY_WIDTH; ++y) {
+    uint8_t cc[DISPLAY_HEIGHT * 2];
+    uint32_t dst = 0;
+    for (int x = 0; x < DISPLAY_HEIGHT; ++x) {
+      uint16_t color = palette[*p++ & 0xf];
+      cc[dst++] = color >> 8;
+      cc[dst++] = color & 0xff;
+    }
+
+    board_display_draw_line(y, cc, sizeof(cc));
+  }
+}
+
 // draw color bar
 static void drawBar(int y, int h, int color) {
   for (int x = 0; x < DISPLAY_WIDTH; ++x) {
@@ -245,7 +260,7 @@ void screen_draw_drag(void) {
   print(10, DRAG - 12, COLOR_WHITE, "firmware.uf2");
   print(90, DRAG - 12, COLOR_WHITE, UF2_VOLUME_LABEL);
 
-  board_display_draw_screen(frame_buf);
+  draw_screen(frame_buf);
 }
 
 #endif

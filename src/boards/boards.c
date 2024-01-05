@@ -214,7 +214,7 @@ static inline void tft_dc(bool state) {
   }
 }
 
-static void tft_cmd(uint8_t cmd, uint8_t const* data, uint8_t narg) {
+static void tft_cmd(uint8_t cmd, uint8_t const* data, size_t narg) {
   tft_cs(false);
 
   // send command
@@ -269,34 +269,20 @@ void board_display_teardown(void) {
   nrf_spim_disable(_spim);
 }
 
-// Send the whole buffer data to display controller
-extern const uint16_t color_palette[];
-void board_display_draw_screen(uint8_t const* fb) {
+void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes) {
+  // column and row address set
+  uint32_t xa32 = DISPLAY_COL_OFFSET << 16 | DISPLAY_WIDTH;
+  xa32 = __builtin_bswap32(xa32);
 
-  tft_cs(false);
+  y += DISPLAY_ROW_OFFSET;
+  uint32_t ya32 = (y << 16) | (y + 1);
+  ya32 = __builtin_bswap32(ya32);
+
+  tft_cmd(0x2A, (uint8_t*) &xa32, 4);
+  tft_cmd(0x2B, (uint8_t*) &ya32, 4);
 
   // command: memory write
-  uint8_t cmd = 0x2C;
-  tft_dc(false);
-  spi_write(_spim, &cmd, 1);
-
-  // data
-  tft_dc(true);
-
-  uint8_t const* p = fb;
-  for (int i = 0; i < DISPLAY_WIDTH; ++i) {
-    uint8_t cc[DISPLAY_HEIGHT * 2];
-    uint32_t dst = 0;
-    for (int j = 0; j < DISPLAY_HEIGHT; ++j) {
-      uint16_t color = color_palette[*p++ & 0xf];
-      cc[dst++] = color >> 8;
-      cc[dst++] = color & 0xff;
-    }
-
-    spi_write(_spim, cc, sizeof(cc));
-  }
-
-  tft_cs(true);
+  tft_cmd(0x2C, buf, nbytes);
 }
 
 #endif
@@ -681,6 +667,14 @@ void neopixel_write (uint8_t *pixels) {
 }
 #endif
 
+#define TFT_MADCTL_MY  0x80  ///< Page addr order: Bottom to top
+#define TFT_MADCTL_MX  0x40  ///< Column addr order: Right to left
+#define TFT_MADCTL_MV  0x20  ///< Page/Column order: Reverse Mode ( X <-> Y )
+#define TFT_MADCTL_ML  0x10  ///< LCD refresh Bottom to top
+#define TFT_MADCTL_MH  0x04  ///< LCD refresh right to left
+#define TFT_MADCTL_RGB 0x00  ///< Red-Green-Blue pixel order
+#define TFT_MADCTL_BGR 0x08  ///< Blue-Green-Red pixel order
+
 #ifdef DISPLAY_CONTROLLER_ST7789
 
 #define ST_CMD_DELAY 0x80 // special signifier for command lists
@@ -742,7 +736,7 @@ static void tft_controller_init(void) {
       //  3: Set color mode, 1 arg + delay: 16-bit color, 10 ms delay
       ST77XX_COLMOD, 1 + ST_CMD_DELAY, 0x55, 10,
       //  4: Mem access ctrl (directions), 1 arg: Row/col addr, bottom-top refresh
-      ST77XX_MADCTL, 1, 0x08,
+      ST77XX_MADCTL, 1, DISPLAY_MADCTL,
       //  5: Column addr set, 4 args, no delay: XSTART = 0, XEND = 240
       ST77XX_CASET, 4, 0x00, 0, 0, 240,
       //  6: Row addr set, 4 args, no delay: YSTART = 0 YEND = 320
