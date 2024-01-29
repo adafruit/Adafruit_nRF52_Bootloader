@@ -50,6 +50,11 @@
 //--------------------------------------------------------------------+
 // Display
 //--------------------------------------------------------------------+
+
+// VSensor required to power the display
+#define DISPLAY_VSENSOR_PIN   _PINNUM(1, 7)
+#define DISPLAY_VSENSOR_ON    1
+
 #define DISPLAY_CONTROLLER_ST7789
 
 #define DISPLAY_PIN_SCK       _PINNUM(0, 26)
