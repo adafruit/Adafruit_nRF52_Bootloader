@@ -250,6 +250,11 @@ void board_display_init(void) {
   //------------- Display Init -------------//
   nrf_gpio_cfg_output(DISPLAY_PIN_DC);
 
+#if defined(DISPLAY_VSENSOR_PIN) && DISPLAY_VSENSOR_PIN >= 0
+  nrf_gpio_cfg_output(DISPLAY_VSENSOR_PIN);
+  nrf_gpio_pin_write(DISPLAY_VSENSOR_PIN, DISPLAY_VSENSOR_ON);
+#endif
+
 #if defined(DISPLAY_PIN_RST) && DISPLAY_PIN_RST >= 0
   nrf_gpio_cfg_output(DISPLAY_PIN_RST);
   nrf_gpio_pin_clear(DISPLAY_PIN_RST);
