@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _FORM_H
-#define _FORM_H
+#ifndef _ADV360PRO_H
+#define _ADV360PRO_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -35,7 +35,7 @@
  #define LEDS_NUMBER           0
 
  #define LED_NEOPIXEL          _PINNUM(0, 20)
- #define NEOPIXELS_NUMBER      2
+ #define NEOPIXELS_NUMBER      3
  #define BOARD_RGB_BRIGHTNESS  0x040404
 
 /*------------------------------------------------------------------*/
@@ -50,7 +50,7 @@
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER  "Kinesis Corporation"
-#define BLEDIS_MODEL         "Form"
+#define BLEDIS_MODEL         "Adv360 Pro"
 
 //--------------------------------------------------------------------+
 // USB
@@ -59,9 +59,9 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "Kinesis Form"
-#define UF2_VOLUME_LABEL  "Form"
-#define UF2_BOARD_ID      "kinesis-form"
-#define UF2_INDEX_URL     "https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dongle"
+#define UF2_PRODUCT_NAME  "Kinesis Advantage 360 Pro"
+#define UF2_VOLUME_LABEL  "ADV360PRO"
+#define UF2_BOARD_ID      "kinesis-adv360pro"
+#define UF2_INDEX_URL     "https://kinesis-ergo.com/shop/adv360pro/"
 
-#endif // _FORM_H
+#endif // _ADV360PRO_H
