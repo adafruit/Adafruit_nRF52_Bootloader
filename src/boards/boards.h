@@ -124,6 +124,17 @@ void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes);
 void screen_draw_drag(void);
 #endif
 
+// Epaper
+#ifdef EPD_PIN_SCK
+void board_epd_init(void);
+void board_epd_teardown(void);
+void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t end_y, uint8_t const* buf, size_t nbytes);
+void epd_draw_unmount(void);
+void epd_draw_mounted(void);
+void epd_draw_flashing(void);
+void epd_draw_complete(void);
+#endif
+
 //--------------------------------------------------------------------+
 // DEBUG
 //--------------------------------------------------------------------+

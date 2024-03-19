@@ -101,6 +101,10 @@ void usb_init(bool cdc_only) {
   board_display_init();
   screen_draw_drag();
   #endif
+  #ifdef EPD_PIN_SCK
+  board_epd_init();
+  epd_draw_unmount();
+  #endif
 }
 
 void usb_teardown(void) {
@@ -113,8 +117,14 @@ void usb_teardown(void) {
 //--------------------------------------------------------------------+
 void tud_mount_cb(void) {
   led_state(STATE_USB_MOUNTED);
+  #ifdef EPD_PIN_SCK
+  epd_draw_mounted();
+  #endif
 }
 
 void tud_umount_cb(void) {
   led_state(STATE_USB_UNMOUNTED);
+  #ifdef EPD_PIN_SCK
+  epd_draw_unmount();
+  #endif
 }

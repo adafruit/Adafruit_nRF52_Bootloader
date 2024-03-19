@@ -38,11 +38,31 @@
  #define NEOPIXELS_NUMBER      1
  #define BOARD_RGB_BRIGHTNESS  0x040404
 
+//Epaper
+
+#define EPD_PWR_PIN   _PINNUM(1, 7)
+#define EPD_PWR_ON    1
+
+#define EPD_CONTROLLER_IL0323
+
+#define EPD_PIN_SCK       _PINNUM(0, 19)
+#define EPD_PIN_MOSI      _PINNUM(0,  17)
+
+#define EPD_PIN_CS        _PINNUM(0,  21)
+#define EPD_PIN_DC        _PINNUM(0,  23)
+#define EPD_PIN_RST       _PINNUM(0,  25)
+#define EPD_PIN_BSY        _PINNUM(1, 0)
+
+#define EPD_WIDTH         80
+#define EPD_HEIGHT        128
+
+#define DISPLAY_TITLE         "NGP"
+
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER    2  // none connected at all
+#define BUTTONS_NUMBER    2  // One in use
 #define BUTTON_1          _PINNUM(0, 18)  // unusable: RESET
 #define BUTTON_2          _PINNUM(1, 6)  // no connection
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP

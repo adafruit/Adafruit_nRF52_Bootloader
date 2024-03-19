@@ -293,6 +293,104 @@ void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes) {
 
 #endif
 
+
+#ifdef EPD_PIN_SCK
+#include "nrf_spim.h"
+// Note don't use SPIM3 since it has lots of errata
+NRF_SPIM_Type* _spim = NRF_SPIM0;
+
+static void spi_write(NRF_SPIM_Type *p_spim, uint8_t const *tx_buf, size_t tx_len) {
+  nrf_spim_tx_buffer_set(p_spim, tx_buf, tx_len);
+  nrf_spim_rx_buffer_set(p_spim, NULL, 0);
+
+  nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_ENDTX);
+  nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_END);
+  nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_START);
+
+  // blocking wait until xfer complete
+  while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END)){}
+}
+
+static void epd_controller_init(void);
+
+static inline void epd_cs(bool state) {
+  nrf_gpio_pin_write(EPD_PIN_CS, state);
+}
+
+static inline void epd_dc(bool state) {
+  nrf_gpio_pin_write(EPD_PIN_DC, state);
+}
+
+static void epd_bsy_wait(void) {
+  while(!nrf_gpio_pin_read(EPD_PIN_BSY)) 
+    NRFX_DELAY_MS(1);
+}
+
+static void epd_cmd(uint8_t cmd, uint8_t const* data, size_t narg) {
+  epd_cs(false);
+
+  // send command
+  epd_dc(false);
+  spi_write(_spim, &cmd, 1);
+
+  // send data
+  if (narg > 0) {
+    epd_dc(true);
+    spi_write(_spim, data, narg);
+  }
+
+  epd_cs(true);
+}
+
+void board_epd_init(void) {
+  //------------- SPI init -------------//
+  // highspeed SPIM should set SCK and MOSI to high drive
+  nrf_gpio_cfg(EPD_PIN_SCK, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_CONNECT,
+               NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_H0H1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg(EPD_PIN_MOSI, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
+               NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_H0H1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg_output(EPD_PIN_CS);
+  nrf_gpio_pin_set(EPD_PIN_CS);
+
+  nrf_spim_pins_set(_spim, EPD_PIN_SCK, EPD_PIN_MOSI, NRF_SPIM_PIN_NOT_CONNECTED);
+  nrf_spim_frequency_set(_spim, NRF_SPIM_FREQ_4M);
+  nrf_spim_configure(_spim, NRF_SPIM_MODE_0, NRF_SPIM_BIT_ORDER_MSB_FIRST);
+  nrf_spim_orc_set(_spim, 0xFF);
+
+  nrf_spim_enable(_spim);
+
+  //------------- Display Init -------------//
+  nrf_gpio_cfg_output(EPD_PIN_DC);
+
+#if defined(EPD_PWR_PIN) && EPD_PWR_PIN >= 0
+  nrf_gpio_cfg_output(EPD_PWR_PIN);
+  nrf_gpio_pin_write(EPD_PWR_PIN, EPD_PWR_ON);
+#endif
+
+#if defined(EPD_PIN_BSY) && EPD_PIN_BSY >= 0
+  nrf_gpio_cfg_sense_input(EPD_PIN_BSY, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_LOW);
+#endif
+
+#if defined(EPD_PIN_RST) && EPD_PIN_RST >= 0
+  nrf_gpio_cfg_output(EPD_PIN_RST);
+  nrf_gpio_pin_clear(EPD_PIN_RST);
+  NRFX_DELAY_MS(10);
+  nrf_gpio_pin_set(EPD_PIN_RST);
+  NRFX_DELAY_MS(20);
+  epd_bsy_wait();
+#endif
+
+  epd_controller_init();
+}
+
+void board_epd_teardown(void) {
+  nrf_spim_disable(_spim);
+}
+
+//Line drawing in screen specific code
+
+#endif
+
 //--------------------------------------------------------------------+
 // LED Indicator
 //--------------------------------------------------------------------+
@@ -774,6 +872,145 @@ static void tft_controller_init(void) {
       NRFX_DELAY_MS(delay);
     }
   }
+}
+
+#endif
+
+#ifdef EPD_CONTROLLER_IL0323
+
+#define IL0323_CMD_PSR 0x00
+#define IL0323_CMD_PWR 0x01
+#define IL0323_CMD_POF 0x02
+#define IL0323_CMD_PFS 0x03
+#define IL0323_CMD_PON 0x04
+#define IL0323_CMD_PMES 0x05
+#define IL0323_CMD_CPSET 0x06
+#define IL0323_CMD_DSLP 0x07
+#define IL0323_CMD_DTM1 0x10
+#define IL0323_CMD_DSP 0x11
+#define IL0323_CMD_DRF 0x12
+#define IL0323_CMD_DTM2 0x13
+#define IL0323_CMD_AUTO 0x17
+#define IL0323_CMD_LUTOPT 0x2A
+#define IL0323_CMD_PLL 0x30
+#define IL0323_CMD_TSC 0x40
+#define IL0323_CMD_TSE 0x41
+#define IL0323_CMD_PBC 0x44
+#define IL0323_CMD_CDI 0x50
+#define IL0323_CMD_LPD 0x51
+#define IL0323_CMD_TCON 0x60
+#define IL0323_CMD_TRES 0x61
+#define IL0323_CMD_GSST 0x65
+#define IL0323_CMD_REV 0x70
+#define IL0323_CMD_FLG 0x71
+#define IL0323_CMD_CRC 0x72
+#define IL0323_CMD_AMV 0x80
+#define IL0323_CMD_VV 0x81
+#define IL0323_CMD_VDCS 0x82
+#define IL0323_CMD_PTL 0x90
+#define IL0323_CMD_PIN 0x91
+#define IL0323_CMD_POUT 0x92
+#define IL0323_CMD_PGM 0xA0
+#define IL0323_CMD_APG 0xA1
+#define IL0323_CMD_ROTP 0xA2
+#define IL0323_CMD_CCSET 0xE0
+#define IL0323_CMD_PWS 0xE3
+#define IL0323_CMD_LVSEL 0xE4
+#define IL0323_CMD_TSSET 0xE5
+
+#define BIT(n)  (1UL << (n))
+#define IL0323_PSR_RES_WIDTH BIT(7)
+#define IL0323_PSR_RES_HEIGHT BIT(6)
+#define IL0323_PSR_LUT_REG BIT(5)
+#define IL0323_PSR_LUT_OTP BIT(4)
+#define IL0323_PSR_UD BIT(3)
+#define IL0323_PSR_SHL BIT(2)
+#define IL0323_PSR_SHD BIT(1)
+#define IL0323_PSR_RST BIT(0)
+
+#define IL0323_AUTO_PON_DRF_POF 0xA5
+#define IL0323_AUTO_PON_DRF_POF_DSLP 0xA7
+
+#define IL0323_CDI_REG_LENGTH 1U
+#define IL0323_CDI_CDI_IDX 0
+
+#define IL0323_TRES_REG_LENGTH 2U
+#define IL0323_TRES_HRES_IDX 0
+#define IL0323_TRES_VRES_IDX 1
+
+#define IL0323_PTL_REG_LENGTH 5U
+#define IL0323_PTL_HRST_IDX 0
+#define IL0323_PTL_HRED_IDX 1
+#define IL0323_PTL_VRST_IDX 2
+#define IL0323_PTL_VRED_IDX 3
+#define IL0323_PTL_PT_SCAN BIT(0)
+
+/* Time constants in ms */
+#define IL0323_RESET_DELAY 10U
+#define IL0323_PON_DELAY 100U
+#define IL0323_BUSY_DELAY 1U
+
+static void epd_controller_init(void) {
+  
+  uint8_t tmp[IL0323_TRES_REG_LENGTH];
+  uint8_t pwr[] = {0x03, 0x00, 0x2b, 0x2b};
+
+  epd_cmd(IL0323_CMD_PWR, pwr, sizeof(pwr));
+  epd_cmd(IL0323_CMD_PON, NULL, 0);
+  NRFX_DELAY_MS(IL0323_PON_DELAY);
+  epd_bsy_wait();
+
+  tmp[0] = IL0323_PSR_UD | IL0323_PSR_SHL | IL0323_PSR_SHD | IL0323_PSR_RST | IL0323_PSR_RES_HEIGHT;
+
+
+  epd_cmd(IL0323_CMD_PSR, tmp, 1);
+/* Set panel resolution */
+  tmp[IL0323_TRES_HRES_IDX] = EPD_WIDTH;
+  tmp[IL0323_TRES_VRES_IDX] = EPD_HEIGHT;
+  epd_cmd(IL0323_CMD_TRES, tmp, IL0323_TRES_REG_LENGTH);
+
+  tmp[0] = 0x57;
+  epd_cmd(IL0323_CMD_CDI, tmp, 1);
+
+  tmp[0] = 0x22;
+  epd_cmd(IL0323_CMD_TCON, tmp, 1);
+  /* Enable Auto Sequence */
+  tmp[0] = IL0323_AUTO_PON_DRF_POF;
+  epd_cmd(IL0323_CMD_AUTO, tmp, 1);
+
+}
+
+static uint8_t old_buffer[1600];
+
+#define IL0323_PIXELS_PER_BYTE 8U
+
+/* Horizontally aligned page! */
+#define IL0323_NUMOF_PAGES (EPD_PANEL_WIDTH / IL0323_PIXELS_PER_BYTE)
+#define IL0323_PANEL_FIRST_GATE 0U
+#define IL0323_PANEL_LAST_GATE (EPD_PANEL_HEIGHT - 1)
+#define IL0323_PANEL_FIRST_PAGE 0U
+#define IL0323_PANEL_LAST_PAGE (IL0323_NUMOF_PAGES - 1)
+
+void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t end_y, uint8_t const* buf, size_t nbytes) {
+  uint8_t ptl[IL0323_PTL_REG_LENGTH] = {0};
+  /* Setup Partial Window and enable Partial Mode */
+    ptl[IL0323_PTL_HRST_IDX] = start_x;
+    ptl[IL0323_PTL_HRED_IDX] = end_x;
+    ptl[IL0323_PTL_VRST_IDX] = start_y;
+    ptl[IL0323_PTL_VRED_IDX] = end_y;
+    ptl[sizeof(ptl) - 1] = IL0323_PTL_PT_SCAN;
+
+    epd_bsy_wait();
+    epd_cmd(IL0323_CMD_PIN, NULL, 0);
+    epd_cmd(IL0323_CMD_PTL, ptl, sizeof(ptl));
+    epd_cmd(IL0323_CMD_DTM1, old_buffer, 1280);
+    epd_cmd(IL0323_CMD_DTM2, buf, nbytes);
+
+    memcpy(old_buffer, buf, 1280);
+
+    epd_cmd(IL0323_CMD_DRF, NULL, 0);
+    NRFX_DELAY_MS(1);
+    epd_cmd(IL0323_CMD_POUT, NULL, 0);
 }
 
 #endif

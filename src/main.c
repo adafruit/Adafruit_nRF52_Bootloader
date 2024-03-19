@@ -299,7 +299,7 @@ static void check_dfu_mode(void) {
     // Initiate an update of the firmware.
     if (APP_ASKS_FOR_SINGLE_TAP_RESET() || uf2_dfu || serial_only_dfu) {
       // If USB is not enumerated in 3s (eg. because we're running on battery), we restart into app.
-      bootloader_dfu_start(_ota_dfu, 3000, true);
+      bootloader_dfu_start(_ota_dfu, 6000, true);
     } else {
       // No timeout if bootloader requires user action (double-reset).
       bootloader_dfu_start(_ota_dfu, 0, false);

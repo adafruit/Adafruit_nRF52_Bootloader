@@ -264,3 +264,99 @@ void screen_draw_drag(void) {
 }
 
 #endif
+
+#ifdef EPD_PIN_SCK
+
+#include <string.h>
+#include <stdlib.h>
+
+// Overlap 4x chars by this much.
+#define CHAR4_KERNING 3
+
+// Width of a single 4x char, adjusted by kerning
+#define CHAR4_KERNED_WIDTH  (6 * 4 - CHAR4_KERNING)
+
+static uint8_t frame_buf[1280];
+extern const uint8_t font8[];
+extern const uint8_t pwlogo[];
+extern const uint8_t unmount[];
+extern const uint8_t mounted[];
+extern const uint8_t flashing[];
+extern const uint8_t complete[];
+
+// print character with font size = 1
+static void printch(int x, int y, const uint8_t* fnt) {
+  for (int i = 0; i < 8; ++i) {
+    uint8_t* p = frame_buf + x/8 + ((y+i)*(EPD_WIDTH/8));
+    *p = *fnt;
+    fnt++;
+  }
+}
+
+static void print(int x, int y, const char* text) {
+  int x0 = x;
+  while (*text) {
+    char c = *text++;
+    if (c == '\r') continue;
+    if (c == '\n') {
+      x = x0;
+      y += 10;
+      continue;
+    }
+   
+    if (c < ' ') c = '?';
+    if (c >= 0x7f) c = '?';
+    c -= ' ';
+    printch(x, y, &font8[c * 8]);
+    x += 8;
+  }
+}
+//X is in multiples of 8
+void epd_draw_img(uint8_t x, uint8_t y, const uint8_t* icon, uint8_t w, uint8_t h) {
+  for(uint8_t i=0; i<h; i++) {
+      memcpy(frame_buf + x + ((y+i)*EPD_WIDTH/8), icon+(i*(w/8)), (w/8));
+  }
+}
+
+void epd_draw_unmount(void){
+  memset(frame_buf, 0xFF, 1280);
+  epd_draw_img(0, 0, pwlogo, 32, 32);
+  print(40, 12, DISPLAY_TITLE);
+  print(0, 32, "Bootloader");
+  epd_draw_img(1, 42, unmount, 64, 64);
+  print(0, 110, "Connect to");
+  print(8, 118, "host ...");
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+
+
+
+}
+
+void epd_draw_mounted(void) {
+
+  //epd_draw_img(0, 0, testimg, 32, 32);
+  memset(frame_buf+420, 0xFF, 640);
+  epd_draw_img(2, 42, mounted, 48, 64);
+  print(0, 110, "Connected!");
+  print(8, 118, "Copy UF2");
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+
+}
+
+void epd_draw_flashing(void) {
+  memset(frame_buf+420, 0xFF, 880);
+  epd_draw_img(1, 42, flashing, 64, 64);
+  print(8, 110, "Flashing");
+  print(8, 118, "Wait ...");
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+}
+
+void epd_draw_complete(void) {
+  memset(frame_buf+420, 0xFF, 880);
+  epd_draw_img(1, 42, complete, 64, 64);
+  print(8, 110, "Complete");
+  print(0, 118, "Rebooting");
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+}
+
+#endif
