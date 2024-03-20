@@ -270,12 +270,6 @@ void screen_draw_drag(void) {
 #include <string.h>
 #include <stdlib.h>
 
-// Overlap 4x chars by this much.
-#define CHAR4_KERNING 3
-
-// Width of a single 4x char, adjusted by kerning
-#define CHAR4_KERNED_WIDTH  (6 * 4 - CHAR4_KERNING)
-
 static uint8_t frame_buf[1280];
 extern const uint8_t font8[];
 extern const uint8_t pwlogo[];
@@ -295,8 +289,8 @@ static void printch(int x, int y, const uint8_t* fnt) {
   else {
     for (int i = 0; i < 8; ++i) {      
       uint8_t* p = frame_buf + x/8 + ((y+i)*(EPD_WIDTH/8));
-      uint8_t temp1 = (*p & (0xFF << (x%8))) | (*fnt>>(x%8)) ;
-      uint8_t temp2 = (*fnt<<(8-(x%8))) | (*(p+1) & (0xFF >> (8-(x%8)))); 
+      uint8_t temp1 = (*p & (0xFF << (8-(x%8)))) | (*fnt>>(x%8)) ;
+      uint8_t temp2 = (*fnt<<(8-(x%8))) | (*(p+1) & (0xFF >> (x%8))); 
       *p = temp1;
       *(p+1) = temp2;
       fnt++;
@@ -322,52 +316,92 @@ static void print(int x, int y, const char* text) {
     x += 8;
   }
 }
-//X is in multiples of 8
-void epd_draw_img(uint8_t x, uint8_t y, const uint8_t* icon, uint8_t w, uint8_t h) {
-  for(uint8_t i=0; i<h; i++) {
-      memcpy(frame_buf + x + ((y+i)*EPD_WIDTH/8), icon+(i*(w/8)), (w/8));
+// Images must be multiple of 8 wide
+static void epd_draw_img(uint8_t x, uint8_t y, const uint8_t* icon, uint8_t w, uint8_t h) {
+
+  //If placed byte aligned copy straight into framebuffer
+  if(!(x%8))
+    for(uint8_t i=0; i<h; i++) {
+      memcpy(frame_buf + x/8 + ((y+i)*EPD_WIDTH/8), icon+(i*(w/8)), (w/8));
+    }
+  //If not byte aligned perform arcane bitshifting voodoo to slide it into framebuffer in appropriate posiiton  
+  else {
+    for (int i = 0; i < h; ++i) {      
+      uint8_t* p = frame_buf + x/8 + ((y+i)*(EPD_WIDTH/8));
+      for (int j=0; j < w/8; j++) {
+        uint8_t temp1 = (*p & (0xFF << (8-(x%8)))) | (*(icon+(i*(w/8))+j)>>(x%8)) ;
+        uint8_t temp2 = (*(icon+(i*(w/8))+j)<<(8-(x%8))) | (*(p+1) & (0xFF >> (x%8))); 
+        *p = temp1;
+        *(p+1) = temp2;
+        p++;
+      }
+    }
   }
+  
 }
 
 void epd_draw_unmount(void){
+
+  #if EPD_WIDTH == 80 
+  #if EPD_HEIGHT == 128
+  // for GDEW0102T4
   memset(frame_buf, 0xFF, 1280);
-  epd_draw_img(0, 0, pwlogo, 32, 32);
-  print(36, 12, DISPLAY_TITLE);
+  epd_draw_img(2, 4, pwlogo, 24, 24);
+  print(32, 12, DISPLAY_TITLE);
   print(0, 32, "Bootloader");
-  epd_draw_img(1, 42, unmount, 64, 64);
+  epd_draw_img(8, 42, unmount, 64, 64);
   print(12, 110, "Connect");
   print(12, 118, "via USB");
   board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
-
+  #endif
+  #endif
 
 
 }
 
 void epd_draw_mounted(void) {
 
-  //epd_draw_img(0, 0, testimg, 32, 32);
+  #if EPD_WIDTH == 80 
+  #if EPD_HEIGHT == 128
+  // for GDEW0102T4
   memset(frame_buf+420, 0xFF, 880);
-  epd_draw_img(2, 42, mounted, 48, 64);
+  epd_draw_img(16, 42, mounted, 48, 64);
   print(4, 110, "Connected");
   print(8, 118, "Copy UF2");
   board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+  #endif
+  #endif
 
 }
 
 void epd_draw_flashing(void) {
+
+  #if EPD_WIDTH == 80 
+  #if EPD_HEIGHT == 128
+  // for GDEW0102T4
   memset(frame_buf+420, 0xFF, 880);
-  epd_draw_img(1, 42, flashing, 64, 64);
+  epd_draw_img(8, 42, flashing, 64, 64);
   print(8, 110, "Flashing");
   print(8, 118, "Wait ...");
   board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+  #endif
+  #endif
+
 }
 
 void epd_draw_complete(void) {
+
+  #if EPD_WIDTH == 80 
+  #if EPD_HEIGHT == 128
+  // for GDEW0102T4
   memset(frame_buf+420, 0xFF, 880);
-  epd_draw_img(1, 42, complete, 64, 64);
+  epd_draw_img(8, 42, complete, 64, 64);
   print(8, 110, "Complete");
   print(4, 118, "Rebooting");
   board_epd_draw(0, 42, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf+420, 880);
+  #endif
+  #endif
+  
 }
 
 #endif
