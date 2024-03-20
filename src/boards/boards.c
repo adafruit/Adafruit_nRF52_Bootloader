@@ -969,7 +969,7 @@ static void epd_controller_init(void) {
   tmp[IL0323_TRES_VRES_IDX] = EPD_HEIGHT;
   epd_cmd(IL0323_CMD_TRES, tmp, IL0323_TRES_REG_LENGTH);
 
-  tmp[0] = 0x57;
+  tmp[0] = 0x97;
   epd_cmd(IL0323_CMD_CDI, tmp, 1);
 
   tmp[0] = 0x22;

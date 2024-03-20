@@ -286,10 +286,21 @@ extern const uint8_t complete[];
 
 // print character with font size = 1
 static void printch(int x, int y, const uint8_t* fnt) {
-  for (int i = 0; i < 8; ++i) {
-    uint8_t* p = frame_buf + x/8 + ((y+i)*(EPD_WIDTH/8));
-    *p = *fnt;
-    fnt++;
+  if(!(x%8))
+    for (int i = 0; i < 8; ++i) {
+      uint8_t* p = frame_buf + x/8 + ((y+i)*(EPD_WIDTH/8));
+      *p = *fnt;
+      fnt++;
+    }
+  else {
+    for (int i = 0; i < 8; ++i) {      
+      uint8_t* p = frame_buf + x/8 + ((y+i)*(EPD_WIDTH/8));
+      uint8_t temp1 = (*p & (0xFF << (x%8))) | (*fnt>>(x%8)) ;
+      uint8_t temp2 = (*fnt<<(8-(x%8))) | (*(p+1) & (0xFF >> (8-(x%8)))); 
+      *p = temp1;
+      *(p+1) = temp2;
+      fnt++;
+    }
   }
 }
 
@@ -321,11 +332,11 @@ void epd_draw_img(uint8_t x, uint8_t y, const uint8_t* icon, uint8_t w, uint8_t 
 void epd_draw_unmount(void){
   memset(frame_buf, 0xFF, 1280);
   epd_draw_img(0, 0, pwlogo, 32, 32);
-  print(40, 12, DISPLAY_TITLE);
+  print(36, 12, DISPLAY_TITLE);
   print(0, 32, "Bootloader");
   epd_draw_img(1, 42, unmount, 64, 64);
-  print(0, 110, "Connect to");
-  print(8, 118, "host ...");
+  print(12, 110, "Connect");
+  print(12, 118, "via USB");
   board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
 
 
@@ -335,9 +346,9 @@ void epd_draw_unmount(void){
 void epd_draw_mounted(void) {
 
   //epd_draw_img(0, 0, testimg, 32, 32);
-  memset(frame_buf+420, 0xFF, 640);
+  memset(frame_buf+420, 0xFF, 880);
   epd_draw_img(2, 42, mounted, 48, 64);
-  print(0, 110, "Connected!");
+  print(4, 110, "Connected");
   print(8, 118, "Copy UF2");
   board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
 
@@ -355,8 +366,8 @@ void epd_draw_complete(void) {
   memset(frame_buf+420, 0xFF, 880);
   epd_draw_img(1, 42, complete, 64, 64);
   print(8, 110, "Complete");
-  print(0, 118, "Rebooting");
-  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
+  print(4, 118, "Rebooting");
+  board_epd_draw(0, 42, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf+420, 880);
 }
 
 #endif
