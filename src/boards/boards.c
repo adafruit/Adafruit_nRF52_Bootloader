@@ -917,6 +917,8 @@ static void tft_controller_init(void) {
 #define IL0323_CMD_PWS 0xE3
 #define IL0323_CMD_LVSEL 0xE4
 #define IL0323_CMD_TSSET 0xE5
+#define IL0323_CMD_LUTW 0x23
+#define IL0323_CMD_LUTB 0x24
 
 #define BIT(n)  (1UL << (n))
 #define IL0323_PSR_RES_WIDTH BIT(7)
@@ -950,15 +952,40 @@ static void tft_controller_init(void) {
 #define IL0323_PON_DELAY 100U
 #define IL0323_BUSY_DELAY 1U
 
+
+const uint8_t lut_w[] =
+{
+0x60	,0x01	,0x01	,0x00	,0x00	,0x01	,
+0x80	,0x0f	,0x00	,0x00	,0x00	,0x01	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+
+};	
+const uint8_t lut_b[] =
+{
+0x90	,0x01	,0x01	,0x00	,0x00	,0x01	,
+0x40	,0x0f	,0x00	,0x00	,0x00	,0x01	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+0x00	,0x00	,0x00	,0x00	,0x00	,0x00	,
+
+};
+
 static void epd_controller_init(void) {
   
   uint8_t tmp[IL0323_TRES_REG_LENGTH];
   uint8_t pwr[] = {0x03, 0x00, 0x2b, 0x2b};
-
+  tmp[0] = 0x3F;
+  epd_cmd(0xD2, tmp, 1);
+  tmp[0] = 0x6F;
+  epd_cmd(IL0323_CMD_PSR, tmp, 1);
   epd_cmd(IL0323_CMD_PWR, pwr, sizeof(pwr));
-  epd_cmd(IL0323_CMD_PON, NULL, 0);
-  NRFX_DELAY_MS(IL0323_PON_DELAY);
-  epd_bsy_wait();
+  
 
   tmp[0] = IL0323_PSR_UD | IL0323_PSR_SHL | IL0323_PSR_SHD | IL0323_PSR_RST | IL0323_PSR_RES_HEIGHT;
 
@@ -969,7 +996,12 @@ static void epd_controller_init(void) {
   tmp[IL0323_TRES_VRES_IDX] = EPD_HEIGHT;
   epd_cmd(IL0323_CMD_TRES, tmp, IL0323_TRES_REG_LENGTH);
 
-  tmp[0] = 0x97;
+  tmp[0] = 0x00;
+  tmp[1] = 0x00;
+
+  epd_cmd(IL0323_CMD_LUTOPT, tmp, 2);
+
+  tmp[0] = 0xF7;
   epd_cmd(IL0323_CMD_CDI, tmp, 1);
 
   tmp[0] = 0x22;
@@ -977,6 +1009,13 @@ static void epd_controller_init(void) {
   /* Enable Auto Sequence */
   tmp[0] = IL0323_AUTO_PON_DRF_POF;
   epd_cmd(IL0323_CMD_AUTO, tmp, 1);
+
+  epd_cmd(IL0323_CMD_LUTW, lut_w, 42);
+  epd_cmd(IL0323_CMD_LUTB, lut_b, 42);
+
+  epd_cmd(IL0323_CMD_PON, NULL, 0);
+  NRFX_DELAY_MS(IL0323_PON_DELAY);
+  epd_bsy_wait();
 
 }
 
