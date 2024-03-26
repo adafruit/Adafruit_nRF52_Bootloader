@@ -980,8 +980,8 @@ static void epd_controller_init(void) {
   
   uint8_t tmp[IL0323_TRES_REG_LENGTH];
   uint8_t pwr[] = {0x03, 0x00, 0x2b, 0x2b};
-  tmp[0] = 0x3F;
-  epd_cmd(0xD2, tmp, 1);
+
+
   tmp[0] = 0x6F;
   epd_cmd(IL0323_CMD_PSR, tmp, 1);
   epd_cmd(IL0323_CMD_PWR, pwr, sizeof(pwr));
@@ -1019,7 +1019,7 @@ static void epd_controller_init(void) {
 
 }
 
-static uint8_t old_buffer[1600];
+static uint8_t old_buffer[1280];
 
 #define IL0323_PIXELS_PER_BYTE 8U
 
@@ -1050,6 +1050,7 @@ void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t en
     epd_cmd(IL0323_CMD_DRF, NULL, 0);
     NRFX_DELAY_MS(1);
     epd_cmd(IL0323_CMD_POUT, NULL, 0);
+    NRFX_DELAY_MS(500);
 }
 
 #endif
