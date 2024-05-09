@@ -167,7 +167,7 @@ target_compile_options(bootloader PUBLIC
   -Wno-endif-labels
   -Wunreachable-code
   # Suppress warning caused by SDK
-  -Wno-unused-parameter -Wno-expansion-to-defined
+  -Wno-unused-parameter -Wno-expansion-to-defined -Wno-array-bounds
   )
 target_compile_definitions(bootloader PUBLIC
   SOFTDEVICE_PRESENT
