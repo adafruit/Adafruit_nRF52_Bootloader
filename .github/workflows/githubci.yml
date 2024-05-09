@@ -65,19 +65,13 @@ jobs:
                     
     steps:
     - name: Setup Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
 
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         submodules: true
-
-    - name: Checkout linkermap
-      uses: actions/checkout@v4
-      with:
-         repository: hathach/linkermap
-         path: linkermap
 
     - name: Install ARM GCC
       uses: carlosperate/arm-none-eabi-gcc-action@v1
@@ -87,18 +81,13 @@ jobs:
     - name: Install Tools
       run: |
         pip3 install adafruit-nrfutil uritemplate requests intelhex setuptools
-        pip3 install linkermap/
 
     - name: Build
       run: |
-        arm-none-eabi-gcc --version
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
 
-    - name: Linker Map
-      run: make BOARD=${{ matrix.board }} linkermap
-
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
