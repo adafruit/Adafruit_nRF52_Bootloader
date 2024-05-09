@@ -9,60 +9,29 @@ on:
       - created
 
 jobs:
+  set-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set matrix
+        id: set-matrix
+        working-directory: src/boards
+        run: |
+          MATRIX_JSON=$(ls -d */ | sed 's/\/$//' | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=$MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
   build:
+    needs: set-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        board:
-          # Adafruit Boards
-          - 'circuitplayground_nrf52840'
-          - 'clue_nrf52840'
-          - 'feather_nrf52832'
-          - 'feather_nrf52833_express'
-          - 'feather_nrf52840_express'
-          - 'feather_nrf52840_sense'
-          - 'feather_nrf52840_sense_tft'
-          - 'itsybitsy_nrf52840_express'
-          - 'metro_nrf52840_express'
-          - 'ledglasses_nrf52840'
-          # Other Makers (Alphabetical order)
-          - 'adm_b_nrf52840_1'
-          - 'ae_bl652_bo'
-          - 'aramcon_badge_2019'
-          - 'aramcon2_badge'
-          - 'arcade_feather_nrf52840_express'
-          - 'arduino_nano_33_ble'
-          - 'bast_ble'
-          - 'bluemicro_nrf52833'
-          - 'bluemicro_nrf52840'
-          - 'challenger_840_ble'
-          - 'ebyte_e104_bt5032a'
-          - 'ebyte_e73_tbb'
-          - 'electronut_labs_papyr'
-          - 'ikigaisense_vita'
-          - 'm60_keyboard'
-          - 'mdk_nrf52840_dongle'
-          - 'mikoto'
-          - 'nice_nano'
-          - 'nrf52840_bboard'
-          - 'nRF52840_connect_kit'
-          - 'nrf52840_m2'
-          - 'ohs2020_badge'
-          - 'particle_argon'
-          - 'particle_boron'
-          - 'particle_xenon'
-          - 'pca10056'
-          - 'pca10059'
-          - 'pca10100'
-          - 'pitaya_go'
-          - 'raytac_mdbt50q_db_40'
-          - 'raytac_mdbt50q_rx'
-          - 'sparkfun_nrf52840_micromod'
-          - 'waveshare_nrf52840_eval'
-          - 'xiao_nrf52840_ble'
-          - 'xiao_nrf52840_ble_sense'
-                    
+        board: ${{ fromJSON(needs.set-matrix.outputs.matrix) }}
     steps:
     - name: Setup Python
       uses: actions/setup-python@v5
