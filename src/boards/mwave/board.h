@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2018 Ha Thach for Adafruit Industries
+ * Copyright (c) 2021 Polarity Works
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,25 +22,26 @@
  * THE SOFTWARE.
  */
 
-#ifndef PCA10100_H
-#define PCA10100_H
+#ifndef _NGP_H
+#define _NGP_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
+
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER         0
+#define LEDS_NUMBER       0
+
 #define LED_SHIFTER
-#define SHIFTER_PIN_CS _PINNUM(0, 31)
-#define SHIFTER_PIN_MOSI _PINNUM(0, 4)
-#define SHIFTER_PIN_SCK _PINNUM(0, 5)
+#define SHIFTER_PIN_CS _PINNUM(0, 18)
+#define SHIFTER_PIN_MOSI _PINNUM(0, 18)
+#define SHIFTER_PIN_SCK _PINNUM(0, 18)
 #define SHIFTER_INDEX 2
-#define SHIFTER_CH_B 2
-#define SHIFTER_CH_R 0
-#define SHIFTER_CH_G 1
 #define SHIFTER_2_LEDS
 #define SHIFTER_COM_ANODE
+
+
 
 /*------------------------------------------------------------------*/
 /* BUTTON
@@ -53,18 +54,19 @@
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER    "Nordic"
-#define BLEDIS_MODEL           "PCA10100"
+#define BLEDIS_MANUFACTURER  "Polarity Works"
+#define BLEDIS_MODEL         "M-Wave"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x1915
-#define USB_DESC_UF2_PID       0x521F
-#define USB_DESC_CDC_ONLY_PID  0x521F
+#define USB_DESC_VID           0x239A
+#define USB_DESC_UF2_PID       0x00B3
+#define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME    "Nordic nRF52833 DK"
-#define UF2_BOARD_ID        "nRF52833-pca10100-v1"
-#define UF2_INDEX_URL       "https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF52833-DK"
+#define UF2_PRODUCT_NAME  "NGP"
+#define UF2_VOLUME_LABEL  "NGP"
+#define UF2_BOARD_ID      "nRF52840-ngp-v1"
+#define UF2_INDEX_URL     "https://polarityworks.com"
 
-#endif // PCA10100_H
+#endif // _NGP_H

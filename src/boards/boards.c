@@ -27,14 +27,14 @@
 #include "app_scheduler.h"
 #include "app_timer.h"
 
-#ifdef LED_APA102
+#if defined(LED_APA102) || defined(LED_SHIFTER)
 #include "nrf_spim.h"
 #endif
 
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102) || defined(LED_SHIFTER)
 void neopixel_init(void);
 void neopixel_write(uint8_t* pixels);
 void neopixel_teardown(void);
@@ -86,7 +86,7 @@ void board_init(void) {
   #endif
 #endif
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102) || defined(LED_SHIFTER)
   // use neopixel for use enumeration
   #ifdef NEOPIXEL_POWER_PIN
   nrf_gpio_cfg_output(NEOPIXEL_POWER_PIN);
@@ -147,7 +147,7 @@ void board_teardown(void) {
   led_pwm_teardown();
 #endif
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102) || defined(LED_SHIFTER)
   neopixel_teardown();
 #endif
 
@@ -394,6 +394,7 @@ void board_epd_teardown(void) {
 //--------------------------------------------------------------------+
 // LED Indicator
 //--------------------------------------------------------------------+
+
 void pwm_teardown(NRF_PWM_Type* pwm) {
   pwm->TASKS_SEQSTART[0] = 0;
   pwm->ENABLE = 0;
@@ -550,7 +551,7 @@ void led_state(uint32_t state) {
     final_color = (uint8_t*) &rgb_color;
   }
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102) || defined(LED_SHIFTER)
   if (final_color != NULL) {
     neopixel_write(final_color);
   }
@@ -769,6 +770,77 @@ void neopixel_write (uint8_t *pixels) {
   led_pwm_duty_cycle(LED_RGB_GREEN, pixels[1]);
   led_pwm_duty_cycle(LED_RGB_BLUE, pixels[0]);
 }
+#endif
+
+#if defined(LED_SHIFTER) && defined(SHIFTER_PIN_CS) && defined(SHIFTER_PIN_MOSI) && defined(SHIFTER_PIN_SCK)  && defined(SHIFTER_INDEX)
+
+static void spi_write(NRF_SPIM_Type *p_spim, uint8_t const *tx_buf, size_t tx_len) {
+  nrf_spim_tx_buffer_set(p_spim, tx_buf, tx_len);
+  nrf_spim_rx_buffer_set(p_spim, NULL, 0);
+
+  nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_ENDTX);
+  nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_END);
+  nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_START);
+
+  // blocking wait until xfer complete
+  while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END)){}
+}
+void neopixel_init(void) {
+  NRF_SPIM_Type* spi = NRF_SPIM1;
+  //------------- SPI init -------------//
+  // highspeed SPIM should set SCK and MOSI to high drive
+  nrf_gpio_cfg(SHIFTER_PIN_SCK, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_CONNECT,
+               NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_H0H1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg(SHIFTER_PIN_MOSI, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
+               NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_H0H1, NRF_GPIO_PIN_NOSENSE);
+  nrf_gpio_cfg_output(SHIFTER_PIN_CS);
+  nrf_gpio_pin_set(SHIFTER_PIN_CS);
+
+  nrf_spim_pins_set(spi, SHIFTER_PIN_SCK, SHIFTER_PIN_MOSI, NRF_SPIM_PIN_NOT_CONNECTED);
+  nrf_spim_frequency_set(spi, NRF_SPIM_FREQ_4M);
+  nrf_spim_configure(spi, NRF_SPIM_MODE_0, NRF_SPIM_BIT_ORDER_MSB_FIRST);
+  nrf_spim_orc_set(spi, 0xFF);
+
+  nrf_spim_enable(spi);
+}
+
+void neopixel_teardown(void) {
+  //uint8_t rgb[3] = { 0, 0, 0 };
+  //neopixel_write(rgb);
+NRF_SPIM_Type* spi = NRF_SPIM1;
+    nrf_spim_disable(spi);
+
+}
+
+// write 3 bytes color to a built-in neopixel
+void neopixel_write (uint8_t *pixels) {
+  nrf_gpio_pin_write(SHIFTER_PIN_CS, false);
+  NRF_SPIM_Type* spi = NRF_SPIM1;
+  //djfhdskjss
+  uint8_t data = 0;
+  // send data
+ #if defined(SHIFTER_COM_ANODE)
+  data = (pixels[0] ? 0 : 1) << SHIFTER_CH_R | (pixels[1] ? 0 : 1) << SHIFTER_CH_G | (pixels[2] ? 0 : 1) << SHIFTER_CH_B;
+  #if defined(SHIFTER_2_LEDS)
+  data |= (pixels[0] ? 0 : 1) << (3+SHIFTER_CH_R) | (pixels[1] ? 0 : 1) << (3+SHIFTER_CH_G) | (pixels[2] ? 0 : 1) << (3+SHIFTER_CH_B);
+  #endif
+  #else
+  data = (pixels[0] ? 1 : 0)  << SHIFTER_CH_R | (pixels[1] ? 1 : 0) << SHIFTER_CH_G | (pixels[2] ? 1 : 0) << SHIFTER_CH_B;
+  #if defined(SHIFTER_2_LEDS)
+  data |= (pixels[0] ? 1 : 0) << (3+SHIFTER_CH_R) | (pixels[1] ? 1 : 0) << (3+SHIFTER_CH_G) | (pixels[2] ? 1 : 0) << (3+SHIFTER_CH_B);
+  #endif
+  #endif
+  spi_write(spi, &data, 1);
+  
+  #if SHIFTER_INDEX > 0
+  data = 0;
+    for(uint8_t i=0; i<SHIFTER_INDEX; i++)
+      spi_write(spi, &data, 1);
+  #endif
+  nrf_gpio_pin_write(SHIFTER_PIN_CS, true);
+
+}
+
 #endif
 
 //--------------------------------------------------------------------+
