@@ -41,7 +41,9 @@
 #include "nrfx.h"
 #include "nrf_clock.h"
 #include "nrfx_power.h"
+#ifndef NRF52820_XXAA 
 #include "nrfx_pwm.h"
+#endif
 
 #include "nordic_common.h"
 #include "sdk_common.h"
@@ -115,7 +117,11 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define DFU_DBL_RESET_MAGIC             0x5A1AD5      // SALADS
 #define DFU_DBL_RESET_APP               0x4ee5677e
 #define DFU_DBL_RESET_DELAY             500
+#ifdef NRF52820_XXAA 
+#define DFU_DBL_RESET_MEM               0x20000F7C
+#else
 #define DFU_DBL_RESET_MEM               0x20007F7C
+#endif
 
 #define BOOTLOADER_VERSION_REGISTER     NRF_TIMER2->CC[0]
 #define DFU_SERIAL_STARTUP_INTERVAL     1000

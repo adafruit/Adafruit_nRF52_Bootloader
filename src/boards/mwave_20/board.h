@@ -33,12 +33,12 @@
 #define LEDS_NUMBER       0
 
 #define LED_SHIFTER
-#define SHIFTER_PIN_CS _PINNUM(0, 31)
+#define SHIFTER_PIN_CS _PINNUM(0, 2)
 #define SHIFTER_PIN_MOSI _PINNUM(0, 4)
 #define SHIFTER_PIN_SCK _PINNUM(0, 5)
-#define SHIFTER_INDEX 1
-#define SHIFTER_CH_B 0
-#define SHIFTER_CH_R 2
+#define SHIFTER_INDEX 2
+#define SHIFTER_CH_B 2
+#define SHIFTER_CH_R 0
 #define SHIFTER_CH_G 1
 #define SHIFTER_2_LEDS
 #define SHIFTER_COM_ANODE
@@ -50,7 +50,7 @@
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER    2  // One in use
 #define BUTTON_1          _PINNUM(0, 18)  // unusable: RESET
-#define BUTTON_2          _PINNUM(1, 7)  // no connection
+#define BUTTON_2          _PINNUM(0, 7)  // no connection
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
@@ -68,7 +68,7 @@
 
 #define UF2_PRODUCT_NAME  "MWAVE"
 #define UF2_VOLUME_LABEL  "MWAVE"
-#define UF2_BOARD_ID      "nRF52833-mwave-v1"
+#define UF2_BOARD_ID      "nRF52820-mwave-v1"
 #define UF2_INDEX_URL     "https://polarityworks.com"
 
 #endif // _MWAVE_H

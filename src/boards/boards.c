@@ -23,7 +23,9 @@
  */
 
 #include "boards.h"
+#ifndef NRF52820_XXAA 
 #include "nrf_pwm.h"
+#endif
 #include "app_scheduler.h"
 #include "app_timer.h"
 
@@ -394,6 +396,7 @@ void board_epd_teardown(void) {
 //--------------------------------------------------------------------+
 // LED Indicator
 //--------------------------------------------------------------------+
+#ifndef NRF52820_XXAA 
 
 void pwm_teardown(NRF_PWM_Type* pwm) {
   pwm->TASKS_SEQSTART[0] = 0;
@@ -455,6 +458,7 @@ void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
   nrf_pwm_event_clear(NRF_PWM0, NRF_PWM_EVENT_SEQEND0);
   nrf_pwm_task_trigger(NRF_PWM0, NRF_PWM_TASK_SEQSTART0);
 }
+#endif
 
 static uint32_t primary_cycle_length;
 #ifdef LED_SECONDARY_PIN
@@ -469,11 +473,13 @@ void led_tick() {
   if (cycle > half_cycle) {
     cycle = primary_cycle_length - cycle;
   }
+#ifndef NRF52820_XXAA 
   uint16_t duty_cycle = 0x4f * cycle / half_cycle;
   #if LED_STATE_ON == 1
   duty_cycle = 0xff - duty_cycle;
   #endif
   led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
+#endif
 
   #ifdef LED_SECONDARY_PIN
   cycle = millis % secondary_cycle_length;
