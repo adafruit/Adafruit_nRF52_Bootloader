@@ -33,15 +33,10 @@ jobs:
       matrix:
         board: ${{ fromJSON(needs.set-matrix.outputs.matrix) }}
     steps:
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-
     - name: Checkout Code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-tags: true
         submodules: true
 
     - name: Install ARM GCC
