@@ -53,8 +53,8 @@
 
 // Shared VID/PID with Feather nRF52840, will be disabled for building in the future
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x0029
+#define USB_DESC_UF2_PID       0x00DA
+#define USB_DESC_CDC_ONLY_PID  0x00DA
 
 #define UF2_PRODUCT_NAME    "Nordic nRF52840 DK"
 #define UF2_BOARD_ID        "nRF52840-pca10056-v1"
