@@ -57,10 +57,10 @@
 // USB
 //--------------------------------------------------------------------+
 
-// Shared VID/PID with Feather nRF52840, will be disabled for building in the future
+// Shared VID/PID with pca10056
 #define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0029
-#define USB_DESC_CDC_ONLY_PID  0x0029
+#define USB_DESC_UF2_PID       0x00DA
+#define USB_DESC_CDC_ONLY_PID  0x00DA
 
 #define UF2_PRODUCT_NAME   "Particle Argon"
 #define UF2_VOLUME_LABEL   "ARGONBOOT  "
