@@ -60,7 +60,7 @@
 //--------------------------------------------------------------------+
 #define UF2_PRODUCT_NAME        "T1000-E"
 #define UF2_VOLUME_LABEL        "T1000-E"
-#define UF2_BOARD_ID            "T1000-E"
+#define UF2_BOARD_ID            "nRF52840-T1000-E"
 #define UF2_INDEX_URL           "https://www.seeedstudio.com/SenseCAP-Card-Tracker-T1000-E-for-Meshtastic-p-5913.html"
 
 
