@@ -34,9 +34,14 @@
 #define LED_PRIMARY_PIN       _PINNUM(0, 6)
 #define LED_STATE_ON          1
 
-#define LED_NEOPIXEL           _PINNUM(0, 8)
-#define NEOPIXELS_NUMBER      1
-#define BOARD_RGB_BRIGHTNESS  0x040404
+#define LED_APA102_CLK          _PINNUM(1, 9)
+#define LED_APA102_DATA         _PINNUM(0, 8)
+#define LED_APA102_BRIGHTNESS   0x1
+#define APA102_NUMBER           1
+
+// For dotstart set to max for colour information is not masked off
+#define BOARD_RGB_BRIGHTNESS  0xffffffff
+
 
 /*------------------------------------------------------------------*/
 /* BUTTON
