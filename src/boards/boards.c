@@ -27,14 +27,14 @@
 #include "app_scheduler.h"
 #include "app_timer.h"
 
-#ifdef LED_APA102
+#ifdef LED_APA102_CLK
 #include "nrf_spim.h"
 #endif
 
 #define SCHED_MAX_EVENT_DATA_SIZE           sizeof(app_timer_event_t)        /**< Maximum size of scheduler events. */
 #define SCHED_QUEUE_SIZE                    30                               /**< Maximum number of events in the scheduler queue. */
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102_CLK)
 void neopixel_init(void);
 void neopixel_write(uint8_t* pixels);
 void neopixel_teardown(void);
@@ -86,7 +86,7 @@ void board_init(void) {
   #endif
 #endif
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102_CLK)
   // use neopixel for use enumeration
   #ifdef NEOPIXEL_POWER_PIN
   nrf_gpio_cfg_output(NEOPIXEL_POWER_PIN);
@@ -147,7 +147,7 @@ void board_teardown(void) {
   led_pwm_teardown();
 #endif
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102_CLK)
   neopixel_teardown();
 #endif
 
@@ -362,7 +362,7 @@ static uint32_t primary_cycle_length;
 static uint32_t secondary_cycle_length;
 #endif
 
-void led_tick() {
+void led_tick(void) {
   uint32_t millis = _systick_count;
 
   uint32_t cycle = millis % primary_cycle_length;
@@ -452,7 +452,7 @@ void led_state(uint32_t state) {
     final_color = (uint8_t*) &rgb_color;
   }
 
-#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102)
+#if defined(LED_NEOPIXEL) || defined(LED_RGB_RED_PIN) || defined(LED_APA102_CLK)
   if (final_color != NULL) {
     neopixel_write(final_color);
   }
@@ -560,7 +560,7 @@ void neopixel_write(uint8_t* pixels) {
 
 #endif
 
-#ifdef LED_APA102
+#ifdef LED_APA102_CLK
 #define BYTE_PER_PIXEL  4
 
 // 4 zero bytes are required to initiate update

@@ -49,6 +49,8 @@ OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
 # merged file = compiled + sd
 MERGED_FILE = $(OUT_NAME)_$(SD_NAME)_$(SD_VERSION)
 
+UF2_FAMILY_ID_BOOTLOADER = 0xd663823c
+
 #------------------------------------------------------------------------------
 # Tool Configure
 #------------------------------------------------------------------------------
@@ -435,7 +437,7 @@ $(BUILD)/$(OUT_NAME)_nosd.hex: $(BUILD)/$(OUT_NAME).hex
 # Bootolader self-update uf2
 $(BUILD)/update-$(OUT_NAME)_nosd.uf2: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Create $(notdir $@)
-	@python3 lib/uf2/utils/uf2conv.py -f 0xd663823c -c -o $@ $^
+	@python3 lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) -c -o $@ $^
 
 # merge bootloader and sd hex together
 $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_NAME).hex
@@ -487,6 +489,11 @@ mbr: flash-mbr
 flash-mbr:
 	@echo Flashing: $(MBR_HEX)
 	$(call FLASH_NOUICR_CMD,$(MBR_HEX))
+
+# flash using uf2
+flash-uf2: $(BUILD)/update-$(OUT_NAME)_nosd.uf2
+	@echo Flashing: $(notdir $<)
+	python lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) --deploy $<
 
 # dfu with adafruit-nrfutil using CDC interface
 dfu-flash: flash-dfu
