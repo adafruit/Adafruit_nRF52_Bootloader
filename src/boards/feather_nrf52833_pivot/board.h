@@ -65,4 +65,3 @@
 #define UF2_VOLUME_LABEL      "PIVOT_BOOT"
 #define UF2_BOARD_ID          "PIVOT_BOOT-revD"
 
-#endif
