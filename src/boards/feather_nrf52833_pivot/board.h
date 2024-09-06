@@ -50,8 +50,8 @@
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "Adafruit PIVOT BOOT"
+#define BLEDIS_MANUFACTURER   "PIVOT Industries"
+#define BLEDIS_MODEL          "PIVOT BOOT"
 
 //--------------------------------------------------------------------+
 // USB
@@ -61,9 +61,8 @@
 #define USB_DESC_CDC_ONLY_PID  0x003A // TODO change later
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME      "Adafruit nRF52833 PIVOT"
+#define UF2_PRODUCT_NAME      "nrf52833 boot  PIVOT"
 #define UF2_VOLUME_LABEL      "PIVOT_BOOT"
 #define UF2_BOARD_ID          "PIVOT_BOOT-revD"
-#define UF2_INDEX_URL         "https://www.adafruit.com/product/4062" // TODO change later
 
 #endif
