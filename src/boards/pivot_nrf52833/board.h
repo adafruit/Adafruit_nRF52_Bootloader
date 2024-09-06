@@ -64,4 +64,7 @@
 #define UF2_PRODUCT_NAME      "nrf52833 boot  PIVOT"
 #define UF2_VOLUME_LABEL      "PIVOT_BOOT"
 #define UF2_BOARD_ID          "PIVOT_BOOT-revD"
+#define UF2_INDEX_URL         "https://www.pivot.com/product/4062" // TODO change later
+
+#endif
 
