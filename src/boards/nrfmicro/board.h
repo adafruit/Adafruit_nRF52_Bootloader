@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _PROMICRO_NRF52840
-#define _PROMICRO_NRF52840
+#ifndef _NRFMICRO_NRF52840
+#define _NRFMICRO_NRF52840
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -47,8 +47,8 @@
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "ProMicro"
-#define BLEDIS_MODEL          "ProMicro nRF52840"
+#define BLEDIS_MANUFACTURER   "nRFMicro"
+#define BLEDIS_MODEL          "nRFMicro nRF52840"
 
 //--------------------------------------------------------------------+
 // USB
@@ -58,9 +58,9 @@
 #define USB_DESC_CDC_ONLY_PID  0x0064
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "ProMicro nRF52840"
-#define UF2_VOLUME_LABEL   "PROMICRO-BOOT"
-#define UF2_BOARD_ID       "nRF52840-ProMicro-v0"
+#define UF2_PRODUCT_NAME   "nRFMicro nRF52840"
+#define UF2_VOLUME_LABEL   "NRFMICRO-BOOT"
+#define UF2_BOARD_ID       "nRF52840-nRFMicro-v0"
 #define UF2_INDEX_URL      "https://github.com/joric/nrfmicro/wiki"
 
-#endif // _PROMICRO_NRF52840
+#endif // _NRFMICRO_NRF52840
