@@ -59,8 +59,8 @@
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   "ProMicro nRF52840"
-#define UF2_VOLUME_LABEL   "PROMICRO"
-#define UF2_BOARD_ID       "ProMicro-nRF52840"
+#define UF2_VOLUME_LABEL   "PROMICRO-BOOT"
+#define UF2_BOARD_ID       "nRF52840-ProMicro-v0"
 #define UF2_INDEX_URL      "https://github.com/joric/nrfmicro/wiki"
 
 #endif // _PROMICRO_NRF52840
