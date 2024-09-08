@@ -54,12 +54,12 @@
 // USB
 //--------------------------------------------------------------------+
 #define USB_DESC_VID           0x1209
-#define USB_DESC_UF2_PID       0x0064
-#define USB_DESC_CDC_ONLY_PID  0x0064
+#define USB_DESC_UF2_PID       0x5284
+#define USB_DESC_CDC_ONLY_PID  0x5284
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "nRFMicro nRF52840"
-#define UF2_VOLUME_LABEL   "NRFMICRO-BOOT"
+#define UF2_PRODUCT_NAME   "nRFMicro"
+#define UF2_VOLUME_LABEL   "NRFMICRO"
 #define UF2_BOARD_ID       "nRF52840-nRFMicro-v0"
 #define UF2_INDEX_URL      "https://github.com/joric/nrfmicro/wiki"
 
