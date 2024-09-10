@@ -19,9 +19,6 @@
 #elif defined(NRF52833_XXAA)
   #define CFG_UF2_FAMILY_APP_ID       0x621E937A
   #define CFG_UF2_FLASH_SIZE          (512*1024)  // 512 kB
-#elif defined(NRF52820_XXAA)
-  #define CFG_UF2_FAMILY_APP_ID       0xd2f791eb
-  #define CFG_UF2_FLASH_SIZE          (256*1024)  // 512 kB
 #endif
 
 // Application Address Space
