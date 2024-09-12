@@ -31,7 +31,7 @@
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 15)
+#define LED_PRIMARY_PIN       _PINNUM(1, 10)
 #define LED_STATE_ON          1 // State when LED is lit (active HIGH)
 
 #define NEOPIXELS_NUMBER      0
@@ -40,8 +40,8 @@
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 14) // RESET
-#define BUTTON_2              _PINNUM(0, 3) // NC
+#define BUTTON_1              _PINNUM(1, 2) // DFU
+#define BUTTON_2              _PINNUM(0, 12) // FRST
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
