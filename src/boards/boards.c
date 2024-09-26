@@ -293,7 +293,6 @@ void board_display_draw_line(uint16_t y, uint8_t const* buf, size_t nbytes) {
 
 #endif
 
-
 #ifdef EPD_PIN_SCK
 #include "nrf_spim.h"
 // Note don't use SPIM3 since it has lots of errata
@@ -322,8 +321,13 @@ static inline void epd_dc(bool state) {
 }
 
 static void epd_bsy_wait(void) {
+  #ifdef EPD_BSY_HIGH
+  while(nrf_gpio_pin_read(EPD_PIN_BSY)) 
+    NRFX_DELAY_MS(1);
+  #else
   while(!nrf_gpio_pin_read(EPD_PIN_BSY)) 
     NRFX_DELAY_MS(1);
+  #endif
 }
 
 static void epd_cmd(uint8_t cmd, uint8_t const* data, size_t narg) {
@@ -1123,6 +1127,176 @@ void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t en
     NRFX_DELAY_MS(1);
     epd_cmd(IL0323_CMD_POUT, NULL, 0);
     NRFX_DELAY_MS(500);
+}
+
+#endif
+
+#ifdef EPD_CONTROLLER_SSD1680
+
+#define SSD16XX_CMD_GDO_CTRL			0x01
+#define SSD16XX_CMD_GDV_CTRL			0x03
+#define SSD16XX_CMD_SDV_CTRL			0x04
+#define SSD16XX_CMD_SOFTSTART			0x0c
+#define SSD16XX_CMD_GSCAN_START			0x0f
+#define SSD16XX_CMD_SLEEP_MODE			0x10
+#define SSD16XX_CMD_ENTRY_MODE			0x11
+#define SSD16XX_CMD_SW_RESET			0x12
+#define SSD16XX_CMD_TSENSOR_SELECTION		0x18
+#define SSD16XX_CMD_TSENS_CTRL			0x1a
+#define SSD16XX_CMD_READ_TSENS_CTRL		0x1b
+#define SSD16XX_CMD_MASTER_ACTIVATION		0x20
+#define SSD16XX_CMD_UPDATE_CTRL1		0x21
+#define SSD16XX_CMD_UPDATE_CTRL2		0x22
+#define SSD16XX_CMD_WRITE_RAM			0x24
+#define SSD16XX_CMD_WRITE_RED_RAM		0x26
+#define SSD16XX_CMD_READ_RAM			0x27
+#define SSD16XX_CMD_VCOM_SENSE			0x28
+#define SSD16XX_CMD_VCOM_SENSE_DURATON		0x29
+#define SSD16XX_CMD_PRGM_VCOM_OTP		0x2a
+#define SSD16XX_CMD_VCOM_VOLTAGE		0x2c
+#define SSD16XX_CMD_READ_OTP_REG		0x2d
+#define SSD16XX_CMD_READ_USER_ID		0x2e
+#define SSD16XX_CMD_READ_STATUS			0x2f
+#define SSD16XX_CMD_PRGM_WS_OTP			0x30
+#define SSD16XX_CMD_LOAD_WS_OTP			0x31
+#define SSD16XX_CMD_UPDATE_LUT			0x32
+#define SSD16XX_CMD_PRGM_OTP_SELECTION		0x36
+#define SSD16XX_CMD_OTP_SELECTION_CTRL		0x37
+#define SSD16XX_CMD_DUMMY_LINE			0x3a
+#define SSD16XX_CMD_GATE_LINE_WIDTH		0x3b
+#define SSD16XX_CMD_BWF_CTRL			0x3c
+#define SSD16XX_CMD_RAM_READ_CTRL		0x41
+#define SSD16XX_CMD_RAM_XPOS_CTRL		0x44
+#define SSD16XX_CMD_RAM_YPOS_CTRL		0x45
+#define SSD16XX_CMD_RAM_XPOS_CNTR		0x4e
+#define SSD16XX_CMD_RAM_YPOS_CNTR		0x4f
+
+/* Data entry sequence modes */
+#define SSD16XX_DATA_ENTRY_MASK			0x07
+#define SSD16XX_DATA_ENTRY_XDYDX		0x00
+#define SSD16XX_DATA_ENTRY_XIYDX		0x01
+#define SSD16XX_DATA_ENTRY_XDYIX		0x02
+#define SSD16XX_DATA_ENTRY_XIYIX		0x03
+#define SSD16XX_DATA_ENTRY_XDYDY		0x04
+#define SSD16XX_DATA_ENTRY_XIYDY		0x05
+#define SSD16XX_DATA_ENTRY_XDYIY		0x06
+#define SSD16XX_DATA_ENTRY_XIYIY		0x07
+
+/* Options for display update */
+#define SSD16XX_CTRL1_INITIAL_UPDATE_LL		0x00
+#define SSD16XX_CTRL1_INITIAL_UPDATE_LH		0x01
+#define SSD16XX_CTRL1_INITIAL_UPDATE_HL		0x02
+#define SSD16XX_CTRL1_INITIAL_UPDATE_HH		0x03
+
+/* Options for display update sequence */
+#define SSD16XX_CTRL2_ENABLE_CLK		0x80
+#define SSD16XX_CTRL2_ENABLE_ANALOG		0x40
+#define SSD16XX_CTRL2_LOAD_TEMPERATURE		0x20
+#define SSD16XX_CTRL2_LOAD_LUT			0x10
+#define SSD16XX_CTRL2_DISABLE_ANALOG		0x02
+#define SSD16XX_CTRL2_DISABLE_CLK		0x01
+
+#define SSD16XX_GEN1_CTRL2_TO_INITIAL		0x08
+#define SSD16XX_GEN1_CTRL2_TO_PATTERN		0x04
+
+#define SSD16XX_GEN2_CTRL2_MODE2		0x08
+#define SSD16XX_GEN2_CTRL2_DISPLAY		0x04
+
+#define SSD16XX_SLEEP_MODE_DSM			0x01
+#define SSD16XX_SLEEP_MODE_PON			0x00
+
+#define SSD16XX_RAM_READ_CTRL_BLACK		0
+#define SSD16XX_RAM_READ_CTRL_RED		1
+
+static void epd_controller_init(void) {
+  
+  uint8_t tmp[6];
+
+  epd_cmd(SSD16XX_CMD_SW_RESET, NULL, 0);
+  epd_bsy_wait();
+
+  tmp[0] = 0x05;
+  epd_cmd(SSD16XX_CMD_BWF_CTRL, tmp, 1);
+
+  tmp[0] = (EPD_HEIGHT-1)%256;
+  tmp[1] = (EPD_HEIGHT-1)/256;
+  tmp[2] = 0;
+
+  epd_cmd(SSD16XX_CMD_GDO_CTRL, tmp, 3);
+
+  tmp[0] = 0x01;
+
+  epd_cmd(SSD16XX_CMD_ENTRY_MODE, tmp, 1);
+
+  tmp[0] = 0x00;
+  tmp[1] = EPD_WIDTH/8 - 1;
+
+  epd_cmd(SSD16XX_CMD_RAM_XPOS_CTRL, tmp, 2);
+
+  tmp[0] = (EPD_HEIGHT-1)%256;
+  tmp[1] = (EPD_HEIGHT-1)/256;
+  tmp[2] = 0;
+  tmp[3] = 0;
+
+  epd_cmd(SSD16XX_CMD_RAM_YPOS_CTRL, tmp, 4);
+
+  tmp[0] = 0;
+  tmp[1] = 0x80;
+
+  epd_cmd(SSD16XX_CMD_UPDATE_CTRL1, tmp, 2);
+
+  tmp[0] = 0x80;
+
+  epd_cmd(SSD16XX_CMD_TSENSOR_SELECTION, tmp, 1);
+
+  tmp[0] = 0;
+
+  epd_cmd(SSD16XX_CMD_RAM_XPOS_CNTR, tmp, 1);
+
+  tmp[0] = (EPD_HEIGHT-1)%256;
+  tmp[1] = (EPD_HEIGHT-1)/256;
+
+  epd_cmd(SSD16XX_CMD_RAM_YPOS_CNTR, tmp, 2);
+
+  epd_bsy_wait();
+
+  uint8_t tmpbuf[2024] = {0};
+
+  epd_cmd(SSD16XX_CMD_WRITE_RAM, tmpbuf, 2024);
+
+  uint8_t tmpbuf2[2024] = {0xFF};
+
+  epd_cmd(SSD16XX_CMD_WRITE_RED_RAM, tmpbuf2, 2024);
+
+  tmp[0] = 0xF7;
+
+epd_cmd(SSD16XX_CMD_UPDATE_CTRL2, tmp, 1);
+epd_cmd(SSD16XX_CMD_MASTER_ACTIVATION, NULL, 0);
+epd_bsy_wait();
+}
+
+//static uint8_t old_buffer[2024];
+
+void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t end_y, uint8_t const* buf, size_t nbytes) {
+ /* nrf_gpio_pin_clear(EPD_PIN_RST);
+  NRFX_DELAY_MS(10);
+  nrf_gpio_pin_set(EPD_PIN_RST);
+  NRFX_DELAY_MS(20);
+
+  uint8_t tmp = 0x80;
+  epd_cmd(SSD16XX_CMD_BWF_CTRL, &tmp, 1);
+
+  epd_cmd(SSD16XX_CMD_WRITE_RAM, buf, nbytes);
+
+  uint8_t tmpbuf2[2024] = {0xFF};
+
+  epd_cmd(SSD16XX_CMD_WRITE_RED_RAM, tmpbuf2, 2024);
+
+  tmp = 0xF7;
+
+epd_cmd(SSD16XX_CMD_UPDATE_CTRL2, &tmp, 1);
+epd_cmd(SSD16XX_CMD_MASTER_ACTIVATION, NULL, 0);
+  epd_bsy_wait();*/
 }
 
 #endif

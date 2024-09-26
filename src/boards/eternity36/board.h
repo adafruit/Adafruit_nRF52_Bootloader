@@ -22,28 +22,39 @@
  * THE SOFTWARE.
  */
 
-#ifndef _MWAVE_H
-#define _MWAVE_H
+#ifndef _NGP_H
+#define _NGP_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
+#define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER       0
 
-#define LED_SHIFTER
-#define SHIFTER_PIN_CS _PINNUM(0, 31)
-#define SHIFTER_PIN_MOSI _PINNUM(0, 4)
-#define SHIFTER_PIN_SCK _PINNUM(0, 5)
-#define SHIFTER_INDEX 1
-#define SHIFTER_CH_B 2
-#define SHIFTER_CH_R 0
-#define SHIFTER_CH_G 1
-#define SHIFTER_2_LEDS
-#define SHIFTER_COM_ANODE
+//Epaper
 
+#define EPD_PWR_PIN   _PINNUM(1, 7)
+#define EPD_PWR_ON    1
+
+#define EPD_CONTROLLER_SSD1680
+
+#define EPD_PIN_SCK       _PINNUM(0, 19)
+#define EPD_PIN_MOSI      _PINNUM(0,  17)
+
+#define EPD_PIN_CS        _PINNUM(0,  21)
+#define EPD_PIN_DC        _PINNUM(0,  23)
+#define EPD_PIN_RST       _PINNUM(0,  25)
+#define EPD_PIN_BSY        _PINNUM(1, 0)
+
+#define EPD_BSY_HIGH
+
+#define EPD_WIDTH         88
+#define EPD_HEIGHT        184
+
+#define DISPLAY_TITLE         "E36"
 
 
 /*------------------------------------------------------------------*/
@@ -51,14 +62,14 @@
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER    2  // One in use
 #define BUTTON_1          _PINNUM(0, 18)  // unusable: RESET
-#define BUTTON_2          _PINNUM(1, 7)  // no connection
+#define BUTTON_2          _PINNUM(1, 6)  // no connection
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER  "Polarity Works"
-#define BLEDIS_MODEL         "M-Wave"
+#define BLEDIS_MODEL         "NGP"
 
 //--------------------------------------------------------------------+
 // USB
@@ -67,9 +78,9 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "MWAVE"
-#define UF2_VOLUME_LABEL  "MWAVE"
-#define UF2_BOARD_ID      "nRF5233-mwave-v1"
+#define UF2_PRODUCT_NAME  "E36"
+#define UF2_VOLUME_LABEL  "E36"
+#define UF2_BOARD_ID      "nRF52840-e36-v1"
 #define UF2_INDEX_URL     "https://polarityworks.com"
 
-#endif // _MWAVE_H
+#endif // _NGP_H

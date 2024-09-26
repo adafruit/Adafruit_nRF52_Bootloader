@@ -43,9 +43,9 @@
 #define EPD_PWR_PIN   _PINNUM(1, 7)
 #define EPD_PWR_ON    1
 
-#define EPD_CONTROLLER_IL0323
+//#define EPD_CONTROLLER_IL0323
 
-#define EPD_PIN_SCK       _PINNUM(0, 19)
+//#define EPD_PIN_SCK       _PINNUM(0, 19)
 #define EPD_PIN_MOSI      _PINNUM(0,  17)
 
 #define EPD_PIN_CS        _PINNUM(0,  21)

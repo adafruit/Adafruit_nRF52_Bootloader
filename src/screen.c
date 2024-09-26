@@ -270,7 +270,7 @@ void screen_draw_drag(void) {
 #include <string.h>
 #include <stdlib.h>
 
-static uint8_t frame_buf[1280];
+static uint8_t frame_buf[2024];
 extern const uint8_t font8[];
 extern const uint8_t pwlogo[];
 extern const uint8_t unmount[];
@@ -342,8 +342,8 @@ static void epd_draw_img(uint8_t x, uint8_t y, const uint8_t* icon, uint8_t w, u
 
 void epd_draw_unmount(void){
 
-  #if EPD_WIDTH == 80 
-  #if EPD_HEIGHT == 128
+//  #if EPD_WIDTH == 80 
+//  #if EPD_HEIGHT == 128
   // for GDEW0102T4
   memset(frame_buf, 0xFF, 1280);
   epd_draw_img(2, 4, pwlogo, 24, 24);
@@ -352,40 +352,40 @@ void epd_draw_unmount(void){
   epd_draw_img(8, 42, unmount, 64, 64);
   print(12, 110, "Connect");
   print(12, 118, "via USB");
-  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
-  #endif
-  #endif
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 2024);
+//  #endif
+//  #endif
 
 
 }
 
 void epd_draw_mounted(void) {
 
-  #if EPD_WIDTH == 80 
-  #if EPD_HEIGHT == 128
+//  #if EPD_WIDTH == 80 
+//  #if EPD_HEIGHT == 128
   // for GDEW0102T4
   memset(frame_buf+420, 0xFF, 880);
   epd_draw_img(16, 42, mounted, 48, 64);
   print(4, 110, "Connected");
   print(8, 118, "Copy UF2");
-  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
-  #endif
-  #endif
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 2024);
+ // #endif
+  //#endif
 
 }
 
 void epd_draw_flashing(void) {
 
-  #if EPD_WIDTH == 80 
-  #if EPD_HEIGHT == 128
+  //#if EPD_WIDTH == 80 
+  //#if EPD_HEIGHT == 128
   // for GDEW0102T4
   memset(frame_buf+420, 0xFF, 880);
   epd_draw_img(8, 42, flashing, 64, 64);
   print(8, 110, "Flashing");
   print(8, 118, "Wait ...");
-  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 1280);
-  #endif
-  #endif
+  board_epd_draw(0, 0, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 2024);
+ // #endif
+  //#endif
 
 }
 
@@ -398,7 +398,7 @@ void epd_draw_complete(void) {
   epd_draw_img(8, 42, complete, 64, 64);
   print(8, 110, "Complete");
   print(4, 118, "Rebooting");
-  board_epd_draw(0, 42, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf+420, 880);
+  board_epd_draw(0, 42, EPD_WIDTH-1, EPD_HEIGHT-1, frame_buf, 2024);
   #endif
   #endif
   
