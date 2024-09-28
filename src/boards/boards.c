@@ -1275,10 +1275,8 @@ epd_cmd(SSD16XX_CMD_MASTER_ACTIVATION, NULL, 0);
 epd_bsy_wait();
 }
 
-//static uint8_t old_buffer[2024];
-
 void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t end_y, uint8_t const* buf, size_t nbytes) {
- /* nrf_gpio_pin_clear(EPD_PIN_RST);
+  nrf_gpio_pin_clear(EPD_PIN_RST);
   NRFX_DELAY_MS(10);
   nrf_gpio_pin_set(EPD_PIN_RST);
   NRFX_DELAY_MS(20);
@@ -1288,15 +1286,11 @@ void board_epd_draw(uint8_t start_x,  uint8_t start_y, uint8_t end_x, uint8_t en
 
   epd_cmd(SSD16XX_CMD_WRITE_RAM, buf, nbytes);
 
-  uint8_t tmpbuf2[2024] = {0xFF};
-
-  epd_cmd(SSD16XX_CMD_WRITE_RED_RAM, tmpbuf2, 2024);
-
   tmp = 0xF7;
 
 epd_cmd(SSD16XX_CMD_UPDATE_CTRL2, &tmp, 1);
 epd_cmd(SSD16XX_CMD_MASTER_ACTIVATION, NULL, 0);
-  epd_bsy_wait();*/
+  epd_bsy_wait();
 }
 
 #endif
