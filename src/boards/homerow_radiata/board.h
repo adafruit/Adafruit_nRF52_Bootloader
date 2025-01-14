@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2020 Nick Winans
+ * Copyright (c) 2020 Mirco Pergreffi
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,8 +22,8 @@
  * THE SOFTWARE.
  */
 
-#ifndef _NICENANO_H
-#define _NICENANO_H
+#ifndef _HOMEROWRADIATA_H
+#define _HOMEROWRADIATA_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
@@ -57,9 +57,9 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "nice!nano"
-#define UF2_VOLUME_LABEL  "NICENANO"
-#define UF2_BOARD_ID      "nRF52840-nicenano"
-#define UF2_INDEX_URL     "https://nicekeyboards.com/docs/nice-nano"
+#define UF2_PRODUCT_NAME  "Homerow Radiata"
+#define UF2_VOLUME_LABEL  "RADIATA"
+#define UF2_BOARD_ID      "nRF52840-radiata"
+#define UF2_INDEX_URL     "https://homerow.cc/"
 
-#endif // _NICENANO_H
+#endif // _HOMEROWRADIATA_H
