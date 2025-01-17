@@ -21,7 +21,7 @@ jobs:
         id: set-matrix
         working-directory: src/boards
         run: |
-          MATRIX_JSON=$(ls -d */ | sed 's/\/$//' | jq -R -s -c 'split("\n")[:-1]')
+          MATRIX_JSON=$(ls -d homerow*/ | sed 's/\/$//' | jq -R -s -c 'split("\n")[:-1]')
           echo "matrix=$MATRIX_JSON"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
