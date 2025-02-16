@@ -59,9 +59,9 @@
 //--------------------------------------------------------------------+
 
 //Shared VID/PID with pca10056 
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x00DA
-#define USB_DESC_CDC_ONLY_PID  0x00DA
+#define USB_DESC_VID           0x1209
+#define USB_DESC_UF2_PID       0xCECE
+#define USB_DESC_CDC_ONLY_PID  0xCECE
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME      "Omnimo nRF52840"
