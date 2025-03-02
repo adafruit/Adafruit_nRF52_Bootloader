@@ -40,7 +40,7 @@ set(UF2_FAMILY_ID_BOOTLOADER 0xd663823c)
 set(CMAKE_EXECUTABLE_SUFFIX .elf)
 add_executable(bootloader)
 
-# SD_VERSION can be overwritten by board.cmake
+# SD_VERSION can be overwritten by board.mk
 if(NOT DEFINED SD_VERSION)
   if(MCU_VARIANT STREQUAL "nrf52833")
     set(SD_VERSION 7.3.0)
