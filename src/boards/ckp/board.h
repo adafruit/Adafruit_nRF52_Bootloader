@@ -22,42 +22,31 @@
  * THE SOFTWARE.
  */
 
-#ifndef _MWAVE_H
-#define _MWAVE_H
+#ifndef _CKP_H
+#define _CKP_H
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER       0
-
-#define LED_SHIFTER
-#define SHIFTER_PIN_CS _PINNUM(0, 31)
-#define SHIFTER_PIN_MOSI _PINNUM(0, 4)
-#define SHIFTER_PIN_SCK _PINNUM(0, 5)
-#define SHIFTER_INDEX 0
-#define SHIFTER_CH_B 2
-#define SHIFTER_CH_R 4
-#define SHIFTER_CH_G 3
-#define SHIFTER_2_LEDS
-#define SHIFTER_COM_ANODE
-
-
+#define LEDS_NUMBER       1
+#define LED_PRIMARY_PIN   _PINNUM(0, 15) // Blue
+#define LED_STATE_ON      1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER    2  // One in use
-#define BUTTON_1          _PINNUM(0, 18)  // unusable: RESET
-#define BUTTON_2          _PINNUM(1, 7)  // no connection
+#define BUTTONS_NUMBER    2  // none connected at all
+#define BUTTON_1          _PINNUM(0, 16)  // unusable: RESET
+#define BUTTON_2          _PINNUM(0, 19)  // no connection
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER  "Kinesis Corporation"
-#define BLEDIS_MODEL         "Keypad LP"
+#define BLEDIS_MANUFACTURER  "Polarity Works"
+#define BLEDIS_MODEL         "CKP"
 
 //--------------------------------------------------------------------+
 // USB
@@ -66,9 +55,9 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "KEYPADLP"
-#define UF2_VOLUME_LABEL  "KEYPADLP"
-#define UF2_BOARD_ID      "nRF52833-KEYPADLP-v1"
-#define UF2_INDEX_URL     "https://kinesis-ergo.com/"
+#define UF2_PRODUCT_NAME  "CKP"
+#define UF2_VOLUME_LABEL  "CKP"
+#define UF2_BOARD_ID      "nRF52840-ckp-v1"
+#define UF2_INDEX_URL     "https://polarityworks.com"
 
-#endif // _MWAVE_H
+#endif // _BT60_H
