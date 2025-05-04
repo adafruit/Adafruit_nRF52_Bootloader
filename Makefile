@@ -336,8 +336,8 @@ endif
 CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
 
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
-# Fixes for gcc version 12 and 13.
-ifneq (,$(filter 12.% 13.%,$(shell $(CC) -dumpversion 2>/dev/null)))
+# Fixes for gcc version 12, 13 and 14.
+ifneq (,$(filter 12.% 13.% 14.%,$(shell $(CC) -dumpversion 2>/dev/null)))
 	CFLAGS += --param=min-pagesize=0
 endif
 
@@ -500,7 +500,7 @@ dfu-flash: flash-dfu
 flash-dfu: $(BUILD)/$(MERGED_FILE).zip
 	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
 	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
-	
+
 # flash skip crc magic ( app valid = 0x0001, crc = 0x0000 )
 #flash-skip-crc:
 # nrfjprog --memwr $(BOOT_SETTING_ADDR) --val 0x00000001 -f nrf52
