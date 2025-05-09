@@ -170,6 +170,7 @@ target_compile_options(bootloader PUBLIC
   -Wmissing-format-attribute
   -Wno-endif-labels
   -Wunreachable-code
+  -Os
   # Suppress warning caused by SDK
   -Wno-unused-parameter -Wno-expansion-to-defined -Wno-array-bounds
   )
