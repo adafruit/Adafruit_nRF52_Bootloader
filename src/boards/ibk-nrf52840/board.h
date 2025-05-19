@@ -59,7 +59,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   		"BLYST840 Breakout board"
 #define UF2_VOLUME_LABEL   		"IBK840_UF2BOOT"
-#define UF2_BOARD_ID       		"IBK-NRF52840"
+#define UF2_BOARD_ID       		"nRF52840-IBK-NRF52840-V0"
 #define UF2_INDEX_URL      		"https://www.i-syst.com/products/blyst840"
 
 #endif // _IBK_NRF52840_H
