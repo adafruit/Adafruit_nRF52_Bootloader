@@ -68,7 +68,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   	"BLYST-NANO DevKit"
 #define UF2_VOLUME_LABEL   	"BLYSTNANO_UF2BOOT"
-#define UF2_BOARD_ID       	"BLYST-NANO"
+#define UF2_BOARD_ID       	"BLYST-NANO-DK"
 #define UF2_INDEX_URL      	"https://www.i-syst.com/products/blyst-nano"
 
 #endif // _BLYST_NANO_DK_H
