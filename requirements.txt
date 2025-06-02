@@ -1,0 +1,4 @@
+adafruit-nrfutil
+intelhex
+pyocd
+
