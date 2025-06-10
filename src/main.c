@@ -157,12 +157,14 @@ static void mbr_init_sd(void) {
   sd_mbr_command(&com);
 }
 
-// Helper function to check if SoftDevice is already enabled.
+// Helper function to disable the SoftDevice with upfront check if it is enabled.
 // Especially SoftDevice S340 locks up when calling sd_softdevice_disable() and it's not enabled.
-static bool is_sd_enabled(void) {
+static void sd_disable(void) {
   uint8_t sd_enabled = 0;
   sd_softdevice_is_enabled(&sd_enabled);
-  return (sd_enabled == 1);
+  if (sd_enabled == 1) {
+    sd_softdevice_disable();
+  }
 }
 
 //--------------------------------------------------------------------+
@@ -214,9 +216,7 @@ int main(void) {
       if (!_sd_inited) mbr_init_sd();
 
       // Make sure SD is disabled
-      if (is_sd_enabled()) {
-        sd_softdevice_disable();
-      }
+      sd_disable();
     }
 
     // clear in case we kept DFU_DBL_RESET_APP there
@@ -317,9 +317,7 @@ static void check_dfu_mode(void) {
     }
 
     if (_ota_dfu) {
-      if (is_sd_enabled()) {
-        sd_softdevice_disable();
-      }
+      sd_disable();
     } else {
       usb_teardown();
     }
