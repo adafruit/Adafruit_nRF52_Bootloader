@@ -157,6 +157,16 @@ static void mbr_init_sd(void) {
   sd_mbr_command(&com);
 }
 
+// Helper function to disable the SoftDevice with upfront check if it is enabled.
+// Especially SoftDevice S340 locks up when calling sd_softdevice_disable() and it's not enabled.
+static void sd_disable(void) {
+  uint8_t sd_enabled = 0;
+  sd_softdevice_is_enabled(&sd_enabled);
+  if (sd_enabled == 1) {
+    sd_softdevice_disable();
+  }
+}
+
 //--------------------------------------------------------------------+
 //
 //--------------------------------------------------------------------+
@@ -206,13 +216,14 @@ int main(void) {
       if (!_sd_inited) mbr_init_sd();
 
       // Make sure SD is disabled
-      sd_softdevice_disable();
+      sd_disable();
     }
 
     // clear in case we kept DFU_DBL_RESET_APP there
     (*dbl_reset_mem) = 0;
 
     // start application
+    PRINTF("Starting app...\r\n");
     bootloader_app_start();
   }
 
@@ -306,7 +317,7 @@ static void check_dfu_mode(void) {
     }
 
     if (_ota_dfu) {
-      sd_softdevice_disable();
+      sd_disable();
     } else {
       usb_teardown();
     }
@@ -326,7 +337,11 @@ static uint32_t ble_stack_init(void) {
       .rc_temp_ctiv = 2,
       .accuracy     = NRF_CLOCK_LF_ACCURACY_250_PPM
   };
-  sd_softdevice_enable(&clock_cfg, app_error_fault_handler);
+  #ifndef ANT_LICENSE_KEY
+    sd_softdevice_enable(&clock_cfg, app_error_fault_handler);
+  #else
+    sd_softdevice_enable(&clock_cfg, app_error_fault_handler, ANT_LICENSE_KEY);
+  #endif
   sd_nvic_EnableIRQ(SD_EVT_IRQn);
 
   /*------------- Configure BLE params  -------------*/

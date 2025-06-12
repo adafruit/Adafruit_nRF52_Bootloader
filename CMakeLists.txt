@@ -227,22 +227,37 @@ if (MCU_VARIANT STREQUAL "nrf52")
     S132
     )
 elseif (MCU_VARIANT STREQUAL "nrf52833")
-  set(SD_NAME s140)
   set(DFU_DEV_REV 52833)
   set(DFU_APP_DATA_RESERVED 7*4096)
-  target_compile_definitions(bootloader PUBLIC
-    NRF52833_XXAA
-    S140
-    )
+  if (SD_NAME STREQUAL "s340")
+    target_compile_definitions(bootloader PUBLIC
+      NRF52833_XXAA
+      S340
+      )
+  else ()
+    set(SD_NAME s140)
+    target_compile_definitions(bootloader PUBLIC
+      NRF52833_XXAA
+      S140
+      )
+  endif ()
 elseif (MCU_VARIANT STREQUAL "nrf52840")
-  set(SD_NAME s140)
   set(DFU_DEV_REV 52840)
   # App reserved 40KB (8+32) to match circuitpython for 840
   set(DFU_APP_DATA_RESERVED 10*4096)
-  target_compile_definitions(bootloader PUBLIC
-    NRF52840_XXAA
-    S140
-    )
+  if (SD_NAME STREQUAL "s340")
+    target_compile_definitions(bootloader PUBLIC
+      NRF52840_XXAA
+      S340
+      )
+  else ()
+    set(SD_NAME s140)
+    target_compile_definitions(bootloader PUBLIC
+      NRF52840_XXAA
+      S140
+      )
+  endif ()
+
 else ()
   message(FATAL_ERROR "MCU_VARIANT ${MCU_VARIANT} is unknown")
 endif ()

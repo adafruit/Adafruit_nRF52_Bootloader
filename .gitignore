@@ -65,3 +65,7 @@ TAGS
 
 .DS_Store
 Makefile.user
+
+# Exclude all SoftDevice S340 files
+lib/softdevice/s340*
+
