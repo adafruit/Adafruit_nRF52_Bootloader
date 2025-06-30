@@ -16,4 +16,3 @@ To add or modify a board with an ANT+ capable SoftDevice S340 the `SD_VERSION` a
 SD_VERSION = 7.0.1
 SD_NAME = s340
 ```
-**Important:** When adding a new board you must add the suffix `_s340` to the folder name to exclude it from automatic builds.
