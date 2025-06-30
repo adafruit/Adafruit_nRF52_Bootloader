@@ -324,7 +324,7 @@ static void check_dfu_mode(void) {
   }
 }
 
-// Initializes the SotdDevice by following SD specs section
+// Initializes the SoftDevice by following SD specs section
 // "Master Boot Record and SoftDevice initializaton procedure"
 static uint32_t ble_stack_init(void) {
   // Forward vector table to bootloader address so that we can handle BLE events
