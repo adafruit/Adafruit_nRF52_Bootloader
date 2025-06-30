@@ -117,7 +117,7 @@ You must have have a J-Link available to "unbrick" your device.
 Firstly clone this repo including its submodules with following command:
 
 ```
-git clone --recurse-submodules -j8 https://github.com/adafruit/Adafruit_nRF52_Bootloader
+git clone --recurse-submodules https://github.com/adafruit/Adafruit_nRF52_Bootloader
 ```
 
 For git versions before `2.13.0` you have to do that manually:
@@ -146,17 +146,33 @@ Makefile:90: *** BOARD not defined.  Stop
 #### Build using `cmake`
 
 Firstly initialize your build environment by passing your board to `cmake` via `-DBOARD={board}`:
-```
-cmake -DBOARD=feather_nrf52840_express -S . -B _build -GNinja
+
+```bash
+mkdir build
+cd build
+cmake .. -DBOARD=feather_nrf52840_express 
 ```
 
 And then build it with:
-```
-cd _build
-ninja
+
+```bash
+make
 ```
 
-You can also use the generator of your choice. For example omit the `-GNinja` and then you can invoke `make` from inside `_build` instead of `ninja`
+You can also use the generator of your choice. For example adding the `-GNinja` and then you can invoke `ninja build` instead of `make`.
+
+To list all supported targets, run:
+
+```bash
+cmake --build . --target help
+``` 
+
+To build individual targets, you can specify it directly with `make` or using `cmake --build`:
+
+```bash
+make bootloader
+cmake --build . --target bootloader
+```
 
 ### Flash
 
