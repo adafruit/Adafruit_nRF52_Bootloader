@@ -130,6 +130,13 @@ endif
 SD_NAME_UPPER = $(subst s,S,${SD_NAME})
 CFLAGS += -D$(SD_NAME_UPPER)
 
+#----------------------------------
+# ANT_LICENSE_KEY handling
+#----------------------------------
+ifdef ANT_LICENSE_KEY
+  CFLAGS += -DANT_LICENSE_KEY=\"$(ANT_LICENSE_KEY)\"
+endif
+
 #------------------------------------------------------------------------------
 # SOURCE FILES
 #------------------------------------------------------------------------------
