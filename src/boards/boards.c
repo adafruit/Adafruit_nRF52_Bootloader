@@ -111,6 +111,12 @@ void board_init(void) {
   //     #define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
   // in board.h when using that power configuration.
 #ifdef UICR_REGOUT0_VALUE
+  // for some reason bellow condition is true even though debugger show 3.0V
+  // pyocd> rw 0x10001304
+  // 10001304:  fffffffc
+  // it leads to infinite boot loop. Let wait for NVM to be ready first.
+  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+  while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
   if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) == (UICR_REGOUT0_VOUT_DEFAULT << UICR_REGOUT0_VOUT_Pos)){
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
     while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
@@ -119,8 +125,10 @@ void board_init(void) {
 
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
     while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
-
-    NVIC_SystemReset();
+    // to avoid infinity boot loop reset only if REGOUT0 was set correctly
+    if((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) == (UICR_REGOUT0_VALUE << UICR_REGOUT0_VOUT_Pos)){
+      NVIC_SystemReset();
+    }
   }
 #endif
 
