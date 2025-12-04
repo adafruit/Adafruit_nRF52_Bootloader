@@ -260,6 +260,13 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 #----------------------------------
+# ANT_LICENSE_KEY handling
+#----------------------------------
+if (DEFINED ANT_LICENSE_KEY)
+  target_compile_definitions(bootloader PUBLIC ANT_LICENSE_KEY=${ANT_LICENSE_KEY})
+endif
+
+#----------------------------------
 # Get UF2 version from git
 #----------------------------------
 execute_process(COMMAND git describe --dirty --always --tags OUTPUT_VARIABLE GIT_VERSION)
