@@ -137,7 +137,7 @@ make BOARD=feather_nrf52840_express all
 For the list of supported boards, run `make` without `BOARD=` :
 
 ```
-$ make
+make
 You must provide a BOARD parameter with 'BOARD='
 Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
 Makefile:90: *** BOARD not defined.  Stop
@@ -213,7 +213,7 @@ make BOARD=feather_nrf52840_express flash-mbr
 If you get the following error ...
 
 ```
-$ make BOARD=feather_nrf52840_express all
+make BOARD=feather_nrf52840_express all
 Compiling file: main.c
 /bin/sh: /usr/bin/arm-none-eabi-gcc: No such file or directory
 make: *** [_build/main.o] Error 127
@@ -222,7 +222,7 @@ make: *** [_build/main.o] Error 127
 ... you may need to pass the location of the GCC ARM toolchain binaries to `make` using
 the variable `CROSS_COMPILE` as below:
 ```
-$ make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
+make CROSS_COMPILE=/opt/gcc-arm-none-eabi-9-2019-q4-major/bin/arm-none-eabi- BOARD=feather_nrf52832 all
 ```
 
 For other compile errors, check the gcc version with `arm-none-eabi-gcc --version` to insure it is at least 9.x.

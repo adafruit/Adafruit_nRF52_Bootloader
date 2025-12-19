@@ -39,13 +39,8 @@
 #include <stddef.h>
 
 #include "nrfx.h"
-#include "nrf_clock.h"
 #include "nrfx_power.h"
-#include "nrfx_pwm.h"
-
-#include "nordic_common.h"
 #include "sdk_common.h"
-#include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
 
@@ -53,10 +48,7 @@
 #include "nrf_soc.h"
 #include "nrf_nvic.h"
 #include "app_error.h"
-#include "nrf_gpio.h"
 #include "ble.h"
-#include "nrf.h"
-#include "ble_hci.h"
 #include "app_scheduler.h"
 #include "nrf_error.h"
 
@@ -64,13 +56,10 @@
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
-#include "pstorage.h"
-#include "nrfx_nvmc.h"
 
 #ifdef NRF_USBD
 
 #include "uf2/uf2.h"
-#include "nrf_usbd.h"
 #include "tusb.h"
 
 void usb_init(bool cdc_only);
@@ -250,14 +239,17 @@ static void check_dfu_mode(void) {
                    (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin);
 
   // Clear GPREGRET if it is our values
-  if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
+  if (dfu_start || dfu_skip) {
+    NRF_POWER->GPREGRET = 0;
+  }
 
   // skip dfu entirely
-  if (dfu_skip) return;
+  if (dfu_skip) {
+    return;
+  }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  // DFU button pressed
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+  dfu_start = dfu_start || button_pressed(BUTTON_DFU); // DFU button pressed
 
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu || (button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET));
@@ -265,16 +257,16 @@ static void check_dfu_mode(void) {
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
-  if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET()) dfu_start = 1;
+  if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET()) {
+    dfu_start = 1;
+  }
 
   // App mode: Double Reset detection or DFU startup for nrf52832
   if (!(just_start_app || dfu_start || !valid_app)) {
 #ifdef NRF52832_XXAA
     /* Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
      * to support auto programming from Arduino IDE
-     *
-     * Note: Double Reset WONT work with nrf52832 since all its SRAM got cleared with GPIO reset.
-     */
+     * Note: Double Reset WONT work with nrf52832 since all its SRAM got cleared with GPIO reset. */
     bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL, false);
 #else
     // Note: RESETREAS is not clear by bootloader, it should be cleared by application upon init()
@@ -322,6 +314,10 @@ static void check_dfu_mode(void) {
     }
   }
 }
+
+//--------------------------------------------------------------------+
+// BLE
+//--------------------------------------------------------------------+
 
 // Initializes the SoftDevice by following SD specs section
 // "Master Boot Record and SoftDevice initializaton procedure"
@@ -388,23 +384,6 @@ static uint32_t ble_stack_init(void) {
 
   return NRF_SUCCESS;
 }
-
-//--------------------------------------------------------------------+
-// Error Handler
-//--------------------------------------------------------------------+
-void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
-  volatile uint32_t* ARM_CM_DHCSR = ((volatile uint32_t*) 0xE000EDF0UL); /* Cortex M CoreDebug->DHCSR */
-  if ((*ARM_CM_DHCSR) & 1UL) __asm("BKPT #0\n"); /* Only halt mcu if debugger is attached */
-  NVIC_SystemReset();
-}
-
-void assert_nrf_callback(uint16_t line_num, uint8_t const* p_file_name) {
-  app_error_fault_handler(0xDEADBEEF, 0, 0);
-}
-
-/*------------------------------------------------------------------*/
-/* SoftDevice Event handler
- *------------------------------------------------------------------*/
 
 // Process BLE event from SD
 uint32_t proc_ble(void) {
@@ -478,6 +457,22 @@ void SD_EVT_IRQHandler(void) {
   // Use App Scheduler to defer handling code in non-isr context
   app_sched_event_put(NULL, 0, proc_sd_task);
 }
+
+//--------------------------------------------------------------------+
+// Error Handler
+//--------------------------------------------------------------------+
+void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info) {
+  volatile uint32_t *ARM_CM_DHCSR = ((volatile uint32_t *)0xE000EDF0UL); /* Cortex M CoreDebug->DHCSR */
+  if ((*ARM_CM_DHCSR) & 1UL) {
+    __asm("BKPT #0\n");                                                  /* Only halt mcu if debugger is attached */
+  }
+  NVIC_SystemReset();
+}
+
+void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name) {
+  app_error_fault_handler(0xDEADBEEF, 0, 0);
+}
+
 
 //--------------------------------------------------------------------+
 // RTT printf retarget for Debug
