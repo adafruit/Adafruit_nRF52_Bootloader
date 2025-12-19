@@ -1,7 +1,7 @@
 /* Linker script to configure memory regions. */
 
 SEARCH_DIR(.)
-GROUP(-lgcc -lc -lnosys)
+/*GROUP(-lgcc -lc -lnosys)*/
 
 MEMORY
 {
@@ -19,8 +19,6 @@ MEMORY
   /** Location of bootloader setting in flash. */
   BOOTLOADER_SETTINGS (rw) : ORIGIN = 0x7F000, LENGTH = 0x1000
 
-
-
   /** RAM Region for bootloader. */
   RAM (rwx) :  ORIGIN = 0x20008000, LENGTH = 0x20010000-0x20008000
 
@@ -30,8 +28,6 @@ MEMORY
   /** Location of non initialized RAM. Non initialized RAM is used for exchanging bond information
    *  from application to bootloader when using buttonless DFU OTA. */
   NOINIT (rwx) :  ORIGIN = 0x20007F80, LENGTH = 0x80
-
-
   
   /** Location in UICR where bootloader start address is stored. */
   UICR_BOOTLOADER (r) : ORIGIN = 0x10001014, LENGTH = 0x04

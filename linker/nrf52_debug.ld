@@ -1,7 +1,7 @@
 /* Linker script to configure memory regions. */
 
 SEARCH_DIR(.)
-GROUP(-lgcc -lc)
+/*GROUP(-lgcc -lc)*/
 
 MEMORY
 {

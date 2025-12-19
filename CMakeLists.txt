@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.17)
+include(CMakePrintHelpers)
 find_package(Python COMPONENTS Interpreter)
 
 if (NOT DEFINED BOARD)
   message(FATAL_ERROR "BOARD is not defined")
-endif ()
-
-if (NOT DEFINED TOOLCHAIN)
-  set(TOOLCHAIN gcc)
 endif ()
 
 # include board specific
@@ -21,7 +18,8 @@ else ()
   set(JLINK_DEVICE ${MCU_VARIANT}_xxaa)
 endif ()
 
-set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}/cmake/toolchain/arm_${TOOLCHAIN}.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/toolchain/arm_gcc.cmake)
+
 
 project(Adafruit_nRF52_Bootloader C ASM)
 
@@ -153,6 +151,7 @@ endif ()
 target_link_options(bootloader PUBLIC
   "LINKER:--script=${LD_FILE}"
   -L${NRFX_DIR}/mdk
+  -nostartfiles
   --specs=nosys.specs --specs=nano.specs
   )
 target_compile_options(bootloader PUBLIC
@@ -179,6 +178,8 @@ target_compile_options(bootloader PUBLIC
 target_compile_definitions(bootloader PUBLIC
   SOFTDEVICE_PRESENT
   CONFIG_GPIO_AS_PINRESET
+  __START=main
+  __STARTUP_CLEAR_BSS
   )
 
 if (TRACE_ETM STREQUAL "1")
@@ -264,7 +265,7 @@ endif ()
 #----------------------------------
 if (DEFINED ANT_LICENSE_KEY)
   target_compile_definitions(bootloader PUBLIC ANT_LICENSE_KEY=${ANT_LICENSE_KEY})
-endif
+endif()
 
 #----------------------------------
 # Get UF2 version from git
@@ -296,15 +297,6 @@ target_compile_definitions(bootloader PUBLIC
   MK_BOOTLOADER_VERSION=${MK_BOOTLOADER_VERSION}
   )
 
-#----------------------------------
-# Post build
-#----------------------------------
-
-# run size after build
-add_custom_command(TARGET bootloader POST_BUILD
-  COMMAND ${CMAKE_SIZE} $<TARGET_FILE:bootloader>
-  )
-
 # Add bin/hex output
 add_custom_command(TARGET bootloader POST_BUILD
   COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:bootloader> $<TARGET_FILE_DIR:bootloader>/bootloader.bin
@@ -316,12 +308,11 @@ add_custom_command(TARGET bootloader POST_BUILD
 #----------------------------------
 # Flashing target
 #----------------------------------
-
 if (NOT DEFINED NRFJPROG)
   set(NRFJPROG nrfjprog)
 endif()
 
-add_custom_target(flash-jlink
+add_custom_target(flash-bootloader
   DEPENDS bootloader
   COMMAND ${NRFJPROG} --program $<TARGET_FILE:bootloader> --verify --sectoranduicrerase -f nrf52 --reset
   )
@@ -332,6 +323,7 @@ add_custom_target(flash-uf2
   )
 
 add_custom_target(flash-sd
+  DEPENDS flash-mbr
   COMMAND ${NRFJPROG} --program ${SD_HEX} --verify --sectorerase -f nrf52 --reset
   )
 
@@ -341,6 +333,10 @@ add_custom_target(flash-mbr
 
 add_custom_target(flash-erase
   COMMAND ${NRFJPROG} -f nrf52 --eraseall
+  )
+
+add_custom_target(flash-all
+  DEPENDS flash-erase flash-sd flash-bootloader
   )
 
 # flash skip crc magic ( app valid = 0x0001, crc = 0x0000 )
