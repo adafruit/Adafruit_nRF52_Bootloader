@@ -20,40 +20,26 @@ endif ()
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/toolchain/arm_gcc.cmake)
 
-
-project(Adafruit_nRF52_Bootloader C ASM)
-
 set(NRFX_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/nrfx)
 set(SDK11_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/sdk11/components)
 set(SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/sdk/components)
 set(SOFTDEVICE_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/softdevice)
+set(MBR_HEX ${SOFTDEVICE_DIR}/mbr/hex/mbr_nrf52_2.4.1_mbr.hex)
 set(TINYUSB_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb/src)
 
 set(UF2CONV_PY ${CMAKE_CURRENT_LIST_DIR}/lib/uf2/utils/uf2conv.py)
 set(UF2_FAMILY_ID_BOOTLOADER 0xd663823c)
 
+#-------------------
+# Bootloader
+#-------------------
 if (NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
   set(CMAKE_BUILD_TYPE MinSizeRel CACHE STRING "Build type" FORCE)
 endif ()
 
-#-------------------
-# Bootloader
-#-------------------
+project(Adafruit_nRF52_Bootloader C ASM)
 set(CMAKE_EXECUTABLE_SUFFIX .elf)
-add_executable(bootloader)
-
-# SD_VERSION can be overwritten by board.cmake
-if(NOT DEFINED SD_VERSION)
-  if(MCU_VARIANT STREQUAL "nrf52833")
-    set(SD_VERSION 7.3.0)
-  else()
-    set(SD_VERSION 6.1.1)
-  endif()
-endif ()
-
-set(MBR_HEX ${SOFTDEVICE_DIR}/mbr/hex/mbr_nrf52_2.4.1_mbr.hex)
-
-target_sources(bootloader PUBLIC
+add_executable(bootloader
   # src
   src/dfu_ble_svc.c
   src/dfu_init.c
@@ -86,7 +72,7 @@ target_sources(bootloader PUBLIC
   ${SDK_DIR}/libraries/hci/hci_slip.c
   ${SDK_DIR}/libraries/hci/hci_transport.c
   ${SDK_DIR}/libraries/util/nrf_assert.c
-  # ASM
+  # startup
   ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S
   )
 target_include_directories(bootloader PUBLIC
@@ -122,28 +108,9 @@ target_include_directories(bootloader PUBLIC
   ${SOFTDEVICE_DIR}/mbr/headers
   )
 
-# Debug option
+# Debug linker file
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  # TODO not work yet, also need to add segger rtt, DFU_APP_DATA_RESERVED=0, BOOTLOADER_REGION_START=0xED000
   set(LD_FILE ${CMAKE_CURRENT_LIST_DIR}/linker/${MCU_VARIANT}_debug.ld)
-
-  target_sources(bootloader PUBLIC
-    lib/SEGGER_RTT/RTT/SEGGER_RTT.c
-    )
-  target_include_directories(bootloader PUBLIC
-    lib/SEGGER_RTT/RTT
-    )
-  target_compile_definitions(bootloader PUBLIC
-    CFG_DEBUG
-    SEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
-    DFU_APP_DATA_RESERVED=0
-    )
-
-  if (MCU_VARIANT STREQUAL "nrf52840")
-    target_compile_definitions(bootloader PUBLIC BOOTLOADER_REGION_START=0xEA000)
-  else ()
-    target_compile_definitions(bootloader PUBLIC BOOTLOADER_REGION_START=0x6D000)
-  endif ()
 else ()
   set(LD_FILE ${CMAKE_CURRENT_LIST_DIR}/linker/${MCU_VARIANT}.ld)
 endif ()
@@ -222,6 +189,16 @@ endif ()
 # MCU Variant differences
 # Supported are: nrf52 (nrf52832), nrf52833, nrf52840
 #----------------------------------------------------
+
+# SD_VERSION can be overwritten by board.cmake
+if(NOT DEFINED SD_VERSION)
+  if(MCU_VARIANT STREQUAL "nrf52833")
+    set(SD_VERSION 7.3.0)
+  else()
+    set(SD_VERSION 6.1.1)
+  endif()
+endif ()
+
 if (MCU_VARIANT STREQUAL "nrf52")
   set(SD_NAME s132)
   set(DFU_DEV_REV 0xADAF)
@@ -246,17 +223,31 @@ else ()
   message(FATAL_ERROR "MCU_VARIANT ${MCU_VARIANT} is unknown")
 endif ()
 
-string(TOUPPER ${SD_NAME} SD_NAME_UPPER)
-target_compile_definitions(bootloader PUBLIC ${SD_NAME_UPPER})
-
 set(SD_FILENAME ${SD_NAME}_nrf52_${SD_VERSION})
 set(SD_HEX ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_softdevice.hex)
 
+string(TOUPPER ${SD_NAME} SD_NAME_UPPER)
+target_compile_definitions(bootloader PUBLIC ${SD_NAME_UPPER})
 target_include_directories(bootloader PUBLIC
   ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_API/include
   )
 
-if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+# debug build
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # TODO not work yet, also need to add segger rtt, DFU_APP_DATA_RESERVED=0, BOOTLOADER_REGION_START=0xED000
+  target_sources(bootloader PUBLIC lib/SEGGER_RTT/RTT/SEGGER_RTT.c)
+  target_include_directories(bootloader PUBLIC lib/SEGGER_RTT/RTT)
+  target_compile_definitions(bootloader PUBLIC
+    CFG_DEBUG
+    SEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+    DFU_APP_DATA_RESERVED=0
+  )
+  if (MCU_VARIANT STREQUAL "nrf52840")
+    target_compile_definitions(bootloader PUBLIC BOOTLOADER_REGION_START=0xEA000)
+  else ()
+    target_compile_definitions(bootloader PUBLIC BOOTLOADER_REGION_START=0x6D000)
+  endif ()
+else ()
   target_compile_definitions(bootloader PUBLIC DFU_APP_DATA_RESERVED=${DFU_APP_DATA_RESERVED})
 endif ()
 
@@ -273,13 +264,6 @@ endif()
 execute_process(COMMAND git describe --dirty --always --tags OUTPUT_VARIABLE GIT_VERSION)
 string(STRIP ${GIT_VERSION} GIT_VERSION)
 
-execute_process(COMMAND bash "-c" "git submodule status | cut -d\" \" -f3,4 | paste -s -d\" \" -"
-  OUTPUT_VARIABLE GIT_SUBMODULE_VERSIONS
-  )
-string(STRIP ${GIT_SUBMODULE_VERSIONS} GIT_SUBMODULE_VERSIONS)
-string(REPLACE ../ "" GIT_SUBMODULE_VERSIONS ${GIT_SUBMODULE_VERSIONS})
-string(REPLACE lib/ "" GIT_SUBMODULE_VERSIONS ${GIT_SUBMODULE_VERSIONS})
-
 string(REPLACE "-" ";" RELEASE_VERSION ${GIT_VERSION})
 list(GET RELEASE_VERSION 0 RELEASE_VERSION)
 string(REPLACE "." ";" RELEASE_VERSION ${RELEASE_VERSION})
@@ -288,11 +272,10 @@ list(GET RELEASE_VERSION 1 RELEASE_VERSION_MINOR)
 list(GET RELEASE_VERSION 2 RELEASE_VERSION_PATCH)
 math(EXPR MK_BOOTLOADER_VERSION "(${RELEASE_VERSION_MAJOR} << 16) + (${RELEASE_VERSION_MINOR} << 8) + ${RELEASE_VERSION_PATCH}")
 
-cmake_print_variables(GIT_VERSION GIT_SUBMODULE_VERSIONS MK_BOOTLOADER_VERSION)
+cmake_print_variables(GIT_VERSION MK_BOOTLOADER_VERSION)
 
 target_compile_definitions(bootloader PUBLIC
-  UF2_VERSION_BASE="${GIT_VERSION}"
-  UF2_VERSION="${GIT_VERSION} - ${GIT_SUBMODULE_VERSIONS}"
+  UF2_VERSION="${GIT_VERSION}"
   BLEDIS_FW_VERSION="${GIT_VERSION} ${SD_NAME} ${SD_VERSION}"
   MK_BOOTLOADER_VERSION=${MK_BOOTLOADER_VERSION}
   )
@@ -324,11 +307,11 @@ add_custom_target(flash-uf2
 
 add_custom_target(flash-sd
   DEPENDS flash-mbr
-  COMMAND ${NRFJPROG} --program ${SD_HEX} --verify --sectorerase -f nrf52 --reset
+  COMMAND ${NRFJPROG} --program ${SD_HEX} --verify --sectorerase -f nrf52
   )
 
 add_custom_target(flash-mbr
-  COMMAND ${NRFJPROG} --program ${MBR_HEX} --verify --sectorerase -f nrf52 --reset
+  COMMAND ${NRFJPROG} --program ${MBR_HEX} --verify --sectorerase -f nrf52
   )
 
 add_custom_target(flash-erase
@@ -336,7 +319,9 @@ add_custom_target(flash-erase
   )
 
 add_custom_target(flash-all
-  DEPENDS flash-erase flash-sd flash-bootloader
+  DEPENDS bootloader flash-erase
+  COMMAND ${NRFJPROG} --program ${SD_HEX} --verify --sectorerase -f nrf52
+  COMMAND ${NRFJPROG} --program $<TARGET_FILE:bootloader> --verify --sectoranduicrerase -f nrf52 --reset
   )
 
 # flash skip crc magic ( app valid = 0x0001, crc = 0x0000 )

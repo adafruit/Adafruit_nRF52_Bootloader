@@ -242,12 +242,12 @@ void screen_draw_drag(void) {
   drawBar(52, 55, COLOR_BLUE);
   drawBar(107, 14, COLOR_ORANGE);
 
-  // Center UF2_PRODUCT_NAME and UF2_VERSION_BASE.
+  // Center UF2_PRODUCT_NAME and UF2_VERSION.
   int name_x = (DISPLAY_WIDTH - CHAR4_KERNED_WIDTH * (int) strlen(DISPLAY_TITLE)) / 2;
   print4(name_x >= 0 ? name_x : 0, 5, COLOR_WHITE, DISPLAY_TITLE);
 
-  int version_x = (DISPLAY_WIDTH - 6 * (int) strlen(UF2_VERSION_BASE)) / 2;
-  print(version_x >= 0 ? version_x : 0, 40, COLOR_PURPLE, UF2_VERSION_BASE);
+  int version_x = (DISPLAY_WIDTH - 6 * (int) strlen(UF2_VERSION)) / 2;
+  print(version_x >= 0 ? version_x : 0, 40, COLOR_PURPLE, UF2_VERSION);
 
   // TODO the reset should be center as well
   print(23, 110, 1, "circuitpython.org");

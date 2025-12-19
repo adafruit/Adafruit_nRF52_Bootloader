@@ -41,7 +41,6 @@ else
 endif
 
 GIT_VERSION := $(shell git describe --dirty --always --tags)
-GIT_SUBMODULE_VERSIONS := $(shell git submodule status | cut -d" " -f3,4 | paste -s -d" " -)
 
 # compiled file name
 OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
@@ -324,8 +323,7 @@ ifneq ($(USE_NFCT),yes)
 endif
 
 CFLAGS += -DSOFTDEVICE_PRESENT
-CFLAGS += -DUF2_VERSION_BASE='"$(GIT_VERSION)"'
-CFLAGS += -DUF2_VERSION='"$(GIT_VERSION) $(GIT_SUBMODULE_VERSIONS)"'
+CFLAGS += -DUF2_VERSION='"$(GIT_VERSION)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
