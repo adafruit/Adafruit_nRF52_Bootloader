@@ -27,7 +27,7 @@
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
-#define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
+//#define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
 
 /*------------------------------------------------------------------*/
 /* LED
@@ -42,7 +42,7 @@
 /* BUTTON
  *------------------------------------------------------------------*/
 #define BUTTONS_NUMBER    2  // none connected at all
-#define BUTTON_1          _PINNUM(0, 18)  // unusable: RESET
+#define BUTTON_1          _PINNUM(0, 7)  // unusable: RESET
 #define BUTTON_2          _PINNUM(0, 13)  // i hope this can pull led pin enough to power
 #define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
 

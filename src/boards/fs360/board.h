@@ -27,6 +27,8 @@
 
 #define _PINNUM(port, pin)    ((port)*32 + (pin))
 
+#define UICR_REGOUT0_VALUE UICR_REGOUT0_VOUT_3V3
+
 
 /*------------------------------------------------------------------*/
 /* LED
@@ -37,10 +39,10 @@
 #define SHIFTER_PIN_CS _PINNUM(0, 31)
 #define SHIFTER_PIN_MOSI _PINNUM(0, 4)
 #define SHIFTER_PIN_SCK _PINNUM(0, 5)
-#define SHIFTER_INDEX 1
-#define SHIFTER_CH_B 0
+#define SHIFTER_INDEX 0
+#define SHIFTER_CH_B 4
 #define SHIFTER_CH_R 2
-#define SHIFTER_CH_G 1
+#define SHIFTER_CH_G 3
 #define SHIFTER_2_LEDS
 #define SHIFTER_COM_ANODE
 
@@ -58,7 +60,7 @@
 // BLE OTA
 //--------------------------------------------------------------------+
 #define BLEDIS_MANUFACTURER  "Kinesis Corporation"
-#define BLEDIS_MODEL         "FS360"
+#define BLEDIS_MODEL         "FS Folio"
 
 //--------------------------------------------------------------------+
 // USB
@@ -67,8 +69,8 @@
 #define USB_DESC_UF2_PID       0x00B3
 #define USB_DESC_CDC_ONLY_PID  0x00B3
 
-#define UF2_PRODUCT_NAME  "FS360"
-#define UF2_VOLUME_LABEL  "FS360"
+#define UF2_PRODUCT_NAME  "FS Folio"
+#define UF2_VOLUME_LABEL  "FS Folio"
 #define UF2_BOARD_ID      "nRF5233-FS360-v1"
 #define UF2_INDEX_URL     "https://kinesis-ergo.com/"
 
