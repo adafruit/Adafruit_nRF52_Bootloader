@@ -326,8 +326,26 @@ CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
-_VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
-CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'
+# Extract semantic version numbers (MAJOR.MINOR.PATCH) from GIT_VERSION.
+# Supports tags like:
+#   v1.2.3
+#   1.2.3
+#   1.2.3-147-gd71abcd
+# If the version string does not match MAJOR.MINOR.PATCH, defaults to 0.0.0.
+_VER3 := $(shell echo "$(GIT_VERSION)" | sed -E 's/^v?([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 \2 \3/; t; s/.*/0 0 0/')
+
+# Split extracted version into individual numeric components
+_VER_MAJ := $(word 1,$(_VER3))
+_VER_MIN := $(word 2,$(_VER3))
+_VER_PAT := $(word 3,$(_VER3))
+
+# Pack MAJOR.MINOR.PATCH into a single 32-bit integer:
+#   [31:16] MAJOR
+#   [15:8]  MINOR
+#   [7:0]   PATCH
+# This value is stored in the bootloader version register and must be a valid C integer constant.
+CFLAGS += -DMK_BOOTLOADER_VERSION='((($(_VER_MAJ)<<16)|($(_VER_MIN)<<8)|($(_VER_PAT))))'
+
 
 # Debug option use RTT for printf
 ifeq ($(DEBUG), 1)
