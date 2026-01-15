@@ -269,9 +269,6 @@ uint32_t dfu_init_prevalidate(uint8_t * p_init_data, uint32_t init_data_len, uin
 	if (uECC_valid_public_key(pk, curve) != 0) 
 		return NRF_ERROR_INVALID_DATA;
 
-	if (uECC_valid_public_key(pk, curve) != 0) 
-		return NRF_ERROR_INVALID_DATA;
-	
 	unsigned char* sig = &m_extended_packet[DFU_INIT_PACKET_POS_EXT_INIT_SIGNATURE_R];
 # if (DFU_INIT_PACKET_POS_EXT_INIT_SIGNATURE_S - DFU_INIT_PACKET_POS_EXT_INIT_SIGNATURE_R) != DFU_SIGNATURE_R_LENGTH
 #  error Incorrect layout: r and s must be contiguous!
