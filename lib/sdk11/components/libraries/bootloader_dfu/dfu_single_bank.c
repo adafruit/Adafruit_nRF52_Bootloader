@@ -731,27 +731,38 @@ uint32_t dfu_bl_image_swap(void)
     return NRF_SUCCESS;
 }
 
-
 uint32_t dfu_bl_image_validate(void)
 {
     bootloader_settings_t bootloader_settings;
-    sd_mbr_command_t      sd_mbr_cmd;
+
+    sd_mbr_command_t      sd_mbr_cmd_1;
+    sd_mbr_command_t      sd_mbr_cmd_2;
 
     bootloader_settings_get(&bootloader_settings);
 
     if (bootloader_settings.bl_image_size != 0)
     {
-        uint32_t bl_image_start = (bootloader_settings.sd_image_size == 0) ?
+        uint32_t bl_image_start_1 = (bootloader_settings.sd_image_size == 0) ?
                                   DFU_BANK_0_REGION_START :
                                   bootloader_settings.sd_image_start +
                                   bootloader_settings.sd_image_size;
 
-        sd_mbr_cmd.command             = SD_MBR_COMMAND_COMPARE;
-        sd_mbr_cmd.params.compare.ptr1 = (uint32_t *)BOOTLOADER_REGION_START;
-        sd_mbr_cmd.params.compare.ptr2 = (uint32_t *)(bl_image_start);
-        sd_mbr_cmd.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
+        sd_mbr_cmd_1.command             = SD_MBR_COMMAND_COMPARE;
+        sd_mbr_cmd_1.params.compare.ptr1 = (uint32_t *)BOOTLOADER_REGION_START;
+        sd_mbr_cmd_1.params.compare.ptr2 = (uint32_t *)(bl_image_start_1);
+        sd_mbr_cmd_1.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
 
-        return sd_mbr_command(&sd_mbr_cmd);
+        uint32_t bl_image_start_2 = (bootloader_settings.sd_image_size == 0) ?
+                                  DFU_BANK_1_REGION_START :
+                                  bootloader_settings.sd_image_start +
+                                  bootloader_settings.sd_image_size;
+
+        sd_mbr_cmd_2.command             = SD_MBR_COMMAND_COMPARE;
+        sd_mbr_cmd_2.params.compare.ptr1 = (uint32_t *)BOOTLOADER_REGION_START;
+        sd_mbr_cmd_2.params.compare.ptr2 = (uint32_t *)(bl_image_start_2);
+        sd_mbr_cmd_2.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
+
+        return sd_mbr_command(&sd_mbr_cmd_1) && sd_mbr_command(&sd_mbr_cmd_2);
     }
     return NRF_SUCCESS;
 }
