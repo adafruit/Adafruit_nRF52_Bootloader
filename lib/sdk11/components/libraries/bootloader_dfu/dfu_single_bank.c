@@ -88,31 +88,24 @@ static void pstorage_callback_handler(pstorage_handle_t * p_handle,
  */
 static void dfu_prepare_func_app_erase(uint32_t image_size)
 {
-  mp_storage_handle_active = &m_storage_handle_app;
+    mp_storage_handle_active = &m_storage_handle_app;
 
-  // Doing a SoftDevice update thus current application must be cleared to ensure enough space
-  // for new SoftDevice.
-  m_dfu_state = DFU_STATE_PREPARING;
+    // Doing a SoftDevice update thus current application must be cleared to ensure enough space
+    // for new SoftDevice.
+    m_dfu_state = DFU_STATE_PREPARING;
 
-  if ( is_ota() )
-  {
-    uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
-    APP_ERROR_CHECK(err_code);
-  }
-  else
-  {
-    uint32_t const page_count = NRFX_CEIL_DIV(m_image_size, CODE_PAGE_SIZE);
-
-    for ( uint32_t i = 0; i < page_count; i++ )
+    if ( is_ota() )
     {
-      uint32_t const addr = DFU_BANK_0_REGION_START + i * CODE_PAGE_SIZE;
-      PRINTF("Erase 0x%08lX\r\n", addr);
-      nrfx_nvmc_page_erase(addr);
+        uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
+        APP_ERROR_CHECK(err_code);
     }
+    else
+    {
+        flash_nrf5x_erase(DFU_BANK_0_REGION_START, m_image_size);
 
-    // invoke complete callback
-    pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
-  }
+        // invoke complete callback
+        pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
+    }
 }
 
 
@@ -136,14 +129,14 @@ static void dfu_cleared_func_app(void)
 uint32_t offset_calculate(uint32_t sd_image_size)
 {
     uint32_t offset = 0;
-    
+
     if (m_start_packet.sd_image_size > DFU_BANK_0_REGION_START)
     {
         uint32_t page_mask = (CODE_PAGE_SIZE - 1);
         uint32_t diff = m_start_packet.sd_image_size - DFU_BANK_0_REGION_START;
-        
+
         offset = diff & ~page_mask;
-        
+
         // Align offset to next page if image size is not page sized.
         if ((diff & page_mask) > 0)
         {
@@ -189,8 +182,7 @@ static uint32_t dfu_activate_sd(void)
  */
 static uint32_t dfu_activate_app(void)
 {
-    uint32_t            err_code = NRF_SUCCESS;
-    dfu_update_status_t update_status;
+    dfu_update_status_t update_status = { 0 };
 
     memset(&update_status, 0, sizeof(dfu_update_status_t ));
     update_status.status_code = DFU_UPDATE_APP_COMPLETE;
@@ -199,7 +191,7 @@ static uint32_t dfu_activate_app(void)
 
     bootloader_dfu_update_process(update_status);
 
-    return err_code;
+    return NRF_SUCCESS;
 }
 
 
@@ -213,7 +205,7 @@ static uint32_t dfu_activate_app(void)
  */
 static uint32_t dfu_activate_bl(void)
 {
-    dfu_update_status_t update_status;
+    dfu_update_status_t update_status = {0};
 
     update_status.status_code = DFU_UPDATE_BOOT_COMPLETE;
     update_status.app_crc     = m_image_crc;
@@ -267,7 +259,7 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
     // - SoftDevice
     // - Bootloader
     // - SoftDevice with Bootloader
-    if (IS_UPDATING_APP(m_start_packet) && 
+    if (IS_UPDATING_APP(m_start_packet) &&
         (IS_UPDATING_SD(m_start_packet) || IS_UPDATING_BL(m_start_packet)))
     {
         // App update is only supported independently.
@@ -284,7 +276,7 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
 
     m_image_size = m_start_packet.sd_image_size + m_start_packet.bl_image_size +
                    m_start_packet.app_image_size;
-    
+
     if (m_start_packet.bl_image_size > DFU_BL_IMAGE_MAX_SIZE)
     {
         return NRF_ERROR_DATA_SIZE;
@@ -296,7 +288,7 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
     }
     m_functions.prepare  = dfu_prepare_func_app_erase;
     m_functions.cleared  = dfu_cleared_func_app;
-    
+
     if (IS_UPDATING_SD(m_start_packet))
     {
         m_functions.activate = dfu_activate_sd;
@@ -358,13 +350,13 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
             if ( is_ota() )
             {
-              err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
-              VERIFY_SUCCESS(err_code);
+                err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
+                VERIFY_SUCCESS(err_code);
             }
             else
             {
-              flash_nrf5x_write(DFU_BANK_0_REGION_START + m_data_received, p_data, data_length, false);
-              pstorage_callback_handler(mp_storage_handle_active, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_data, data_length);
+                flash_nrf5x_write(DFU_BANK_0_REGION_START + m_data_received, p_data, data_length, false);
+                pstorage_callback_handler(mp_storage_handle_active, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_data, data_length);
             }
 
             m_data_received += data_length;
@@ -376,10 +368,10 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-              if ( !is_ota() ) flash_nrf5x_flush(false);
+                if ( !is_ota() ) flash_nrf5x_flush(false);
 
-              // The entire image has been received. Return NRF_SUCCESS.
-              err_code = NRF_SUCCESS;
+                // The entire image has been received. Return NRF_SUCCESS.
+                err_code = NRF_SUCCESS;
             }
             break;
 
@@ -395,14 +387,14 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 uint32_t dfu_init_pkt_complete(void)
 {
     uint32_t err_code = NRF_ERROR_INVALID_STATE;
-    
+
     // DFU initialization has been done and a start packet has been received.
     if (IMAGE_WRITE_IN_PROGRESS())
     {
         // Image write is already in progress. Cannot handle an init packet now.
         return NRF_ERROR_INVALID_STATE;
     }
-    
+
     if (m_dfu_state == DFU_STATE_RX_INIT_PKT)
     {
         err_code = dfu_init_prevalidate(m_init_packet, m_init_packet_length, m_start_packet.dfu_update_mode);
@@ -513,7 +505,7 @@ uint32_t dfu_image_activate()
 
 void dfu_reset(void)
 {
-    dfu_update_status_t update_status;
+    dfu_update_status_t update_status = { 0 };
 
     update_status.status_code = DFU_RESET;
 
@@ -547,13 +539,13 @@ static uint32_t dfu_copy_sd(uint32_t * src, uint32_t * dst, uint32_t len)
 }
 
 
-static uint32_t dfu_sd_img_block_swap(uint32_t * src, 
-                                      uint32_t * dst, 
-                                      uint32_t len, 
+static uint32_t dfu_sd_img_block_swap(uint32_t * src,
+                                      uint32_t * dst,
+                                      uint32_t len,
                                       uint32_t block_size)
 {
     // It is neccesarry to swap the new SoftDevice in 3 rounds to ensure correct copy of data
-    // and verifucation of data in case power reset occurs during write to flash. 
+    // and verification of data in case power reset occurs during write to flash.
     // To ensure the robustness of swapping the images are compared backwards till start of
     // image swap. If the back is identical everything is swapped.
     uint32_t err_code = dfu_compare_block(src, dst, len);
@@ -564,9 +556,9 @@ static uint32_t dfu_sd_img_block_swap(uint32_t * src,
 
     if ((uint32_t)dst > SOFTDEVICE_REGION_START)
     {
-        err_code = dfu_sd_img_block_swap((uint32_t *)((uint32_t)src - block_size), 
-                                         (uint32_t *)((uint32_t)dst - block_size), 
-                                         block_size, 
+        err_code = dfu_sd_img_block_swap((uint32_t *)((uint32_t)src - block_size),
+                                         (uint32_t *)((uint32_t)dst - block_size),
+                                         block_size,
                                          block_size);
         VERIFY_SUCCESS(err_code);
     }
@@ -588,37 +580,37 @@ uint32_t dfu_sd_image_swap(void)
     {
         return NRF_SUCCESS;
     }
-    
+
     if ((SOFTDEVICE_REGION_START + boot_settings.sd_image_size) > boot_settings.sd_image_start)
     {
         uint32_t err_code;
         uint32_t sd_start        = SOFTDEVICE_REGION_START;
         uint32_t block_size      = (boot_settings.sd_image_start - sd_start) / 2;
-        
+
         /* ##### FIX START ##### */
-        block_size &= ~(uint32_t)(CODE_PAGE_SIZE - 1); 
-        /* ##### FIX END ##### */       
-        
+        block_size &= ~(uint32_t)(CODE_PAGE_SIZE - 1);
+        /* ##### FIX END ##### */
+
         uint32_t image_end       = boot_settings.sd_image_start + boot_settings.sd_image_size;
 
         uint32_t img_block_start = boot_settings.sd_image_start + 2 * block_size;
         uint32_t sd_block_start  = sd_start + 2 * block_size;
-        
+
         if (SD_SIZE_GET(MBR_SIZE) < boot_settings.sd_image_size)
         {
             // This will clear a page thus ensuring the old image is invalidated before swapping.
-            err_code = dfu_copy_sd((uint32_t *)(sd_start + block_size), 
-                                   (uint32_t *)(sd_start + block_size), 
+            err_code = dfu_copy_sd((uint32_t *)(sd_start + block_size),
+                                   (uint32_t *)(sd_start + block_size),
                                    sizeof(uint32_t));
             VERIFY_SUCCESS(err_code);
 
             err_code = dfu_copy_sd((uint32_t *)sd_start, (uint32_t *)sd_start, sizeof(uint32_t));
             VERIFY_SUCCESS(err_code);
         }
-        
-        return dfu_sd_img_block_swap((uint32_t *)img_block_start, 
-                                     (uint32_t *)sd_block_start, 
-                                     image_end - img_block_start, 
+
+        return dfu_sd_img_block_swap((uint32_t *)img_block_start,
+                                     (uint32_t *)sd_block_start,
+                                     image_end - img_block_start,
                                      block_size);
     }
     else
@@ -626,7 +618,7 @@ uint32_t dfu_sd_image_swap(void)
         if (boot_settings.sd_image_size != 0)
         {
             return dfu_copy_sd((uint32_t *)boot_settings.sd_image_start,
-                               (uint32_t *)SOFTDEVICE_REGION_START, 
+                               (uint32_t *)SOFTDEVICE_REGION_START,
                                boot_settings.sd_image_size);
         }
     }
@@ -646,7 +638,7 @@ uint32_t dfu_bl_image_swap(void)
     {
         uint32_t bl_image_start = (bootloader_settings.sd_image_size == 0) ?
                                   DFU_BANK_0_REGION_START :
-                                  bootloader_settings.sd_image_start + 
+                                  bootloader_settings.sd_image_start +
                                   bootloader_settings.sd_image_size;
 
         sd_mbr_cmd.command               = SD_MBR_COMMAND_COPY_BL;
@@ -695,17 +687,18 @@ uint32_t dfu_sd_image_validate(void)
     {
         return NRF_SUCCESS;
     }
-    
+
     if ((SOFTDEVICE_REGION_START + bootloader_settings.sd_image_size) > bootloader_settings.sd_image_start)
     {
         uint32_t sd_start        = SOFTDEVICE_REGION_START;
         uint32_t block_size      = (bootloader_settings.sd_image_start - sd_start) / 2;
-        uint32_t image_end       = bootloader_settings.sd_image_start + 
+        uint32_t image_end       = bootloader_settings.sd_image_start +
                                    bootloader_settings.sd_image_size;
 
         /* ##### FIX START ##### */
-        block_size &= ~(uint32_t)(CODE_PAGE_SIZE - 1); 
-        /* ##### FIX END ##### */       
+        block_size &= ~(uint32_t)(CODE_PAGE_SIZE - 1);
+        /* ##### FIX END ##### */
+
         uint32_t img_block_start = bootloader_settings.sd_image_start + 2 * block_size;
         uint32_t sd_block_start  = sd_start + 2 * block_size;
 
@@ -714,12 +707,12 @@ uint32_t dfu_sd_image_validate(void)
             return NRF_ERROR_NULL;
         }
 
-        return dfu_sd_img_block_swap((uint32_t *)img_block_start, 
-                                     (uint32_t *)sd_block_start, 
-                                     image_end - img_block_start, 
+        return dfu_sd_img_block_swap((uint32_t *)img_block_start,
+                                     (uint32_t *)sd_block_start,
+                                     image_end - img_block_start,
                                      block_size);
     }
-    
+
     sd_mbr_cmd.command             = SD_MBR_COMMAND_COMPARE;
     sd_mbr_cmd.params.compare.ptr1 = (uint32_t *)SOFTDEVICE_REGION_START;
     sd_mbr_cmd.params.compare.ptr2 = (uint32_t *)bootloader_settings.sd_image_start;
