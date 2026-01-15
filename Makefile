@@ -1,10 +1,11 @@
 #------------------------------------------------------------------------------
 # CONFIGURE
-# - SDK_PATH   : path to SDK directory
+# - SDK_PATH     : path to SDK directory
 #
-# - SD_NAME    : e.g s132, s140
-# - SD_VERSION : SoftDevice version e.g 6.0.0
-# - SD_HEX     : to bootloader hex binary
+# - SD_NAME      : e.g s132, s140
+# - SD_VERSION   : SoftDevice version e.g 6.0.0
+# - SD_HEX       : to bootloader hex binary
+# - DUALBANK_FW  : If bootloader will implement a dual bank feature to allow autorecover from failed
 #------------------------------------------------------------------------------
 
 # local customization
@@ -163,7 +164,11 @@ C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
+ifeq ($(DUALBANK_FW), 1)
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_dual_bank.c
+else
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
+endif
 C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
 C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dis/ble_dis.c
 C_SRC += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c

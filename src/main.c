@@ -39,8 +39,13 @@
 #include <stddef.h>
 
 #include "nrfx.h"
+#include "nrf_clock.h"
 #include "nrfx_power.h"
+#include "nrfx_pwm.h"
+
+#include "nordic_common.h"
 #include "sdk_common.h"
+#include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
 
