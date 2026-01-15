@@ -36,8 +36,7 @@
 #include "sdk_common.h"
 
 
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             23
+#define BLEGATT_ATT_MTU_MAX             247
 enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 #define DFU_REV_MAJOR                        0x00                                                    /** DFU Major revision number to be exposed. */
@@ -51,15 +50,15 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define DEVICE_NAME                          "AdaDFU"                                                /**< Name of device. Will be included in the advertising data. */
 #endif
 
-#define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
+#define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(15, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
 #define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (15 milliseconds). */
 #define SLAVE_LATENCY                        0                                                       /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                     (4 * 100)                                               /**< Connection supervisory timeout (4 seconds). */
+#define CONN_SUP_TIMEOUT                     MSEC_TO_UNITS(8000, UNIT_10_MS)                         /**< Connection supervisory timeout (4 seconds). */
 #define SPEEDUP_FLASH_WRITES                 1                                                       /**< Speedup FLASH writes by changing Softdevice local latency */
 
 #define APP_ADV_INTERVAL                     MSEC_TO_UNITS(25, UNIT_0_625_MS)                        /**< The advertising interval (25 ms.). */
 #define APP_ADV_TIMEOUT                      BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED                   /**< The advertising timeout in units of seconds. This is set to @ref BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED so that the advertisement is done as long as there there is a call to @ref dfu_transport_close function.*/
-#define APP_DIRECTED_ADV_TIMEOUT             50                                                       /**< number of direct advertisement (each lasting 1.28seconds). */
+#define APP_DIRECTED_ADV_TIMEOUT             50                                                      /**< number of direct advertisement (each lasting 1.28seconds). */
 #define PEER_ADDRESS_TYPE_INVALID            0xFF                                                    /**< Value indicating that no valid peer address exists. This will be the case when a private resolvable address is used in which case there is no address available but instead an IRK is present. */
 #define PEER_ADDRESS_TYPE_INVALID            0xFF                                                    /**< Value indicating that no valid peer address exists. This will be the case when a private resolvable address is used in which case there is no address available but instead an IRK is present. */
 
@@ -790,8 +789,22 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
-            m_is_advertising = false;
+            {
+                m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
+                m_is_advertising = false;
+
+                // Force changing the slave latency to try to improve transfer throughput (bandwidth)
+                //  But Android and IOS will override it with their minimum supported value
+                ble_gap_conn_params_t p_conn_params;
+                p_conn_params.min_conn_interval = p_ble_evt->evt.gap_evt.params.connected.conn_params.min_conn_interval;
+                p_conn_params.max_conn_interval = p_ble_evt->evt.gap_evt.params.connected.conn_params.max_conn_interval;
+                p_conn_params.slave_latency     = SLAVE_LATENCY;
+                p_conn_params.conn_sup_timeout  = p_ble_evt->evt.gap_evt.params.connected.conn_params.conn_sup_timeout;
+
+                err_code = sd_ble_gap_conn_param_update(m_conn_handle, &p_conn_params);
+                APP_ERROR_CHECK(err_code);
+
+            }
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -819,6 +832,9 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
+            break;
+
+        case BLE_GAP_EVT_CONN_PARAM_UPDATE:
             break;
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
@@ -947,6 +963,11 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
         {
           uint16_t att_mtu = MIN(p_ble_evt->evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu, BLEGATT_ATT_MTU_MAX);
+
+		  // Round it to a multiple of 4 plus 3 bytes, as we need data packets to be multiple of 4 bytes
+          att_mtu &= 0xFFFCU;
+          att_mtu |= 3;
+
           PRINTF("GAP ATT MTU is changed to %d\r\n", att_mtu);
           APP_ERROR_CHECK( sd_ble_gatts_exchange_mtu_reply(m_conn_handle, att_mtu) );
         }

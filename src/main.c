@@ -115,8 +115,11 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(DFU_BANK_0_REGION_START + 0x200)) == 0x87eeb07c)
 
 // These value must be the same with one in dfu_transport_ble.c
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             23
+#define BLEGAP_EVENT_LENGTH             12
+#define BLEGATT_ATT_MTU_MAX             247 
+#define BLEGATTS_HVN_QSIZE              12
+#define BLEGATTC_WRCMD_QSIZE            2  
+
 enum {
   BLE_CONN_CFG_HIGH_BANDWIDTH = 1
 };
@@ -371,11 +374,23 @@ static uint32_t ble_stack_init(void) {
   blecfg.conn_cfg.params.gap_conn_cfg.event_length = BLEGAP_EVENT_LENGTH;
   sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start);
 
+  // HVN queue size
+  varclr(&blecfg);
+  blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
+  blecfg.conn_cfg.params.gatts_conn_cfg.hvn_tx_queue_size = BLEGATTS_HVN_QSIZE; 
+  sd_ble_cfg_set(BLE_CONN_CFG_GATTS, &blecfg, ram_start);
+
+  // WRITE COMMAND queue size
+  varclr(&blecfg);
+  blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
+  blecfg.conn_cfg.params.gattc_conn_cfg.write_cmd_tx_queue_size = BLEGATTC_WRCMD_QSIZE;
+  sd_ble_cfg_set(BLE_CONN_CFG_GATTC, &blecfg, ram_start); 
+  
   // Enable BLE stack.
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
   sd_ble_enable(&ram_start);
 
-#if 0
+#if BLEGATT_ATT_MTU_MAX > 23
   ble_opt_t  opt;
   varclr(&opt);
   opt.common_opt.conn_evt_ext.enable = 1; // enable Data Length Extension
@@ -401,10 +416,19 @@ uint32_t proc_ble(void) {
   if (NRF_SUCCESS == err) {
     switch (evt->header.evt_id) {
       case BLE_GAP_EVT_CONNECTED:
+      {
+        // Try to enable 2M phy,if phone allows it
+        ble_gap_phys_t const phys =
+        {
+          .rx_phys = BLE_GAP_PHY_AUTO,
+          .tx_phys = BLE_GAP_PHY_AUTO,
+        };
+        sd_ble_gap_phy_update(evt->evt.gap_evt.conn_handle, &phys);
+
         _ota_connected = true;
         led_state(STATE_BLE_CONNECTED);
         break;
-
+      }
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
         led_state(STATE_BLE_DISCONNECTED);

@@ -17,14 +17,14 @@
 #include <stddef.h>
 #include "sdk_common.h"
 
-#define DFU_PKT_ENABLE_WR_WO_RESPONSE_ONLY   0                                  /**< Enable Write Without Response on Data Endpoint ONLY (otherwise both With and Without response will be supported)*/
-#define MAX_DFU_PKT_LEN         20                                              /**< Maximum length (in bytes) of the DFU Packet characteristic. */
-#define PKT_START_DFU_PARAM_LEN 2                                               /**< Length (in bytes) of the parameters for Packet Start DFU Request. */
-#define PKT_INIT_DFU_PARAM_LEN  2                                               /**< Length (in bytes) of the parameters for Packet Init DFU Request. */
-#define PKT_RCPT_NOTIF_REQ_LEN  3                                               /**< Length (in bytes) of the Packet Receipt Notification Request. */
-#define MAX_PKTS_RCPT_NOTIF_LEN 6                                               /**< Maximum length (in bytes) of the Packets Receipt Notification. */
-#define MAX_RESPONSE_LEN        7                                               /**< Maximum length (in bytes) of the response to a Control Point command. */
-#define MAX_NOTIF_BUFFER_LEN    MAX(MAX_PKTS_RCPT_NOTIF_LEN, MAX_RESPONSE_LEN)  /**< Maximum length (in bytes) of the buffer needed by DFU Service while sending notifications to peer. */
+#define DFU_PKT_ENABLE_WR_WO_RESPONSE_ONLY   0                                          /**< Enable Write Without Response on Data Endpoint ONLY (otherwise both With and Without response will be supported)*/
+#define MAX_DFU_PKT_LEN                 244                                             /**< Maximum length (in bytes) of the DFU Packet characteristic. */
+#define PKT_START_DFU_PARAM_LEN         2                                               /**< Length (in bytes) of the parameters for Packet Start DFU Request. */
+#define PKT_INIT_DFU_PARAM_LEN          2                                               /**< Length (in bytes) of the parameters for Packet Init DFU Request. */
+#define PKT_RCPT_NOTIF_REQ_LEN          3                                               /**< Length (in bytes) of the Packet Receipt Notification Request. */
+#define MAX_PKTS_RCPT_NOTIF_LEN         6                                               /**< Maximum length (in bytes) of the Packets Receipt Notification. */
+#define MAX_RESPONSE_LEN                7                                               /**< Maximum length (in bytes) of the response to a Control Point command. */
+#define MAX_NOTIF_BUFFER_LEN            MAX(MAX_PKTS_RCPT_NOTIF_LEN, MAX_RESPONSE_LEN)  /**< Maximum length (in bytes) of the buffer needed by DFU Service while sending notifications to peer. */
 
 enum
 {
