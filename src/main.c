@@ -411,6 +411,10 @@ static uint32_t ble_stack_init(void) {
   return NRF_SUCCESS;
 }
 
+/*------------------------------------------------------------------*/
+/* SoftDevice Event handler
+ *------------------------------------------------------------------*/
+ 
 // Process BLE event from SD
 uint32_t proc_ble(void) {
   __ALIGN(4) uint8_t ev_buf[BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX)];
