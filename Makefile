@@ -41,6 +41,15 @@ SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
 
+# Detect the operating system
+# The "OS" environment variable on Windows is always "Windows_NT"
+# when running under a modern shell like cmd.exe or powershell
+ifeq ($(OS),Windows_NT)
+	NULL_DEVICE = NUL
+else
+	NULL_DEVICE = /dev/null
+endif
+
 # linker by MCU eg. nrf52840.ld
 ifeq ($(DEBUG), 1)
   LD_FILE = linker/$(MCU_SUB_VARIANT)_debug.ld
@@ -385,9 +394,9 @@ CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
 
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 # Fixes for gcc version 12, 13 and 14.
-#ifneq (,$(filter 12.% 13.% 14.%,$(shell $(CC) -dumpversion 2>/dev/null)))
+ifneq (,$(filter 12.% 13.% 14.%,$(shell $(CC) -dumpversion 2>$(NULL_DEVICE))))
 	CFLAGS += --param=min-pagesize=0
-#endif
+endif
 
 #------------------------------------------------------------------------------
 # Linker Flags
