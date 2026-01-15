@@ -55,6 +55,7 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (15 milliseconds). */
 #define SLAVE_LATENCY                        0                                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                     (4 * 100)                                               /**< Connection supervisory timeout (4 seconds). */
+#define SPEEDUP_FLASH_WRITES                 1                                                       /**< Speedup FLASH writes by changing Softdevice local latency */
 
 #define APP_ADV_INTERVAL                     MSEC_TO_UNITS(25, UNIT_0_625_MS)                        /**< The advertising interval (25 ms.). */
 #define APP_ADV_TIMEOUT                      BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED                   /**< The advertising timeout in units of seconds. This is set to @ref BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED so that the advertisement is done as long as there there is a call to @ref dfu_transport_close function.*/
@@ -210,6 +211,34 @@ static ble_dfu_resp_val_t nrf_err_code_translate(uint32_t                  err_c
     }
 }
 
+static void prioritize_ble_over_flash_writes(void)
+{
+#ifdef SPEEDUP_FLASH_WRITES
+    // We set the local latency to 0: That will revert latency to the negotiated one with the host.
+    //  That will increase throughput to the maximum possible
+    ble_opt_t opt;
+    varclr(&opt);
+    opt.gap_opt.local_conn_latency.conn_handle = m_conn_handle;/**< Connection Handle */
+    opt.gap_opt.local_conn_latency.requested_latency = 0;      /**< Requested local connection latency. */
+    opt.gap_opt.local_conn_latency.p_actual_latency = NULL;    /**< Pointer to storage for the actual local connection latency (can be set to NULL to skip return value). */
+    sd_ble_opt_set(BLE_GAP_OPT_LOCAL_CONN_LATENCY, &opt);
+#endif
+}
+
+static void prioritize_flash_writes_over_ble(void)
+{
+#ifdef SPEEDUP_FLASH_WRITES
+    // We set the local latency to the maximum possible: That will make FLASH writes faster, as BLE comms will
+    //  be delayed (even losing RXd packets, but this is the same as a poor connection and will be handled by
+    //  the protocol itself)
+    ble_opt_t opt;
+    varclr(&opt);
+    opt.gap_opt.local_conn_latency.conn_handle = m_conn_handle;/**< Connection Handle */
+    opt.gap_opt.local_conn_latency.requested_latency = 50;     /**< Requested local connection latency. */
+    opt.gap_opt.local_conn_latency.p_actual_latency = NULL;    /**< Pointer to storage for the actual local connection latency (can be set to NULL to skip return value). */
+    sd_ble_opt_set(BLE_GAP_OPT_LOCAL_CONN_LATENCY, &opt);
+#endif
+}
 
 /**@brief     Function for handling the callback events from the dfu module.
  *            Callbacks are expected when \ref dfu_data_pkt_handle has been executed.
@@ -228,6 +257,9 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
         case DATA_PACKET:
             if (result != NRF_SUCCESS)
             {
+                // Restore latency to the negotiated one
+                prioritize_ble_over_flash_writes();
+
                 // Disconnect from peer.
                 if (IS_CONNECTED())
                 {
@@ -244,6 +276,9 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
                 // If the callback matches final data packet received then the peer is notified.
                 if (mp_final_packet == p_data)
                 {
+                    // Restore latency to the negotiated one
+                    prioritize_ble_over_flash_writes();
+
                     // Notify the DFU Controller about the success of the procedure.
                     err_code = ble_dfu_response_send(&m_dfu,
                                                      BLE_DFU_RECEIVE_APP_PROCEDURE,
@@ -254,6 +289,10 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
             break;
 
         case START_PACKET:
+
+            // Restore latency to the negotiated one
+            prioritize_ble_over_flash_writes();
+
             // Translate the err_code returned by the above function to DFU Response Value.
             resp_val = nrf_err_code_translate(result, BLE_DFU_START_PROCEDURE);
 
@@ -326,9 +365,15 @@ static void start_data_process(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
         start_packet.bl_image_size  = uint32_decode(p_length_data + BL_IMAGE_SIZE_OFFSET);
         start_packet.app_image_size = uint32_decode(p_length_data + APP_IMAGE_SIZE_OFFSET);
 
+        // Prioritize FLASH writes over BLE comms
+        prioritize_flash_writes_over_ble();
+
         err_code = dfu_start_pkt_handle(&update_packet);
         if (err_code != NRF_SUCCESS)
         {
+            // Prioritize BLE over flash writes
+            prioritize_ble_over_flash_writes();
+
             // Translate the err_code returned by the above function to DFU Response Value.
             ble_dfu_resp_val_t resp_val;
 
