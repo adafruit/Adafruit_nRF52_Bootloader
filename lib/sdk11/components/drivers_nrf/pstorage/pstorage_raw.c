@@ -280,6 +280,10 @@ static void app_notify(uint32_t result, cmd_queue_element_t * p_elem)
  */
 void pstorage_sys_event_handler(uint32_t sys_evt)
 {
+    // Do not bother processing events we are not interested in
+    if (sys_evt != NRF_EVT_FLASH_OPERATION_SUCCESS &&
+        sys_evt != NRF_EVT_FLASH_OPERATION_ERROR) return;
+		
     uint32_t retval = NRF_SUCCESS;
 
     // The event shall only be processed if requested by this module.
@@ -339,6 +343,7 @@ void pstorage_sys_event_handler(uint32_t sys_evt)
  * @brief Function for processing of commands and issuing flash access request to the SoftDevice.
  *
  * @return The return value received from SoftDevice.
+ * @remark This function is only called when m_cmd_queue.flash_access == false
  */
 static uint32_t cmd_process(void)
 {
@@ -352,6 +357,9 @@ static uint32_t cmd_process(void)
 
     storage_addr = p_cmd->storage_addr.block_id;
 
+    // Let's assume we will do a flash access
+    m_cmd_queue.flash_access = true;
+	
     switch (p_cmd->op_code)
     {
         case PSTORAGE_STORE_OP_CODE:
@@ -396,9 +404,10 @@ static uint32_t cmd_process(void)
             break;
     }
     
-    if (retval == NRF_SUCCESS)
+    // An error means we will not do it
+    if (retval != NRF_SUCCESS)
     {
-       m_cmd_queue.flash_access = true;
+       m_cmd_queue.flash_access = false;
     }
 
     return retval;
