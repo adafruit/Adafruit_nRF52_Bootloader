@@ -47,7 +47,9 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define BLE_HANDLE_MAX                       0xFFFF                                                  /**< Max handle value is BLE. */
 
 // limit of 8 chars
+#ifndef DEVICE_NAME
 #define DEVICE_NAME                          "AdaDFU"                                                /**< Name of device. Will be included in the advertising data. */
+#endif
 
 #define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
 #define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (15 milliseconds). */
