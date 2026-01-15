@@ -32,6 +32,8 @@ In addition, there is also lots of other 3rd-party boards which are added by oth
 - Self-upgradable via Serial and OTA
 - DFU using UF2 (https://github.com/Microsoft/uf2) (application only)
 - Auto-enter DFU briefly on startup for DTR auto-reset trick (832 only)
+- Supports dual bank firmware updates (disabled by default)
+- Supports signed firmware updates (disabled by default)
 
 ## How to use
 
@@ -101,7 +103,7 @@ Pre-builtin binaries are available on GitHub [releases](https://github.com/adafr
 Note: The bootloader can be downgraded. Since the binary release is a merged version of
 both bootloader and the Nordic SoftDevice, you can freely upgrade/downgrade to any version you like.
 
-## How to compile and build
+## How to compile and build 
 
 You should only continue if you are looking to develop bootloader for your own.
 You must have have a J-Link available to "unbrick" your device.
@@ -204,6 +206,57 @@ To flash MBR only
 
 ```
 make BOARD=feather_nrf52840_express flash-mbr
+```
+
+### Dual bank firmware support:
+
+This bootloader can split the FLASH memory into 2 partitions, one for the last successfully uploaded firmware, and the other for the new firmware that is being uploaded. In case the firmware upload fails, the bootloader will revert to the last working firmware version. The only drawback is that the maximum firmware size is half of the device FLASH size: That is why it is disabled by default.
+You can enable this feature by passing DUALBANK_FW=1 to the make process while compiling the bootloader
+
+### Signed firmware support:
+This bootloader can validate that the uploaded firmware is digitally signed, and refuse to install unsigned or signed with the improper key firmware. Because this will make Arduino uploads stop working (because they are not digitally signed), this feature is disabled by default.
+But if you want to ensure noone else is allowed to upload firmware to your device, this option is probably what you want to enable.
+
+To create a signing key, you will need the adafruit-nrfutil utility. First, generate a signing key and store at given path by using
+
+```
+adafruit-nrfutil keys --gen-key stored_key.pem
+```
+
+This command will create a signing key and store it in the file stored_key.pem.  STORE THIS FILE IN A SAFE PLACE, as without it, you won't be able to sign your firmware packages, and the bootloader will refuse to flash them!!
+
+Now, you must show the verification key (that is calculated from the signing key):
+
+```
+adafruit-nrfutil keys --show-vk code stored_key.pem
+```
+
+This command will read your signing key (from the file stored_key.pem) and display C source code with the Qx and Qy arrays: Something along the lines
+
+```
+static uint8_t Qx[] = { ... };
+static uint8_t Qy[] = { ... };
+```
+
+You must save thw Qx and Qy values, remove all spaces, an pass them to the make command line
+```
+make BOARD=feather_nrf52840_express SIGNED_FW=1 SIGNED_FW_QX='Qx values' SIGNED_FW_QY='Qy values'
+```
+
+And replace Qx values with the Qx array values, and the Qy values with the Qy array values. That will create a bootloader that ONLY accepts firmware signed with the stored_key.pem signing key. Take into account that the option SIGNED_FW=1 is what enables to build a bootloader that enforces signing, and will ALSO result in disabling UF2 support, as UF2 format does NOT support signing keys. There is an option (only for testing!) called FORCE_UF2 that will FORCE UF2 support on bootloaders that enforce firmware security. It is there to bypass security so you can test a secure bootloader and have a way to recover it something goes wrong, but should NEVER be used if you want to enforce security
+
+Finally, to create a signed firmware application/bootloader update package, you can use, for example
+
+```
+adafruit-nrfutil dfu genpkg --dev-type 0x0052 --sd-req 0x0123 --application "application.hex" --key-file "stored_key.pem" "application_package.zip"
+```
+
+Please, use full paths for all files. The examples omit them for clarity!
+
+And, to upload it to your device, 
+
+```
+adafruit-nrfutil.exe --verbose dfu serial -pkg "application_package.zip" -p /dev/tty0 -b 115200
 ```
 
 ### Common makefile problems
