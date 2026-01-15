@@ -561,29 +561,35 @@ uint32_t ble_dfu_bytes_rcvd_report(ble_dfu_t * p_dfu, uint32_t num_of_firmware_b
         return NRF_ERROR_INVALID_STATE;
     }
 
-    ble_gatts_hvx_params_t hvx_params;
-    uint16_t               index = 0;
+    uint32_t err_code;
+	do {
 
-    // Encode the Op Code.
-    m_notif_buffer[index++] = OP_CODE_RESPONSE;
+        ble_gatts_hvx_params_t hvx_params;
+        uint16_t               index = 0;
+    
+        // Encode the Op Code.
+        m_notif_buffer[index++] = OP_CODE_RESPONSE;
+    
+        // Encode the Reqest Op Code.
+        m_notif_buffer[index++] = OP_CODE_IMAGE_SIZE_REQ;
+    
+        // Encode the Response Value.
+        m_notif_buffer[index++] = (uint8_t)BLE_DFU_RESP_VAL_SUCCESS;
+    
+        index += uint32_encode(num_of_firmware_bytes_rcvd, &m_notif_buffer[index]);
+    
+        memset(&hvx_params, 0, sizeof(hvx_params));
+    
+        hvx_params.handle = p_dfu->dfu_ctrl_pt_handles.value_handle;
+        hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
+        hvx_params.offset = 0;
+        hvx_params.p_len  = &index;
+        hvx_params.p_data = m_notif_buffer;
+		
+        err_code = sd_ble_gatts_hvx(p_dfu->conn_handle, &hvx_params);
+    } while (err_code == NRF_ERROR_RESOURCES);	
 
-    // Encode the Reqest Op Code.
-    m_notif_buffer[index++] = OP_CODE_IMAGE_SIZE_REQ;
-
-    // Encode the Response Value.
-    m_notif_buffer[index++] = (uint8_t)BLE_DFU_RESP_VAL_SUCCESS;
-
-    index += uint32_encode(num_of_firmware_bytes_rcvd, &m_notif_buffer[index]);
-
-    memset(&hvx_params, 0, sizeof(hvx_params));
-
-    hvx_params.handle = p_dfu->dfu_ctrl_pt_handles.value_handle;
-    hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
-    hvx_params.offset = 0;
-    hvx_params.p_len  = &index;
-    hvx_params.p_data = m_notif_buffer;
-
-    return sd_ble_gatts_hvx(p_dfu->conn_handle, &hvx_params);
+    return err_code;	
 }
 
 
@@ -599,22 +605,28 @@ uint32_t ble_dfu_pkts_rcpt_notify(ble_dfu_t * p_dfu, uint32_t num_of_firmware_by
         return NRF_ERROR_INVALID_STATE;
     }
 
-    ble_gatts_hvx_params_t hvx_params;
-    uint16_t               index = 0;
+    uint32_t err_code;
+	do {
 
-    m_notif_buffer[index++] = OP_CODE_PKT_RCPT_NOTIF;
+        ble_gatts_hvx_params_t hvx_params;
+        uint16_t               index = 0;
+    
+        m_notif_buffer[index++] = OP_CODE_PKT_RCPT_NOTIF;
+    
+        index += uint32_encode(num_of_firmware_bytes_rcvd, &m_notif_buffer[index]);
+    
+        memset(&hvx_params, 0, sizeof(hvx_params));
+    
+        hvx_params.handle = p_dfu->dfu_ctrl_pt_handles.value_handle;
+        hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
+        hvx_params.offset = 0;
+        hvx_params.p_len  = &index;
+        hvx_params.p_data = m_notif_buffer;
 
-    index += uint32_encode(num_of_firmware_bytes_rcvd, &m_notif_buffer[index]);
+        err_code = sd_ble_gatts_hvx(p_dfu->conn_handle, &hvx_params);
+    } while (err_code == NRF_ERROR_RESOURCES);	
 
-    memset(&hvx_params, 0, sizeof(hvx_params));
-
-    hvx_params.handle = p_dfu->dfu_ctrl_pt_handles.value_handle;
-    hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
-    hvx_params.offset = 0;
-    hvx_params.p_len  = &index;
-    hvx_params.p_data = m_notif_buffer;
-
-    return sd_ble_gatts_hvx(p_dfu->conn_handle, &hvx_params);
+    return err_code;	
 }
 
 
@@ -632,24 +644,30 @@ uint32_t ble_dfu_response_send(ble_dfu_t         * p_dfu,
         return NRF_ERROR_INVALID_STATE;
     }
 
-    ble_gatts_hvx_params_t hvx_params;
-    uint16_t               index = 0;
+    uint32_t err_code;
+	do {
 
-    m_notif_buffer[index++] = OP_CODE_RESPONSE;
+        ble_gatts_hvx_params_t hvx_params;
+        uint16_t               index = 0;
+    
+        m_notif_buffer[index++] = OP_CODE_RESPONSE;
+    
+        // Encode the Request Op code
+        m_notif_buffer[index++] = (uint8_t)dfu_proc;
+    
+        // Encode the Response Value.
+        m_notif_buffer[index++] = (uint8_t)resp_val;
+    
+        memset(&hvx_params, 0, sizeof(hvx_params));
+    
+        hvx_params.handle = p_dfu->dfu_ctrl_pt_handles.value_handle;
+        hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
+        hvx_params.offset = 0;
+        hvx_params.p_len  = &index;
+        hvx_params.p_data = m_notif_buffer;
+    
+        err_code = sd_ble_gatts_hvx(p_dfu->conn_handle, &hvx_params);
+    } while (err_code == NRF_ERROR_RESOURCES);
 
-    // Encode the Request Op code
-    m_notif_buffer[index++] = (uint8_t)dfu_proc;
-
-    // Encode the Response Value.
-    m_notif_buffer[index++] = (uint8_t)resp_val;
-
-    memset(&hvx_params, 0, sizeof(hvx_params));
-
-    hvx_params.handle = p_dfu->dfu_ctrl_pt_handles.value_handle;
-    hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
-    hvx_params.offset = 0;
-    hvx_params.p_len  = &index;
-    hvx_params.p_data = m_notif_buffer;
-
-    return sd_ble_gatts_hvx(p_dfu->conn_handle, &hvx_params);
+    return err_code;	
 }
