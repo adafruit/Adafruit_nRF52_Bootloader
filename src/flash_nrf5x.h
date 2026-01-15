@@ -34,7 +34,8 @@
  extern "C" {
 #endif
 
-void flash_nrf5x_write (uint32_t dst, void const *src, int len, bool need_erase);
+void flash_nrf5x_erase (uint32_t dst, uint32_t len);
+void flash_nrf5x_write (uint32_t dst, void const *src, uint32_t len, bool need_erase);
 void flash_nrf5x_flush (bool need_erase);
 
 #ifdef __cplusplus

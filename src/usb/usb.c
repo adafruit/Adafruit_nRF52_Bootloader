@@ -94,7 +94,9 @@ void usb_init(bool cdc_only) {
   }
 
   usb_desc_init(cdc_only);
+#if !defined(SIGNED_FW) || defined(FORCE_UF2)
   uf2_init();
+#endif
   tusb_init();
 
   #ifdef DISPLAY_PIN_SCK
