@@ -29,7 +29,7 @@ static dfu_state_t                  m_dfu_state;                /**< Current DFU
 static uint32_t                     m_image_size;               /**< Size of the image that will be transmitted. */
 
 static dfu_start_packet_t           m_start_packet;             /**< Start packet received for this update procedure. Contains update mode and image sizes information to be used for image transfer. */
-static uint8_t                      m_init_packet[128];         /**< Init packet, can hold CRC, Hash, Signed Hash and similar, for image validation, integrety check and authorization checking. */ 
+static uint8_t                      m_init_packet[128];         /**< Init packet, can hold CRC, Hash, Signed Hash and similar, for image validation, integrity check and authorization checking. */ 
 static uint8_t                      m_init_packet_length;       /**< Length of init packet received. */
 static uint16_t                     m_image_crc;                /**< Calculated CRC of the image received. */
 
@@ -200,8 +200,8 @@ static void dfu_cleared_func_app(void)
 /**@brief   Function for calculating storage offset for receiving SoftDevice image.
  *
  * @details When a new SoftDevice is received it will be temporary stored in flash before moved to
- *          address 0x0. In order to succesfully validate transfer and relocation it is important
- *          that temporary image and final installed image does not ovwerlap hence an offset must
+ *          address 0x0. In order to successfully validate transfer and relocation it is important
+ *          that temporary image and final installed image does not overlap hence an offset must
  *          be calculated in case new image is larger than currently installed SoftDevice.
  */
 uint32_t offset_calculate(uint32_t sd_image_size)
@@ -253,7 +253,7 @@ static uint32_t dfu_activate_sd(void)
 
 /**@brief Function for activating received Application image.
  *
- *  @details This function will move the received application image fram swap (bank 1) to
+ *  @details This function will move the received application image from swap (bank 1) to
  *           application area (bank 0).
  *
  * @return NRF_SUCCESS on success. Error code otherwise.
@@ -606,7 +606,7 @@ uint32_t dfu_image_validate()
             // Check if the application image write has finished.
             if (m_data_received != m_image_size)
             {
-                // Image not yet fully transfered by the peer or the peer has attempted to write
+                // Image not yet fully transferred by the peer or the peer has attempted to write
                 // too much data. Hence the validation should fail.
                 err_code = NRF_ERROR_INVALID_STATE;
             }
@@ -701,8 +701,8 @@ static uint32_t dfu_sd_img_block_swap(uint32_t * src,
                                       uint32_t len, 
                                       uint32_t block_size)
 {
-    // It is neccesarry to swap the new SoftDevice in 3 rounds to ensure correct copy of data
-    // and verifucation of data in case power reset occurs during write to flash. 
+    // It is necessary to swap the new SoftDevice in 3 rounds to ensure correct copy of data
+    // and verification of data in case power reset occurs during write to flash. 
     // To ensure the robustness of swapping the images are compared backwards till start of
     // image swap. If the back is identical everything is swapped.
     uint32_t err_code = dfu_compare_block(src, dst, len);
@@ -810,7 +810,7 @@ uint32_t dfu_bl_image_swap(void)
 
 uint32_t dfu_bl_image_validate(void)
 {
-    bootloader_settings_t bootloader_settings;\
+    bootloader_settings_t bootloader_settings;
 	
     sd_mbr_command_t      sd_mbr_cmd_1;
     sd_mbr_command_t      sd_mbr_cmd_2;
