@@ -94,7 +94,7 @@ void usb_init(bool cdc_only) {
   }
 
   usb_desc_init(cdc_only);
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)
+#if CFG_TUD_MSC
   uf2_init();
 #endif
   tusb_init();
