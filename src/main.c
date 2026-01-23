@@ -39,7 +39,10 @@
 #include <stddef.h>
 
 #include "nrfx.h"
+#include "nrf_clock.h"
 #include "nrfx_power.h"
+#include "nrfx_pwm.h"
+
 #include "sdk_common.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
@@ -48,7 +51,10 @@
 #include "nrf_soc.h"
 #include "nrf_nvic.h"
 #include "app_error.h"
+#include "nrf_gpio.h"
 #include "ble.h"
+#include "nrf.h"
+#include "ble_hci.h"
 #include "app_scheduler.h"
 #include "nrf_error.h"
 
@@ -56,10 +62,12 @@
 
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
+#include "pstorage.h"
 
 #ifdef NRF_USBD
 
 #include "uf2/uf2.h"
+#include "nrf_usbd.h"
 #include "tusb.h"
 
 void usb_init(bool cdc_only);
@@ -114,12 +122,9 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 // DFU_DBL_RESET magic is used to determined which mode is entered
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(DFU_BANK_0_REGION_START + 0x200)) == 0x87eeb07c)
 
-// These value must be the same with one in dfu_transport_ble.c
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             23
-enum {
-  BLE_CONN_CFG_HIGH_BANDWIDTH = 1
-};
+#define BLEGAP_EVENT_LENGTH             12
+#define BLEGATTS_HVN_QSIZE              12
+#define BLEGATTC_WRCMD_QSIZE            2
 
 //--------------------------------------------------------------------+
 //
@@ -214,6 +219,9 @@ int main(void) {
     PRINTF("Starting app...\r\n");
     bootloader_app_start();
   }
+
+  // No application was loaded, reset the system with the OTA DFU update
+  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
 
   NVIC_SystemReset();
 }
@@ -371,11 +379,23 @@ static uint32_t ble_stack_init(void) {
   blecfg.conn_cfg.params.gap_conn_cfg.event_length = BLEGAP_EVENT_LENGTH;
   sd_ble_cfg_set(BLE_CONN_CFG_GAP, &blecfg, ram_start);
 
+  // HVN queue size
+  varclr(&blecfg);
+  blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
+  blecfg.conn_cfg.params.gatts_conn_cfg.hvn_tx_queue_size = BLEGATTS_HVN_QSIZE; 
+  sd_ble_cfg_set(BLE_CONN_CFG_GATTS, &blecfg, ram_start);
+
+  // WRITE COMMAND queue size
+  varclr(&blecfg);
+  blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
+  blecfg.conn_cfg.params.gattc_conn_cfg.write_cmd_tx_queue_size = BLEGATTC_WRCMD_QSIZE;
+  sd_ble_cfg_set(BLE_CONN_CFG_GATTC, &blecfg, ram_start); 
+  
   // Enable BLE stack.
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
   sd_ble_enable(&ram_start);
 
-#if 0
+#if BLEGATT_ATT_MTU_MAX > 23
   ble_opt_t  opt;
   varclr(&opt);
   opt.common_opt.conn_evt_ext.enable = 1; // enable Data Length Extension
@@ -384,6 +404,11 @@ static uint32_t ble_stack_init(void) {
 
   return NRF_SUCCESS;
 }
+
+/*------------------------------------------------------------------*/
+/* SoftDevice Event handler
+ *------------------------------------------------------------------*/
+extern void ble_evt_dispatch(ble_evt_t *p_ble_evt);
 
 // Process BLE event from SD
 uint32_t proc_ble(void) {
@@ -400,10 +425,19 @@ uint32_t proc_ble(void) {
   // Handle valid event, ignore error
   if (NRF_SUCCESS == err) {
     switch (evt->header.evt_id) {
-      case BLE_GAP_EVT_CONNECTED:
+      case BLE_GAP_EVT_CONNECTED: {
+        // Try to enable 2M phy,if phone allows it
+        ble_gap_phys_t const phys =
+        {
+          .rx_phys = BLE_GAP_PHY_AUTO,
+          .tx_phys = BLE_GAP_PHY_AUTO,
+        };
+        sd_ble_gap_phy_update(evt->evt.gap_evt.conn_handle, &phys);
+
         _ota_connected = true;
         led_state(STATE_BLE_CONNECTED);
         break;
+      }
 
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
@@ -415,7 +449,6 @@ uint32_t proc_ble(void) {
     }
 
     // from dfu_transport_ble
-    extern void ble_evt_dispatch(ble_evt_t* p_ble_evt);
     ble_evt_dispatch(evt);
   }
 
@@ -436,7 +469,9 @@ uint32_t proc_soc(void) {
                      (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY :
                      (soc_evt == NRF_EVT_POWER_USB_REMOVED) ? NRFX_POWER_USB_EVT_REMOVED : -1;
 
-    if (usbevt >= 0) tusb_hal_nrf_power_event((uint32_t) usbevt);
+    if (usbevt >= 0) {
+      tusb_hal_nrf_power_event((uint32_t)usbevt);
+    }
 #endif
   }
 

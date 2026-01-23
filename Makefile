@@ -1,11 +1,18 @@
 #------------------------------------------------------------------------------
 # CONFIGURE
-# - SDK_PATH   : path to SDK directory
+# - SDK_PATH     : path to SDK directory
 #
-# - SD_NAME    : e.g s132, s140
-# - SD_VERSION : SoftDevice version e.g 6.0.0
-# - SD_HEX     : to bootloader hex binary
+# - SD_NAME      : e.g s132, s140
+# - SD_VERSION   : SoftDevice version e.g 6.0.0
+# - SD_HEX       : to bootloader hex binary
+# - SIGNED_FW    : if bootloader will ONLY accept signed firmware
+# - SIGNED_FW_QX : Qx for signed firmware verification
+# - SIGNED_FW_QY : Qy for signed firmware verification
+# - DUALBANK_FW  : If bootloader will implement a dual bank feature to allow autorecover from failed
+# - FORCE_UF2    : if SIGNED_FW is 1, will force to include UF2 support (UNSECURE, UF2 does NOT validate signature!)
 #------------------------------------------------------------------------------
+
+PYTHON = python
 
 # local customization
 -include Makefile.user
@@ -16,6 +23,7 @@
 SDK_PATH     = lib/sdk/components
 SDK11_PATH   = lib/sdk11/components
 TUSB_PATH    = lib/tinyusb/src
+TCRYPT_PATH  = lib/tinycrypt/lib
 NRFX_PATH    = lib/nrfx
 SD_PATH      = lib/softdevice/$(SD_FILENAME)
 
@@ -32,6 +40,15 @@ SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
 SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
 
 MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
+
+# Detect the operating system
+# The "OS" environment variable on Windows is always "Windows_NT"
+# when running under a modern shell like cmd.exe or powershell
+ifeq ($(OS),Windows_NT)
+	NULL_DEVICE = NUL
+else
+	NULL_DEVICE = /dev/null
+endif
 
 # linker by MCU eg. nrf52840.ld
 ifeq ($(DEBUG), 1)
@@ -149,6 +166,15 @@ C_SRC += \
   src/screen.c \
   src/images.c \
 
+# if using a signed firmware
+ifeq ($(SIGNED_FW), 1)
+C_SRC += \
+  $(TCRYPT_PATH)/source/sha256.c \
+  $(TCRYPT_PATH)/source/ecc.c \
+  $(TCRYPT_PATH)/source/ecc_dsa.c \
+  $(TCRYPT_PATH)/source/utils.c
+endif
+
 # all files in boards
 C_SRC += src/boards/boards.c
 
@@ -163,7 +189,11 @@ C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
+ifeq ($(DUALBANK_FW), 1)
+C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_dual_bank.c
+else
 C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
+endif
 C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
 C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dis/ble_dis.c
 C_SRC += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c
@@ -197,10 +227,10 @@ C_SRC += src/boards/$(BOARD)/pinconfig.c
 
 # USB Application ( MSC + UF2 )
 C_SRC += \
-	src/usb/msc_uf2.c \
 	src/usb/usb_desc.c \
-	src/usb/usb.c \
-	src/usb/uf2/ghostfat.c
+	src/usb/msc_uf2.c \
+	src/usb/uf2/ghostfat.c \
+	src/usb/usb.c
 
 # TinyUSB stack
 C_SRC += \
@@ -211,8 +241,8 @@ C_SRC += \
 	$(TUSB_PATH)/class/cdc/cdc_device.c \
 	$(TUSB_PATH)/class/msc/msc_device.c \
 	$(TUSB_PATH)/tusb.c
-
 endif
+
 
 #------------------------------------------------------------------------------
 # Assembly Files
@@ -231,6 +261,11 @@ IPATH += \
   src/cmsis/include \
   src/usb \
   $(TUSB_PATH)
+  
+ifeq ($(SIGNED_FW), 1)
+IPATH += \
+  $(TCRYPT_PATH)/include
+endif
 
 # nrfx
 IPATH += \
@@ -326,6 +361,16 @@ CFLAGS += -DSOFTDEVICE_PRESENT
 CFLAGS += -DUF2_VERSION='"$(GIT_VERSION)"'
 CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
 
+ifeq ($(SIGNED_FW), 1)
+CFLAGS += -DSIGNED_FW
+CFLAGS += -DSIGNED_FW_QX='$(SIGNED_FW_QX)'
+CFLAGS += -DSIGNED_FW_QY='$(SIGNED_FW_QY)'
+endif
+
+ifeq ($(FORCE_UF2), 1)
+CFLAGS += -DFORCE_UF2
+endif
+
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
 CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'
 
@@ -349,7 +394,7 @@ CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
 
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 # Fixes for gcc version 12, 13 and 14.
-ifneq (,$(filter 12.% 13.% 14.%,$(shell $(CC) -dumpversion 2>/dev/null)))
+ifneq (,$(filter 12.% 13.% 14.%,$(shell $(CC) -dumpversion 2>$(NULL_DEVICE))))
 	CFLAGS += --param=min-pagesize=0
 endif
 
@@ -444,17 +489,17 @@ $(BUILD)/$(OUT_NAME).hex: $(BUILD)/$(OUT_NAME).out
 # Hex file with mbr (still no SD)
 $(BUILD)/$(OUT_NAME)_nosd.hex: $(BUILD)/$(OUT_NAME).hex
 	@echo Create $(notdir $@)
-	@python3 tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
+	@$(PYTHON) tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
 
 # Bootolader self-update uf2
 $(BUILD)/update-$(OUT_NAME)_nosd.uf2: $(BUILD)/$(OUT_NAME)_nosd.hex
 	@echo Create $(notdir $@)
-	@python3 lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) -c -o $@ $^
+	$(PYTHON) lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) -c -o $@ $^
 
 # merge bootloader and sd hex together
 $(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_NAME).hex
 	@echo Create $(notdir $@)
-	@python3 tools/hexmerge.py -o $@ $< $(SD_HEX)
+	@$(PYTHON) tools/hexmerge.py -o $@ $< $(SD_HEX)
 
 # Create pkg zip file for bootloader+SD combo to use with DFU CDC
 $(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_NAME).hex
