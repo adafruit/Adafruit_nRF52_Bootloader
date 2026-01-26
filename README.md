@@ -28,12 +28,16 @@ In addition, there is also lots of other 3rd-party boards which are added by oth
 
 ## Features
 
-- DFU over Serial and OTA ( application, Bootloader+SD )
+- DFU over Serial and OTA (application, Bootloader+SD)
 - Self-upgradable via Serial and OTA
 - DFU using UF2 (https://github.com/Microsoft/uf2) (application only)
 - Auto-enter DFU briefly on startup for DTR auto-reset trick (832 only)
 - Supports dual bank firmware updates (disabled by default)
 - Supports signed firmware updates (disabled by default)
+
+Note: For OTA, `Packet Receipt Notification` (PRN) must be 8 or less, which can be configured in nRF DFU. Otherwise, the
+bootloader will run out of
+memory.
 
 ## How to use
 
@@ -238,7 +242,7 @@ static uint8_t Qx[] = { ... };
 static uint8_t Qy[] = { ... };
 ```
 
-You must save thw Qx and Qy values, remove all spaces, an pass them to the make command line
+You must save the Qx and Qy values, remove all spaces, and pass them to the make command line
 ```
 make BOARD=feather_nrf52840_express SIGNED_FW=1 SIGNED_FW_QX='Qx values' SIGNED_FW_QY='Qy values'
 ```

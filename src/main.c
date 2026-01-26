@@ -43,9 +43,7 @@
 #include "nrfx_power.h"
 #include "nrfx_pwm.h"
 
-#include "nordic_common.h"
 #include "sdk_common.h"
-#include "dfu_transport.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
 
@@ -65,7 +63,6 @@
 #include "pstorage_platform.h"
 #include "nrf_mbr.h"
 #include "pstorage.h"
-#include "nrfx_nvmc.h"
 
 #ifdef NRF_USBD
 
@@ -125,15 +122,9 @@ extern void tusb_hal_nrf_power_event(uint32_t event);
 // DFU_DBL_RESET magic is used to determined which mode is entered
 #define APP_ASKS_FOR_SINGLE_TAP_RESET() (*((uint32_t*)(DFU_BANK_0_REGION_START + 0x200)) == 0x87eeb07c)
 
-// These value must be the same with one in dfu_transport_ble.c
 #define BLEGAP_EVENT_LENGTH             12
-#define BLEGATT_ATT_MTU_MAX             247 
 #define BLEGATTS_HVN_QSIZE              12
-#define BLEGATTC_WRCMD_QSIZE            2  
-
-enum {
-  BLE_CONN_CFG_HIGH_BANDWIDTH = 1
-};
+#define BLEGATTC_WRCMD_QSIZE            2
 
 //--------------------------------------------------------------------+
 //
@@ -230,8 +221,8 @@ int main(void) {
   }
 
   // No application was loaded, reset the system with the OTA DFU update
-  NRF_POWER->GPREGRET = 0xA8; 
-  
+  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
+
   NVIC_SystemReset();
 }
 
@@ -256,14 +247,17 @@ static void check_dfu_mode(void) {
                    (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin);
 
   // Clear GPREGRET if it is our values
-  if (dfu_start || dfu_skip) NRF_POWER->GPREGRET = 0;
+  if (dfu_start || dfu_skip) {
+    NRF_POWER->GPREGRET = 0;
+  }
 
   // skip dfu entirely
-  if (dfu_skip) return;
+  if (dfu_skip) {
+    return;
+  }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  // DFU button pressed
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+  dfu_start = dfu_start || button_pressed(BUTTON_DFU); // DFU button pressed
 
   // DFU + FRESET are pressed --> OTA
   _ota_dfu = _ota_dfu || (button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET));
@@ -271,16 +265,16 @@ static void check_dfu_mode(void) {
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
 
-  if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET()) dfu_start = 1;
+  if (!just_start_app && APP_ASKS_FOR_SINGLE_TAP_RESET()) {
+    dfu_start = 1;
+  }
 
   // App mode: Double Reset detection or DFU startup for nrf52832
   if (!(just_start_app || dfu_start || !valid_app)) {
 #ifdef NRF52832_XXAA
     /* Even DFU is not active, we still force an 1000 ms dfu serial mode when startup
      * to support auto programming from Arduino IDE
-     *
-     * Note: Double Reset WONT work with nrf52832 since all its SRAM got cleared with GPIO reset.
-     */
+     * Note: Double Reset WONT work with nrf52832 since all its SRAM got cleared with GPIO reset. */
     bootloader_dfu_start(false, DFU_SERIAL_STARTUP_INTERVAL, false);
 #else
     // Note: RESETREAS is not clear by bootloader, it should be cleared by application upon init()
@@ -414,7 +408,8 @@ static uint32_t ble_stack_init(void) {
 /*------------------------------------------------------------------*/
 /* SoftDevice Event handler
  *------------------------------------------------------------------*/
- 
+extern void ble_evt_dispatch(ble_evt_t *p_ble_evt);
+
 // Process BLE event from SD
 uint32_t proc_ble(void) {
   __ALIGN(4) uint8_t ev_buf[BLE_EVT_LEN_MAX(BLEGATT_ATT_MTU_MAX)];
@@ -430,8 +425,7 @@ uint32_t proc_ble(void) {
   // Handle valid event, ignore error
   if (NRF_SUCCESS == err) {
     switch (evt->header.evt_id) {
-      case BLE_GAP_EVT_CONNECTED:
-      {
+      case BLE_GAP_EVT_CONNECTED: {
         // Try to enable 2M phy,if phone allows it
         ble_gap_phys_t const phys =
         {
@@ -444,6 +438,7 @@ uint32_t proc_ble(void) {
         led_state(STATE_BLE_CONNECTED);
         break;
       }
+
       case BLE_GAP_EVT_DISCONNECTED:
         _ota_connected = false;
         led_state(STATE_BLE_DISCONNECTED);
@@ -454,7 +449,6 @@ uint32_t proc_ble(void) {
     }
 
     // from dfu_transport_ble
-    extern void ble_evt_dispatch(ble_evt_t* p_ble_evt);
     ble_evt_dispatch(evt);
   }
 
@@ -475,7 +469,9 @@ uint32_t proc_soc(void) {
                      (soc_evt == NRF_EVT_POWER_USB_POWER_READY) ? NRFX_POWER_USB_EVT_READY :
                      (soc_evt == NRF_EVT_POWER_USB_REMOVED) ? NRFX_POWER_USB_EVT_REMOVED : -1;
 
-    if (usbevt >= 0) tusb_hal_nrf_power_event((uint32_t) usbevt);
+    if (usbevt >= 0) {
+      tusb_hal_nrf_power_event((uint32_t)usbevt);
+    }
 #endif
   }
 

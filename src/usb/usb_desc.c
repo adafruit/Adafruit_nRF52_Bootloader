@@ -30,9 +30,7 @@ enum {
     STRID_PRODUCT      ,
     STRID_SERIAL       ,
     STRID_CDC          ,
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)	
     STRID_MSC
-#endif
 };
 
 #if !defined(SIGNED_FW) || defined(FORCE_UF2)
@@ -88,7 +86,7 @@ enum {
     ITF_NUM_TOTAL
 };
 
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)
+#if CFG_TUD_MSC
 uint8_t desc_configuration_cdc_msc[] =
 {
   // Interface count, string index, total length, attribute, power in mA
@@ -118,7 +116,7 @@ uint8_t desc_configuration_cdc_only[] =
 uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
   (void) index; // for multiple configurations
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)
+#if CFG_TUD_MSC
   return _cdc_only ? desc_configuration_cdc_only : desc_configuration_cdc_msc;
 #else
   return desc_configuration_cdc_only;
@@ -128,17 +126,16 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 // Enumerate as CDC + MSC or CDC only
 void usb_desc_init(bool cdc_only)
 {
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)
-  _cdc_only = cdc_only;
+  (void)cdc_only; // for non MSC build
 
+#if CFG_TUD_MSC
+  _cdc_only = cdc_only;
   if ( cdc_only )
-  {
 #endif
+  {
     // Change PID to CDC only
     desc_device.idProduct = USB_DESC_CDC_ONLY_PID;
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)
   }
-#endif
 
   // Create Serial string descriptor
   uint8_t const* device_id = (uint8_t const*) &NRF_FICR->DEVICEID;
@@ -168,7 +165,7 @@ char const* string_desc_arr [] =
   BLEDIS_MODEL,                  // 2: Product
   desc_str_serial,               // 3: Serials, should use chip ID
   "nRF Serial",                  // 4: CDC Interface
-#if !defined(SIGNED_FW) || defined(FORCE_UF2)
+#if CFG_TUD_MSC
   "nRF UF2",                     // 5: MSC Interface
 #endif
 };

@@ -38,8 +38,6 @@
  * 
  */
 
-
-
 #ifndef SDK_CONFIG_H
 #define SDK_CONFIG_H
 
@@ -118,6 +116,12 @@
 
 #define CRC16_ENABLED                      1
 #define NRF_STRERROR_ENABLED               1
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+#define BLEGATT_ATT_MTU_MAX         247
+#define BLE_CONN_CFG_HIGH_BANDWIDTH 1
 
 
 #endif //SDK_CONFIG_H

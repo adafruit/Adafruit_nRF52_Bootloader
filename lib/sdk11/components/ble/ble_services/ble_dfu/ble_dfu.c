@@ -17,8 +17,7 @@
 #include <stddef.h>
 #include "sdk_common.h"
 
-#define DFU_PKT_ENABLE_WR_WO_RESPONSE_ONLY   0                                          /**< Enable Write Without Response on Data Endpoint ONLY (otherwise both With and Without response will be supported)*/
-#define MAX_DFU_PKT_LEN                 244                                             /**< Maximum length (in bytes) of the DFU Packet characteristic. */
+#define MAX_DFU_PKT_LEN                 (BLEGATT_ATT_MTU_MAX - 3) /**< Maximum length (in bytes) of the DFU Packet characteristic. */
 #define PKT_START_DFU_PARAM_LEN         2                                               /**< Length (in bytes) of the parameters for Packet Start DFU Request. */
 #define PKT_INIT_DFU_PARAM_LEN          2                                               /**< Length (in bytes) of the parameters for Packet Init DFU Request. */
 #define PKT_RCPT_NOTIF_REQ_LEN          3                                               /**< Length (in bytes) of the Packet Receipt Notification Request. */
@@ -58,12 +57,8 @@ static uint32_t dfu_pkt_char_add(ble_dfu_t * const p_dfu)
 
     memset(&char_md, 0, sizeof(char_md));
 
-#if DFU_PKT_ENABLE_WR_WO_RESPONSE_ONLY
-    char_md.char_props.write_wo_resp = 1;
-#else
-    char_md.char_props.write = 1;			// For those improved apps that can take advantage of ACK
-    char_md.char_props.write_wo_resp = 1;   // Nordic IOS DFU app REQUIRES Write Without Response */
-#endif
+    char_md.char_props.write         = 1; // For those improved apps that can take advantage of ACK
+    char_md.char_props.write_wo_resp = 1; // Nordic IOS DFU app REQUIRES Write Without Response */
     char_md.p_char_user_desc         = NULL;
     char_md.p_char_pf                = NULL;
     char_md.p_user_desc_md           = NULL;
