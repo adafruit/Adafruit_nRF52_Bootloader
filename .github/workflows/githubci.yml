@@ -9,92 +9,51 @@ on:
       - created
 
 jobs:
+  set-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set matrix
+        id: set-matrix
+        working-directory: src/boards
+        run: |
+          MATRIX_JSON=$(ls -d */ | sed 's/\/$//' | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=$MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
   build:
+    needs: set-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        board:
-          # Adafruit Boards
-          - 'circuitplayground_nrf52840'
-          - 'clue_nrf52840'
-          - 'feather_nrf52832'
-          - 'feather_nrf52833_express'
-          - 'feather_nrf52840_express'
-          - 'feather_nrf52840_sense'
-          - 'itsybitsy_nrf52840_express'
-          - 'metro_nrf52840_express'
-          - 'ledglasses_nrf52840'
-          # Other Makers (Alphabetical order)
-          - 'adm_b_nrf52840_1'
-          - 'ae_bl652_bo'
-          - 'aramcon_badge_2019'
-          - 'aramcon2_badge'
-          - 'arcade_feather_nrf52840_express'
-          - 'arduino_nano_33_ble'
-          - 'bast_ble'
-          - 'bluemicro_nrf52833'
-          - 'bluemicro_nrf52840'
-          - 'challenger_840_ble'
-          - 'ebyte_e104_bt5032a'
-          - 'ebyte_e73_tbb'
-          - 'electronut_labs_papyr'
-          - 'ikigaisense_vita'
-          - 'm60_keyboard'
-          - 'mdk_nrf52840_dongle'
-          - 'mikoto'
-          - 'nice_nano'
-          - 'nrf52840_bboard'
-          - 'nrf52840_m2'
-          - 'ohs2020_badge'
-          - 'particle_argon'
-          - 'particle_boron'
-          - 'particle_xenon'
-          - 'pca10056'
-          - 'pca10059'
-          - 'pca10100'
-          - 'pitaya_go'
-          - 'raytac_mdbt50q_db_40'
-          - 'raytac_mdbt50q_rx'
-          - 'sparkfun_nrf52840_micromod'
-          - 'waveshare_nrf52840_eval'
-
+        board: ${{ fromJSON(needs.set-matrix.outputs.matrix) }}
     steps:
-    - name: Setup Python
-      uses: actions/setup-python@v3
-
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         submodules: true
 
-    - name: Checkout linkermap
-      uses: actions/checkout@v3
-      with:
-         repository: hathach/linkermap
-         path: linkermap
-
     - name: Install ARM GCC
       uses: carlosperate/arm-none-eabi-gcc-action@v1
       with:
-        release: '10-2020-q4'
+        release: '12.3.Rel1'
 
     - name: Install Tools
       run: |
-        pip3 install adafruit-nrfutil uritemplate requests intelhex
-        pip3 install linkermap/
+        pip3 install adafruit-nrfutil uritemplate requests intelhex setuptools
 
     - name: Build
       run: |
-        arm-none-eabi-gcc --version
         make BOARD=${{ matrix.board }} all
         make BOARD=${{ matrix.board }} copy-artifact
 
-    - name: Linker Map
-      run: make BOARD=${{ matrix.board }} linkermap
-
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.board }}
         path: _bin/${{ matrix.board }}
