@@ -41,7 +41,6 @@
 // App can trigger OTA bootloader by writing DFU_MAGIC_OTA_APPJUM to
 // GPREGRET register if softdevice is not initialized; or by
 // writing DFU_MAGIC_OTA_RESET in case softdevice is initialized.
-#define BUTTONS_NUMBER      2
 #define BUTTON_1            18 // RESET also by default
 #define BUTTON_2            1  // P0.1 not exposed anywhere, FRST n/a
 #define BUTTON_PULL         NRF_GPIO_PIN_PULLUP

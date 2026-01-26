@@ -42,7 +42,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER 2
 #define BUTTON_DFU          _PINNUM(0, 11)
 #define BUTTON_FRESET       _PINNUM(0, 03) // A0
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP

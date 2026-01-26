@@ -41,7 +41,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(1, 0)  // P1.00: User Button
 #define BUTTON_2              _PINNUM(1, 7)  // P1.07: NC
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP

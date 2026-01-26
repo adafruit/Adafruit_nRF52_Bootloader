@@ -37,7 +37,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(1, 11)  // D2 switch
 #define BUTTON_2              _PINNUM(1, 12)  // D3 switch
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP

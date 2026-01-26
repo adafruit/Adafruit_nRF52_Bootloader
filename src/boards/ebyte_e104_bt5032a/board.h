@@ -36,7 +36,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     2
 #define BUTTON_1           29 // DISC Button on E104-BT5032A-TB Test Board
                               // BUTTON_1 is DFU.  The module does not have reset circuitry.
                               // The Test Board from Ebyte (E104-BT5032A-TB) also does not have reset circuitry

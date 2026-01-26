@@ -36,7 +36,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     2
 #define BUTTON_1           11 // BTN1
 #define BUTTON_2           15 // BTN2
 #define BUTTON_PULL        NRF_GPIO_PIN_PULLUP

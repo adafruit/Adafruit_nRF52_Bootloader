@@ -40,7 +40,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
 /* This is the 'KEY1' in top left of the board under RESET key.
  * It is used to remain in bootloader mode after reset. */
 #define BUTTON_1              _PINNUM(0, 11)

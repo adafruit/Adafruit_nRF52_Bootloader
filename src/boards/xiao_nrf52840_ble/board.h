@@ -40,7 +40,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
 #define BUTTON_1              _PINNUM(0, 18)
 // Button 2 is defined as D1 from expansion board.
 #define BUTTON_2              _PINNUM(0, 3)

@@ -36,7 +36,6 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     2
 #define BUTTON_1           14 // BUTTON_1 is DFU.  SW1 on E73-TBB Test Board. 
                               // This Test board uses the E73-2G4M04S1B module which contains a nrf52832. 
                               // The module does not have reset circuitry. 
