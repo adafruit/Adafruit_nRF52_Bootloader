@@ -257,10 +257,15 @@ static void check_dfu_mode(void) {
   }
 
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU); // DFU button pressed
+  // DFU button pressed
+#if defined(BUTTON_DFU)
+  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+#endif
 
   // DFU + FRESET are pressed --> OTA
+#if defined(BUTTON_DFU) && defined(BUTTON_FRESET)
   _ota_dfu = _ota_dfu || (button_pressed(BUTTON_DFU) && button_pressed(BUTTON_FRESET));
+#endif
 
   bool const valid_app = bootloader_app_is_valid();
   bool const just_start_app = valid_app && !dfu_start && (*dbl_reset_mem) == DFU_DBL_RESET_APP;
@@ -382,15 +387,15 @@ static uint32_t ble_stack_init(void) {
   // HVN queue size
   varclr(&blecfg);
   blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
-  blecfg.conn_cfg.params.gatts_conn_cfg.hvn_tx_queue_size = BLEGATTS_HVN_QSIZE; 
+  blecfg.conn_cfg.params.gatts_conn_cfg.hvn_tx_queue_size = BLEGATTS_HVN_QSIZE;
   sd_ble_cfg_set(BLE_CONN_CFG_GATTS, &blecfg, ram_start);
 
   // WRITE COMMAND queue size
   varclr(&blecfg);
   blecfg.conn_cfg.conn_cfg_tag = BLE_CONN_CFG_HIGH_BANDWIDTH;
   blecfg.conn_cfg.params.gattc_conn_cfg.write_cmd_tx_queue_size = BLEGATTC_WRCMD_QSIZE;
-  sd_ble_cfg_set(BLE_CONN_CFG_GATTC, &blecfg, ram_start); 
-  
+  sd_ble_cfg_set(BLE_CONN_CFG_GATTC, &blecfg, ram_start);
+
   // Enable BLE stack.
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
   sd_ble_enable(&ram_start);
