@@ -104,7 +104,6 @@ void led_tick(void);
 //--------------------------------------------------------------------+
 // BUTTONS
 //--------------------------------------------------------------------+
-
 #if defined(BUTTON_DFU) || defined(BUTTON_FRESET)
 void button_init(uint32_t pin);
 bool button_pressed(uint32_t pin);

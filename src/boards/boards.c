@@ -63,7 +63,6 @@ bool button_pressed(uint32_t pin) {
   uint32_t const active_state = (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN ? 1 : 0);
   return nrf_gpio_pin_read(pin) == active_state;
 }
-
 #endif
 
 // This is declared so that a board specific init can be called from here.
