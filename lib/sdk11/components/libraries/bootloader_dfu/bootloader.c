@@ -186,10 +186,34 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
 {
   if ( is_ota() )
   {
-    uint32_t err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+    uint32_t err_code;
+    while(1) {
+      err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+      if (err_code != NRF_ERROR_NO_MEM)
+        break;
+      // This means the write/erase queue of commands was completely full - Should not
+      //  happen, but better safe than sorry, wait until space becomes available -
+      //  the pstorage event handler is only run from the main loop, and we are also 
+      //  running from a BLE event on the main loop: This means if we wait here, the FLASH 
+      //  completion events will never be handled (will be queued by app_scheduler, but
+      //  not handled, and that means this wait will never end... So, process SOC events
+      //  from the SD (but NOT BLE events!) - This will free entries on the pstorage queue
+      //  as soon as operations are complete, allowing this op to be queued
+      while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+        // nothing
+      }
+    }
     APP_ERROR_CHECK(err_code);
 
-    err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
+    while(1) {
+      err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
+      if (err_code != NRF_ERROR_NO_MEM)
+        break;
+      // No space, wait until an entry in the queue is freed
+      while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+        // nothing
+      }
+    }
     APP_ERROR_CHECK(err_code);
   }
   else

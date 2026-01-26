@@ -140,7 +140,16 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
 
     if ( is_ota() )
     {
-        uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
+        uint32_t err_code;
+        while(1) {
+            err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
+            if (err_code != NRF_ERROR_NO_MEM)
+                break;
+            // No space, wait until an entry in the queue is freed
+            while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                // nothing
+            }
+        }
         APP_ERROR_CHECK(err_code);
     }
     else
@@ -414,7 +423,15 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
             if ( is_ota() )
             {
-                err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
+                while(1) {
+                    err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
+                    if (err_code != NRF_ERROR_NO_MEM)
+                        break;
+                    // No space, wait until an entry in the queue is freed
+                    while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                        // nothing
+                    }
+                }
                 VERIFY_SUCCESS(err_code);
             }
             else
@@ -742,6 +759,17 @@ uint32_t dfu_bl_image_validate(void)
 
     if (bootloader_settings.bl_image_size != 0)
     {
+		/*
+		 * The problem with updating the bootloader from a dual to single bank bootloader is that the new 
+		 * bootloader expects the firmware image to be at the start of BANK 0, while it's actually loaded 
+		 * to BANK1 by the old bootloader. After the update the new single bank bootloader verifies that 
+		 * the image was correctly written to flash by comparing itself with the firmware image that it 
+		 * expects to be located in BANK0. Since the actual firmware image is in BANK 1 this check will 
+		 * fail and the new bootloader updates itself with whatever data located in BANK0 using the MBR.
+
+		 * The fix is to modify the dfu_bl_image_validate() function in dfu_single_bank.c run verification 
+		 * on both addresses (BANK0 and BANK1)
+		*/
         uint32_t bl_image_start_1 = (bootloader_settings.sd_image_size == 0) ?
                                   DFU_BANK_0_REGION_START :
                                   bootloader_settings.sd_image_start +
@@ -751,6 +779,10 @@ uint32_t dfu_bl_image_validate(void)
         sd_mbr_cmd_1.params.compare.ptr1 = (uint32_t *)BOOTLOADER_REGION_START;
         sd_mbr_cmd_1.params.compare.ptr2 = (uint32_t *)(bl_image_start_1);
         sd_mbr_cmd_1.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
+
+        uint32_t err_code = sd_mbr_command(&sd_mbr_cmd_1);
+        if (err_code == NRF_SUCCESS)
+            return NRF_SUCCESS;
 
         uint32_t bl_image_start_2 = (bootloader_settings.sd_image_size == 0) ?
                                   DFU_BANK_1_REGION_START :
@@ -762,7 +794,7 @@ uint32_t dfu_bl_image_validate(void)
         sd_mbr_cmd_2.params.compare.ptr2 = (uint32_t *)(bl_image_start_2);
         sd_mbr_cmd_2.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
 
-        return sd_mbr_command(&sd_mbr_cmd_1) && sd_mbr_command(&sd_mbr_cmd_2);
+        return sd_mbr_command(&sd_mbr_cmd_2);
     }
     return NRF_SUCCESS;
 }
