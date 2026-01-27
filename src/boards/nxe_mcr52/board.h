@@ -62,7 +62,7 @@
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME   "NXE-MCR52"
 #define UF2_VOLUME_LABEL   "NXE-BOOT"
-#define UF2_BOARD_ID       "NXE-MCR52"
+#define UF2_BOARD_ID       "nRF52840-NXE-MCR52-revA"
 #define UF2_INDEX_URL      "https://github.com/piotrmalek"
 
-#endif // _XIAO_BLE
+#endif
