@@ -40,9 +40,16 @@
 //
 //--------------------------------------------------------------------+
 
+// Add nonstring attribute if supported to avoid errors in GCC 15
+#ifdef __has_attribute
+    #define __NONSTRING__ __attribute__((nonstring))
+#else
+    #define __NONSTRING__
+#endif
+
 typedef struct {
     uint8_t JumpInstruction[3];
-    uint8_t OEMInfo[8];
+    uint8_t OEMInfo[8] __NONSTRING__;
     uint16_t SectorSize;
     uint8_t SectorsPerCluster;
     uint16_t ReservedSectors;
@@ -59,8 +66,8 @@ typedef struct {
     uint8_t Reserved;
     uint8_t ExtendedBootSig;
     uint32_t VolumeSerialNumber;
-    uint8_t VolumeLabel[11];
-    uint8_t FilesystemIdentifier[8];
+    uint8_t VolumeLabel[11] __NONSTRING__;
+    uint8_t FilesystemIdentifier[8] __NONSTRING__;
 } __attribute__((packed)) FAT_BootBlock;
 
 typedef struct {
@@ -81,7 +88,7 @@ typedef struct {
 STATIC_ASSERT(sizeof(DirEntry) == 32);
 
 struct TextFile {
-  char const name[11];
+  char const name[11] __NONSTRING__;
   char const *content;
 };
 

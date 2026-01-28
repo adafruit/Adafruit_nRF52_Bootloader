@@ -393,8 +393,8 @@ endif
 CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
 
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
-# Fixes for gcc version 12, 13 and 14.
-ifneq (,$(filter 12.% 13.% 14.%,$(shell $(CC) -dumpversion 2>$(NULL_DEVICE))))
+# Fixes for gcc version 12, 13, 14 and 15.
+ifneq (,$(filter 12.% 13.% 14.% 15.%,$(shell $(CC) -dumpversion 2>$(NULL_DEVICE))))
 	CFLAGS += --param=min-pagesize=0
 endif
 
