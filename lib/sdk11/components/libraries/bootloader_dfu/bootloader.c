@@ -44,7 +44,8 @@ typedef enum
     BOOTLOADER_SETTINGS_SAVING,                         /**< Bootloader status for indicating that saving of bootloader settings is in progress. */
     BOOTLOADER_COMPLETE,                                /**< Bootloader status for indicating that all operations for the update procedure has completed and it is safe to reset the system. */
     BOOTLOADER_TIMEOUT,                                 /**< Bootloader status field for indicating that a timeout has occured and current update process should be aborted. */
-    BOOTLOADER_RESET,                                   /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted. */
+    BOOTLOADER_SYS_RESET,                               /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted. */
+    BOOTLOADER_RESET_TO_SELF,                           /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted and the bootloader must be reentered. */
 } bootloader_status_t;
 
 static pstorage_handle_t        m_bootsettings_handle;  /**< Pstorage handle to use for registration and identifying the bootloader module on subsequent calls to the pstorage module for load and store of bootloader setting in flash. */
@@ -136,7 +137,8 @@ static void wait_for_events(void)
 
     if ((m_update_status == BOOTLOADER_COMPLETE) ||
         (m_update_status == BOOTLOADER_TIMEOUT) ||
-        (m_update_status == BOOTLOADER_RESET) )
+        (m_update_status == BOOTLOADER_SYS_RESET) ||
+        (m_update_status == BOOTLOADER_RESET_TO_SELF))
     {
       // When update has completed or a timeout/reset occured we will return.
       return;
@@ -320,7 +322,9 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
   else if (update_status.status_code == DFU_RESET)
   {
-    m_update_status = BOOTLOADER_RESET;
+    m_update_status = update_status.restart_into_bootloader == false
+      ? BOOTLOADER_SYS_RESET 
+      : BOOTLOADER_RESET_TO_SELF;
   }
   else
   {
@@ -328,6 +332,10 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
 }
 
+bool bootloader_must_reset_to_self(void)
+{
+  return m_update_status == BOOTLOADER_RESET_TO_SELF;
+}
 
 uint32_t bootloader_init(void)
 {

@@ -32,6 +32,13 @@
  */
 uint32_t bootloader_init(void);
 
+/**@brief Function to check if bootloader must be reentered after a reset
+ * @details: This function can only be called after bootloader_dfu_start returns
+ * @retval     true          If device must reboot to the bootloader
+ * @retval     false         If device must reboot to the application, if possible
+ */
+bool bootloader_must_reset_to_self(void);
+
 /**@brief Function for validating application region in flash.
  * @retval     true          If Application region is valid.
  * @retval     false         If Application region is not valid.

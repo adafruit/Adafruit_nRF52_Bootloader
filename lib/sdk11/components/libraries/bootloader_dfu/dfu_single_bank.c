@@ -607,6 +607,14 @@ void dfu_reset(void)
 
     update_status.status_code = DFU_RESET;
 
+    // If we are still receiving packets, and we are expecting more of them,
+    //  and we receive the RESET command, this means the DFU app is trying
+    //  to interrupt and recover a failed previous attempt of FLASHing a new
+    //  application. Make sure to reboot into DFU mode instead of starting 
+    //  a previously stored application (specially valid for double bank 
+    //  bootloaders
+    update_status.restart_into_bootloader = (m_dfu_state == DFU_STATE_RX_DATA_PKT && m_data_received != m_image_size);
+
     bootloader_dfu_update_process(update_status);
 }
 
