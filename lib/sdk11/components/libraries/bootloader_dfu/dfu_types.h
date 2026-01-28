@@ -24,6 +24,7 @@
 #define DFU_TYPES_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "nrf_sdm.h"
 #include "nrf_mbr.h"
 #include "nrf.h"
@@ -154,6 +155,7 @@ typedef struct
     uint32_t                 bl_size;                                                                   /**< Size of the recieved BootLoader. */
     uint32_t                 app_size;                                                                  /**< Size of the recieved Application. */
     uint32_t                 sd_image_start;                                                            /**< Location in flash where the received SoftDevice image is stored. */
+    bool                     restart_into_bootloader;                                                   /**< If the chip must be reset and must reenter bootloader mode. */
 } dfu_update_status_t;
 
 /**@brief Update complete handler type. */

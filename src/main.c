@@ -134,6 +134,7 @@ uint32_t* dbl_reset_mem = ((uint32_t*) DFU_DBL_RESET_MEM);
 // true if ble, false if serial
 bool _ota_dfu = false;
 bool _ota_connected = false;
+bool _ota_was_active = false;
 bool _sd_inited = false;
 
 bool is_ota(void) {
@@ -192,6 +193,10 @@ int main(void) {
   // Return when DFU process is complete (or not entered at all)
   check_dfu_mode();
 
+  // Check if we must reenter the bootloader after reset, instead of 
+  // launching the user application
+  bool bootloader_must_be_reentered = bootloader_must_reset_to_self();
+
   // Reset peripherals
   board_teardown();
 
@@ -202,7 +207,9 @@ int main(void) {
    * - sd_softdevice_vector_table_base_set(APP_ADDR)
    * - jump to App reset
    */
-  if (bootloader_app_is_valid() && !bootloader_dfu_sd_in_progress()) {
+  if (!bootloader_must_be_reentered && 
+       bootloader_app_is_valid() && 
+      !bootloader_dfu_sd_in_progress()) {
     PRINTF("App is valid\r\n");
     if (is_sd_existed()) {
       // MBR forward IRQ to SD (if not already)
@@ -220,9 +227,14 @@ int main(void) {
     bootloader_app_start();
   }
 
-  // No application was loaded, reset the system with the OTA DFU update
-  NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
-
+  // No application was loaded or we need to reenter the bootloader
+  
+  // Reset the system with the OTA DFU update in case we were in it, 
+  // to allow completion of FLASHING, otherwise, default to normal reset
+  if (_ota_was_active) {
+    NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
+  }
+  
   NVIC_SystemReset();
 }
 
@@ -440,6 +452,9 @@ uint32_t proc_ble(void) {
         sd_ble_gap_phy_update(evt->evt.gap_evt.conn_handle, &phys);
 
         _ota_connected = true;
+
+        // Remember someone connected to BLE        
+        _ota_was_active = true;
         led_state(STATE_BLE_CONNECTED);
         break;
       }

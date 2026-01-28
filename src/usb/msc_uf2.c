@@ -171,6 +171,7 @@ void tud_msc_write10_complete_cb(uint8_t lun)
     dfu_update_status_t update_status;
     memset(&update_status, 0, sizeof(dfu_update_status_t ));
     update_status.status_code = DFU_RESET;
+    update_status.restart_into_bootloader = false;
 
     bootloader_dfu_update_process(update_status);
 
@@ -195,9 +196,10 @@ void tud_msc_write10_complete_cb(uint8_t lun)
       {
         // update bootloader always end with reset
         update_status.status_code = DFU_RESET;
+        update_status.restart_into_bootloader = false;
 
         // Location of current stored new bootloader
-        uint32_t * new_bootloader = (uint32_t *) BOOTLOADER_ADDR_NEW_RECIEVED;
+        uint32_t * new_bootloader = (uint32_t *) BOOTLOADER_ADDR_NEW_RECEIVED;
 
         PRINT_HEX(new_bootloader);
 
