@@ -286,6 +286,16 @@ static void check_dfu_mode(void) {
     dfu_start = 1;
   }
 
+#ifdef DEFAULT_TO_OTA_DFU
+  // Default to OTA DFU mode, instead of Serial DFU mode, if there is no app present, 
+  // because otherwise, if there is no application, it will restart in Serial DFU mode,
+  // making it IMPOSSIBLE to recover devices in the field if there are no user 
+  // accessible USB ports
+  if (!valid_app || dfu_start) {
+    _ota_dfu = 1;
+  }
+#endif
+
   // App mode: Double Reset detection or DFU startup for nrf52832
   if (!(just_start_app || dfu_start || !valid_app)) {
 #ifdef NRF52832_XXAA
