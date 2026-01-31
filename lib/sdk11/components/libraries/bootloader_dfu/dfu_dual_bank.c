@@ -136,19 +136,28 @@ static void dfu_prepare_func_app_erase(uint32_t image_size)
     // Doing a SoftDevice update thus current application must be cleared to ensure enough space
     // for new SoftDevice.
     m_dfu_state = DFU_STATE_PREPARING;
-	
-	if ( is_ota() )
-	{
-		uint32_t err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
-		APP_ERROR_CHECK(err_code);
-	}
-	else
-	{
-		flash_nrf5x_erase(DFU_BANK_0_REGION_START, m_image_size);
+    
+    if ( is_ota() )
+    {
+        uint32_t err_code;
+        while(1) {
+            err_code = pstorage_clear(&m_storage_handle_app, m_image_size);
+            if (err_code != NRF_ERROR_NO_MEM)
+                break;
+            // No space, wait until an entry in the queue is freed
+            while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                // nothing
+            }
+        }
+        APP_ERROR_CHECK(err_code);      
+    }
+    else
+    {
+        flash_nrf5x_erase(DFU_BANK_0_REGION_START, m_image_size);
 
-		// invoke complete callback
-		pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
-	}
+        // invoke complete callback
+        pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
+    }
 }
 
 
@@ -163,19 +172,28 @@ static void dfu_prepare_func_swap_erase(uint32_t image_size)
     mp_storage_handle_active = &m_storage_handle_swap;
 
     m_dfu_state = DFU_STATE_PREPARING;
-	
-	if ( is_ota() )
-	{
-		uint32_t err_code = pstorage_clear(&m_storage_handle_swap, image_size);
-		APP_ERROR_CHECK(err_code);
-	} 
-	else 
-	{
-		flash_nrf5x_erase(DFU_BANK_1_REGION_START, image_size);
+    
+    if ( is_ota() )
+    {
+        uint32_t err_code;
+        while(1) {
+            err_code = pstorage_clear(&m_storage_handle_swap, image_size);
+            if (err_code != NRF_ERROR_NO_MEM)
+                break;
+            // No space, wait until an entry in the queue is freed
+            while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                // nothing
+            }
+        }
+        APP_ERROR_CHECK(err_code);
+    } 
+    else 
+    {
+        flash_nrf5x_erase(DFU_BANK_1_REGION_START, image_size);
 
-		// invoke complete callback
-		pstorage_callback_handler(&m_storage_handle_swap, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
-	}
+        // invoke complete callback
+        pstorage_callback_handler(&m_storage_handle_swap, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
+    }
 }
 
 
@@ -263,26 +281,45 @@ static uint32_t dfu_activate_app(void)
     uint32_t err_code = NRF_SUCCESS;
 
     // Erase BANK 0.
-	if ( is_ota() )
-	{
-		err_code = pstorage_clear(&m_storage_handle_app, m_start_packet.app_image_size);
-		APP_ERROR_CHECK(err_code);
-		
-		err_code = pstorage_store(&m_storage_handle_app,
-									  (uint8_t *)m_storage_handle_swap.block_id,
-									  m_start_packet.app_image_size,
-									  0);
-	}
-	else
-	{
+    if ( is_ota() )
+    {
+        while(1) {
+            err_code = pstorage_clear(&m_storage_handle_app, m_start_packet.app_image_size);
+            if (err_code != NRF_ERROR_NO_MEM)
+                break;
+            // No space, wait until an entry in the queue is freed
+            while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                // nothing
+            }
+        }
+        APP_ERROR_CHECK(err_code);
+        
+        while(1) {
+            err_code = pstorage_store(&m_storage_handle_app,
+                                          (uint8_t *)m_storage_handle_swap.block_id,
+                                          m_start_packet.app_image_size,
+                                          0);
+
+            if (err_code != NRF_ERROR_NO_MEM)
+                break;
+            // No space, wait until an entry in the queue is freed
+            while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                // nothing
+            }
+        }
+        VERIFY_SUCCESS(err_code);
+        
+    }
+    else
+    {
         flash_nrf5x_erase(DFU_BANK_0_REGION_START, m_start_packet.app_image_size); 
         pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_CLEAR_OP_CODE, NRF_SUCCESS, NULL, 0);
-		
+        
         flash_nrf5x_write(DFU_BANK_0_REGION_START, (uint8_t *)DFU_BANK_1_REGION_START, m_start_packet.app_image_size, false);
-		flash_nrf5x_flush(false);
+        flash_nrf5x_flush(false);
         pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) DFU_BANK_1_REGION_START, m_start_packet.app_image_size);
-	}
-	
+    }
+    
     if (err_code == NRF_SUCCESS)
     {
         dfu_update_status_t update_status = { 0 };
@@ -430,13 +467,13 @@ uint32_t dfu_start_pkt_handle(dfu_update_packet_t * p_packet)
     }
 
     if ( DFU_STATE_IDLE != m_dfu_state ) 
-		return NRF_ERROR_INVALID_STATE;
-	
-	// Valid peer activity detected. Hence restart the DFU timer.
-	err_code = dfu_timer_restart();
-	VERIFY_SUCCESS(err_code);
-	
-	m_functions.prepare(m_image_size);
+        return NRF_ERROR_INVALID_STATE;
+    
+    // Valid peer activity detected. Hence restart the DFU timer.
+    err_code = dfu_timer_restart();
+    VERIFY_SUCCESS(err_code);
+    
+    m_functions.prepare(m_image_size);
 
     return NRF_SUCCESS;
 }
@@ -486,17 +523,25 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
 
             if ( is_ota() )
             {
-				err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
-				VERIFY_SUCCESS(err_code);
+                while(1) {
+                    err_code = pstorage_store(mp_storage_handle_active, (uint8_t *)p_data, data_length, m_data_received);
+                    if (err_code != NRF_ERROR_NO_MEM)
+                        break;
+                    // No space, wait until an entry in the queue is freed
+                    while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+                        // nothing
+                    }
+                }
+                VERIFY_SUCCESS(err_code);
             }
             else
             {
-				flash_nrf5x_write(
-					(mp_storage_handle_active == &m_storage_handle_app
-						? DFU_BANK_0_REGION_START 
-						: DFU_BANK_1_REGION_START)
-					+ m_data_received, p_data, data_length, false);
-				pstorage_callback_handler(mp_storage_handle_active, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_data, data_length);
+                flash_nrf5x_write(
+                    (mp_storage_handle_active == &m_storage_handle_app
+                        ? DFU_BANK_0_REGION_START 
+                        : DFU_BANK_1_REGION_START)
+                    + m_data_received, p_data, data_length, false);
+                pstorage_callback_handler(mp_storage_handle_active, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) p_data, data_length);
             }
 
             m_data_received += data_length;
@@ -508,8 +553,8 @@ uint32_t dfu_data_pkt_handle(dfu_update_packet_t * p_packet)
             }
             else
             {
-				if ( !is_ota() ) flash_nrf5x_flush(false);
-				
+                if ( !is_ota() ) flash_nrf5x_flush(false);
+                
                 // The entire image has been received. Return NRF_SUCCESS.
                 err_code = NRF_SUCCESS;
             }
@@ -561,7 +606,7 @@ uint32_t dfu_init_pkt_handle(dfu_update_packet_t * p_packet)
         case DFU_STATE_RDY:
             m_dfu_state = DFU_STATE_RX_INIT_PKT;
             // When receiving init packet in state ready just update and fall through this case.         
-			/* FALLTHRU */
+            /* FALLTHRU */
 
         case DFU_STATE_RX_INIT_PKT:
             // DFU initialization has been done and a start packet has been received.
@@ -665,6 +710,14 @@ void dfu_reset(void)
     dfu_update_status_t update_status = { 0 };
 
     update_status.status_code = DFU_RESET;
+
+    // If we are still receiving packets, and we are expecting more of them,
+    //  and we receive the RESET command, this means the DFU app is trying
+    //  to interrupt and recover a failed previous attempt of FLASHing a new
+    //  application. Make sure to reboot into DFU mode instead of starting 
+    //  a previously stored application (specially valid for double bank 
+    //  bootloaders
+    update_status.restart_into_bootloader = (m_dfu_state == DFU_STATE_RX_DATA_PKT && m_data_received != m_image_size);
 
     bootloader_dfu_update_process(update_status);
 }
@@ -811,7 +864,6 @@ uint32_t dfu_bl_image_swap(void)
 uint32_t dfu_bl_image_validate(void)
 {
     bootloader_settings_t bootloader_settings;
-	
     sd_mbr_command_t      sd_mbr_cmd_1;
     sd_mbr_command_t      sd_mbr_cmd_2;
 
@@ -830,9 +882,8 @@ uint32_t dfu_bl_image_validate(void)
         sd_mbr_cmd_1.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
 
         uint32_t err_code = sd_mbr_command(&sd_mbr_cmd_1);
-        if (err_code != NRF_SUCCESS) {
-          return err_code;
-        }
+        if (err_code == NRF_SUCCESS)
+            return NRF_SUCCESS;
 
         uint32_t bl_image_start_2 = (bootloader_settings.sd_image_size == 0) ?
                                   DFU_BANK_1_REGION_START :
@@ -868,7 +919,7 @@ uint32_t dfu_sd_image_validate(void)
         uint32_t block_size      = (bootloader_settings.sd_image_start - sd_start) / 2;
         uint32_t image_end       = bootloader_settings.sd_image_start + 
                                    bootloader_settings.sd_image_size;
-		
+        
         /* ##### FIX START ##### */
         block_size &= ~(uint32_t)(CODE_PAGE_SIZE - 1); 
         /* ##### FIX END ##### */       

@@ -2,14 +2,15 @@
 # CONFIGURE
 # - SDK_PATH     : path to SDK directory
 #
-# - SD_NAME      : e.g s132, s140
-# - SD_VERSION   : SoftDevice version e.g 6.0.0
-# - SD_HEX       : to bootloader hex binary
-# - SIGNED_FW    : if bootloader will ONLY accept signed firmware
-# - SIGNED_FW_QX : Qx for signed firmware verification
-# - SIGNED_FW_QY : Qy for signed firmware verification
-# - DUALBANK_FW  : If bootloader will implement a dual bank feature to allow autorecover from failed
-# - FORCE_UF2    : if SIGNED_FW is 1, will force to include UF2 support (UNSECURE, UF2 does NOT validate signature!)
+# - SD_NAME            : e.g s132, s140
+# - SD_VERSION         : SoftDevice version e.g 6.0.0
+# - SD_HEX             : to bootloader hex binary
+# - SIGNED_FW          : if bootloader will ONLY accept signed firmware
+# - SIGNED_FW_QX       : Qx for signed firmware verification
+# - SIGNED_FW_QY       : Qy for signed firmware verification
+# - DUALBANK_FW        : If bootloader will implement a dual bank feature to allow autorecover from failed
+# - FORCE_UF2          : if SIGNED_FW is 1, will force to include UF2 support (UNSECURE, UF2 does NOT validate signature!)
+# - DEFAULT_TO_OTA_DFU : if entering DFU, by default enter OTA DFU instead of Serial DFU
 #------------------------------------------------------------------------------
 
 PYTHON = python
@@ -369,6 +370,10 @@ endif
 
 ifeq ($(FORCE_UF2), 1)
 CFLAGS += -DFORCE_UF2
+endif
+
+ifeq ($(DEFAULT_TO_OTA_DFU), 1)
+CFLAGS += -DDEFAULT_TO_OTA_DFU
 endif
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))

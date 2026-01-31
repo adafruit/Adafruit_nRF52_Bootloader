@@ -28,6 +28,7 @@ set(MBR_HEX ${SOFTDEVICE_DIR}/mbr/hex/mbr_nrf52_2.4.1_mbr.hex)
 set(TINYUSB_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb/src)
 set(TCRYPT_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinycrypt/lib)
 
+option(DEFAULT_TO_OTA_DFU "Default to OTA DFU instead of Serial DFU" OFF)
 option(SIGNED_FW "Enable signed firmware verification" OFF)
 option(DUALBANK_FW "Enable dual bank DFU support" OFF)
 option(FORCE_UF2 "Force UF2 support even with SIGNED_FW" OFF)
@@ -194,6 +195,10 @@ endif ()
 
 if (FORCE_UF2)
   target_compile_definitions(bootloader PUBLIC FORCE_UF2)
+endif ()
+
+if (DEFAULT_TO_OTA_DFU)
+  target_compile_definitions(bootloader PUBLIC DEFAULT_TO_OTA_DFU)
 endif ()
 
 if (TRACE_ETM STREQUAL "1")
