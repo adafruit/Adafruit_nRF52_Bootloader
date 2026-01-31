@@ -373,7 +373,7 @@ CFLAGS += -DFORCE_UF2
 endif
 
 ifeq ($(DEFAULT_TO_OTA_DFU), 1)
-CFLAGS += -DEFAULT_TO_OTA_DFU
+CFLAGS += -DDEFAULT_TO_OTA_DFU
 endif
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
