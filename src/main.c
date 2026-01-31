@@ -422,11 +422,74 @@ static uint32_t ble_stack_init(void) {
   // Note: Interrupt state (enabled, forwarding) is not work properly if not enable ble
   sd_ble_enable(&ram_start);
 
-#if BLEGATT_ATT_MTU_MAX > 23
+#if BLEGATT_ATT_MTU_MAX > 23 || defined(GPIO_PA_PIN) || defined(GPIO_LNA_PIN)
   ble_opt_t  opt;
+#endif
+
+#if BLEGATT_ATT_MTU_MAX > 23
   varclr(&opt);
   opt.common_opt.conn_evt_ext.enable = 1; // enable Data Length Extension
   sd_ble_opt_set(BLE_COMMON_OPT_CONN_EVT_EXT, &opt);
+#endif
+
+#if defined(GPIO_PA_LNA_MODE_PIN)
+  // Set PA / LNA Mode Pin: Low for Normal operation
+  nrf_gpio_cfg_output(GPIO_PA_LNA_MODE_PIN);
+  nrf_gpio_pin_clear(GPIO_PA_LNA_MODE_PIN);
+#endif
+
+#if defined(GPIO_PA_LNA_SELECT_PIN)
+  // Set PA / LNA Select Pin: low for u.FL
+  nrf_gpio_cfg_output(GPIO_PA_LNA_SELECT_PIN);
+  nrf_gpio_pin_clear(GPIO_PA_LNA_SELECT_PIN);
+#endif
+
+  // Configure SoftDevice PA / LNA assist if required
+#if defined(GPIO_PA_PIN) || defined(GPIO_LNA_PIN)
+  
+  static const uint32_t gpio_toggle_ch = 0;
+  static const uint32_t ppi_set_ch = 0;
+  static const uint32_t ppi_clr_ch = 1;
+  
+  varclr(&opt);
+  
+  // Common PA / LNA config
+  // GPIOTE channel
+  opt.common_opt.pa_lna.gpiote_ch_id = gpio_toggle_ch;
+  // PPI channel for pin learing
+  opt.common_opt.pa_lna.ppi_ch_id_clr = ppi_clr_ch;
+  // PPI channel for pin setting
+  opt.common_opt.pa_lna.ppi_ch_id_set = ppi_set_ch;
+  
+# if defined(GPIO_PA_PIN)
+  // -- PA config --
+  // Set the pin to be active high
+  opt.common_opt.pa_lna.pa_cfg.active_high = GPIO_PA_PIN_ACTIVE_STATE;
+  // Enable toggling
+  opt.common_opt.pa_lna.pa_cfg.enable = 1;
+  // The GPIO pin to toggle
+  opt.common_opt.pa_lna.pa_cfg.gpio_pin = GPIO_PA_PIN;
+# endif
+
+# if defined(GPIO_LNA_PIN)
+  // -- LNA config --
+  // Set the pin to be active high
+  opt.common_opt.pa_lna.lna_cfg.active_high = GPIO_LNA_PIN_ACTIVE_STATE;
+  // Enable toggling
+  opt.common_opt.pa_lna.lna_cfg.enable = 1;
+  
+  // The GPIO pin to toggle
+  opt.common_opt.pa_lna.lna_cfg.gpio_pin = GPIO_LNA_PIN;
+  sd_ble_opt_set(BLE_COMMON_OPT_PA_LNA, &opt);
+# endif
+
+  // Set TX power for scan responses
+  sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_SCAN_INIT, 0, RADIO_TXPOWER_TXPOWER_Neg8dBm);
+  
+  // Set TX power for advertisements
+  sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, 0, RADIO_TXPOWER_TXPOWER_Neg8dBm);
+  // (Tx power setting for connections inherit the scan or advertising power setting)
+  
 #endif
 
   return NRF_SUCCESS;
