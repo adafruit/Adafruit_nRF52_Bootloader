@@ -42,7 +42,6 @@
 // For dotstart set to max for colour information is not masked off
 #define BOARD_RGB_BRIGHTNESS  0xffffffff
 
-
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
@@ -67,6 +66,6 @@
 #define UF2_PRODUCT_NAME   "Adafruit ItsyBitsy nRF52840 Express"
 #define UF2_VOLUME_LABEL   "ITSY840BOOT"
 #define UF2_BOARD_ID       "nRF52840-ItsyBitsy-revA"
-#define UF2_INDEX_URL      "https://www.adafruit.com/"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/4481"
 
-#endif // _ITSY_NRF52840_H
+#endif
