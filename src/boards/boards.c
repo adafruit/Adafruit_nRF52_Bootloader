@@ -50,7 +50,7 @@ void SysTick_Handler(void) {
   led_tick();
 }
 
-#if defined(BUTTON_DFU) || defined(BUTTON_FRESET)
+#if defined(BUTTON_DFU) || defined(BUTTON_DFU_OTA)
 void button_init(uint32_t pin) {
   if (BUTTON_PULL == NRF_GPIO_PIN_PULLDOWN) {
     nrf_gpio_cfg_sense_input(pin, BUTTON_PULL, NRF_GPIO_PIN_SENSE_HIGH);
@@ -79,8 +79,8 @@ void board_init(void) {
 #ifdef BUTTON_DFU
   button_init(BUTTON_DFU);
 #endif
-#ifdef BUTTON_FRESET
-  button_init(BUTTON_FRESET);
+#ifdef BUTTON_DFU_OTA
+  button_init(BUTTON_DFU_OTA);
 #endif
   NRFX_DELAY_US(100); // wait for the pin state is stable
 

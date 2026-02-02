@@ -28,32 +28,32 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER        2
-#define LED_PRIMARY_PIN    17 // Red  - named "LED1"
-#define LED_SECONDARY_PIN  18 // Blue - named "LED2" (also a red one on the Test Board)
-#define LED_STATE_ON       0
+#define LEDS_NUMBER       2
+#define LED_PRIMARY_PIN   17 // Red  - named "LED1"
+#define LED_SECONDARY_PIN 18 // Blue - named "LED2" (also a red one on the Test Board)
+#define LED_STATE_ON      0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     2
-#define BUTTON_1           14 // BUTTON_1 is DFU.  SW1 on E73-TBB Test Board. 
-                              // This Test board uses the E73-2G4M04S1B module which contains a nrf52832. 
-                              // The module does not have reset circuitry. 
-                              // The Test Board from Ebyte (E73-TBB) also does not have reset circuitry
-                              // To be able to upload using the Arduino IDE, (To enter DFU mode)
-                              // Press "SW1", momentarily ground "RST/P0.21", then release "SW1"
-#define BUTTON_2           13 // SW2 on board
-#define BUTTON_PULL        NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU                                                          \
+  14                      // BUTTON_DFU is DFU.  SW1 on E73-TBB Test Board.
+                          // This Test board uses the E73-2G4M04S1B module which contains a nrf52832.
+                          // The module does not have reset circuitry.
+                          // The Test Board from Ebyte (E73-TBB) also does not have reset circuitry
+                          // To be able to upload using the Arduino IDE, (To enter DFU mode)
+                          // Press "SW1", momentarily ground "RST/P0.21", then release "SW1"
+#define BUTTON_DFU_OTA 13 // SW2 on board
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART (only used by nRF52832)
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      8
-#define TX_PIN_NUMBER      6
-#define CTS_PIN_NUMBER     5
-#define RTS_PIN_NUMBER     7
-#define HWFC               false  // leaving it false to make GPIO available
+#define RX_PIN_NUMBER  8
+#define TX_PIN_NUMBER  6
+#define CTS_PIN_NUMBER 5
+#define RTS_PIN_NUMBER 7
+#define HWFC           false // leaving it false to make GPIO available
 
 //--------------------------------------------------------------------+
 // BLE OTA

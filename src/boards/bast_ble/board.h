@@ -25,40 +25,38 @@
 #ifndef _BASTBLE_NRF52840_H
 #define _BASTBLE_NRF52840_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1  // red LED
-#define LED_PRIMARY_PIN       _PINNUM(0, 24)
-#define LED_STATE_ON          0
+#define LEDS_NUMBER     1 // red LED
+#define LED_PRIMARY_PIN PINNUM(0, 24)
+#define LED_STATE_ON    0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER      2
-#define BUTTON_1            _PINNUM(0, 05)
-#define BUTTON_2            _PINNUM(0, 10)
-#define BUTTON_PULL         NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(0, 05)
+#define BUTTON_DFU_OTA PINNUM(0, 10)
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER    "ElectronicCats"
-#define BLEDIS_MODEL           "BastBLE"
+#define BLEDIS_MANUFACTURER "ElectronicCats"
+#define BLEDIS_MODEL        "BastBLE"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
 
 // Shared VID/PID with Feather nRF52840, will be disabled for building in the future
-#define USB_DESC_VID           0x1209
-#define USB_DESC_UF2_PID       0x805A
-#define USB_DESC_CDC_ONLY_PID  0x805A
+#define USB_DESC_VID          0x1209
+#define USB_DESC_UF2_PID      0x805A
+#define USB_DESC_CDC_ONLY_PID 0x805A
 
-#define UF2_PRODUCT_NAME    "Bast BLE"
-#define UF2_VOLUME_LABEL    "BASTBLE"
-#define UF2_BOARD_ID        "Bast-ble-v1"
-#define UF2_INDEX_URL       "https://www.electroniccats.com"
+#define UF2_PRODUCT_NAME      "Bast BLE"
+#define UF2_VOLUME_LABEL      "BASTBLE"
+#define UF2_BOARD_ID          "Bast-ble-v1"
+#define UF2_INDEX_URL         "https://www.electroniccats.com"
 
 #endif // _BASTBLE_NRF52840_H
