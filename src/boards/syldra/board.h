@@ -25,31 +25,26 @@
 #ifndef _SYLDRA_H
 #define _SYLDRA_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 //------------------------------------------------------------------//
 // LED
 //------------------------------------------------------------------//
 #define LEDS_NUMBER             1
-#define LED_PRIMARY_PIN         _PINNUM(0, 17)           // AD10 LED
+#define LED_PRIMARY_PIN         PINNUM(0, 17) // AD10 LED
 #define LED_STATE_ON            1
 
 //------------------------------------------------------------------//
 // BUTTON
 //------------------------------------------------------------------//
-#define BUTTONS_NUMBER          2
-#define BUTTON_1                _PINNUM(0, 24)          // AD20 -- DFU
-#define BUTTON_2                _PINNUM(1, 00)          // AD22 -- FRST
+#define BUTTON_DFU     PINNUM(0, 24) // AD20 -- DFU
+#define BUTTON_DFU_OTA PINNUM(1, 00) // AD22 -- OTA
 
 #define BUTTON_PULL             NRF_GPIO_PIN_PULLUP
-
 
 //-------------------------------------------------------------------//
 // BLE OTA
 //-------------------------------------------------------------------//
 #define BLEDIS_MANUFACTURER     "Ambraglow-&-localcc"
 #define BLEDIS_MODEL            "Syldra_dev_r1"
-
 
 //--------------------------------------------------------------------+
 // USB - using test PIDs
