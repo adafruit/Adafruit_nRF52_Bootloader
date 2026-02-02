@@ -25,47 +25,44 @@
 #ifndef _MAKERDIARY_PITAYA_GO_H_
 #define _MAKERDIARY_PITAYA_GO_H_
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(1, 10)  // Red
-#define LED_STATE_ON          0
+#define LEDS_NUMBER          1
+#define LED_PRIMARY_PIN      PINNUM(1, 10) // Red
+#define LED_STATE_ON         0
 
-#define LED_RGB_RED_PIN       _PINNUM(1, 10)
-#define LED_RGB_GREEN_PIN     _PINNUM(1, 11)
-#define LED_RGB_BLUE_PIN      _PINNUM(1, 12)
-#define BOARD_RGB_BRIGHTNESS  0x404040
+#define LED_RGB_RED_PIN      PINNUM(1, 10)
+#define LED_RGB_GREEN_PIN    PINNUM(1, 11)
+#define LED_RGB_BLUE_PIN     PINNUM(1, 12)
+#define BOARD_RGB_BRIGHTNESS 0x404040
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(1, 0)  // P1.00: User Button
-#define BUTTON_2              _PINNUM(1, 7)  // P1.07: NC
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(1, 0) // P1.00: User Button
+#define BUTTON_DFU_OTA PINNUM(1, 7) // P1.07: NC
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "Makerdiary"
-#define BLEDIS_MODEL          "Pitaya Go"
+#define BLEDIS_MANUFACTURER "Makerdiary"
+#define BLEDIS_MODEL        "Pitaya Go"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID            0x2886
-#define USB_DESC_UF2_PID        0xF00E
-#define USB_DESC_CDC_ONLY_PID   0xF00E
+#define USB_DESC_VID          0x2886
+#define USB_DESC_UF2_PID      0xF00E
+#define USB_DESC_CDC_ONLY_PID 0xF00E
 
 //--------------------------------------------------------------------+
 // UF2
 //--------------------------------------------------------------------+
-#define UF2_PRODUCT_NAME        "Pitaya Go"
-#define UF2_VOLUME_LABEL        "PITAYAGO"
-#define UF2_BOARD_ID            "PITAYAGO"
-#define UF2_INDEX_URL           "https://wiki.makerdiary.com/pitaya-go"
+#define UF2_PRODUCT_NAME "Pitaya Go"
+#define UF2_VOLUME_LABEL "PITAYAGO"
+#define UF2_BOARD_ID     "PITAYAGO"
+#define UF2_INDEX_URL    "https://wiki.makerdiary.com/pitaya-go"
 
 
 #endif /* _MAKERDIARY_PITAYA_GO_H_ */

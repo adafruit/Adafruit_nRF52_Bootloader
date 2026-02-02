@@ -31,18 +31,11 @@
 #include "nrf.h"
 #include "nrf_gpio.h"
 
+#define PINNUM(port, pin) ((port) * 32 + (pin))
 #include "board.h"
 
 #ifndef UF2_VOLUME_LABEL
 #define UF2_VOLUME_LABEL   "NRF52BOOT  "
-#endif
-
-#if !defined(BUTTON_DFU) && defined(BUTTON_1)
-#define BUTTON_DFU      BUTTON_1
-#endif
-
-#if !defined(BUTTON_FRESET) && defined(BUTTON_2)
-#define BUTTON_FRESET   BUTTON_2
 #endif
 
 // The primary LED is usually Red but not in all cases.
@@ -104,7 +97,7 @@ void led_tick(void);
 //--------------------------------------------------------------------+
 // BUTTONS
 //--------------------------------------------------------------------+
-#if defined(BUTTON_DFU) || defined(BUTTON_FRESET)
+#if defined(BUTTON_DFU) || defined(BUTTON_DFU_OTA)
 void button_init(uint32_t pin);
 bool button_pressed(uint32_t pin);
 #endif

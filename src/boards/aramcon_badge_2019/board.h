@@ -26,43 +26,40 @@
 #ifndef _ARAMCON_BADGE_2019_H
 #define _ARAMCON_BADGE_2019_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(1, 11) // Red
+#define LEDS_NUMBER          1
+#define LED_PRIMARY_PIN      PINNUM(1, 11) // Red
 
-#define LED_NEOPIXEL          _PINNUM(0, 8)
-#define NEOPIXELS_NUMBER      4
-#define BOARD_RGB_BRIGHTNESS  0x040404
+#define LED_NEOPIXEL         PINNUM(0, 8)
+#define NEOPIXELS_NUMBER     4
+#define BOARD_RGB_BRIGHTNESS 0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 2) // left Button
-#define BUTTON_2              _PINNUM(0, 29) // middle button
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(0, 2)  // left Button
+#define BUTTON_DFU_OTA PINNUM(0, 29) // middle button
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "ARAMCON Badge Team"
-#define BLEDIS_MODEL          "ARAMCON Badge 2019"
+#define BLEDIS_MANUFACTURER "ARAMCON Badge Team"
+#define BLEDIS_MODEL        "ARAMCON Badge 2019"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0079
-#define USB_DESC_CDC_ONLY_PID  0x0079
+#define USB_DESC_VID          0x239A
+#define USB_DESC_UF2_PID      0x0079
+#define USB_DESC_CDC_ONLY_PID 0x0079
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "ARAMCON Badge 2019"
-#define UF2_VOLUME_LABEL   "ARAMBOOT"
-#define UF2_BOARD_ID       "nrf52840-ARAMCON-Badge-2019"
-#define UF2_INDEX_URL      "https://github.com/aramcon-badge"
+#define UF2_PRODUCT_NAME "ARAMCON Badge 2019"
+#define UF2_VOLUME_LABEL "ARAMBOOT"
+#define UF2_BOARD_ID     "nrf52840-ARAMCON-Badge-2019"
+#define UF2_INDEX_URL    "https://github.com/aramcon-badge"
 
 #endif // _ARAMCON_BADGE_2019_H

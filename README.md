@@ -24,7 +24,8 @@ Officially supported boards are:
 - Adafruit Metro nRF52840 Express
 - [Raytac MDBT50Q-RX Dongle](https://www.adafruit.com/product/5199)
 
-In addition, there is also lots of other 3rd-party boards which are added by other makers, users and community. Check out the [complete list of all boards here](/src/boards).
+In addition, there is also lots of other 3rd-party boards which are added by other makers, users and community. Check
+out the [complete list of all boards here](/supported_boards.md).
 
 ## Features
 
