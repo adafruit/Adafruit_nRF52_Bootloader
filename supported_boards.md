@@ -4,7 +4,6 @@
 
 | Board | Name | VID PID | URL |
 | --- | --- | --- | --- |
-| arcade_feather_nrf52840_express | Adafruit Feather nRF52840 Express | 0x239A:0x0029 | https://www.adafruit.com/product/4062 |
 | circuitplayground_nrf52840 | Adafruit Circuit Playground nRF52840 | 0x239A:0x0045 | https://www.adafruit.com/product/4333 |
 | clue_nrf52840 | Adafruit CLUE nRF52840 | 0x239A:0x0071 | https://www.adafruit.com/product/4500 |
 | feather_nrf52832 | Adafruit Feather nRF52832 | N/A | https://www.adafruit.com/product/3406 |
