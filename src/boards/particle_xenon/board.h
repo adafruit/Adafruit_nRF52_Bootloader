@@ -25,45 +25,43 @@
 #ifndef _PARTICLE_XENON_H
 #define _PARTICLE_XENON_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER    1
-#define LED_PRIMARY_PIN           _PINNUM(1, 12)
-#define LED_STATE_ON   1
+#define LEDS_NUMBER          1
+#define LED_PRIMARY_PIN      PINNUM(1, 12)
+#define LED_STATE_ON         1
 
-#define LED_RGB_RED_PIN           _PINNUM(0, 13)
-#define LED_RGB_GREEN_PIN         _PINNUM(0, 14)
-#define LED_RGB_BLUE_PIN          _PINNUM(0, 15)
+#define LED_RGB_RED_PIN      PINNUM(0, 13)
+#define LED_RGB_GREEN_PIN    PINNUM(0, 14)
+#define LED_RGB_BLUE_PIN     PINNUM(0, 15)
 #define BOARD_RGB_BRIGHTNESS 0x202020
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_DFU          _PINNUM(0, 11)
-#define BUTTON_FRESET       _PINNUM(0, 03) // A0
+#define BUTTON_DFU     PINNUM(0, 11)
+#define BUTTON_DFU_OTA PINNUM(0, 03) // A0
 #define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "Particle Industries"
-#define BLEDIS_MODEL          "Xenon"
+#define BLEDIS_MANUFACTURER "Particle Industries"
+#define BLEDIS_MODEL        "Xenon"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
 
 // Shared VID/PID with pca10056
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x00DA
-#define USB_DESC_CDC_ONLY_PID  0x00DA
+#define USB_DESC_VID          0x239A
+#define USB_DESC_UF2_PID      0x00DA
+#define USB_DESC_CDC_ONLY_PID 0x00DA
 
-#define UF2_PRODUCT_NAME   "Particle Xenon"
-#define UF2_VOLUME_LABEL   "XENONBOOT  "
-#define UF2_BOARD_ID       "nRF52840-Xenon-v1"
-#define UF2_INDEX_URL      "https://www.particle.io/mesh/"
+#define UF2_PRODUCT_NAME      "Particle Xenon"
+#define UF2_VOLUME_LABEL      "XENONBOOT  "
+#define UF2_BOARD_ID          "nRF52840-Xenon-v1"
+#define UF2_INDEX_URL         "https://www.particle.io/mesh/"
 
 #endif // _PARTICLE_XENON_H

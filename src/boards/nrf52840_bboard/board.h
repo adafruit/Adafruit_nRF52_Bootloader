@@ -25,14 +25,12 @@
 #ifndef _NRF52840_BBOARD_H
 #define _NRF52840_BBOARD_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 7)
-#define LED_STATE_ON          1
+#define LEDS_NUMBER     1
+#define LED_PRIMARY_PIN PINNUM(0, 7)
+#define LED_STATE_ON    1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
@@ -41,27 +39,27 @@
 // App can trigger OTA bootloader by writing DFU_MAGIC_OTA_APPJUM to
 // GPREGRET register if softdevice is not initialized; or by
 // writing DFU_MAGIC_OTA_RESET in case softdevice is initialized.
-#define BUTTON_1            18 // RESET also by default
-#define BUTTON_2            1  // P0.1 not exposed anywhere, FRST n/a
-#define BUTTON_PULL         NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     18 // RESET also by default
+#define BUTTON_DFU_OTA 1  // P0.1 not exposed anywhere, FRST n/a
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "ddB0515"
-#define BLEDIS_MODEL          "nRF52840 BBoard"
+#define BLEDIS_MANUFACTURER "ddB0515"
+#define BLEDIS_MODEL        "nRF52840 BBoard"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x1d50
-#define USB_DESC_UF2_PID       0x6157
-#define USB_DESC_CDC_ONLY_PID  0x6157
+#define USB_DESC_VID          0x1d50
+#define USB_DESC_UF2_PID      0x6157
+#define USB_DESC_CDC_ONLY_PID 0x6157
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "nRF52840 BBoard"
-#define UF2_VOLUME_LABEL   "BBOARDBOOT"
-#define UF2_BOARD_ID       "nRF52840-BBoard-rev2"
-#define UF2_INDEX_URL      "https://github.com/ddB0515/nRF52840-BBoard"
+#define UF2_PRODUCT_NAME "nRF52840 BBoard"
+#define UF2_VOLUME_LABEL "BBOARDBOOT"
+#define UF2_BOARD_ID     "nRF52840-BBoard-rev2"
+#define UF2_INDEX_URL    "https://github.com/ddB0515/nRF52840-BBoard"
 
 #endif // _NRF52840_BBOARD_H

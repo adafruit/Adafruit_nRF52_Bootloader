@@ -26,39 +26,37 @@
 #ifndef _OHS2020_BADGE_H
 #define _OHS2020_BADGE_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 04)	// fake LED since we have none 
-#define LED_STATE_ON          1
+#define LEDS_NUMBER     1
+#define LED_PRIMARY_PIN PINNUM(0, 04) // fake LED since we have none
+#define LED_STATE_ON    1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_1              _PINNUM(0, 29)     // SW2
-#define BUTTON_2              _PINNUM(0, 03)     // SW1
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(0, 29) // SW2
+#define BUTTON_DFU_OTA PINNUM(0, 03) // SW1
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "OSHWA"
-#define BLEDIS_MODEL          "OHS2020 Badge"
+#define BLEDIS_MANUFACTURER "OSHWA"
+#define BLEDIS_MODEL        "OHS2020 Badge"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x007F
-#define USB_DESC_CDC_ONLY_PID  0x007F
+#define USB_DESC_VID          0x239A
+#define USB_DESC_UF2_PID      0x007F
+#define USB_DESC_CDC_ONLY_PID 0x007F
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "OHS2020 Badge"
-#define UF2_VOLUME_LABEL   "BADGEBOOT"
-#define UF2_BOARD_ID       "OHS2020-Badge-revA"
-#define UF2_INDEX_URL      "https://2020.oshwa.org/"
+#define UF2_PRODUCT_NAME "OHS2020 Badge"
+#define UF2_VOLUME_LABEL "BADGEBOOT"
+#define UF2_BOARD_ID     "OHS2020-Badge-revA"
+#define UF2_INDEX_URL    "https://2020.oshwa.org/"
 
 #endif // _OHS2020_BADGE_H

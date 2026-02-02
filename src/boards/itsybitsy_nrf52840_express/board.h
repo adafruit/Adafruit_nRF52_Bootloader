@@ -25,17 +25,15 @@
 #ifndef _ITSYBITSY_NRF52840_H
 #define _ITSYBITSY_NRF52840_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 6)
+#define LED_PRIMARY_PIN         PINNUM(0, 6)
 #define LED_STATE_ON          1
 
-#define LED_APA102_CLK          _PINNUM(1, 9)
-#define LED_APA102_DATA         _PINNUM(0, 8)
+#define LED_APA102_CLK          PINNUM(1, 9)
+#define LED_APA102_DATA         PINNUM(0, 8)
 #define LED_APA102_BRIGHTNESS   0x1
 #define APA102_NUMBER           1
 
@@ -45,8 +43,8 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_1              _PINNUM(0, 29)  // user switch
-#define BUTTON_2              _PINNUM(1, 02)  // D2 breakout
+#define BUTTON_DFU     PINNUM(0, 29) // user switch
+#define BUTTON_DFU_OTA PINNUM(1, 02) // D2 breakout
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+

@@ -25,40 +25,38 @@
 #ifndef _BLUEMICRO_NRF52840_H
 #define _BLUEMICRO_NRF52840_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 4)
-#define LED_SECONDARY_PIN     _PINNUM(1, 10)
-#define LED_STATE_ON          1
+#define LEDS_NUMBER       2
+#define LED_PRIMARY_PIN   PINNUM(1, 4)
+#define LED_SECONDARY_PIN PINNUM(1, 10)
+#define LED_STATE_ON      1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_1          _PINNUM(0, 18)    // unusable: RESET
-#define BUTTON_2          _PINNUM(1, 1)     // no connection on E73-2G4M08S1C Module
-#define BUTTON_PULL       NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(0, 18) // unusable: RESET
+#define BUTTON_DFU_OTA PINNUM(1, 1)  // no connection on E73-2G4M08S1C Module
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER  "BlueMicro"
-#define BLEDIS_MODEL         "BlueMicro 840"
+#define BLEDIS_MANUFACTURER "BlueMicro"
+#define BLEDIS_MODEL        "BlueMicro 840"
 
 //--------------------------------------------------------------------+
 // USB PID from openmoko:
 // Approved PR https://github.com/openmoko/openmoko-usb-oui/pull/20
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x1d50
-#define USB_DESC_UF2_PID       0x6160
-#define USB_DESC_CDC_ONLY_PID  0x6160
+#define USB_DESC_VID          0x1d50
+#define USB_DESC_UF2_PID      0x6160
+#define USB_DESC_CDC_ONLY_PID 0x6160
 
-#define UF2_PRODUCT_NAME  "BlueMicro"
-#define UF2_VOLUME_LABEL  "BLUEMICRO"
-#define UF2_BOARD_ID      "nRF52840-BlueMicro-v1"
-#define UF2_INDEX_URL     "http://bluemicro.jpconstantineau.com/"
+#define UF2_PRODUCT_NAME      "BlueMicro"
+#define UF2_VOLUME_LABEL      "BLUEMICRO"
+#define UF2_BOARD_ID          "nRF52840-BlueMicro-v1"
+#define UF2_INDEX_URL         "http://bluemicro.jpconstantineau.com/"
 
 #endif // _BLUEMICRO_H

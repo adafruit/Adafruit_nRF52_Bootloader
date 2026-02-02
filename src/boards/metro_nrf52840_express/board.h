@@ -25,45 +25,43 @@
 #ifndef _METRO_NRF52840_H_
 #define _METRO_NRF52840_H_
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 13)
-#define LED_SECONDARY_PIN     _PINNUM(1, 15)
-#define LED_STATE_ON          1
+#define LEDS_NUMBER          2
+#define LED_PRIMARY_PIN      PINNUM(1, 13)
+#define LED_SECONDARY_PIN    PINNUM(1, 15)
+#define LED_STATE_ON         1
 
-#define LED_NEOPIXEL          _PINNUM(0, 13)
-#define NEOPIXELS_NUMBER      1
-#define BOARD_RGB_BRIGHTNESS  0x040404
+#define LED_NEOPIXEL         PINNUM(0, 13)
+#define NEOPIXELS_NUMBER     1
+#define BOARD_RGB_BRIGHTNESS 0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_1              _PINNUM(1, 0)
-#define BUTTON_2              _PINNUM(2, 2)
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(1, 0)
+#define BUTTON_DFU_OTA PINNUM(2, 2)
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "Metro nRF52840 Express"
+#define BLEDIS_MANUFACTURER "Adafruit Industries"
+#define BLEDIS_MODEL        "Metro nRF52840 Express"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x003F
-#define USB_DESC_CDC_ONLY_PID  0x0040
+#define USB_DESC_VID          0x239A
+#define USB_DESC_UF2_PID      0x003F
+#define USB_DESC_CDC_ONLY_PID 0x0040
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME       "Adafruit Metro nRF52840 Express"
-#define UF2_VOLUME_LABEL       "METR840BOOT"
-#define UF2_BOARD_ID           "nRF52840-Metro-revA"
+#define UF2_PRODUCT_NAME "Adafruit Metro nRF52840 Express"
+#define UF2_VOLUME_LABEL "METR840BOOT"
+#define UF2_BOARD_ID     "nRF52840-Metro-revA"
 
-#define UF2_INDEX_URL          "https://www.adafruit.com/"
+#define UF2_INDEX_URL    "https://www.adafruit.com/"
 
 #endif /* _METRO_NRF52840_H_ */

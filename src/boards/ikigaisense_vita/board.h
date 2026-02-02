@@ -25,44 +25,42 @@
 #ifndef _IKIGAISENSE_VITA_NRF52840_H
 #define _IKIGAISENSE_VITA_NRF52840_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           2
-#define LED_PRIMARY_PIN       _PINNUM(1, 15)
-#define LED_SECONDARY_PIN     _PINNUM(1, 10)
-#define LED_STATE_ON          1
+#define LEDS_NUMBER          2
+#define LED_PRIMARY_PIN      PINNUM(1, 15)
+#define LED_SECONDARY_PIN    PINNUM(1, 10)
+#define LED_STATE_ON         1
 
-#define LED_NEOPIXEL           _PINNUM(0, 16)
-#define NEOPIXELS_NUMBER      1
-#define BOARD_RGB_BRIGHTNESS  0x040404
+#define LED_NEOPIXEL         PINNUM(0, 16)
+#define NEOPIXELS_NUMBER     1
+#define BOARD_RGB_BRIGHTNESS 0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_1              _PINNUM(1, 02)
-#define BUTTON_2              _PINNUM(0, 10)
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(1, 02)
+#define BUTTON_DFU_OTA PINNUM(0, 10)
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "IkigaiSense Technologies"
-#define BLEDIS_MODEL          "Vita nRF52840"
+#define BLEDIS_MANUFACTURER "IkigaiSense Technologies"
+#define BLEDIS_MODEL        "Vita nRF52840"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x0093
-#define USB_DESC_CDC_ONLY_PID  0x0093
+#define USB_DESC_VID          0x239A
+#define USB_DESC_UF2_PID      0x0093
+#define USB_DESC_CDC_ONLY_PID 0x0093
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME      "IkigaiSense Vita nRF52840"
-#define UF2_VOLUME_LABEL      "ISVITABoot"
-#define UF2_BOARD_ID          "nRF52840-isVITA-revA"
-#define UF2_INDEX_URL         "https://github.com/ikigaisense/vita"
+#define UF2_PRODUCT_NAME "IkigaiSense Vita nRF52840"
+#define UF2_VOLUME_LABEL "ISVITABoot"
+#define UF2_BOARD_ID     "nRF52840-isVITA-revA"
+#define UF2_INDEX_URL    "https://github.com/ikigaisense/vita"
 
 #endif // _IKIGAISENSE_VITA_NRF52840_H

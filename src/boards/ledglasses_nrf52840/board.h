@@ -25,43 +25,41 @@
 #ifndef _LEDGLASSES_NRF52840_H
 #define _LEDGLASSES_NRF52840_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 31)
-#define LED_STATE_ON          1
+#define LEDS_NUMBER          1
+#define LED_PRIMARY_PIN      PINNUM(0, 31)
+#define LED_STATE_ON         1
 
-#define LED_NEOPIXEL           _PINNUM(1, 15)
-#define NEOPIXELS_NUMBER      1
-#define BOARD_RGB_BRIGHTNESS  0x040404
+#define LED_NEOPIXEL         PINNUM(1, 15)
+#define NEOPIXELS_NUMBER     1
+#define BOARD_RGB_BRIGHTNESS 0x040404
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTON_1              _PINNUM(0, 30)  // user switch
-#define BUTTON_2              _PINNUM(0, 28)  // NC
-#define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     PINNUM(0, 30) // user switch
+#define BUTTON_DFU_OTA PINNUM(0, 28) // NC
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
 // BLE OTA
 //--------------------------------------------------------------------+
-#define BLEDIS_MANUFACTURER   "Adafruit Industries"
-#define BLEDIS_MODEL          "LED Glasses Driver nRF52840"
+#define BLEDIS_MANUFACTURER "Adafruit Industries"
+#define BLEDIS_MODEL        "LED Glasses Driver nRF52840"
 
 //--------------------------------------------------------------------+
 // USB
 //--------------------------------------------------------------------+
-#define USB_DESC_VID           0x239A
-#define USB_DESC_UF2_PID       0x010D
-#define USB_DESC_CDC_ONLY_PID  0x010E
+#define USB_DESC_VID          0x239A
+#define USB_DESC_UF2_PID      0x010D
+#define USB_DESC_CDC_ONLY_PID 0x010E
 
 //------------- UF2 -------------//
-#define UF2_PRODUCT_NAME   "Adafruit LED Glasses Driver nRF52840"
-#define UF2_VOLUME_LABEL   "GLASSESBOOT"
-#define UF2_BOARD_ID       "nRF52840-LedGlasses-revA"
-#define UF2_INDEX_URL      "https://www.adafruit.com/product/5217"
+#define UF2_PRODUCT_NAME "Adafruit LED Glasses Driver nRF52840"
+#define UF2_VOLUME_LABEL "GLASSESBOOT"
+#define UF2_BOARD_ID     "nRF52840-LedGlasses-revA"
+#define UF2_INDEX_URL    "https://www.adafruit.com/product/5217"
 
 #endif // _LEDGLASSES_NRF52840_H

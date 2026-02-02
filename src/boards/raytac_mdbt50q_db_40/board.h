@@ -25,18 +25,18 @@
 #ifndef RAYTAC_MDBT50Q_DB_40_H
 #define RAYTAC_MDBT50Q_DB_40_H
 
-#define _PINNUM(port, pin)      ((port)*32 + (pin))
+#define PINNUM(port, pin) ((port) * 32 + (pin))
 
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER             3
 /* This is the Green led marked D1 on the board */
-#define LED_PRIMARY_PIN         _PINNUM(1, 13)
+#define LED_PRIMARY_PIN PINNUM(1, 13)
 /* This is the Red led marked D2 on the board */
-#define LED_SECONDARY_PIN  	_PINNUM(1, 14)
+#define LED_SECONDARY_PIN PINNUM(1, 14)
 /* This is the Blue led marked D3 on the board */
-#define LED_TERTIARY_PIN  	_PINNUM(1, 15)
+#define LED_TERTIARY_PIN PINNUM(1, 15)
 /* There are one more unpopulated LEDs, but for the purposes of bootloader that
  * doesn't matter. */
 #define LED_STATE_ON            0
@@ -45,10 +45,10 @@
 /* BUTTON
  *------------------------------------------------------------------*/
 
-#define BUTTON_1                _PINNUM(0, 11)
-#define BUTTON_2                _PINNUM(0, 12)
-#define BUTTON_3                _PINNUM(0, 24)
-#define BUTTON_4                _PINNUM(0, 25)
+#define BUTTON_DFU     PINNUM(0, 11)
+#define BUTTON_DFU_OTA PINNUM(0, 12)
+#define BUTTON_3       PINNUM(0, 24)
+#define BUTTON_4       PINNUM(0, 25)
 #define BUTTON_PULL             NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
