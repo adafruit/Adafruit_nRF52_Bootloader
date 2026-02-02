@@ -78,7 +78,7 @@ static __INLINE uint32_t pstorage_flash_page_end()
 #define PSTORAGE_SWAP_ADDR          PSTORAGE_DATA_END_ADDR
 
 #define PSTORAGE_MAX_BLOCK_SIZE     PSTORAGE_FLASH_PAGE_SIZE                                    /**< Maximum size of block that can be registered with the module. Should be configured based on system requirements. And should be greater than or equal to the minimum size. */
-#define PSTORAGE_CMD_QUEUE_SIZE     10                                                          /**< Maximum number of flash access commands that can be maintained by the module for all applications. Configurable. */
+#define PSTORAGE_CMD_QUEUE_SIZE     18                                                          /**< Maximum number of flash access commands that can be maintained by the module for all applications. Configurable. */
 
 /**@breif Define this flag in case Raw access to persistent memory is to be enabled. Raw mode
  * unlike the data mode is for uses other than storing data from various mode. This mode is
