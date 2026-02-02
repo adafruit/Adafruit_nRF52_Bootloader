@@ -44,7 +44,8 @@ typedef enum
     BOOTLOADER_SETTINGS_SAVING,                         /**< Bootloader status for indicating that saving of bootloader settings is in progress. */
     BOOTLOADER_COMPLETE,                                /**< Bootloader status for indicating that all operations for the update procedure has completed and it is safe to reset the system. */
     BOOTLOADER_TIMEOUT,                                 /**< Bootloader status field for indicating that a timeout has occured and current update process should be aborted. */
-    BOOTLOADER_RESET,                                   /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted. */
+    BOOTLOADER_SYS_RESET,                               /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted. */
+    BOOTLOADER_RESET_TO_SELF,                           /**< Bootloader status field for indicating that a reset has been requested and current update process should be aborted and the bootloader must be reentered. */
 } bootloader_status_t;
 
 static pstorage_handle_t        m_bootsettings_handle;  /**< Pstorage handle to use for registration and identifying the bootloader module on subsequent calls to the pstorage module for load and store of bootloader setting in flash. */
@@ -136,9 +137,10 @@ static void wait_for_events(void)
 
     if ((m_update_status == BOOTLOADER_COMPLETE) ||
         (m_update_status == BOOTLOADER_TIMEOUT) ||
-        (m_update_status == BOOTLOADER_RESET) )
+        (m_update_status == BOOTLOADER_SYS_RESET) ||
+        (m_update_status == BOOTLOADER_RESET_TO_SELF))
     {
-      // When update has completed or a timeout/reset occured we will return.
+      // When update has completed or a timeout/reset occurred we will return.
       return;
     }
   }
@@ -186,10 +188,36 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
 {
   if ( is_ota() )
   {
-    uint32_t err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+    uint32_t err_code;
+    while(1) {
+      err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
+      if (err_code != NRF_ERROR_NO_MEM) {
+        break;
+      }
+      // This means the write/erase queue of commands was completely full - Should not
+      //  happen, but better safe than sorry, wait until space becomes available -
+      //  the pstorage event handler is only run from the main loop, and we are also 
+      //  running from a BLE event on the main loop: This means if we wait here, the FLASH 
+      //  completion events will never be handled (will be queued by app_scheduler, but
+      //  not handled, and that means this wait will never end... So, process SOC events
+      //  from the SD (but NOT BLE events!) - This will free entries on the pstorage queue
+      //  as soon as operations are complete, allowing this op to be queued
+      while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+        // nothing
+      }
+    }
     APP_ERROR_CHECK(err_code);
 
-    err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
+    while(1) {
+      err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
+      if (err_code != NRF_ERROR_NO_MEM) {
+        break;
+      }
+      // No space, wait until an entry in the queue is freed
+      while (NRF_ERROR_NOT_FOUND != proc_soc()) {
+        // nothing
+      }
+    }
     APP_ERROR_CHECK(err_code);
   }
   else
@@ -296,7 +324,8 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
   else if (update_status.status_code == DFU_RESET)
   {
-    m_update_status = BOOTLOADER_RESET;
+    m_update_status =
+      (update_status.restart_into_bootloader == false ? BOOTLOADER_SYS_RESET : BOOTLOADER_RESET_TO_SELF);
   }
   else
   {
@@ -304,6 +333,10 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
 }
 
+bool bootloader_must_reset_to_self(void)
+{
+  return m_update_status == BOOTLOADER_RESET_TO_SELF;
+}
 
 uint32_t bootloader_init(void)
 {
