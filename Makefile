@@ -11,6 +11,7 @@
 # - DUALBANK_FW        : If bootloader will implement a dual bank feature to allow autorecover from failed
 # - FORCE_UF2          : if SIGNED_FW is 1, will force to include UF2 support (UNSECURE, UF2 does NOT validate signature!)
 # - DEFAULT_TO_OTA_DFU : if entering DFU, by default enter OTA DFU instead of Serial DFU
+# - SKIP_FLASH_PROT    : Skip enabling protection against user application writing to FLASH MBR/Bootloader
 #------------------------------------------------------------------------------
 
 PYTHON = python
@@ -374,6 +375,10 @@ endif
 
 ifeq ($(DEFAULT_TO_OTA_DFU), 1)
 CFLAGS += -DDEFAULT_TO_OTA_DFU
+endif
+
+ifeq ($(SKIP_FLASH_PROT), 1)
+CFLAGS += -DSKIP_FLASH_PROT
 endif
 
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
