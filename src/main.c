@@ -134,7 +134,7 @@ uint32_t* dbl_reset_mem = ((uint32_t*) DFU_DBL_RESET_MEM);
 // true if ble, false if serial
 bool _ota_dfu = false;
 bool _ota_connected = false;
-bool _ota_was_active = false;
+bool _ota_was_connected = false;
 bool _sd_inited = false;
 
 bool is_ota(void) {
@@ -231,7 +231,7 @@ int main(void) {
   
   // Reset the system with the OTA DFU update in case we were in it, 
   // to allow completion of FLASHING, otherwise, default to normal reset
-  if (_ota_was_active) {
+  if (_ota_was_connected) {
     NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
   }
   
@@ -526,8 +526,8 @@ uint32_t proc_ble(void) {
 
         _ota_connected = true;
 
-        // Remember someone connected to BLE        
-        _ota_was_active = true;
+        // Remember someone connected to BLE
+        _ota_was_connected = true;
         led_state(STATE_BLE_CONNECTED);
         break;
       }
