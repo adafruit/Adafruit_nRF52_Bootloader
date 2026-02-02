@@ -789,8 +789,9 @@ uint32_t dfu_bl_image_validate(void)
         sd_mbr_cmd_1.params.compare.len  = bootloader_settings.bl_image_size / sizeof(uint32_t);
 
         uint32_t err_code = sd_mbr_command(&sd_mbr_cmd_1);
-        if (err_code == NRF_SUCCESS)
-            return NRF_SUCCESS;
+        if (err_code == NRF_SUCCESS) {
+          return NRF_SUCCESS;
+        }
 
         uint32_t bl_image_start_2 = (bootloader_settings.sd_image_size == 0) ?
                                   DFU_BANK_1_REGION_START :

@@ -140,7 +140,7 @@ static void wait_for_events(void)
         (m_update_status == BOOTLOADER_SYS_RESET) ||
         (m_update_status == BOOTLOADER_RESET_TO_SELF))
     {
-      // When update has completed or a timeout/reset occured we will return.
+      // When update has completed or a timeout/reset occurred we will return.
       return;
     }
   }
@@ -191,8 +191,9 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
     uint32_t err_code;
     while(1) {
       err_code = pstorage_clear(&m_bootsettings_handle, sizeof(bootloader_settings_t));
-      if (err_code != NRF_ERROR_NO_MEM)
+      if (err_code != NRF_ERROR_NO_MEM) {
         break;
+      }
       // This means the write/erase queue of commands was completely full - Should not
       //  happen, but better safe than sorry, wait until space becomes available -
       //  the pstorage event handler is only run from the main loop, and we are also 
@@ -209,8 +210,9 @@ static void bootloader_settings_save(bootloader_settings_t * p_settings)
 
     while(1) {
       err_code = pstorage_store(&m_bootsettings_handle, (uint8_t *) p_settings, sizeof(bootloader_settings_t), 0);
-      if (err_code != NRF_ERROR_NO_MEM)
+      if (err_code != NRF_ERROR_NO_MEM) {
         break;
+      }
       // No space, wait until an entry in the queue is freed
       while (NRF_ERROR_NOT_FOUND != proc_soc()) {
         // nothing
@@ -322,9 +324,8 @@ void bootloader_dfu_update_process(dfu_update_status_t update_status)
   }
   else if (update_status.status_code == DFU_RESET)
   {
-    m_update_status = update_status.restart_into_bootloader == false
-      ? BOOTLOADER_SYS_RESET 
-      : BOOTLOADER_RESET_TO_SELF;
+    m_update_status =
+      (update_status.restart_into_bootloader == false ? BOOTLOADER_SYS_RESET : BOOTLOADER_RESET_TO_SELF);
   }
   else
   {
