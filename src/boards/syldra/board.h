@@ -55,7 +55,7 @@
 
 #define UF2_PRODUCT_NAME        "Syldra nrf52840 Development Board"
 #define UF2_VOLUME_LABEL        "Syldra-boot"
-#define UF2_BOARD_ID            "Syldra-dev-v1"
+#define UF2_BOARD_ID            "nRF52840-Syldra-dev-v1"
 #define UF2_INDEX_URL           "https://github.com/ambraglow/nonorf"
 
 #endif
