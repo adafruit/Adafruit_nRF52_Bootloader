@@ -20,6 +20,37 @@
  * @brief Device Firmware Update module type and definitions.
  */
 
+/*
+ * Flash layout (nrf52840, see linker/nrf52840.ld):
+ *
+ *  -------------------------
+ * |  Bootloader Settings    |
+ * |          4 KB           |
+ * |-------------------------| 0xFF000 BOOTLOADER_SETTINGS_ADDRESS
+ * |     MBR Params Page     |
+ * |          4 KB           |
+ * |-------------------------| 0xFE000
+ * |    Bootloader Config    |
+ * |          2 KB           |
+ * |-------------------------| 0xFD800
+ * |       Bootloader        |
+ * |          38 KB          |
+ * |-------------------------| 0xF4000 BOOTLOADER_REGION_START
+ * |    App Data Reserved    |
+ * |         40 KB           |
+ * |-------------------------| 0xEA000
+ * |       Application       |
+ * |    Single/ Dual Bank    |
+ * |                         |
+ * |-------------------------| CODE_REGION_1_START
+ * |        SoftDevice       |
+ * |    0x26000 (optional)   |
+ * |-------------------------| 0x01000
+ * |           MBR           |
+ * |          4 KB           |
+ *  -------------------------  0x00000
+ */
+
 #ifndef DFU_TYPES_H__
 #define DFU_TYPES_H__
 
