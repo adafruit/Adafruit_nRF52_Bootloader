@@ -376,7 +376,6 @@ ifeq ($(DEFAULT_TO_OTA_DFU), 1)
 CFLAGS += -DDEFAULT_TO_OTA_DFU
 endif
 
-
 _VER = $(subst ., ,$(word 1, $(subst -, ,$(GIT_VERSION))))
 CFLAGS += -DMK_BOOTLOADER_VERSION='($(word 1,$(_VER)) << 16) + ($(word 2,$(_VER)) << 8) + $(word 3,$(_VER))'
 
