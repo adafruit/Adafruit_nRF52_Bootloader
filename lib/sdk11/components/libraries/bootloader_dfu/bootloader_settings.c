@@ -42,6 +42,10 @@ void bootloader_util_settings_get(const bootloader_settings_t ** pp_bootloader_s
 
 void bootloader_mbr_addrs_populate(void)
 {
+#if defined(__GNUC__) && (__GNUC__ >= 12)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
   if (*(const uint32_t *)MBR_BOOTLOADER_ADDR == 0xFFFFFFFF)
   {
     nrfx_nvmc_word_write(MBR_BOOTLOADER_ADDR, BOOTLOADER_REGION_START);
@@ -51,4 +55,7 @@ void bootloader_mbr_addrs_populate(void)
   {
     nrfx_nvmc_word_write(MBR_PARAM_PAGE_ADDR, BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS);
   }
+#if defined(__GNUC__) && (__GNUC__ >= 12)
+#pragma GCC diagnostic pop
+#endif
 }
