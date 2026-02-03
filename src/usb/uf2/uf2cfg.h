@@ -32,4 +32,4 @@
 #define BOOTLOADER_ADDR_END           BOOTLOADER_MBR_PARAMS_PAGE_ADDRESS
 
 // Address where new bootloader is written before activation (skip application data)
-#define BOOTLOADER_ADDR_NEW_RECIEVED  (USER_FLASH_END-DFU_BL_IMAGE_MAX_SIZE)
+#define BOOTLOADER_ADDR_NEW_RECEIVED  (USER_FLASH_END-DFU_BL_IMAGE_MAX_SIZE)
