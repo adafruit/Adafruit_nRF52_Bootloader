@@ -38,8 +38,6 @@
  * 
  */
 
-
-
 #ifndef SDK_CONFIG_H
 #define SDK_CONFIG_H
 
@@ -66,7 +64,7 @@
 #define HCI_MEM_POOL_ENABLED               1
 #define HCI_TX_BUF_SIZE                    600 // not used
 #define HCI_RX_BUF_SIZE                    600
-#define HCI_RX_BUF_QUEUE_SIZE              8   // must be power of 2
+#define HCI_RX_BUF_QUEUE_SIZE              16  // must be power of 2
 
 //==========================================================
 // <e> UART_ENABLED - nrf_drv_uart - UART/UARTE peripheral driver
@@ -118,6 +116,12 @@
 
 #define CRC16_ENABLED                      1
 #define NRF_STRERROR_ENABLED               1
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+#define BLEGATT_ATT_MTU_MAX         247
+#define BLE_CONN_CFG_HIGH_BANDWIDTH 1
 
 
 #endif //SDK_CONFIG_H

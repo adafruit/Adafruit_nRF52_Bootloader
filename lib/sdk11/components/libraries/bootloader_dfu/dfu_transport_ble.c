@@ -35,11 +35,6 @@
 #include "nrf_delay.h"
 #include "sdk_common.h"
 
-
-#define BLEGAP_EVENT_LENGTH             6
-#define BLEGATT_ATT_MTU_MAX             23
-enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
-
 #define DFU_REV_MAJOR                        0x00                                                    /** DFU Major revision number to be exposed. */
 #define DFU_REV_MINOR                        0x08                                                    /** DFU Minor revision number to be exposed. */
 #define DFU_REVISION                         ((DFU_REV_MAJOR << 8) | DFU_REV_MINOR)                  /** DFU Revision number to be exposed. Combined of major and minor versions. */
@@ -47,16 +42,19 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 #define BLE_HANDLE_MAX                       0xFFFF                                                  /**< Max handle value is BLE. */
 
 // limit of 8 chars
+#ifndef DEVICE_NAME
 #define DEVICE_NAME                          "AdaDFU"                                                /**< Name of device. Will be included in the advertising data. */
+#endif
 
-#define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(10, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
+#define MIN_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(15, UNIT_1_25_MS))             /**< Minimum acceptable connection interval (11.25 milliseconds). */
 #define MAX_CONN_INTERVAL                    (uint16_t)(MSEC_TO_UNITS(30, UNIT_1_25_MS))             /**< Maximum acceptable connection interval (15 milliseconds). */
-#define SLAVE_LATENCY                        0                                                       /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                     (4 * 100)                                               /**< Connection supervisory timeout (4 seconds). */
+#define SLAVE_LATENCY                        4                                                       /**< Slave latency. */
+#define CONN_SUP_TIMEOUT                     MSEC_TO_UNITS(8000, UNIT_10_MS)                         /**< Connection supervisory timeout (4 seconds). */
+#define SPEEDUP_FLASH_WRITES                 1 /**< Speedup FLASH writes by changing Softdevice local latency */
 
 #define APP_ADV_INTERVAL                     MSEC_TO_UNITS(25, UNIT_0_625_MS)                        /**< The advertising interval (25 ms.). */
 #define APP_ADV_TIMEOUT                      BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED                   /**< The advertising timeout in units of seconds. This is set to @ref BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED so that the advertisement is done as long as there there is a call to @ref dfu_transport_close function.*/
-#define APP_DIRECTED_ADV_TIMEOUT             50                                                       /**< number of direct advertisement (each lasting 1.28seconds). */
+#define APP_DIRECTED_ADV_TIMEOUT             50                                                      /**< number of direct advertisement (each lasting 1.28seconds). */
 #define PEER_ADDRESS_TYPE_INVALID            0xFF                                                    /**< Value indicating that no valid peer address exists. This will be the case when a private resolvable address is used in which case there is no address available but instead an IRK is present. */
 #define PEER_ADDRESS_TYPE_INVALID            0xFF                                                    /**< Value indicating that no valid peer address exists. This will be the case when a private resolvable address is used in which case there is no address available but instead an IRK is present. */
 
@@ -75,8 +73,9 @@ enum { BLE_CONN_CFG_HIGH_BANDWIDTH = 1 };
 
 #define IS_CONNECTED()                       (m_conn_handle != BLE_CONN_HANDLE_INVALID)              /**< Macro to determine if the device is in connected state. */
 
-#define APP_FEATURE_NOT_SUPPORTED            BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2                    /**< Reply when unsupported features are requested. */
-#define SD_IMAGE_SIZE_OFFSET                 0                                                       /**< Offset in start packet for the size information for SoftDevice. */
+#define APP_FEATURE_NOT_SUPPORTED                                                                     \
+  (BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2)       /**< Reply when unsupported features are requested. */
+#define SD_IMAGE_SIZE_OFFSET                 0 /**< Offset in start packet for the size information for SoftDevice. */
 #define BL_IMAGE_SIZE_OFFSET                 4                                                       /**< Offset in start packet for the size information for bootloader. */
 #define APP_IMAGE_SIZE_OFFSET                8                                                       /**< Offset in start packet for the size information for application. */
 
@@ -208,7 +207,35 @@ static ble_dfu_resp_val_t nrf_err_code_translate(uint32_t                  err_c
     }
 }
 
+#ifdef SPEEDUP_FLASH_WRITES
+static void prioritize_ble_over_flash_writes(void) {
+  // We set the local latency to 0: That will revert latency to the negotiated one with the host.
+  //  That will increase throughput to the maximum possible
+  ble_opt_t opt;
+  varclr(&opt);
+  opt.gap_opt.local_conn_latency.conn_handle       = m_conn_handle; /**< Connection Handle */
+  opt.gap_opt.local_conn_latency.requested_latency = 0;             /**< Requested local connection latency. */
+  opt.gap_opt.local_conn_latency.p_actual_latency =
+    NULL; /**< Pointer to storage for the actual local connection latency (can be set to NULL to skip return value). */
+  sd_ble_opt_set(BLE_GAP_OPT_LOCAL_CONN_LATENCY, &opt);
+}
 
+static void prioritize_flash_writes_over_ble(void) {
+  // We set the local latency to the maximum possible: That will make FLASH writes faster, as BLE comms will
+  //  be delayed (even losing RXd packets, but this is the same as a poor connection and will be handled by
+  //  the protocol itself)
+  ble_opt_t opt;
+  varclr(&opt);
+  opt.gap_opt.local_conn_latency.conn_handle       = m_conn_handle; /**< Connection Handle */
+  opt.gap_opt.local_conn_latency.requested_latency = 50;            /**< Requested local connection latency. */
+  opt.gap_opt.local_conn_latency.p_actual_latency =
+    NULL; /**< Pointer to storage for the actual local connection latency (can be set to NULL to skip return value). */
+  sd_ble_opt_set(BLE_GAP_OPT_LOCAL_CONN_LATENCY, &opt);
+}
+#else
+  #define prioritize_ble_over_flash_writes()
+  #define prioritize_flash_writes_over_ble()
+#endif
 /**@brief     Function for handling the callback events from the dfu module.
  *            Callbacks are expected when \ref dfu_data_pkt_handle has been executed.
  *
@@ -226,6 +253,9 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
         case DATA_PACKET:
             if (result != NRF_SUCCESS)
             {
+                // Restore latency to the negotiated one
+                prioritize_ble_over_flash_writes();
+
                 // Disconnect from peer.
                 if (IS_CONNECTED())
                 {
@@ -242,6 +272,9 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
                 // If the callback matches final data packet received then the peer is notified.
                 if (mp_final_packet == p_data)
                 {
+                    // Restore latency to the negotiated one
+                    prioritize_ble_over_flash_writes();
+
                     // Notify the DFU Controller about the success of the procedure.
                     err_code = ble_dfu_response_send(&m_dfu,
                                                      BLE_DFU_RECEIVE_APP_PROCEDURE,
@@ -252,6 +285,10 @@ static void dfu_cb_handler(uint32_t packet, uint32_t result, uint8_t * p_data)
             break;
 
         case START_PACKET:
+
+            // Restore latency to the negotiated one
+            prioritize_ble_over_flash_writes();
+
             // Translate the err_code returned by the above function to DFU Response Value.
             resp_val = nrf_err_code_translate(result, BLE_DFU_START_PROCEDURE);
 
@@ -324,9 +361,15 @@ static void start_data_process(ble_dfu_t * p_dfu, ble_dfu_evt_t * p_evt)
         start_packet.bl_image_size  = uint32_decode(p_length_data + BL_IMAGE_SIZE_OFFSET);
         start_packet.app_image_size = uint32_decode(p_length_data + APP_IMAGE_SIZE_OFFSET);
 
+        // Prioritize FLASH writes over BLE comms
+        prioritize_flash_writes_over_ble();
+
         err_code = dfu_start_pkt_handle(&update_packet);
         if (err_code != NRF_SUCCESS)
         {
+            // Prioritize BLE over flash writes
+            prioritize_ble_over_flash_writes();
+
             // Translate the err_code returned by the above function to DFU Response Value.
             ble_dfu_resp_val_t resp_val;
 
@@ -743,8 +786,22 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
-            m_is_advertising = false;
+            {
+                m_conn_handle    = p_ble_evt->evt.gap_evt.conn_handle;
+                m_is_advertising = false;
+
+                // Force changing the slave latency to try to improve transfer throughput (bandwidth)
+                //  But Android and IOS will override it with their minimum supported value
+                ble_gap_conn_params_t p_conn_params;
+                p_conn_params.min_conn_interval = p_ble_evt->evt.gap_evt.params.connected.conn_params.min_conn_interval;
+                p_conn_params.max_conn_interval = p_ble_evt->evt.gap_evt.params.connected.conn_params.max_conn_interval;
+                p_conn_params.slave_latency     = SLAVE_LATENCY;
+                p_conn_params.conn_sup_timeout  = p_ble_evt->evt.gap_evt.params.connected.conn_params.conn_sup_timeout;
+
+                err_code = sd_ble_gap_conn_param_update(m_conn_handle, &p_conn_params);
+                APP_ERROR_CHECK(err_code);
+
+            }
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -772,6 +829,9 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
 
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
+            break;
+
+        case BLE_GAP_EVT_CONN_PARAM_UPDATE:
             break;
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
@@ -900,6 +960,11 @@ static void on_ble_evt(ble_evt_t * p_ble_evt)
         case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
         {
           uint16_t att_mtu = MIN(p_ble_evt->evt.gatts_evt.params.exchange_mtu_request.client_rx_mtu, BLEGATT_ATT_MTU_MAX);
+
+		  // Round it to a multiple of 4 plus 3 bytes, as we need data packets to be multiple of 4 bytes
+          att_mtu &= 0xFFFCU;
+          att_mtu |= 3;
+
           PRINTF("GAP ATT MTU is changed to %d\r\n", att_mtu);
           APP_ERROR_CHECK( sd_ble_gatts_exchange_mtu_reply(m_conn_handle, att_mtu) );
         }

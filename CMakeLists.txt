@@ -26,6 +26,14 @@ set(SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/sdk/components)
 set(SOFTDEVICE_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/softdevice)
 set(MBR_HEX ${SOFTDEVICE_DIR}/mbr/hex/mbr_nrf52_2.4.1_mbr.hex)
 set(TINYUSB_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb/src)
+set(TCRYPT_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinycrypt/lib)
+
+option(DEFAULT_TO_OTA_DFU "Default to OTA DFU instead of Serial DFU" OFF)
+option(SIGNED_FW "Enable signed firmware verification" OFF)
+option(DUALBANK_FW "Enable dual bank DFU support" OFF)
+option(FORCE_UF2 "Force UF2 support even with SIGNED_FW" OFF)
+set(SIGNED_FW_QX "" CACHE STRING "Public key Qx (comma-separated bytes)")
+set(SIGNED_FW_QY "" CACHE STRING "Public key Qy (comma-separated bytes)")
 
 set(UF2CONV_PY ${CMAKE_CURRENT_LIST_DIR}/lib/uf2/utils/uf2conv.py)
 set(UF2_FAMILY_ID_BOOTLOADER 0xd663823c)
@@ -58,7 +66,6 @@ add_executable(bootloader
   ${SDK11_DIR}/libraries/bootloader_dfu/bootloader_util.c
   ${SDK11_DIR}/libraries/bootloader_dfu/dfu_transport_serial.c
   ${SDK11_DIR}/libraries/bootloader_dfu/dfu_transport_ble.c
-  ${SDK11_DIR}/libraries/bootloader_dfu/dfu_single_bank.c
   ${SDK11_DIR}/ble/ble_services/ble_dfu/ble_dfu.c
   ${SDK11_DIR}/ble/ble_services/ble_dis/ble_dis.c
   ${SDK11_DIR}/drivers_nrf/pstorage/pstorage_raw.c
@@ -75,6 +82,30 @@ add_executable(bootloader
   # startup
   ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S
   )
+
+if (DUALBANK_FW)
+  target_sources(bootloader PUBLIC
+    ${SDK11_DIR}/libraries/bootloader_dfu/dfu_dual_bank.c
+  )
+else ()
+  target_sources(bootloader PUBLIC
+    ${SDK11_DIR}/libraries/bootloader_dfu/dfu_single_bank.c
+  )
+endif ()
+
+if (SIGNED_FW)
+  target_sources(bootloader PUBLIC
+    ${TCRYPT_DIR}/source/sha256.c
+    ${TCRYPT_DIR}/source/ecc.c
+    ${TCRYPT_DIR}/source/ecc_dsa.c
+    ${TCRYPT_DIR}/source/utils.c
+  )
+
+  target_include_directories(bootloader PUBLIC
+    ${TCRYPT_DIR}/include
+  )
+endif ()
+
 target_include_directories(bootloader PUBLIC
   src
   src/boards
@@ -148,6 +179,27 @@ target_compile_definitions(bootloader PUBLIC
   __START=main
   __STARTUP_CLEAR_BSS
   )
+
+if (SIGNED_FW)
+  if (SIGNED_FW_QX STREQUAL "" OR SIGNED_FW_QY STREQUAL "")
+    message(FATAL_ERROR "SIGNED_FW requires SIGNED_FW_QX and SIGNED_FW_QY to be set")
+  endif ()
+  string(REPLACE " " "" SIGNED_FW_QX_STR "${SIGNED_FW_QX}")
+  string(REPLACE " " "" SIGNED_FW_QY_STR "${SIGNED_FW_QY}")
+  target_compile_definitions(bootloader PUBLIC
+    SIGNED_FW
+    "SIGNED_FW_QX=${SIGNED_FW_QX_STR}"
+    "SIGNED_FW_QY=${SIGNED_FW_QY_STR}"
+  )
+endif ()
+
+if (FORCE_UF2)
+  target_compile_definitions(bootloader PUBLIC FORCE_UF2)
+endif ()
+
+if (DEFAULT_TO_OTA_DFU)
+  target_compile_definitions(bootloader PUBLIC DEFAULT_TO_OTA_DFU)
+endif ()
 
 if (TRACE_ETM STREQUAL "1")
   # ENABLE_TRACE will cause system_nrf5x.c to set up ETM trace

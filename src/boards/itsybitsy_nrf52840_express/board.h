@@ -25,30 +25,26 @@
 #ifndef _ITSYBITSY_NRF52840_H
 #define _ITSYBITSY_NRF52840_H
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 6)
+#define LED_PRIMARY_PIN         PINNUM(0, 6)
 #define LED_STATE_ON          1
 
-#define LED_APA102_CLK          _PINNUM(1, 9)
-#define LED_APA102_DATA         _PINNUM(0, 8)
+#define LED_APA102_CLK          PINNUM(1, 9)
+#define LED_APA102_DATA         PINNUM(0, 8)
 #define LED_APA102_BRIGHTNESS   0x1
 #define APA102_NUMBER           1
 
 // For dotstart set to max for colour information is not masked off
 #define BOARD_RGB_BRIGHTNESS  0xffffffff
 
-
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 29)  // user switch
-#define BUTTON_2              _PINNUM(1, 02)  // D2 breakout
+#define BUTTON_DFU     PINNUM(0, 29) // user switch
+#define BUTTON_DFU_OTA PINNUM(1, 02) // D2 breakout
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
@@ -68,6 +64,6 @@
 #define UF2_PRODUCT_NAME   "Adafruit ItsyBitsy nRF52840 Express"
 #define UF2_VOLUME_LABEL   "ITSY840BOOT"
 #define UF2_BOARD_ID       "nRF52840-ItsyBitsy-revA"
-#define UF2_INDEX_URL      "https://www.adafruit.com/"
+#define UF2_INDEX_URL      "https://www.adafruit.com/product/4481"
 
-#endif // _ITSY_NRF52840_H
+#endif

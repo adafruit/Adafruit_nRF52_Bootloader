@@ -32,6 +32,12 @@
 #if defined ( __CC_ARM )
 __asm static void bootloader_util_reset(uint32_t start_addr)
 {
+    MOVS  R5, #0x00             ; R5 = 0
+    MSR   CONTROL, R5           ; Clear CONTROL
+    MSR   PRIMASK, R5           ; Clear PRIMASK
+    MSR   BASEPRI, R5           ; Clear BASEPRI
+    MSR   FAULTMASK, R5         ; Clear FAULTMASK
+
     LDR   R5, [R0]              ; Get App initial MSP for bootloader.
     MSR   MSP, R5               ; Set the main stack pointer to the applications MSP.
     LDR   R0, [R0, #0x04]       ; Load Reset handler into R0. This will be first argument to branch instruction (BX).
@@ -69,6 +75,12 @@ static inline void bootloader_util_reset (uint32_t start_addr) __attribute__ ((o
 static inline void bootloader_util_reset(uint32_t start_addr)
 {
     __asm volatile(
+        "movs  r5, #0x00\t\n"           // R5 = 0
+        "msr   control, r5\t\n"         // Clear CONTROL
+        "msr   primask, r5\t\n"         // Clear PRIMASK
+        "msr   basepri, r5\t\n"         // Clear BASEPRI
+        "msr   faultmask, r5\t\n"       // Clear FAULTMASK
+
         "ldr   r0, [%0]\t\n"            // Get App initial MSP for bootloader.
         "msr   msp, r0\t\n"             // Set the main stack pointer to the applications MSP.
         "ldr   r0, [%0, #0x04]\t\n"     // Load Reset handler into R0.
@@ -108,7 +120,13 @@ static inline void bootloader_util_reset(uint32_t start_addr)
 #elif defined ( __ICCARM__ )
 static inline void bootloader_util_reset(uint32_t start_addr)
 {
-    asm("ldr   r5, [%0]\n"                    // Get App initial MSP for bootloader.
+    asm("movs  r5, #0x00\n"                   // R5 = 0
+        "msr   control, r5\n"                 // Clear CONTROL
+        "msr   primask, r5\n"                 // Clear PRIMASK
+        "msr   basepri, r5\n"                 // Clear BASEPRI
+        "msr   faultmask, r5\n"               // Clear FAULTMASK
+
+        "ldr   r5, [%0]\n"                    // Get App initial MSP for bootloader.
         "msr   msp, r5\n"                     // Set the main stack pointer to the applications MSP.
         "ldr   r0, [%0, #0x04]\n"             // Load Reset handler into R0.
 

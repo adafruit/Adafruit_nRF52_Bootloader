@@ -28,27 +28,26 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER        2
-#define LED_PRIMARY_PIN    17 // Red
-#define LED_SECONDARY_PIN  19 // Blue
-#define LED_STATE_ON       1
+#define LEDS_NUMBER       2
+#define LED_PRIMARY_PIN   17 // Red
+#define LED_SECONDARY_PIN 19 // Blue
+#define LED_STATE_ON      1
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     2
-#define BUTTON_1           20
-#define BUTTON_2           22
-#define BUTTON_PULL        NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU     20
+#define BUTTON_DFU_OTA 22
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART (only used by nRF52832)
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      8
-#define TX_PIN_NUMBER      6
-#define CTS_PIN_NUMBER     0
-#define RTS_PIN_NUMBER     0
-#define HWFC               false
+#define RX_PIN_NUMBER  8
+#define TX_PIN_NUMBER  6
+#define CTS_PIN_NUMBER 0
+#define RTS_PIN_NUMBER 0
+#define HWFC           false
 
 //--------------------------------------------------------------------+
 // BLE OTA

@@ -28,31 +28,31 @@
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
-#define LEDS_NUMBER        2
-#define LED_PRIMARY_PIN    31 // Red  - named "Data"
-#define LED_SECONDARY_PIN  30 // Blue - named "Link" (also a red one on the Test Board)
-#define LED_STATE_ON       0
+#define LEDS_NUMBER       2
+#define LED_PRIMARY_PIN   31 // Red  - named "Data"
+#define LED_SECONDARY_PIN 30 // Blue - named "Link" (also a red one on the Test Board)
+#define LED_STATE_ON      0
 
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER     2
-#define BUTTON_1           29 // DISC Button on E104-BT5032A-TB Test Board
-                              // BUTTON_1 is DFU.  The module does not have reset circuitry.
-                              // The Test Board from Ebyte (E104-BT5032A-TB) also does not have reset circuitry
-                              // To be able to upload using the Arduino IDE, (To enter DFU mode)
-                              // Press "DISC", press and release "RST", then release "DISC"
-#define BUTTON_2           28 // No button - WKP pin
-#define BUTTON_PULL        NRF_GPIO_PIN_PULLUP
+#define BUTTON_DFU                                                     \
+  29                      // DISC Button on E104-BT5032A-TB Test Board
+                          // BUTTON_DFU is DFU.  The module does not have reset circuitry.
+                          // The Test Board from Ebyte (E104-BT5032A-TB) also does not have reset circuitry
+                          // To be able to upload using the Arduino IDE, (To enter DFU mode)
+                          // Press "DISC", press and release "RST", then release "DISC"
+#define BUTTON_DFU_OTA 28 // No button - WKP pin
+#define BUTTON_PULL    NRF_GPIO_PIN_PULLUP
 
 /*------------------------------------------------------------------*/
 /* UART (only used by nRF52832)
  *------------------------------------------------------------------*/
-#define RX_PIN_NUMBER      14
-#define TX_PIN_NUMBER      18
-#define CTS_PIN_NUMBER     20
-#define RTS_PIN_NUMBER     19
-#define HWFC               false  // leaving it false to make GPIO available
+#define RX_PIN_NUMBER  14
+#define TX_PIN_NUMBER  18
+#define CTS_PIN_NUMBER 20
+#define RTS_PIN_NUMBER 19
+#define HWFC           false // leaving it false to make GPIO available
 
 //--------------------------------------------------------------------+
 // BLE OTA
