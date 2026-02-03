@@ -169,7 +169,7 @@ static inline void bootloader_util_reset(uint32_t start_addr)
 
 // protect flash region from write access
 static uint32_t bootloader_util_flash_protect(uint32_t address, uint32_t size) {
-  if ((size & (CODE_PAGE_SIZE - 1)) || (address > BOOTLOADER_SETTINGS_ADDRESS)) {
+  if ((size & (CODE_PAGE_SIZE - 1)) || (address & (CODE_PAGE_SIZE - 1)) || (address > BOOTLOADER_SETTINGS_ADDRESS)) {
     return NRF_ERROR_INVALID_PARAM;
   }
 
