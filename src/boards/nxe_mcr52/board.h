@@ -25,14 +25,12 @@
 #ifndef _NXE_MCR52
 #define _NXE_MCR52
 
-#define _PINNUM(port, pin)    ((port)*32 + (pin))
-
 /*------------------------------------------------------------------*/
 /* LED
  *------------------------------------------------------------------*/
 // The board has 3 leds, but changing the number here causes OTA issues.
 #define LEDS_NUMBER           1
-#define LED_PRIMARY_PIN       _PINNUM(0, 7)
+#define LED_PRIMARY_PIN       PINNUM(0, 7)
 #define LED_STATE_ON          0
 
 #define NEOPIXELS_NUMBER      0
@@ -40,10 +38,9 @@
 /*------------------------------------------------------------------*/
 /* BUTTON
  *------------------------------------------------------------------*/
-#define BUTTONS_NUMBER        2
-#define BUTTON_1              _PINNUM(0, 18)
+#define BUTTON_DFU PINNUM(0, 18)
 // Button 2 is defined as D1 from expansion board.
-#define BUTTON_2              _PINNUM(0, 13)
+#define BUTTON_DFU_OTA PINNUM(0, 13)
 #define BUTTON_PULL           NRF_GPIO_PIN_PULLUP
 
 //--------------------------------------------------------------------+
