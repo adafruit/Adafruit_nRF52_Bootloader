@@ -11,9 +11,12 @@
  */
 
 #include "bootloader_util.h"
-#include <stdint.h>
-#include <string.h>
+#include "dfu_types.h"
+#include "nrf_peripherals.h"
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
 
 /**
  * @brief Function for aborting current application/bootloader jump to to other app/bootloader.
@@ -164,8 +167,76 @@ static inline void bootloader_util_reset(uint32_t start_addr)
 #error Compiler not supported.
 #endif
 
+// protect flash region from write access
+static uint32_t bootloader_util_flash_protect(uint32_t address, uint32_t size) {
+  if ((size & (CODE_PAGE_SIZE - 1)) || (address & (CODE_PAGE_SIZE - 1)) || (address > BOOTLOADER_SETTINGS_ADDRESS)) {
+    return NRF_ERROR_INVALID_PARAM;
+  }
 
-void bootloader_util_app_start(uint32_t start_addr)
-{
-    bootloader_util_reset(start_addr);
+#if defined(ACL_PRESENT)
+  // Protect using ACL.
+  static uint32_t acl_instance = 0;
+
+  volatile ACL_ACL_Type *p_acl;
+  const uint32_t         mask = (ACL_ACL_PERM_WRITE_Disable << ACL_ACL_PERM_WRITE_Pos);
+
+  do {
+    if (acl_instance >= ACL_REGIONS_COUNT) {
+      return NRF_ERROR_NO_MEM;
+    }
+
+    p_acl       = &NRF_ACL->ACL[acl_instance];
+    p_acl->ADDR = address;
+    p_acl->SIZE = size;
+    p_acl->PERM = mask;
+
+    acl_instance++;
+
+  } while (p_acl->ADDR != address || p_acl->SIZE != size ||
+           p_acl->PERM != mask); // Check whether the acl_instance has been used before.
+
+#elif defined(BPROT_PRESENT)
+  // Protect using BPROT. BPROT does not support read protection.
+  uint32_t pagenum_start = address / CODE_PAGE_SIZE;
+  uint32_t pagenum_end   = pagenum_start + ((size - 1) / CODE_PAGE_SIZE);
+
+  for (uint32_t i = pagenum_start; i <= pagenum_end; i++) {
+    uint32_t config_index = i / 32;
+    uint32_t mask         = (1 << (i - config_index * 32));
+
+    switch (config_index) {
+      case 0:
+        NRF_BPROT->CONFIG0 = mask;
+        break;
+      case 1:
+        NRF_BPROT->CONFIG1 = mask;
+        break;
+  #if BPROT_REGIONS_NUM > 64
+      case 2:
+        NRF_BPROT->CONFIG2 = mask;
+        break;
+      case 3:
+        NRF_BPROT->CONFIG3 = mask;
+        break;
+  #endif
+    }
+  }
+
+#endif
+
+  return NRF_SUCCESS;
+}
+
+void bootloader_util_app_start(uint32_t start_addr) {
+  // Protect MBR against user writes
+  bootloader_util_flash_protect(0, MBR_SIZE);
+
+  // Size of the bootloader flash area to protect (Bootloader + MBR params + Bootloader settings)
+  const uint32_t area_size = BOOTLOADER_SETTINGS_ADDRESS + CODE_PAGE_SIZE - BOOTLOADER_REGION_START;
+
+  // Protect bootloader code and params pages against user writes
+  bootloader_util_flash_protect(BOOTLOADER_REGION_START, area_size);
+
+  // Jump to user application
+  bootloader_util_reset(start_addr);
 }
