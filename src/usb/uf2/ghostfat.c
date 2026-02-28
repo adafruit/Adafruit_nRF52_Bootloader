@@ -413,6 +413,12 @@ int write_block (uint32_t block_no, uint8_t *data, WriteState *state)
 
   if ( !is_uf2_block(bl) ) return -1;
 
+  if (bl->blockNo == 0) {
+    state->numBlocks = bl->numBlocks;
+    state->numWritten = 0;
+    memset(state->writtenMask, 0, sizeof(state->writtenMask));
+  }
+
   switch ( bl->familyID )
   {
 
