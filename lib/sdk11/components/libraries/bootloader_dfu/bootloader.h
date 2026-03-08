@@ -74,6 +74,13 @@ void bootloader_settings_get(bootloader_settings_t * const p_settings);
  */
 void bootloader_dfu_update_process(dfu_update_status_t update_status);
 
+/**@brief Mark that startup DFU has received valid update activity.
+ *
+ * @details This suppresses the startup timeout or USB unplug fallback that is only
+ *          meant for the "entered bootloader, but never started an update" case.
+ */
+void bootloader_dfu_activity_mark(void);
+
 /**@brief Function getting state of SoftDevice update in progress.
  *        After a successfull SoftDevice transfer the system restarts in orderto disable SoftDevice
  *        and complete the update.
