@@ -58,7 +58,7 @@
 
 //------------- UF2 -------------//
 #define UF2_PRODUCT_NAME "Seeed XIAO nRF52840"
-#define UF2_VOLUME_LABEL "XIAO-BOOT"
+#define UF2_VOLUME_LABEL "PADEL-ON"
 #define UF2_BOARD_ID     "nRF52840-SeeedXiao-v1"
 #define UF2_INDEX_URL    "https://www.seeedstudio.com/"
 
