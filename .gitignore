@@ -56,6 +56,7 @@ dkms.conf
 
 segger/Output
 _build/
+cmake-build-*/
 bin/
 *.emSession
 *.jlink
@@ -68,4 +69,3 @@ Makefile.user
 
 # Exclude all SoftDevice S340 files
 lib/softdevice/s340*
-
