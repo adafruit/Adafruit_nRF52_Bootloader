@@ -1,12 +1,17 @@
 name: Build
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
-  repository_dispatch:
+    branches: [ master ]
   release:
     types:
       - created
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   set-matrix:
