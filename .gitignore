@@ -69,3 +69,6 @@ Makefile.user
 
 # Exclude all SoftDevice S340 files
 lib/softdevice/s340*
+
+cmake-build*
+docs/
