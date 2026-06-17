@@ -60,6 +60,6 @@
 #define UF2_PRODUCT_NAME  "mona60"
 #define UF2_VOLUME_LABEL  "MONA60"
 #define UF2_BOARD_ID      "nRF52840-mona60"
-#define UF2_INDEX_URL     "https://mona.keyboards.com"
+#define UF2_INDEX_URL     "https://www.github.com/playingboy/mona60"
 
 #endif // _MONA60_H
