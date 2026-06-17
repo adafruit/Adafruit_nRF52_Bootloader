@@ -74,6 +74,20 @@ void bootloader_settings_get(bootloader_settings_t * const p_settings);
  */
 void bootloader_dfu_update_process(dfu_update_status_t update_status);
 
+/**@brief Mark that startup DFU has received valid update activity.
+ *
+ * @details This suppresses the startup timeout or USB unplug fallback that is only
+ *          meant for the "entered bootloader, but never started an update" case.
+ */
+void bootloader_dfu_activity_mark(void);
+
+/**@brief Mark that the USB DFU session was enumerated by a host.
+ *
+ * @details Called from tud_mount_cb(). Enables the USB-unplug exit path in
+ *          wait_for_events(), which exits startup DFU once VBUS is removed.
+ */
+void bootloader_mark_usb_mounted(void);
+
 /**@brief Function getting state of SoftDevice update in progress.
  *        After a successfull SoftDevice transfer the system restarts in orderto disable SoftDevice
  *        and complete the update.

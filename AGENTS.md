@@ -87,6 +87,10 @@ Each board lives in `src/boards/{board_name}/` with:
 - `DEFAULT_TO_OTA_DFU` — Default to BLE OTA instead of serial DFU
 - `DEBUG` — Enable RTT debugging, larger bootloader region
 
+## PR Review Checklist
+
+- **VID/PID assignment**: When a PR adds or modifies a board, verify `USB_DESC_VID`/`USB_DESC_UF2_PID` in `board.h`. New boards should use unique values. The Adafruit VID `0x239A` is reserved for Adafruit-allocated boards; third-party boards must use their own VID. Some legacy boards intentionally share a VID/PID with a reference board (see `// Shared VID/PID with ...` comments) — these are pending cleanup, not a template for new boards.
+
 ## CI
 
 GitHub Actions (`.github/workflows/githubci.yml`) builds all boards in parallel using a matrix generated from `src/boards/` directory names. On release, artifacts (zip, hex, uf2) are uploaded as release assets.

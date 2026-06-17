@@ -12,6 +12,7 @@
 
 #include "dfu_transport.h"
 #include <stddef.h>
+#include "bootloader.h"
 #include "dfu.h"
 #include <dfu_types.h>
 #include "app_error.h"
@@ -197,9 +198,8 @@ static void process_dfu_packet(void * p_event_data, uint16_t event_size)
     uint32_t              index;
     dfu_update_packet_t * packet;
 
-    // Adafruit modification for startup dfu
-    extern bool dfu_startup_packet_received;
-    dfu_startup_packet_received = true;
+    // Mark that startup DFU has transitioned into a real update flow.
+    bootloader_dfu_activity_mark();
 
     while (false == DATA_QUEUE_EMPTY())
     {

@@ -145,9 +145,19 @@ int32_t tud_msc_write10_cb (uint8_t lun, uint32_t lba, uint32_t offset, uint8_t*
   uint32_t count = 0;
   while ( count < bufsize )
   {
+    int written;
+
     // Consider non-uf2 block write as successful
     // only break if write_block is busy with flashing (return 0)
-    if ( 0 == write_block(lba, buffer, &_wr_state) ) break;
+    written = write_block(lba, buffer, &_wr_state);
+    if ( written > 0 )
+    {
+      bootloader_dfu_activity_mark();
+    }
+    else if ( written == 0 )
+    {
+      break;
+    }
 
     lba++;
     buffer += 512;
