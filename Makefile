@@ -92,7 +92,7 @@ RM = rm -rf
 CP = cp
 
 # Flasher utility options
-NRFUTIL = adafruit-nrfutil
+NRFUTIL ?= adafruit-nrfutil
 NRFJPROG = nrfjprog
 FLASHER ?= nrfjprog
 PYOCD ?= pyocd
@@ -382,7 +382,9 @@ endif
 #   1.2.3
 #   1.2.3-147-gd71abcd
 # If the version string does not match MAJOR.MINOR.PATCH, defaults to 0.0.0.
-_VER3 := $(shell echo "$(GIT_VERSION)" | sed -E 's/^v?([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 \2 \3/; t; s/.*/0 0 0/')
+_VER3 := $(shell printf '%s\n' "$(GIT_VERSION)" | sed -n \
+	's/^v\{0,1\}\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2 \3/p')
+_VER3 := $(if $(_VER3),$(_VER3),0 0 0)
 
 # Split extracted version into individual numeric components
 _VER_MAJ := $(word 1,$(_VER3))
