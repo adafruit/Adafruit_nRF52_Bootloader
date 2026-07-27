@@ -18,6 +18,20 @@ PYTHON = python
 # local customization
 -include Makefile.user
 
+# Select the board before loading board-specific configuration.
+BOARD_LIST := $(sort $(notdir $(patsubst %/,%,$(dir $(wildcard src/boards/*/board.mk)))))
+
+ifeq ($(BOARD),)
+  $(info You must provide a BOARD parameter with 'BOARD=')
+  $(info Supported boards are:)
+  $(foreach b,$(BOARD_LIST),$(info - $(b)))
+  $(error BOARD not defined)
+else ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
+  $(info Unknown board '$(BOARD)'. Supported boards are:)
+  $(foreach b,$(BOARD_LIST),$(info - $(b)))
+  $(error Invalid BOARD specified)
+endif
+
 # Board specific
 -include src/boards/$(BOARD)/board.mk
 
