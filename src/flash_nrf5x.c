@@ -33,6 +33,20 @@
 static uint32_t _fl_addr = FLASH_CACHE_INVALID_ADDR;
 static uint8_t _fl_buf[CODE_PAGE_SIZE] __attribute__((aligned(4)));
 
+static inline void flash_wdt_feed(void)
+{
+    if (NRF_WDT->RUNSTATUS & WDT_RUNSTATUS_RUNSTATUS_Running)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            if (NRF_WDT->RREN & (1UL << i))
+            {
+                NRF_WDT->RR[i] = WDT_RR_RR_Reload;
+            }
+        }
+    }
+}
+
 void flash_nrf5x_erase (uint32_t dst, uint32_t len)
 {
     uint32_t page_addr = dst & ~(CODE_PAGE_SIZE - 1);
@@ -41,6 +55,7 @@ void flash_nrf5x_erase (uint32_t dst, uint32_t len)
     {
         uint32_t const addr = page_addr + i * CODE_PAGE_SIZE;
         PRINTF("Erase 0x%08lX\r\n", addr);
+        flash_wdt_feed();
         nrfx_nvmc_page_erase(addr);
     }
 }
@@ -62,10 +77,12 @@ void flash_nrf5x_flush (bool need_erase)
         if ( need_erase )
         {
             PRINTF("Erase and ");
+            flash_wdt_feed();
             nrfx_nvmc_page_erase(_fl_addr);
         }
 
         PRINTF("Write 0x%08lX\r\n", _fl_addr);
+        flash_wdt_feed();
         nrfx_nvmc_words_write(_fl_addr, (uint32_t *) _fl_buf, CODE_PAGE_SIZE / 4);
     }
 
