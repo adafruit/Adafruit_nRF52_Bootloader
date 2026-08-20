@@ -13,7 +13,7 @@
 # - DEFAULT_TO_OTA_DFU : if entering DFU, by default enter OTA DFU instead of Serial DFU
 #------------------------------------------------------------------------------
 
-PYTHON = python
+PYTHON ?= python3
 
 # local customization
 -include Makefile.user
@@ -566,7 +566,7 @@ flash-mbr:
 # flash using uf2
 flash-uf2: $(BUILD)/update-$(OUT_NAME)_nosd.uf2
 	@echo Flashing: $(notdir $<)
-	python lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) --deploy $<
+	$(PYTHON) lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) --deploy $<
 
 # dfu with adafruit-nrfutil using CDC interface
 dfu-flash: flash-dfu

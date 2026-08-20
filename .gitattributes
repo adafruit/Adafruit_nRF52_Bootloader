@@ -1,0 +1,20 @@
+# Auto-detect text files: normalize to LF in Git, use OS-native line endings in working tree
+* text=auto
+
+# Shell scripts must always retain LF even on Windows
+*.sh text eol=lf
+
+# Explicitly declare binary files
+*.hex binary
+*.bin binary
+*.zip binary
+*.uf2 binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.axf binary
+*.FLM binary
+*.chm binary
+*.vsd binary
+*.exe binary

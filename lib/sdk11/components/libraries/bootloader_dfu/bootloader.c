@@ -185,23 +185,32 @@ bool bootloader_app_is_valid(void)
     return false;
   }
 
+  uint32_t const ram_start = 0x20000000UL;
+  uint32_t const ram_size = NRF_FICR->INFO.RAM ? (NRF_FICR->INFO.RAM << 10u) : (64u * 1024u);
+  uint32_t const ram_end = ram_start + ram_size;
+  bool const sp_valid = (sp_addr >= ram_start) && (sp_addr <= ram_end) && ((sp_addr & 3U) == 0);
+  bool const reset_in_app = (reset_addr & 1U) &&
+    (reset_addr >= app_addr) &&
+    (reset_addr < BOOTLOADER_REGION_START);
+  bool const vector_valid = sp_valid && reset_in_app;
+
   bootloader_settings_t const * p_bootloader_settings;
   bootloader_util_settings_get(&p_bootloader_settings);
 
   // Primary path: a prior DFU flagged bank 0 as valid.
   if (p_bootloader_settings->bank_0 == BANK_VALID_APP)
   {
-    uint16_t image_crc = 0;
-
-    // A stored crc value of 0 indicates that CRC checking is not used.
+    // A stored crc value of 0 indicates that CRC checking is not used,
+    // so verify the Cortex-M vector table.
     if ( p_bootloader_settings->bank_0_crc != 0 )
     {
-      image_crc = crc16_compute((uint8_t*) app_addr,
-                                p_bootloader_settings->bank_0_size,
-                                NULL);
+      uint16_t const image_crc = crc16_compute((uint8_t*) app_addr,
+                                               p_bootloader_settings->bank_0_size,
+                                               NULL);
+      return (image_crc == p_bootloader_settings->bank_0_crc);
     }
 
-    return (image_crc == p_bootloader_settings->bank_0_crc);
+    return vector_valid;
   }
 
   // Fallback for debugger-flashed apps: settings page is erased (bank_0 = 0xFFFF)
@@ -211,13 +220,7 @@ bool bootloader_app_is_valid(void)
   // inclusive because the empty-descending stack initializes one past RAM end.
   if (p_bootloader_settings->bank_0 == 0xFFFF)
   {
-    uint32_t const ram_start = 0x20000000UL;
-    uint32_t const ram_end = ram_start + (NRF_FICR->INFO.RAM << 10u);
-    bool const sp_valid = (sp_addr >= ram_start) && (sp_addr <= ram_end) && ((sp_addr & 3U) == 0);
-    bool const reset_in_app = (reset_addr & 1U) &&
-      (reset_addr >= app_addr) &&
-      (reset_addr < BOOTLOADER_REGION_START);
-    return sp_valid && reset_in_app;
+    return vector_valid;
   }
 
   return false;
