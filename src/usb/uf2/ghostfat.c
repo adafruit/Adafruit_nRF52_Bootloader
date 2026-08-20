@@ -140,15 +140,97 @@ const char indexFile[] =
     "</body>"
     "</html>\n";
 
+#include "crash_handler.h"
+
+char crashFile[512] = "";
+
+static void append_str(char **p, const char *s) {
+  while (*s) {
+    *(*p)++ = *s++;
+  }
+}
+
+static void append_hex(char **p, uint32_t val) {
+  static const char hex[] = "0123456789ABCDEF";
+  *(*p)++ = '0';
+  *(*p)++ = 'x';
+  for (int i = 28; i >= 0; i -= 4) {
+    *(*p)++ = hex[(val >> i) & 0xF];
+  }
+}
+
+static void append_dec(char **p, uint32_t val) {
+  if (val == 0) {
+    *(*p)++ = '0';
+    return;
+  }
+  char buf[10];
+  int idx = 0;
+  while (val > 0) {
+    buf[idx++] = '0' + (val % 10);
+    val /= 10;
+  }
+  while (idx > 0) {
+    *(*p)++ = buf[--idx];
+  }
+}
+
+static void update_crash_file(void) {
+  char *p = crashFile;
+  const struct crash_dump_data_v1 *crash = CRASH_DUMP_GLOBAL;
+  if (crash_handler_is_valid(crash)) {
+    append_str(&p, "=================================================\r\n");
+    append_str(&p, " Application Fatal Crash Dump Report (v");
+    append_dec(&p, crash->version);
+    append_str(&p, ")\r\n=================================================\r\n Version: ");
+    append_dec(&p, crash->version);
+    append_str(&p, "\r\n Reason:  ");
+    append_hex(&p, crash->reason);
+    append_str(&p, "\r\n PC:      ");
+    append_hex(&p, crash->pc);
+    append_str(&p, "\r\n LR:      ");
+    append_hex(&p, crash->lr);
+    append_str(&p, "\r\n SP:      ");
+    append_hex(&p, crash->sp);
+    append_str(&p, "\r\n xPSR:    ");
+    append_hex(&p, crash->xpsr);
+    append_str(&p, "\r\n CFSR:    ");
+    append_hex(&p, crash->cfsr);
+    append_str(&p, "\r\n HFSR:    ");
+    append_hex(&p, crash->hfsr);
+    append_str(&p, "\r\n Stack (Top 8 Words):\r\n   ");
+    for (int i = 0; i < 8; i++) {
+      append_hex(&p, crash->stack_words[i]);
+      if (i == 3) {
+        append_str(&p, "\r\n   ");
+      } else if (i < 7) {
+        append_str(&p, " ");
+      }
+    }
+    append_str(&p, "\r\n=================================================\r\n");
+  } else {
+    append_str(&p, "=================================================\r\n");
+    append_str(&p, " UF2 Bootloader Diagnostic Status\r\n");
+    append_str(&p, "=================================================\r\n");
+    append_str(&p, " No fatal crash recorded in RAM.\r\n");
+    append_str(&p, " System Reset Reason (RESETREAS): ");
+    append_hex(&p, NRF_POWER->RESETREAS);
+    append_str(&p, "\r\n=================================================\r\n");
+  }
+  *p = '\0';
+}
+
 static struct TextFile const info[] = {
     {.name = "INFO_UF2TXT", .content = infoUf2File},
     {.name = "INDEX   HTM", .content = indexFile},
+    {.name = "CRASH   TXT", .content = crashFile},
 
     // current.uf2 must be the last element and its content must be NULL
     {.name = "CURRENT UF2", .content = NULL},
 };
 STATIC_ASSERT(ARRAY_SIZE(infoUf2File) < BPB_SECTOR_SIZE); // GhostFAT requires files to fit in one sector
 STATIC_ASSERT(ARRAY_SIZE(indexFile)   < BPB_SECTOR_SIZE); // GhostFAT requires files to fit in one sector
+STATIC_ASSERT(ARRAY_SIZE(crashFile)   <= BPB_SECTOR_SIZE);
 
 #define NUM_FILES          (ARRAY_SIZE(info))
 #define NUM_DIRENTRIES     (NUM_FILES + 1) // Code adds volume label as first root directory entry
@@ -252,6 +334,7 @@ static inline bool in_uicr_space(uint32_t addr)
 
 void uf2_init(void)
 {
+  update_crash_file();
   strcat(infoUf2File, "SoftDevice: ");
 
   if ( is_sd_existed() )

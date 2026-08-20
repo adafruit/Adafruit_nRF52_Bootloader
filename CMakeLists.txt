@@ -112,6 +112,7 @@ target_include_directories(bootloader PUBLIC
   src/boards/${BOARD}
   src/cmsis/include
   src/usb
+  user_app
   ${TINYUSB_DIR}
   # nrfx
   ${NRFX_DIR}
