@@ -46,6 +46,7 @@
 #include "sdk_common.h"
 #include "bootloader.h"
 #include "bootloader_util.h"
+#include "crash_handler.h"
 
 #include "nrf.h"
 #include "nrf_soc.h"
@@ -254,8 +255,13 @@ static void check_dfu_mode(void) {
 
   bool const reason_reset_pin = (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk) ? true : false;
 
-  // start either serial, uf2 or ble
-  bool dfu_start = _ota_dfu || serial_only_dfu || uf2_dfu ||
+  /* Halt autoboot ONLY if application explicitly sets crash magic */
+  bool const crash_magic_gpregret = (gpregret == DFU_MAGIC_UF2_RESET);
+  bool const crash_magic_ram      = crash_handler_is_valid(CRASH_DUMP_GLOBAL);
+  bool const crash_halt           = crash_magic_gpregret || crash_magic_ram;
+
+  // start either serial, uf2 or ble, or if explicit crash magic was set by application
+  bool dfu_start = _ota_dfu || serial_only_dfu || crash_halt ||
                    (((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin);
 
   // Clear GPREGRET if it is our values

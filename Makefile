@@ -261,6 +261,7 @@ IPATH += \
   src/boards/$(BOARD) \
   src/cmsis/include \
   src/usb \
+  user_app \
   $(TUSB_PATH)
 
 ifeq ($(SIGNED_FW), 1)

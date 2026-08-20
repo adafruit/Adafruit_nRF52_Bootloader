@@ -33,6 +33,7 @@ out the [complete list of all boards here](/supported_boards.md).
 - Self-upgradable via Serial and OTA
 - DFU using UF2 (https://github.com/Microsoft/uf2) (application only)
 - Auto-enter DFU briefly on startup for DTR auto-reset trick (832 only)
+- Application Crash Interception & virtual `CRASH.TXT` generation (halts bootloops on fatal exceptions, see [user_app/](user_app/))
 - Supports dual bank firmware updates (disabled by default)
 - Supports signed firmware updates (disabled by default)
 
@@ -97,6 +98,18 @@ To create a UF2 image for bootloader from a .hex file using separated family of 
 ```
 uf2conv.py bootloader.hex -c -f 0xd663823c
 ```
+
+### Application Crash Interception & Post-Mortem Diagnostics
+
+If the user application crashes (e.g. `HardFault`, `BusFault`, `MemManage`, `UsageFault`, `Kernel Panic`, or `Watchdog Timeout`), the application can capture register state into retained RAM and reboot with `GPREGRET = 0x57`.
+
+The bootloader will:
+1. Halt autoboot to break unrecoverable reboot loops.
+2. Mount the USB Mass Storage volume in DFU mode.
+3. Expose a virtual **`CRASH.TXT`** file containing the exception reason, CPU registers (`PC`, `LR`, `SP`, `xPSR`, `CFSR`, `HFSR`, `MMFAR`, `BFAR`), and the top 64 words of the stack.
+4. Allow automated source line resolution using the included [`user_app/decode_crash.py`](user_app/decode_crash.py) tool and application `.elf` file.
+
+See [`user_app/README.md`](user_app/README.md) and [`user_app/crash_handler.h`](user_app/crash_handler.h) for integration details (supports Zephyr RTOS, FreeRTOS, and bare-metal ARM).
 
 ## Burn & Upgrade with pre-built binaries
 
