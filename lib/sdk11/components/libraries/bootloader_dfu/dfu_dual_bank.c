@@ -11,6 +11,7 @@
  */
 
 #include <stddef.h>
+#include <string.h>
 #include "dfu.h"
 #include <dfu_types.h>
 #include "dfu_bank_internal.h"
@@ -317,6 +318,12 @@ static uint32_t dfu_activate_app(void)
         
         flash_nrf5x_write(DFU_BANK_0_REGION_START, (uint8_t *)DFU_BANK_1_REGION_START, m_start_packet.app_image_size, false);
         flash_nrf5x_flush(false);
+
+        if (memcmp((const void *)DFU_BANK_0_REGION_START, (const void *)DFU_BANK_1_REGION_START, m_start_packet.app_image_size) != 0)
+        {
+            return NRF_ERROR_INVALID_DATA;
+        }
+
         pstorage_callback_handler(&m_storage_handle_app, PSTORAGE_STORE_OP_CODE, NRF_SUCCESS, (uint8_t *) DFU_BANK_1_REGION_START, m_start_packet.app_image_size);
     }
     
