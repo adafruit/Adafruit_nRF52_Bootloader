@@ -55,43 +55,7 @@ add_executable(bootloader
   src/main.c
   src/screen.c
   src/images.c
-  src/boards/boards.c
-  # nrfx
-  ${NRFX_DIR}/drivers/src/nrfx_power.c
-  ${NRFX_DIR}/drivers/src/nrfx_nvmc.c
-  ${NRFX_DIR}/mdk/system_${MCU_VARIANT}.c
-  # sdk 11
-  ${SDK11_DIR}/libraries/bootloader_dfu/bootloader.c
-  ${SDK11_DIR}/libraries/bootloader_dfu/bootloader_settings.c
-  ${SDK11_DIR}/libraries/bootloader_dfu/bootloader_util.c
-  ${SDK11_DIR}/libraries/bootloader_dfu/dfu_transport_serial.c
-  ${SDK11_DIR}/libraries/bootloader_dfu/dfu_transport_ble.c
-  ${SDK11_DIR}/ble/ble_services/ble_dfu/ble_dfu.c
-  ${SDK11_DIR}/ble/ble_services/ble_dis/ble_dis.c
-  ${SDK11_DIR}/drivers_nrf/pstorage/pstorage_raw.c
-  # latest sdk
-  ${SDK_DIR}/libraries/timer/app_timer.c
-  ${SDK_DIR}/libraries/scheduler/app_scheduler.c
-  ${SDK_DIR}/libraries/util/app_error.c
-  ${SDK_DIR}/libraries/util/app_util_platform.c
-  ${SDK_DIR}/libraries/crc16/crc16.c
-  ${SDK_DIR}/libraries/hci/hci_mem_pool.c
-  ${SDK_DIR}/libraries/hci/hci_slip.c
-  ${SDK_DIR}/libraries/hci/hci_transport.c
-  ${SDK_DIR}/libraries/util/nrf_assert.c
-  # startup
-  ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S
   )
-
-if (DUALBANK_FW)
-  target_sources(bootloader PUBLIC
-    ${SDK11_DIR}/libraries/bootloader_dfu/dfu_dual_bank.c
-  )
-else ()
-  target_sources(bootloader PUBLIC
-    ${SDK11_DIR}/libraries/bootloader_dfu/dfu_single_bank.c
-  )
-endif ()
 
 if (SIGNED_FW)
   target_sources(bootloader PUBLIC
@@ -105,6 +69,46 @@ if (SIGNED_FW)
     ${TCRYPT_DIR}/include
   )
 endif ()
+
+target_sources(bootloader PUBLIC
+  src/boards/boards.c
+  # nrfx
+  ${NRFX_DIR}/drivers/src/nrfx_power.c
+  ${NRFX_DIR}/drivers/src/nrfx_nvmc.c
+  ${NRFX_DIR}/mdk/system_${MCU_VARIANT}.c
+  # sdk 11
+  ${SDK11_DIR}/libraries/bootloader_dfu/bootloader.c
+  ${SDK11_DIR}/libraries/bootloader_dfu/bootloader_settings.c
+  ${SDK11_DIR}/libraries/bootloader_dfu/bootloader_util.c
+  ${SDK11_DIR}/libraries/bootloader_dfu/dfu_transport_serial.c
+  ${SDK11_DIR}/libraries/bootloader_dfu/dfu_transport_ble.c
+  )
+
+if (DUALBANK_FW)
+  target_sources(bootloader PUBLIC
+    ${SDK11_DIR}/libraries/bootloader_dfu/dfu_dual_bank.c
+  )
+else ()
+  target_sources(bootloader PUBLIC
+    ${SDK11_DIR}/libraries/bootloader_dfu/dfu_single_bank.c
+  )
+endif ()
+
+target_sources(bootloader PUBLIC
+  ${SDK11_DIR}/ble/ble_services/ble_dfu/ble_dfu.c
+  ${SDK11_DIR}/ble/ble_services/ble_dis/ble_dis.c
+  ${SDK11_DIR}/drivers_nrf/pstorage/pstorage_raw.c
+  # latest sdk
+  ${SDK_DIR}/libraries/timer/app_timer.c
+  ${SDK_DIR}/libraries/scheduler/app_scheduler.c
+  ${SDK_DIR}/libraries/util/app_error.c
+  ${SDK_DIR}/libraries/util/app_util_platform.c
+  ${SDK_DIR}/libraries/crc16/crc16.c
+  ${SDK_DIR}/libraries/hci/hci_mem_pool.c
+  ${SDK_DIR}/libraries/hci/hci_slip.c
+  ${SDK_DIR}/libraries/hci/hci_transport.c
+  ${SDK_DIR}/libraries/util/nrf_assert.c
+  )
 
 target_include_directories(bootloader PUBLIC
   src
@@ -135,8 +139,6 @@ target_include_directories(bootloader PUBLIC
   ${SDK_DIR}/libraries/hci
   ${SDK_DIR}/libraries/uart
   ${SDK_DIR}/drivers_nrf/delay
-  # Softdevice
-  ${SOFTDEVICE_DIR}/mbr/headers
   )
 
 # Debug linker file
@@ -146,12 +148,15 @@ else ()
   set(LD_FILE ${CMAKE_CURRENT_LIST_DIR}/linker/${MCU_VARIANT}.ld)
 endif ()
 
+# the linker script INCLUDEs nrf_common.ld from linker/, not nrfx's copy
 target_link_options(bootloader PUBLIC
   "LINKER:--script=${LD_FILE}"
-  -L${NRFX_DIR}/mdk
-  -nostartfiles
+  -L${CMAKE_CURRENT_LIST_DIR}/linker
+  "LINKER:-Map=$<TARGET_FILE:bootloader>.map"
+  "LINKER:-cref"
   --specs=nosys.specs --specs=nano.specs
   )
+target_link_libraries(bootloader PUBLIC -Wl,--start-group m c -Wl,--end-group)
 target_compile_options(bootloader PUBLIC
   -fno-builtin
   -fshort-enums
@@ -173,12 +178,25 @@ target_compile_options(bootloader PUBLIC
   # Suppress warning caused by SDK
   -Wno-unused-parameter -Wno-expansion-to-defined -Wno-array-bounds
   )
+
+# Nordic SoftDevice headers have inline asm with broken constraints: gcc-11's IPA-modref pass drops the
+# arguments of SVCALL() wrappers and breaks the bootloader (see Makefile)
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-fno-ipa-modref HAS_FNO_IPA_MODREF)
+if (HAS_FNO_IPA_MODREF)
+  target_compile_options(bootloader PUBLIC -fno-ipa-modref)
+endif ()
+
 target_compile_definitions(bootloader PUBLIC
+  __HEAP_SIZE=0
   SOFTDEVICE_PRESENT
   CONFIG_GPIO_AS_PINRESET
-  __START=main
-  __STARTUP_CLEAR_BSS
   )
+
+# board.cmake sets USE_NFCT when the board uses the NFC pins as NFC
+if (NOT USE_NFCT)
+  target_compile_definitions(bootloader PUBLIC CONFIG_NFCT_PINS_AS_GPIOS)
+endif ()
 
 if (SIGNED_FW)
   if (SIGNED_FW_QX STREQUAL "" OR SIGNED_FW_QY STREQUAL "")
@@ -222,10 +240,10 @@ else ()
   # USB transport
   target_sources(bootloader PUBLIC
     src/boards/${BOARD}/pinconfig.c
-    src/usb/msc_uf2.c
-    src/usb/usb.c
     src/usb/usb_desc.c
+    src/usb/msc_uf2.c
     src/usb/uf2/ghostfat.c
+    src/usb/usb.c
     # TinyUSB
     ${TINYUSB_DIR}/portable/nordic/nrf5x/dcd_nrf5x.c
     ${TINYUSB_DIR}/common/tusb_fifo.c
@@ -236,6 +254,9 @@ else ()
     ${TINYUSB_DIR}/tusb.c
     )
 endif ()
+
+# startup assembled last: make links it after the C objects
+target_sources(bootloader PUBLIC ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S)
 
 #----------------------------------------------------
 # MCU Variant differences
@@ -282,6 +303,7 @@ string(TOUPPER ${SD_NAME} SD_NAME_UPPER)
 target_compile_definitions(bootloader PUBLIC ${SD_NAME_UPPER})
 target_include_directories(bootloader PUBLIC
   ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_API/include
+  ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_API/include/nrf52
   )
 
 # debug build
@@ -307,13 +329,14 @@ endif ()
 # ANT_LICENSE_KEY handling
 #----------------------------------
 if (DEFINED ANT_LICENSE_KEY)
-  target_compile_definitions(bootloader PUBLIC ANT_LICENSE_KEY=${ANT_LICENSE_KEY})
+  target_compile_definitions(bootloader PUBLIC ANT_LICENSE_KEY="${ANT_LICENSE_KEY}")
 endif()
 
 #----------------------------------
 # Get UF2 version from git
 #----------------------------------
-execute_process(COMMAND git describe --dirty --always --tags OUTPUT_VARIABLE GIT_VERSION)
+execute_process(COMMAND git describe --dirty --always --tags OUTPUT_VARIABLE GIT_VERSION
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 string(STRIP ${GIT_VERSION} GIT_VERSION)
 
 # Extract semantic version numbers (MAJOR.MINOR.PATCH) from GIT_VERSION.
@@ -348,6 +371,24 @@ add_custom_command(TARGET bootloader POST_BUILD
   COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py --overlap=replace -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex $<TARGET_FILE_DIR:bootloader>/bootloader.hex ${MBR_HEX}
   COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} -c -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2 $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex
   VERBATIM)
+
+# Release artifacts, named as the Makefile names them
+set(OUT_NAME ${BOARD}_bootloader-${GIT_VERSION})
+set(MERGED_NAME ${OUT_NAME}_${SD_NAME}_${SD_VERSION})
+add_custom_command(TARGET bootloader POST_BUILD
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py -o $<TARGET_FILE_DIR:bootloader>/${MERGED_NAME}.hex $<TARGET_FILE_DIR:bootloader>/bootloader.hex ${SD_HEX}
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2 $<TARGET_FILE_DIR:bootloader>/update-${OUT_NAME}_nosd.uf2
+  VERBATIM)
+
+# DFU package (bootloader + SoftDevice) for adafruit-nrfutil over CDC/serial
+find_program(NRFUTIL adafruit-nrfutil)
+if (NRFUTIL)
+  add_custom_command(TARGET bootloader POST_BUILD
+    COMMAND ${NRFUTIL} dfu genpkg --dev-type 0x0052 --dev-revision ${DFU_DEV_REV} --bootloader $<TARGET_FILE_DIR:bootloader>/bootloader.hex --softdevice ${SD_HEX} $<TARGET_FILE_DIR:bootloader>/${MERGED_NAME}.zip
+    VERBATIM)
+else ()
+  message(WARNING "adafruit-nrfutil not found: ${MERGED_NAME}.zip is not built")
+endif ()
 
 #----------------------------------
 # Flashing target

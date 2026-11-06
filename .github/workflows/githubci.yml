@@ -51,12 +51,17 @@ jobs:
 
     - name: Install Tools
       run: |
-        pip3 install adafruit-nrfutil uritemplate requests intelhex setuptools
+        pip3 install adafruit-nrfutil uritemplate requests intelhex setuptools ninja
 
     - name: Build
+      env:
+        BUILD_DIR: cmake-build/cmake-build-${{ matrix.board }}
+        BIN_DIR: _bin/${{ matrix.board }}
       run: |
-        make BOARD=${{ matrix.board }} all
-        make BOARD=${{ matrix.board }} copy-artifact
+        cmake -S . -B $BUILD_DIR -G Ninja -DBOARD=${{ matrix.board }}
+        cmake --build $BUILD_DIR
+        mkdir -p $BIN_DIR
+        cp $BUILD_DIR/update-*_nosd.uf2 $BUILD_DIR/*_bootloader-*_s*.hex $BUILD_DIR/*_bootloader-*_s*.zip $BIN_DIR
 
     - uses: actions/upload-artifact@v4
       with:

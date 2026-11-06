@@ -19,9 +19,9 @@ include(${CMAKE_CURRENT_LIST_DIR}/../cpu/${CMAKE_SYSTEM_PROCESSOR}.cmake)
 list(APPEND TOOLCHAIN_COMMON_FLAGS
   -fdata-sections
   -ffunction-sections
-  -fsingle-precision-constant
   -fno-strict-aliasing
-  -g
+  -mabi=aapcs
+  -ggdb
   )
 
 set(TOOLCHAIN_EXE_LINKER_FLAGS

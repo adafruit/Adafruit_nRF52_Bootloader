@@ -1,1 +1,2 @@
 set(MCU_VARIANT nrf52840)
+set(USE_NFCT ON)
