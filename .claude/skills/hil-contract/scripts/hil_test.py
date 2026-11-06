@@ -343,10 +343,10 @@ class Tools:
     except BaseException as e:
       self.note(argv, getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None))
       raise
+    self.note(argv, r.cleanup, r.receipt)   # before anything else can fail
     with open(self.log, 'a') as fh:
       fh.write(f'$ {" ".join(argv)}\n{process().cmd_stdout_text(r.stdout)}{process().cmd_stdout_text(r.stderr or "")}'
                f'\n# exit {r.returncode}, cleanup {r.cleanup}\n')
-    self.note(argv, r.cleanup, r.receipt)
     return r
 
   def note(self, argv, cleanup, receipt):
@@ -670,13 +670,28 @@ def prove_hold(board, reason):
 
 
 def prove_cleanup_holder(board, pid):
-  """The board's lock record: a live cleanup holder `pid` (a failed run's, or a takeover's) of this board alone."""
+  """The board's lock record: a live cleanup holder `pid` (a failed run's, or a takeover's) of this board alone, every
+  receipt it was handed rechecking `done`, and no tool of a run left on the host."""
   helper = lock_helper()
   rec = helper.read_record(board['lock'])
   if not helper.is_cleanup_holder(rec) or rec.get('pid') != pid or not helper.holder_alive(rec) \
      or rec.get('locks') != [board['lock']] or not rec.get('token'):
     raise Refused(f'{board["lock"]} is not held by cleanup holder {pid} alone: {rec}')
+  open_receipts = [r for r in rec.get('receipts') or [] if process().recheck(r) != 'done']
+  if open_receipts:
+    raise Refused(f'cleanup holder {pid} names receipts not yet done: {open_receipts}')
+  if left := tools_left():
+    raise Refused(f'tools of an earlier run are still on the host: {left}')
   return rec
+
+
+def tools_left():
+  """Every JLinkExe, mcopy and hil_test.py child on the host (recovery's host-wide check)."""
+  found = []
+  for pattern in ('JLinkExe', 'mcopy', r'hil_test\.py (fat-read|flush)'):
+    out = subprocess.run(['pgrep', '-af', pattern], capture_output=True, text=True).stdout
+    found += [l for l in out.splitlines() if l.split(maxsplit=1)[0] != str(os.getpid())]
+  return found
 
 
 def probe_users(board):

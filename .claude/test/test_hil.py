@@ -254,6 +254,15 @@ class Probe(unittest.TestCase):
       p.regs()
     self.assertEqual(p.tools.receipts, [{'cmd': 'JLinkExe', 'cleanup': 'unknown', 'receipt': None}])
 
+  def test_a_receipt_is_kept_when_the_log_cannot_be_written(self):
+    tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
+    tools = ht.Tools(tmp, Path(tmp) / 'missing-dir' / 'hil.log')
+    pending = mock.Mock(returncode=0, stdout='', stderr='', cleanup='pending', receipt={'token': 'r'})
+    with mock.patch.object(ht.process(), 'run_tracked', return_value=pending), self.assertRaises(OSError):
+      tools.run(['JLinkExe'], timeout=1)
+    self.assertEqual(tools.receipts, [{'cmd': 'JLinkExe', 'cleanup': 'pending', 'receipt': {'token': 'r'}}])
+
   def test_regs_parses_pc_r0_ipsr(self):
     regs = ('PC = 00026040, CycleCnt = 00000000\nR0 = 0000002A, R1 = 00000000\n'
             'XPSR = 61000000: APSR = nZCvq, EPSR = 01000000, IPSR = 000 (NoException)\n')
@@ -391,10 +400,18 @@ class Cli(unittest.TestCase):
                          is_cleanup_holder=lambda r: isinstance(r, dict) and r.get('role') == 'cleanup-holder')
       with mock.patch.object(ht, 'lock_helper', return_value=helper), self.assertRaises(ht.Refused):
         ht.prove_cleanup_holder(board, 1)
-    rec = {'role': 'cleanup-holder', 'pid': 1, 'token': 't', 'locks': ['nrf52840dk']}
+    rec = {'role': 'cleanup-holder', 'pid': 1, 'token': 't', 'locks': ['nrf52840dk'], 'receipts': [{'token': 'r'}]}
     helper.read_record.return_value = rec
-    with mock.patch.object(ht, 'lock_helper', return_value=helper):
-      self.assertEqual(ht.prove_cleanup_holder(board, 1), rec)
+    proc = mock.Mock(recheck=mock.Mock(return_value='done'))
+    with mock.patch.object(ht, 'lock_helper', return_value=helper), mock.patch.object(ht, 'process', return_value=proc):
+      with mock.patch.object(ht, 'tools_left', return_value=[]):
+        self.assertEqual(ht.prove_cleanup_holder(board, 1), rec)
+      with mock.patch.object(ht, 'tools_left', return_value=['123 mcopy -i /dev/sde']), \
+           self.assertRaisesRegex(ht.Refused, 'still on the host'):
+        ht.prove_cleanup_holder(board, 1)
+      proc.recheck.return_value = 'pending'
+      with mock.patch.object(ht, 'tools_left', return_value=[]), self.assertRaisesRegex(ht.Refused, 'not yet done'):
+        ht.prove_cleanup_holder(board, 1)
 
 
 if __name__ == '__main__':
