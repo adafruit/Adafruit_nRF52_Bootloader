@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  profile: chill
+  high_level_summary: false
+  in_progress_fortune: false
+  auto_review:
+    auto_pause_after_reviewed_commits: 0
+  auto_approvals:
+    enabled: true
+
+  path_filters:
+    - "!lib/softdevice/**"
+    - "!lib/SEGGER_RTT/**"
+    - "!src/cmsis/**"
+    - "!supported_boards.md"
+
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Bootloader core for nRF52832/nRF52833/nRF52840. Flag anything that can
+        brick a device: erasing or writing the MBR, bootloader, SoftDevice or
+        UICR outside a validated update, a wrong application start address,
+        or jumping to the application without validating it. Code must build
+        for every MCU_SUB_VARIANT (nrf52, nrf52833, nrf52840); src/usb is not
+        built for nrf52.
+    - path: "src/usb/**"
+      instructions: |
+        USB CDC/MSC and UF2 drag-and-drop. In uf2/ghostfat.c, check the UF2
+        block checks (magic, flags, family ID, address range) before writing
+        flash.
+    - path: "lib/sdk11/**"
+      instructions: |
+        Nordic SDK code modified for this bootloader; bootloader_dfu holds the
+        DFU, settings and application-jump logic. Review it like local code,
+        with the same bricking concerns as src/, but do not ask to match
+        upstream SDK style.
+    - path: "src/boards/**"
+      instructions: |
+        Board definitions. A value repeated across a board's files (MCU
+        variant, USB VID/PID, flash/RAM size, UF2 family or board ID) must
+        match in each; USB fields apply only to USB-capable variants.
+    - path: "linker/**"
+      instructions: |
+        Linker scripts. Each MEMORY region must fit the target MCU, must not
+        overlap another, and must match its counterpart define, if any, in
+        lib/sdk11/.../dfu_types.h. Preserve the established NOINIT and
+        DBL_RESET addresses and the MBR parameter and bootloader settings
+        page locations.
