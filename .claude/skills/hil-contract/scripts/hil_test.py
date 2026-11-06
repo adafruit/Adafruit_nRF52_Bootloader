@@ -32,6 +32,7 @@ import agentrc  # noqa: E402
 import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
+PENDING_KIND = 'nrf52-bootloader'   # hil_lock.PendingSessions: <lock>.nrf52-bootloader-pending.json
 STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b')
 REENTRY = ('gpregret',)
 # nRF52 NVMC (PS v1.7 4.3.9) and POWER.GPREGRET (5.3.7.16); the same offsets on nRF52832/833
@@ -330,8 +331,8 @@ def private_dir(path):
 class Tools:
   """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
   a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder."""
-  def __init__(self, workdir, log):
-    self.dir, self.log, self.receipts = private_dir(Path(workdir) / 'ops'), log, []
+  def __init__(self, workdir, log, lock=None):
+    self.dir, self.log, self.lock, self.receipts = private_dir(Path(workdir) / 'ops'), log, lock, []
 
   def run(self, cmd, cwd=None, *, env=None, timeout):
     """hil_flash's runner contract: a CompletedProcess carrying `cleanup` and `receipt`."""
@@ -350,8 +351,17 @@ class Tools:
     return r
 
   def note(self, argv, cleanup, receipt):
-    if cleanup != 'done' or receipt is not None:
-      self.receipts.append({'cmd': argv[0], 'cleanup': cleanup, 'receipt': receipt})
+    """Keep a tool not proven ended; one with a receipt also goes into the board's pending mark at once, so every later
+    invocation, a recovery's included, refuses until it rechecks done (pending_clear)."""
+    if cleanup == 'done' and receipt is None:
+      return
+    entry = {'cmd': argv[0], 'cleanup': cleanup, 'receipt': receipt}
+    if receipt is not None and self.lock:
+      try:
+        lock_helper().PendingSessions(self.lock, PENDING_KIND).add([{'receipt': receipt, 'cmd': argv[0]}])
+      except Exception as e:   # the board stays held by its cleanup holder either way
+        entry['markError'] = f'{type(e).__name__}: {e}'
+    self.receipts.append(entry)
 
   def check(self, what):
     if self.receipts:
@@ -548,7 +558,7 @@ class Drive:
 class Battery:
   def __init__(self, board, f, workdir, log, fail_at=None):
     self.b, self.f, self.dir, self.fail_at = board, f, Path(workdir), fail_at
-    self.tools = Tools(workdir, log)
+    self.tools = Tools(workdir, log, board.get('lock'))
     self.probe, self.drive = Probe(board, workdir, self.tools), Drive(board, f, self.tools)
     self.steps, self.touched = [], False
 
@@ -662,6 +672,16 @@ def take_lock(board, run_dir, wait):
       time.sleep(min(LOCK_RETRY, max(0, end - time.monotonic())))
 
 
+def pending_clear(board):
+  """Refused while the board's pending mark lists a tool whose receipt does not recheck done; the mark is removed
+  once every one does."""
+  helper = lock_helper()
+  try:
+    helper.PendingSessions(board['lock'], PENDING_KIND).clear(lambda s: process().recheck(s['receipt']) == 'done')
+  except helper.PendingRefused as e:
+    raise Refused(f'a tool of an earlier invocation is not proven ended: {e}')
+
+
 def prove_hold(board, reason):
   helper = lock_helper()
   rec = helper.read_record(board['lock'])
@@ -751,8 +771,14 @@ def cmd_run(args, argv):
   bat = Battery(board, f, run_dir, log, args.fail_at)
   code, row['cleanup'] = 1, None
   try:
-    users = probe_users(board)
-    if users:
+    try:
+      pending_clear(board)
+      blocked, users = None, probe_users(board)
+    except Refused as e:
+      blocked, users = str(e), []
+    if blocked:
+      row.update(recoveryBlocker=True, detail=blocked)
+    elif users:
       row.update(probeUsers=users, detail='another JLinkExe uses the probe')
     else:
       row['ran'] = True
@@ -797,6 +823,7 @@ def cmd_manual(args, argv):
       holder = prove_cleanup_holder(board, args.recover_holder)
     _, rrow, copies = admit(args.build_record, args.board, args.roster, workdir)
     f = facts(args.board, rrow, copies, workdir)
+    pending_clear(board)
     if probe_users(board):
       raise Refused('another JLinkExe uses the probe')
   except Refused as e:

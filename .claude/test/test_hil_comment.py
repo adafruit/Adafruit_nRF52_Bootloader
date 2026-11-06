@@ -32,42 +32,69 @@ def report(passed=True, failed_step=None, exit_code=0, cleanup=True):
 
 class Render(unittest.TestCase):
   def test_a_pass(self):
-    body = hc.render({'pca10056': report()}, SELECTION, META)
+    body = hc.render({'pca10056': ('pass', '', report())}, SELECTION, META)
     self.assertIn('**✅ passed** · bootloader `0.11.0`', body)
     self.assertIn('| `pca10056` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 14s |', body)
     self.assertIn('- `nRF52832: no roster board on this host`', body)
     self.assertIn('- `BLE OTA DFU`', body)
 
   def test_a_failed_step_and_a_blocker(self):
-    body = hc.render({'pca10056': report(False, 'dfu', 1)}, SELECTION, META)
+    body = hc.render({'pca10056': ('fail', 'dfu: no drive', report(False, 'dfu', 1))}, SELECTION, META)
     self.assertIn('**❌ failed**', body)
     self.assertIn('- `pca10056`: `dfu: no drive`', body)
-    body = hc.render({'pca10056': report(False, 'dfu', 4, cleanup=False)}, SELECTION, META)
+    body = hc.render({'pca10056': ('blocker', 'report corrupt: x', None)}, SELECTION, META)
     self.assertIn('**⛔ blocked**', body)
+    self.assertIn('`report corrupt: x`', body)
 
-  def test_missing_report_selection_and_no_boards(self):
-    self.assertIn('HIL report unavailable for `pca10056`', hc.render({}, SELECTION, META))
+  def test_missing_run_selection_and_no_boards(self):
+    self.assertIn('HIL report unavailable for `pca10056`', hc.render({'pca10056': None}, SELECTION, META))
     self.assertIn('_Selection unavailable._', hc.render({}, None, META))
     self.assertIn('_No affected boards on this rig', hc.render({}, {'boards': [], 'uncovered': []}, META))
 
   def test_report_text_cannot_render_markdown_or_mention(self):
-    r = report(False, 'dfu', 1)
-    r['results'][0]['steps'][-1]['detail'] = '@someone [x](http://y) `z`'
-    body = hc.render({'pca10056': r}, SELECTION, META)
+    body = hc.render({'pca10056': ('fail', 'dfu: @someone [x](http://y) `z`', report(False, 'dfu', 1))}, SELECTION,
+                     META)
     self.assertIn('`` dfu: @\u200bsomeone [x](http://y) `z` ``', body)
     self.assertNotIn('@someone', body)
 
-  def test_reads_the_newest_report_per_board(self):
-    with tempfile.TemporaryDirectory() as d:
-      for name, version in (('run-20260101-000000-1', 'old'), ('run-20260101-000100-2', 'new')):
-        (Path(d) / name).mkdir()
-        r = report()
-        r['results'][0]['firmware']['version'] = version
-        (Path(d) / name / 'hil_report.json').write_text(json.dumps(r))
-      (Path(d) / 'run-20260101-000200-3').mkdir()
-      (Path(d) / 'run-20260101-000200-3' / 'hil_report.json').write_text('not json')
-      got = hc.read_reports(d)
-    self.assertEqual(got['pca10056']['results'][0]['firmware']['version'], 'new')
+
+class BoardResult(unittest.TestCase):
+  """Through the installed agentrc's report core, as the workflow's comment job loads the pinned one."""
+  def setUp(self):
+    import agentrc
+    self.core = agentrc.load_file('skills/hil/scripts/hil_report_core.py')
+    self.tmp = tempfile.TemporaryDirectory()
+    self.addCleanup(self.tmp.cleanup)
+
+  def publish(self, name, body, termination='completed'):
+    run_dir = Path(self.tmp.name, 'pca10056', name)
+    run_dir.mkdir(parents=True)
+    schema = hc.run_report.schema(self.core)
+    attempt = self.core.start_attempt(run_dir, schema, False, name)
+    meta = self.core.make_meta(schema, attempt, termination=termination, invocation=['hil_test.py'],
+                               selection=['pca10056'], host='ci', roster={'name': 'ci.json', 'sha256': '0' * 64})
+    self.core.publish(run_dir, schema, body, meta)
+    return run_dir
+
+  def test_a_published_pass(self):
+    self.publish('run-20260101-000000-1', report())
+    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056')[:2], ('pass', ''))
+
+  def test_an_aborted_run_or_a_caveat_is_not_a_pass(self):
+    self.publish('run-20260101-000000-1', report(), termination='aborted')
+    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056')[0], 'blocker')
+    self.publish('run-20260101-000100-2', dict(report(), caveat='lock lost'))
+    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056')[0], 'blocker')
+
+  def test_an_unreadable_newest_report_never_falls_back_to_an_older_pass(self):
+    self.publish('run-20260101-000000-1', report())
+    newest = Path(self.tmp.name, 'pca10056', 'run-20260101-000100-2')
+    newest.mkdir()
+    (newest / 'hil_report.json').write_text('{"truncated')
+    verdict, detail, body = hc.board_result(self.core, self.tmp.name, 'pca10056')
+    self.assertEqual((verdict, body), ('blocker', None))
+    self.assertIn('report', detail)
+    self.assertIsNone(hc.board_result(self.core, self.tmp.name, 'pca10100'))
 
 
 class Fresh(unittest.TestCase):

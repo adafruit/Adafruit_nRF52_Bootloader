@@ -33,8 +33,8 @@ board covers. Uncovered is reported pending, never passed. The battery is fixed;
 The run's firmware is the build contract's HIL record of a clean tree at HEAD:
 
 ```bash
-python3 .claude/skills/build/scripts/check_build.py --board pca10056 --shared --hil-config test/hil/ci.json \
-  > cmake-build/pca10056.hil.json
+mkdir -p cmake-build && python3 .claude/skills/build/scripts/check_build.py --board pca10056 --shared \
+  --hil-config test/hil/ci.json > cmake-build/pca10056.hil.json
 ```
 
 The record binds HEAD, the submodules, the roster's sha256, the agentrc identity and every artifact's sha256
@@ -74,7 +74,9 @@ JSON report and its exit is final. The battery, each step judged from its own ev
 
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, the FAT reader and
 flush) runs under agentrc's `hil_process.run_tracked`; one whose process tree is not proven ended stops the battery,
-skips the restore and hands its receipt to the cleanup holder.
+skips the restore and hands its receipt to the cleanup holder; a receipt also goes at once into the board's pending
+mark (`hil_lock.PendingSessions`, `<lock>.nrf52-bootloader-pending.json`), which every later `run`, `install` and
+`restore` rechecks before touching the board and refuses on while any receipt is not `done`.
 
 ### CI
 
@@ -83,9 +85,10 @@ dispatch naming boards (`fail_at` for acceptance only). `select` runs the select
 reports a board pending commissioning as uncovered; `hil-build` builds each board's HIL record on a hosted runner with
 CI's arm-gcc and the agentrc pin and uploads the record and its artifacts; `hil-run`, on the rig's `nrf52-bootloader`
 runner (agentrc `hil-farm-setup`), checks out the same commit, fetches `lib/nrfx` and the pin, and runs `run` per board
-with a 30-minute lock wait into `$(dirname "$GITHUB_WORKSPACE")/hil-state/<run>-<attempt>`, uploaded as
+with a 30-minute lock wait into `$(dirname "$GITHUB_WORKSPACE")/hil-state/<run>-<attempt>/<board>`, uploaded as
 `hil-run-<attempt>`; the rig builds nothing. `pr-comment` posts the sticky `hil-report` comment (`hil_comment.py`) only
-from the newest attempt of the newest run for the PR's head. Runs are never cancelled: a newer push waits.
+from the newest attempt of the newest run for the PR's head, judging each board's newest report by the report core's
+shared run rules. Runs are never cancelled: a newer push waits.
 
 ## Reservation
 

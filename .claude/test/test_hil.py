@@ -414,5 +414,24 @@ class Cli(unittest.TestCase):
         ht.prove_cleanup_holder(board, 1)
 
 
+class Pending(unittest.TestCase):
+  def test_a_receipt_goes_into_the_boards_pending_mark(self):
+    tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
+    helper = mock.Mock()
+    with mock.patch.object(ht, 'lock_helper', return_value=helper):
+      ht.Tools(tmp, Path(tmp) / 'hil.log', 'nrf52840dk').note(['JLinkExe'], 'pending', {'token': 'r'})
+    helper.PendingSessions.assert_called_once_with('nrf52840dk', ht.PENDING_KIND)
+    helper.PendingSessions.return_value.add.assert_called_once_with([{'receipt': {'token': 'r'}, 'cmd': 'JLinkExe'}])
+
+  def test_pending_clear_refuses_while_a_receipt_is_not_done(self):
+    class Refused(Exception):
+      pass
+    helper = mock.Mock(PendingRefused=Refused)
+    helper.PendingSessions.return_value.clear.side_effect = Refused('sessions [r] are not ended')
+    with mock.patch.object(ht, 'lock_helper', return_value=helper), self.assertRaisesRegex(ht.Refused, 'not ended'):
+      ht.pending_clear({'lock': 'nrf52840dk'})
+
+
 if __name__ == '__main__':
   unittest.main()

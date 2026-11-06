@@ -7,10 +7,13 @@ as Markdown, and the check that this run is still the newest for the PR's head b
                         --out FILE
   hil_comment.py fresh --repo R --pr N --head SHA --run-id N --attempt N
 
-`--reports` is the rig job's run root: each `run-*/hil_report.json` in it, the newest per board. A board without
-one, or a missing or unreadable `--selection`, renders as such, never as a pass or as no affected boards.
+`--reports` is the rig job's run root, one `<board>/run-*/` per battery: each board's newest report is read through
+agentrc's report core and judged by its shared run rules, so an aborted run, a caveat or an unreadable newest report
+is never a pass and never falls back to an older one. A board without a run, or a missing or unreadable `--selection`,
+renders as such, never as a pass or as no affected boards.
 `fresh` exits 0 when the run is the newest attempt of the PR's newest HIL run for its current head, 1 when it is
-stale (the reason on stdout), 2 when the API cannot tell. Stdlib only: it runs on a hosted runner.
+stale (the reason on stdout), 2 when the API cannot tell. `render` loads the report core through agentrc.py (in CI
+the pin, after `agentrc.py fetch`).
 """
 import argparse
 import json
@@ -42,8 +45,22 @@ def literal(v, table=False):
   return f'{fence}{pad}{text}{pad}{fence}'
 
 
-def board_lines(report, board):
-  verdict, detail = run_report.verdict(run_report.exit_of(report), report, board)
+def board_result(core, run_root, board):
+  """(verdict, detail, native body or None) of `board`'s newest run under run_root/<board>, by the shared run rules;
+  None when it has no run."""
+  runs = sorted(Path(run_root, board).glob('run-*'))   # run-<time>-<pid>: oldest first
+  if not runs:
+    return None
+  reading = core.read_document(runs[-1] / 'hil_report.json', run_report.schema(core))
+  body = reading.body if reading.outcome in core.READABLE else None
+  row = run_report.shared_run(core, run_report.exit_of(body) if body else None, reading, [board])['rows'][0]
+  return row['verdict'], row['detail'], body
+
+
+def board_lines(result, board):
+  verdict, detail, report = result
+  if report is None:
+    return [f'**{VERDICT[verdict]}**', '', f'- {literal(board)}: {literal(detail)}', '']
   row = run_report.row_of(report, board) or {}
   marks = {s.get('step'): run_report.STEP_MARK[bool(s.get('pass'))] for s in row.get('steps') or []
            if isinstance(s, dict)}
@@ -67,8 +84,8 @@ def uncovered(selection, report=None):
   return ['Not covered on this rig:', *(f'- {literal(u)}' for u in items), ''] if items else []
 
 
-def render(reports, selection, meta):
-  """The comment body. `reports` maps a board to its parsed report; `selection` is the parsed file or None; `meta`
+def render(results, selection, meta):
+  """The comment body. `results` maps a board to board_result()'s; `selection` is the parsed file or None; `meta`
   is {head, tested, runUrl, runId, attempt}."""
   lines = [TITLE, '', '### ci.json (ci.lan)', '',
            f'_PR head `{meta["head"][:7]}` · tested `{meta["tested"][:7]}` · '
@@ -82,10 +99,9 @@ def render(reports, selection, meta):
     lines += ['_Every roster board: the HIL contract or the roster changed._' if selection.get('full')
               else '_Boards the change reaches._', '']
     for board in boards:
-      lines += (board_lines(reports[board], board) if board in reports
-                else [f'**HIL report unavailable for {literal(board)}: the run ended without one (run incomplete).**',
-                      ''])
-  report = next(iter(reports.values()), None)
+      lines += (board_lines(results[board], board) if results.get(board)
+                else [f'**HIL report unavailable for {literal(board)}: no run of it (run incomplete).**', ''])
+  report = next((r[2] for r in results.values() if r and r[2]), None)
   return finish(lines + uncovered(selection, report) + [f'_[Reports and logs]({meta["runUrl"]})_'])
 
 
@@ -121,20 +137,6 @@ def gh_api(path):
   return json.loads(r.stdout)
 
 
-def read_reports(root):
-  """{board: native body} of the run reports under `root`, the newest run dir per board; unreadable ones skipped."""
-  out = {}
-  for path in sorted(Path(root).glob('run-*/hil_report.json')):   # run-<time>-<pid>: oldest first
-    try:
-      body = json.loads(path.read_text(encoding='utf-8'))
-      run_report.check(body)
-    except (OSError, ValueError, TypeError, AttributeError):
-      continue
-    for row in body['results']:
-      out[row.get('board')] = body
-  return out
-
-
 def read_selection(path):
   try:
     sel = json.loads(Path(path).read_text(encoding='utf-8'))
@@ -147,7 +149,7 @@ def main(argv=None):
   ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
   sub = ap.add_subparsers(dest='cmd', required=True)
   r = sub.add_parser('render', help='write the comment body')
-  r.add_argument('--reports', required=True, help="the rig job's run root, which may be missing")
+  r.add_argument('--reports', required=True, help="the rig job's run root (<board>/run-*/), which may be missing")
   r.add_argument('--selection', required=True, help="the select job's hil-selection.json, which may be missing")
   r.add_argument('--head', required=True, help="the PR's head SHA")
   r.add_argument('--tested', required=True, help='the merge commit the rig tested')
@@ -165,8 +167,11 @@ def main(argv=None):
   if args.cmd == 'render':
     meta = {'head': args.head, 'tested': args.tested, 'runUrl': args.run_url, 'runId': args.run_id,
             'attempt': args.attempt}
-    Path(args.out).write_text(render(read_reports(args.reports), read_selection(args.selection), meta),
-                              encoding='utf-8')
+    import agentrc
+    core = agentrc.load_file('skills/hil/scripts/hil_report_core.py')
+    selection = read_selection(args.selection)
+    results = {b: board_result(core, args.reports, b) for b in (selection or {}).get('boards') or []}
+    Path(args.out).write_text(render(results, selection, meta), encoding='utf-8')
     return 0
   try:
     ok, why = fresh(gh_api, args.repo, args.pr, args.head, args.run_id, args.attempt)

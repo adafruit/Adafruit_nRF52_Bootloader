@@ -107,6 +107,7 @@ jobs:
 
       - name: Build the HIL records
         run: |
+          mkdir -p cmake-build
           for b in $BOARDS; do
             python3 .claude/skills/build/scripts/check_build.py --board "$b" --shared --hil-config test/hil/ci.json \
               > "cmake-build/$b.hil.json" || { tail -c 2000 "cmake-build/$b.hil.json"; exit 1; }
@@ -178,7 +179,7 @@ jobs:
           rc=0
           for b in $BOARDS; do
             python3 .claude/skills/hil-contract/scripts/hil_test.py run -b "$b" --build-record "cmake-build/$b.hil.json" \
-              --lock-wait 1800 --run-root "$HIL_OUT" ${FAIL_AT:+--fail-at "$FAIL_AT"} test/hil/ci.json || rc=1
+              --lock-wait 1800 --run-root "$HIL_OUT/$b" ${FAIL_AT:+--fail-at "$FAIL_AT"} test/hil/ci.json || rc=1
           done
           exit $rc
 
@@ -236,6 +237,11 @@ jobs:
         with:
           name: hil-run-${{ env.RIG_ATTEMPT }}
           path: hil-out
+
+      # the report core the comment judges each report with (hil_comment.py render)
+      - name: Fetch agentrc
+        if: steps.fresh.outputs.post == 'true'
+        run: python3 .claude/skills/hil-contract/scripts/agentrc.py fetch
 
       - name: Render the report
         if: steps.fresh.outputs.post == 'true'
