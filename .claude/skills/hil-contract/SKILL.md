@@ -39,10 +39,13 @@ python3 .claude/skills/build/scripts/check_build.py --board pca10056 --shared --
 
 The record binds HEAD, the submodules, the roster's sha256, the agentrc identity and every artifact's sha256
 (`.claude/skills/build/SKILL.md`, A HIL record). `hil_test.py` refuses a record that is not passing, dirty, of another
-HEAD, submodules, roster or agentrc, or whose artifacts no longer hash as recorded, and copies the artifacts into the
-run dir before use. What the battery checks comes from the record and this checkout: the version from the image's
-`UF2 Bootloader <version>` string, VID/PID and `UF2_BOARD_ID` from `board.h`, the app start (`MBR_SIZE` plus the
-SoftDevice's `SD_FLASH_SIZE`) and the RAM end from the record's SoftDevice and the MCU's linker script.
+HEAD, submodules, roster or agentrc, not of the default configuration, or whose artifacts are incomplete or no longer
+hash as recorded, and copies the artifacts into the run dir before use. Before any hardware access it checks the merged
+HEX's spans: only flash and UICR NRFFW, runs at 0 (MBR), 0x1000 (SoftDevice) and the bootloader start, nothing in the
+app region, and NRFFW[0] pointing at the bootloader. What the battery checks comes from the record and this checkout:
+the version from the image's `UF2 Bootloader <version>` string, VID/PID and `UF2_BOARD_ID` from `board.h`, the app start
+(`MBR_SIZE` plus the SoftDevice's `SD_FLASH_SIZE`) and the RAM end from the record's SoftDevice and the MCU's linker
+script.
 
 ## Execution
 
@@ -60,15 +63,18 @@ JSON report and its exit is final. The battery, each step judged from its own ev
    (MBR, SoftDevice, bootloader, UICR) loaded and each of its runs verified with `verifybin`, then reset.
 2. `dfu`: the UF2 drive with the board's VID:PID and roster serial; `INFO_UF2.TXT` names the record's version,
    `UF2_BOARD_ID` and SoftDevice.
-3. `copy`: a generated app A (vector table at the app start, a counting loop, a 4 KiB pattern from a random nonce) as
-   UF2 with the board's family ID, written with `mcopy` and flushed; the drive leaves.
-4. `app-ran`: no probe reset first; the drive stays away, and two register samples show thread mode, PC in A's loop and
-   R0 advancing.
+3. `copy`: a generated app A (vector table at the app start, a reset handler that loads A's marker word into R1 and
+   counts in R0, a 4 KiB pattern from a random nonce) as UF2 with the board's family ID, written with `mcopy` and
+   flushed; the drive leaves.
+4. `app-ran`: no probe reset first; the drive stays away, and two register samples show thread mode, PC in the counting
+   loop, R1 A's marker and R0 advancing.
 5. `reenter`: GPREGRET = 0x57 written and read back, then SYSRESETREQ (a soft reset keeps GPREGRET); the drive returns
    and `CURRENT.UF2` reads back A's bytes at the app start. Forced entry, not a double reset.
-6. `copy-b`, `app-ran-b`: app B from another nonce runs, so a stale image cannot pass.
+6. `copy-b`, `app-ran-b`: app B, with another nonce and marker, runs, so a stale image cannot pass.
 
-`--fail-at STEP` fails that step on purpose, to exercise cleanup.
+`--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, the FAT reader and
+flush) runs under agentrc's `hil_process.run_tracked`; one whose process tree is not proven ended stops the battery,
+skips the restore and hands its receipt to the cleanup holder.
 
 ## Reservation
 
@@ -87,7 +93,9 @@ python3 ~/.claude/skills/hil/scripts/hil_lock.py release nrf52840dk
   `install` writes the candidate and checks its drive; `restore` is the cleanup below. Release only after a passing
   `restore`.
 - Cleanup (`cleanup` in the row): untouched when nothing was written; otherwise the candidate installed again and a
-  benign generated app copied through it and proven running (`fixture running`). The board is then left with MBR,
+  benign generated app copied through it and proven running (`fixture running`). A failed step, an unexpected error
+  inside a step or a failed check is restored the same way; an interrupt, a tool not proven ended or a failed restore
+  leaves `unknown` and the board with a cleanup holder (exit 4). The board is then left with MBR,
   SoftDevice, the candidate bootloader, UICR pointing at it, and that app: tinyusb and the Arduino HILs flash their
   own images over it (the nRF52 Arduino core's base check rewrites MBR, SoftDevice, bootloader and settings).
 
@@ -95,9 +103,9 @@ python3 ~/.claude/skills/hil/scripts/hil_lock.py release nrf52840dk
 
 `<run-root>/run-<time>-<pid>/hil_report.json` and `.md` through agentrc's report core (`hil` Reporting), body schema
 `nrf52-bootloader-hil-run`; the same JSON is the last stdout line. Fields: `pass`, `exitCode`, `caveat`, `error`,
-`reportPath`, and per board `results[]`: `ran`, `pass`, `locked` (with `recoveryBlocker`), `probeUsers`, `detail`,
-`firmware` (version, record, merged sha256, head), `steps[]` (`step`, `pass`, `detail`, `evidence`, `seconds`) and
-`cleanup` (`pass`, `state`, `heldAfter`, `holder`).
+`reportPath`, `uncovered` (what the rig cannot establish, Limits), and per board `results[]`: `ran`, `pass`, `locked`
+(with `recoveryBlocker`), `probeUsers`, `detail`, `firmware` (version, record, merged sha256, head), `steps[]` (`step`,
+`pass`, `detail`, `evidence`, `seconds`) and `cleanup` (`pass`, `state`, `heldAfter`, `holder`, `receipts`).
 
 Exits: 0 pass and cleaned up; 1 a step failed, the board did not run, or it was locked; 2 refused before any hardware
 access; 4 cleanup failed and the board is held by a cleanup holder. `scripts/hil_run_report.py`'s `verdict()` maps a row

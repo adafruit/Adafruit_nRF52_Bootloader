@@ -20,6 +20,12 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    # the HIL contract's tests read lib/nrfx and load agentrc at its pin
+    - name: Fetch the test inputs
+      run: |
+        git submodule update --init --depth 1 lib/nrfx
+        python3 .claude/skills/hil-contract/scripts/agentrc.py fetch
+
     - name: Agent skill script tests
       run: python3 -m unittest discover -s .claude/test -p 'test_*.py'
 

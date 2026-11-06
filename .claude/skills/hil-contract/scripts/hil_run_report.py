@@ -6,7 +6,8 @@ the core's shared run rules. The core module is passed in, loaded through the ag
 
 NAME, VERSION, STEM = 'nrf52-bootloader-hil-run', 1, 'hil_report'
 STEP_MARK = {True: '✅', False: '❌'}
-TYPES = {'pass': bool, 'caveat': str, 'reportPath': str, 'error': str, 'exitCode': int, 'heldInProcess': bool}
+TYPES = {'pass': bool, 'caveat': str, 'reportPath': str, 'error': str, 'exitCode': int, 'heldInProcess': bool,
+         'uncovered': list}
 
 
 def check(body):
@@ -36,6 +37,8 @@ def render(core, body):
     if r.get('detail'):
       lines += [cell(r['detail']), '']
     lines.append(core.table(['Step', 'Result', 'Detail'], steps, center={1}) if steps else '_No steps ran._')
+  if body.get('uncovered'):
+    lines += ['', 'Not covered on this rig:', *(f'- {cell(u)}' for u in body['uncovered'])]
   return '\n'.join(lines) + '\n'
 
 

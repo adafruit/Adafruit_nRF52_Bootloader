@@ -51,7 +51,14 @@ APP_SAMPLE_MS = 200
 LOCK_RETRY = 15
 FLUSH_GONE = 3
 JLINK_CRASH_RCS = {139, -11, 134, -6}
-CHILDREN_ALIVE = []
+SETTLE = 1.0                 # s after a tool exits for its descendants to be proven gone (hil_process.run_tracked)
+UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] MBR parameter page
+ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
+DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
+                  'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
+UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'CDC serial DFU',
+             'SIGNED_FW and dual-bank builds', 'a physical double reset', 'an interrupted update',
+             'bootloader self-update')
 
 
 class Refused(Exception):
@@ -62,6 +69,10 @@ class StepFail(Exception):
   def __init__(self, msg, evidence=None):
     super().__init__(msg)
     self.evidence = evidence or {}
+
+
+class NotEnded(StepFail):
+  """A tool whose process tree is not proven ended: the board must not be touched again until recovery."""
 
 
 # ------------------------------------------------------------------ agentrc
@@ -134,6 +145,12 @@ def admit(record_path, board, roster_path, workdir):
     raise Refused(f'{record_path}: not a passing HIL record of {board} (check_build.py --board {board} --shared '
                   f'--hil-config {roster_path})')
   row, inp = rows[0], rec['input']
+  config = row.get('config') or {}
+  wrong = {k: config.get(k) for k, v in {**DEFAULT_CONFIG, 'BOARD': board}.items() if config.get(k) != v}
+  if rec.get('defines') or wrong:
+    raise Refused(f'{record_path}: not the default configuration (defines {rec.get("defines")}, {wrong})')
+  if set(row.get('artifacts') or {}) != ARTIFACTS or set(row.get('sha256') or {}) != ARTIFACTS:
+    raise Refused(f'{record_path}: artifacts {sorted(row.get("artifacts") or {})} are not {sorted(ARTIFACTS)}')
   if inp.get('dirty') or inp.get('head') != git('rev-parse', 'HEAD').strip() or git('status', '--porcelain').strip():
     raise Refused(f'{record_path} was built from {inp.get("head")} (dirty {inp.get("dirty")}); this checkout is '
                   f'{git("rev-parse", "HEAD").strip()} (dirty {bool(git("status", "--porcelain").strip())}): rebuild '
@@ -173,7 +190,7 @@ def parse_hex(path):
     raw = bytes.fromhex(line[1:])
     if sum(raw) & 0xFF or len(raw) != raw[0] + 5:
       raise Refused(f'{path}:{n}: bad record')
-    count, addr, kind, body = raw[0], int.from_bytes(raw[1:3], 'big'), raw[3], raw[4:4 + raw[0]]
+    addr, kind, body = int.from_bytes(raw[1:3], 'big'), raw[3], raw[4:4 + raw[0]]
     if kind == 0:
       for i, b in enumerate(body):
         data[base + addr + i] = b
@@ -202,6 +219,22 @@ def runs(data):
   return out
 
 
+def check_spans(data, flash_end, app_start, boot_start, name):
+  """Refused unless the merged image writes only flash below `flash_end` and UICR NRFFW, holds MBR, SoftDevice and
+  bootloader, leaves the app region [app_start, boot_start) empty, and points NRFFW[0] at the bootloader."""
+  stray = sorted(a for a in data if not (a < flash_end or UICR_NRFFW[0] <= a < UICR_NRFFW[1]))
+  if stray:
+    raise Refused(f'{name} writes outside flash and UICR NRFFW, from {stray[0]:#x}')
+  in_app = [a for a in data if app_start <= a < boot_start]
+  if in_app:
+    raise Refused(f'{name} writes the app region at {min(in_app):#x}')
+  starts = {a for a, _ in runs(data)}
+  nrffw0 = bytes(data.get(UICR_NRFFW[0] + i, 0xFF) for i in range(4))
+  if not {0, MBR_SIZE, boot_start} <= starts or int.from_bytes(nrffw0, 'little') != boot_start:
+    raise Refused(f'{name}: want runs at 0 (MBR), {MBR_SIZE:#x} (SoftDevice) and {boot_start:#x} (bootloader) and '
+                  f'NRFFW[0] = {boot_start:#x}; have runs at {sorted(map(hex, starts))}, NRFFW[0] {nrffw0.hex()}')
+
+
 def define(text, name):
   m = re.search(rf'^\s*#define\s+{name}\s+(.+?)\s*(//.*)?$', text, re.M)
   return m[1] if m else None
@@ -225,12 +258,16 @@ def facts(board, row, copies, workdir):
   if not (sd_size and ram and vid and pid and board_id):
     raise Refused(f'{board}: cannot establish SD_FLASH_SIZE, RAM, USB_DESC_VID/UF2_PID or UF2_BOARD_ID')
   merged = parse_hex(copies['merged'])
-  image = bytes(merged.get(a, 0xFF) for a in range(min(merged), max(merged) + 1)) if merged else b''
-  versions = set(re.findall(rb'UF2 Bootloader ([^\r\n\x00]+)\r\n', image))
+  flash = re.search(r'FLASH\s*\(rx\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+),\s*LENGTH\s*=\s*(0x[0-9A-Fa-f]+)', ld)
+  boot = re.search(r'FLASH\s*\(rx\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)', (ROOT / f'linker/{mcu}.ld').read_text())
+  if not flash or not boot:
+    raise Refused(f'{mcu}: cannot establish the flash size or the bootloader start')
+  check_spans(merged, int(flash[2], 16), MBR_SIZE + int(sd_size, 0), int(boot[1], 16), copies['merged'].name)
+  hex_runs = runs(merged)
+  versions = {v for _, data in hex_runs for v in re.findall(rb'UF2 Bootloader ([^\r\n\x00]+)\r\n', data)}
   if len(versions) != 1:
     raise Refused(f'{copies["merged"].name}: expected one "UF2 Bootloader <version>" string, found {len(versions)}')
-  hex_runs = runs(merged)
-  for i, (a, b) in enumerate(hex_runs):
+  for a, b in hex_runs:
     (Path(workdir) / f'run-{a:08x}.bin').write_bytes(b)
   return {'mcu': mcu, 'family': APP_FAMILY[mcu], 'appStart': MBR_SIZE + int(sd_size, 0),
           'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0),
@@ -242,17 +279,20 @@ def facts(board, row, copies, workdir):
 # ------------------------------------------------------------------ the fixture app
 
 def fixture(f, nonce):
-  """An app the probe can prove ran: SP and reset vectors, every other vector a fault loop, a reset handler that
-  counts in r0 forever, then a 4 KiB pattern from `nonce`, so an earlier copy's image reads back different."""
+  """An app the probe can prove ran, and which one: SP and reset vectors, every other vector a fault loop, a reset
+  handler that loads a word of `nonce` into r1 and counts in r0 forever, then a 4 KiB pattern from `nonce`, so an
+  earlier copy's image reads back different."""
   start, table = f['appStart'], 64
-  handler, fault = start + table, start + table + 4
+  handler = start + table
+  loop, fault = handler + 2, handler + 6
+  marker = int.from_bytes(hashlib.sha256(b'marker' + nonce).digest()[:4], 'little')
   vectors = [f['ramEnd'], handler | 1] + [fault | 1] * (table // 4 - 2)
-  code = struct.pack('<HHH', 0x3001, 0xE7FD, 0xE7FE)   # adds r0,#1 ; b handler ; b . (fault)
+  # ldr r1, [pc, #4] (the marker) ; loop: adds r0, #1 ; b loop ; fault: b . ; marker
+  code = struct.pack('<HHHHI', 0x4901, 0x3001, 0xE7FD, 0xE7FE, marker)
   pattern = b''.join(hashlib.sha256(nonce + i.to_bytes(4, 'little')).digest() for i in range(128))
-  img = struct.pack(f'<{len(vectors)}I', *vectors) + code
-  img += b'\0' * (-len(img) % 4) + pattern
+  img = struct.pack(f'<{len(vectors)}I', *vectors) + code + pattern
   img += b'\xff' * (-len(img) % 256)
-  return {'image': img, 'handler': handler, 'fault': fault, 'start': start}
+  return {'image': img, 'handler': handler, 'loop': loop, 'fault': fault, 'marker': marker, 'start': start}
 
 
 def make_uf2(img, base, family):
@@ -277,52 +317,68 @@ def uf2_payload(blob, base, length):
 
 # ------------------------------------------------------------------ processes
 
-def spawn(argv, log, timeout, cwd=None):
-  """(exit, output) of a bounded child; its transcript appended to `log`. rc 124 on the bound (its session killed)."""
-  r = process().run_cmd([str(a) for a in argv], cwd=cwd, timeout=timeout, quiet=True)
-  out = process().cmd_stdout_text(r.stdout) + process().cmd_stdout_text(r.stderr or '')
-  with open(log, 'a') as fh:
-    fh.write(f'$ {" ".join(map(str, argv))}\n{out}\n# exit {r.returncode}\n')
-  return r.returncode, out
+class Tools:
+  """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
+  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder."""
+  def __init__(self, workdir, log):
+    self.dir, self.log, self.receipts = str(workdir), log, []
 
-
-def tool_runner(log):
-  def run(cmd, cwd=None, *, env=None, timeout):
+  def run(self, cmd, cwd=None, *, env=None, timeout):
+    """hil_flash's runner contract: a CompletedProcess carrying `cleanup` and `receipt`."""
     if env:
       raise ValueError('no tool here takes an environment')
-    code, out = spawn(cmd, log, timeout, cwd)
-    r = subprocess.CompletedProcess(cmd, code, out, None)
-    r.cleanup = 'done' if code != 124 else 'unknown'
+    argv = [str(a) for a in cmd]
+    try:
+      r = process().run_tracked(argv, cwd=cwd, timeout=timeout, settle=SETTLE, state_dir=self.dir, quiet=True)
+    except BaseException as e:
+      self.note(argv, getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None))
+      raise
+    with open(self.log, 'a') as fh:
+      fh.write(f'$ {" ".join(argv)}\n{process().cmd_stdout_text(r.stdout)}{process().cmd_stdout_text(r.stderr or "")}'
+               f'\n# exit {r.returncode}, cleanup {r.cleanup}\n')
+    self.note(argv, r.cleanup, r.receipt)
     return r
-  return run
 
+  def note(self, argv, cleanup, receipt):
+    if cleanup != 'done' or receipt is not None:
+      self.receipts.append({'cmd': argv[0], 'cleanup': cleanup, 'receipt': receipt})
 
-def child_json(argv, log, timeout, what):
-  code, out = spawn([sys.executable, '-B', __file__, *argv], log, timeout)
-  try:
-    res = json.loads(out.strip().splitlines()[-1])
-  except (IndexError, ValueError):
-    res = None
-  if code == 124:
-    raise StepFail(f'{what}: timed out after {timeout}s')
-  return code, res
+  def check(self, what):
+    if self.receipts:
+      raise NotEnded(f'{what}: a tool is not proven ended', {'receipts': self.receipts})
+
+  def spawn(self, argv, timeout):
+    """(exit, output) of a bounded child; exit 124 on the bound."""
+    r = self.run(argv, timeout=timeout)
+    self.check(Path(str(argv[0])).name)
+    return r.returncode, process().cmd_stdout_text(r.stdout) + process().cmd_stdout_text(r.stderr or '')
+
+  def child_json(self, argv, timeout, what):
+    code, out = self.spawn([sys.executable, '-B', __file__, *argv], timeout)
+    if code == 124:
+      raise StepFail(f'{what}: timed out after {timeout}s')
+    try:
+      return code, json.loads(out.strip().splitlines()[-1])
+    except (IndexError, ValueError):
+      return code, None
 
 
 # ------------------------------------------------------------------ probe
 
 class Probe:
   """J-Link sessions through agentrc's provider, each command judged from its own output."""
-  def __init__(self, board, workdir, log):
-    self.b, self.dir, self.log = board, str(workdir), log
+  def __init__(self, board, workdir, tools):
+    self.b, self.tools = board, tools
     self.profile = {'interface': 'swd', 'speed': JLINK_SPEED, 'autoconnect': True, 'device': board['device'],
-                    'workdir': self.dir}
+                    'workdir': str(workdir)}
 
   def session(self, commands, timeout=PROBE_TIMEOUT, judge=True):
     def crashed(a):   # the OB's libjlinkarm crash before any target access (agentrc hil_flash JLINK_CRASH_RCS)
       out = process().cmd_stdout_text(a.result.stdout)
       return a.result.returncode in JLINK_CRASH_RCS and 'Found Cortex' not in out
     op = provider().run_jlink_commands(self.b['flasher'], list(commands), **self.profile, timeout=timeout,
-                                       run=tool_runner(self.log), retry_if=crashed, retry_delay=2)
+                                       run=self.tools.run, retry_if=crashed, retry_delay=2)
+    self.tools.check('JLinkExe')
     out, last = process().cmd_stdout_text(op.stdout), op.attempts[-1]
     tail = {'tail': out.strip().splitlines()[-6:]}
     if last.timed_out:
@@ -359,7 +415,7 @@ class Probe:
         raise StepFail(f'no {pat!r} in J-Link regs output')
       return int(m[1], 16)
     return {'pc': one(r'\bPC = ([0-9A-F]{8})'), 'r0': one(r'\bR0 = ([0-9A-F]{8})'),
-            'ipsr': one(r'\bIPSR = ([0-9A-F]{3})')}
+            'r1': one(r'\bR1 = ([0-9A-F]{8})'), 'ipsr': one(r'\bIPSR = ([0-9A-F]{3})')}
 
   def reenter(self):
     """GPREGRET = DFU_MAGIC_UF2_RESET, read back, then SYSRESETREQ: a soft reset keeps the retained register (PS
@@ -369,7 +425,8 @@ class Probe:
     if not m or int(m[1], 16) & 0xFF != DFU_MAGIC_UF2_RESET:
       raise StepFail(f'GPREGRET reads back {m[1] if m else "nothing"}')
     op = provider().sysresetreq_jlink(self.b['flasher'], **self.profile, timeout=PROBE_TIMEOUT,
-                                      run=tool_runner(self.log))
+                                      run=self.tools.run)
+    self.tools.check('JLinkExe')
     if op.attempts[-1].timed_out or 'Writing 05FA0004 -> E000ED0C' not in process().cmd_stdout_text(op.stdout):
       raise StepFail('the SYSRESETREQ write was not issued')
     return {'gpregret': m[1]}
@@ -433,8 +490,8 @@ def exclusive(dev):
 
 
 class Drive:
-  def __init__(self, board, f, log):
-    self.b, self.f, self.log = board, f, log
+  def __init__(self, board, f, tools):
+    self.b, self.f, self.tools = board, f, tools
 
   def present(self):
     usb = usb_device(self.f['vid'], self.f['pid'], self.b['uid'])
@@ -449,7 +506,7 @@ class Drive:
 
   def read(self, dev, name, offset=0, length=None):
     argv = ['fat-read', '--dev', dev, '--file', name, '--offset', str(offset)]
-    code, res = child_json(argv + (['--length', str(length)] if length else []), self.log, CHILD_TIMEOUT, name)
+    code, res = self.tools.child_json(argv + (['--length', str(length)] if length else []), CHILD_TIMEOUT, name)
     if code or not res or not res.get('ok'):
       raise StepFail(f'reading {name} failed', {'result': res, 'exit': code})
     return bytes.fromhex(res['data']), res
@@ -466,10 +523,10 @@ class Drive:
   def copy(self, dev, uf2, workdir):
     path = Path(workdir) / 'app.uf2'
     path.write_bytes(uf2)
-    code, out = spawn(['mcopy', '-o', '-i', dev, path, '::APP.UF2'], self.log, 60)
+    code, out = self.tools.spawn(['mcopy', '-o', '-i', dev, path, '::APP.UF2'], 60)
     if code:
       raise StepFail('mcopy failed', {'tail': out.strip().splitlines()[-5:]})
-    code, res = child_json(['flush', '--dev', dev], self.log, CHILD_TIMEOUT, 'flush')
+    code, res = self.tools.child_json(['flush', '--dev', dev], CHILD_TIMEOUT, 'flush')
     if code not in (0, FLUSH_GONE):
       raise StepFail('flush failed', {'result': res})
     wait_for(lambda: not self.present(), LEAVE_TIMEOUT, 'the drive leaving after the copy')
@@ -480,8 +537,9 @@ class Drive:
 
 class Battery:
   def __init__(self, board, f, workdir, log, fail_at=None):
-    self.b, self.f, self.dir, self.log, self.fail_at = board, f, Path(workdir), log, fail_at
-    self.probe, self.drive = Probe(board, workdir, log), Drive(board, f, log)
+    self.b, self.f, self.dir, self.fail_at = board, f, Path(workdir), fail_at
+    self.tools = Tools(workdir, log)
+    self.probe, self.drive = Probe(board, workdir, self.tools), Drive(board, f, self.tools)
     self.steps, self.touched = [], False
 
   def step(self, name, fn):
@@ -496,6 +554,10 @@ class Battery:
       self.steps.append({'step': name, 'pass': False, 'detail': str(e), 'evidence': e.evidence,
                          'seconds': round(time.monotonic() - t, 1)})
       raise
+    except Exception as e:   # unexpected: the step failed, and cleanup decides what the board is left in
+      self.steps.append({'step': name, 'pass': False, 'detail': f'{type(e).__name__}: {e}',
+                         'seconds': round(time.monotonic() - t, 1)})
+      raise StepFail(f'{type(e).__name__}: {e}') from e
 
   def install(self):
     self.touched = True
@@ -512,17 +574,19 @@ class Battery:
     return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
   def app_ran(self, nonce):
-    """The app the copy wrote runs after the bootloader's own reset: no probe reset first. Two samples: thread mode,
-    PC in the counting loop, r0 advancing; then the drive stays away."""
+    """The app the copy wrote runs after the bootloader's own reset: no probe reset first. The drive stays away, then
+    two samples: thread mode, PC in the counting loop, r1 this copy's marker, r0 advancing."""
     fx = fixture(self.f, nonce)
     stays_away(self.drive.present, QUIET, 'the UF2 drive came back instead of the app')
     first = self.probe.regs()
     time.sleep(APP_SAMPLE_MS / 1000)
     second = self.probe.regs()
-    loop = range(fx['handler'], fx['handler'] + 4)
+    loop = range(fx['loop'], fx['fault'])
     for s in (first, second):
-      if s['ipsr'] or s['pc'] not in loop:
-        raise StepFail('the app is not counting in thread mode', {'samples': [first, second], 'loop': hex(fx['handler'])})
+      if s['ipsr'] or s['pc'] not in loop or s['r1'] != fx['marker']:
+        raise StepFail('this copy\'s app is not counting in thread mode',
+                       {'samples': [{k: hex(v) for k, v in x.items()} for x in (first, second)],
+                        'loop': hex(fx['loop']), 'marker': hex(fx['marker'])})
     if (second['r0'] - first['r0']) & 0xFFFFFFFF == 0:
       raise StepFail('r0 did not advance', {'samples': [first, second]})
     return {'samples': [{k: hex(v) for k, v in s.items()} for s in (first, second)]}
@@ -553,9 +617,13 @@ class Battery:
     self.step('app-ran-b', lambda: self.app_ran(b))
 
   def restore(self):
-    """The candidate installed again and the benign fixture copied through it and running."""
+    """The candidate installed again and the benign fixture copied through it and running; never while a tool of the
+    run is not proven ended."""
     if not self.touched:
       return {'pass': True, 'state': 'untouched', 'evidence': {}}
+    if self.tools.receipts:
+      return {'pass': False, 'state': 'unknown', 'detail': 'a tool is not proven ended; not restored',
+              'receipts': self.tools.receipts}
     ev, nonce = {}, b'restore'.ljust(16, b'\0')
     try:
       ev['install'] = self.probe.install(self.f)
@@ -563,8 +631,9 @@ class Battery:
       ev['copy'] = self.copy(nonce)
       ev['appRan'] = self.app_ran(nonce)
       return {'pass': True, 'state': 'fixture running', 'evidence': ev}
-    except StepFail as e:
-      return {'pass': False, 'state': 'unknown', 'detail': str(e), 'evidence': {**ev, 'failed': e.evidence}}
+    except Exception as e:
+      return {'pass': False, 'state': 'unknown', 'detail': f'{type(e).__name__}: {e}',
+              'evidence': {**ev, 'failed': getattr(e, 'evidence', {})}, 'receipts': self.tools.receipts}
 
 
 # ------------------------------------------------------------------ locks
@@ -628,7 +697,7 @@ def cmd_run(args, argv):
   row = {'board': args.board, 'ran': False, 'pass': False, 'locked': False, 'steps': [],
          'cleanup': {'pass': True, 'state': 'untouched'}}
   result = {'pass': False, 'caveat': '', 'results': [row], 'reportPath': str(run_dir / 'hil_report.json'),
-            'heldInProcess': False}
+            'heldInProcess': False, 'uncovered': list(UNCOVERED)}
 
   def finish(code):
     result['exitCode'] = code
@@ -655,7 +724,7 @@ def cmd_run(args, argv):
     row.update(held)
     return finish(1)
   bat = Battery(board, f, run_dir, log, args.fail_at)
-  code = 1
+  code, row['cleanup'] = 1, None
   try:
     users = probe_users(board)
     if users:
@@ -671,9 +740,14 @@ def cmd_run(args, argv):
       code = 0 if row['pass'] and row['cleanup']['pass'] else 1
   finally:
     row['steps'] = bat.steps
+    if row['cleanup'] is None:   # never restored: an interrupt, or nothing written
+      row['cleanup'] = ({'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
+                         'receipts': bat.tools.receipts} if bat.touched else {'pass': True, 'state': 'untouched'})
     if not row['cleanup']['pass']:
       try:
-        token = lock_helper().hand_to_cleanup_holder({board['lock']: fh}, REASON, detail=row['cleanup'].get('detail'))
+        token = lock_helper().hand_to_cleanup_holder(
+          {board['lock']: fh}, REASON, detail=row['cleanup'].get('detail'),
+          receipts=[r['receipt'] for r in bat.tools.receipts if r['receipt'] is not None])
         row['cleanup'].update(heldAfter=True, holder={'token': token})
       except Exception as e:
         row['cleanup'].update(heldAfter=True, holder={'error': str(e)})

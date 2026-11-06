@@ -76,13 +76,16 @@ class Images(unittest.TestCase):
     sp, reset = struct.unpack_from('<2I', fx['image'])
     self.assertEqual((sp, reset), (0x20040000, (0x26000 + 64) | 1))
     self.assertEqual(struct.unpack_from('<I', fx['image'], 8)[0], fx['fault'] | 1)
-    self.assertEqual(fx['image'][64:70], bytes.fromhex('0130fde7fee7'))   # adds r0,#1; b handler; b .
+    # ldr r1, [pc, #4]; adds r0, #1; b loop; b .; the marker
+    self.assertEqual(fx['image'][64:72], bytes.fromhex('01490130fde7fee7'))
+    self.assertEqual(struct.unpack_from('<I', fx['image'], 72)[0], fx['marker'])
+    self.assertEqual((fx['loop'], fx['fault']), (0x26042, 0x26046))
     self.assertEqual(len(fx['image']) % 256, 0)
 
-  def test_fixtures_of_different_nonces_differ_only_past_the_code(self):
+  def test_fixtures_of_different_nonces_differ_in_their_marker(self):
     a, b = ht.fixture(FACTS, b'a' * 16), ht.fixture(FACTS, b'b' * 16)
     self.assertEqual(a['image'][:72], b['image'][:72])
-    self.assertNotEqual(a['image'], b['image'])
+    self.assertNotEqual(a['marker'], b['marker'])
 
   def test_uf2_round_trip(self):
     img = ht.fixture(FACTS, b'x' * 16)['image']
@@ -162,14 +165,44 @@ class Admit(unittest.TestCase):
       with self.assertRaisesRegex(ht.Refused, 'not a passing HIL record'):
         ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent')
 
-  def test_refuses_a_dirty_record(self):
-    rec = {'pass': True, 'hilRecord': {}, 'input': {'dirty': True, 'head': 'x'},
-           'boards': [{'board': 'pca10056', 'status': 'ok', 'sha256': {}}]}
+  def record(self, **row):
+    keys = dict.fromkeys(ht.ARTIFACTS, 'x')
+    row = {'board': 'pca10056', 'status': 'ok', 'artifacts': keys, 'sha256': keys,
+           'config': {**ht.DEFAULT_CONFIG, 'BOARD': 'pca10056'}, **row}
+    return {'pass': True, 'hilRecord': {}, 'input': {'dirty': True, 'head': 'x'}, 'boards': [row]}
+
+  def admit(self, rec):
     with tempfile.NamedTemporaryFile('w', suffix='.json') as f:
       json.dump(rec, f)
       f.flush()
-      with self.assertRaisesRegex(ht.Refused, 'rebuild on a clean HEAD'):
-        ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent')
+      ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent')
+
+  def test_refuses_a_dirty_record(self):
+    with self.assertRaisesRegex(ht.Refused, 'rebuild on a clean HEAD'):
+      self.admit(self.record())
+
+  def test_refuses_a_non_default_configuration_or_incomplete_artifacts(self):
+    cfg = {**ht.DEFAULT_CONFIG, 'BOARD': 'pca10056'}
+    for bad in ({'config': {**cfg, 'SIGNED_FW': 'ON'}}, {'config': {**cfg, 'CMAKE_BUILD_TYPE': 'Debug'}},
+                {'config': {**cfg, 'BOARD': 'pca10100'}}):
+      with self.subTest(bad=bad), self.assertRaisesRegex(ht.Refused, 'not the default configuration'):
+        self.admit(self.record(**bad))
+    with self.assertRaisesRegex(ht.Refused, 'not the default configuration'):
+      self.admit({**self.record(), 'defines': ['DUALBANK_FW=ON']})
+    with self.assertRaisesRegex(ht.Refused, 'artifacts'):
+      self.admit(self.record(artifacts={}))
+
+  def test_spans(self):
+    good = {a: 0 for a in (0, 0x1000, 0xF4000)}
+    good.update(zip(range(0x10001014, 0x10001018), (0x00, 0x40, 0x0F, 0x00)))
+    ht.check_spans(good, 0x100000, 0x26000, 0xF4000, 'm.hex')
+    for bad, why in (({0x40000000: 0}, 'outside flash'), ({0x26000: 0}, 'app region'), ({0x10001000: 0}, 'outside'),
+                     ({0x10001015: 0x41}, 'NRFFW')):
+      with self.subTest(why=why), self.assertRaisesRegex(ht.Refused, why):
+        ht.check_spans({**good, **bad}, 0x100000, 0x26000, 0xF4000, 'm.hex')
+    no_sd = {a: v for a, v in good.items() if a != 0x1000}
+    with self.assertRaisesRegex(ht.Refused, 'want runs'):
+      ht.check_spans(no_sd, 0x100000, 0x26000, 0xF4000, 'm.hex')
 
   def test_facts_from_this_checkout(self):
     f = {'name': 's140', 'version': '6.1.1'}
@@ -177,12 +210,16 @@ class Admit(unittest.TestCase):
       merged = Path(d) / 'm.hex'
       merged.write_text(':10000000' + b'UF2 Bootloader 1.2\r\n'[:16].hex().upper() + '00\n:00000001FF\n')
       self.assertRaises(ht.Refused, ht.facts, 'pca10056', {'softdevice': f}, {'merged': merged}, d)   # bad checksum
+      def record(addr, data):
+        raw = bytes([len(data)]) + (addr & 0xFFFF).to_bytes(2, 'big') + b'\0' + data
+        return ':' + (raw + bytes([-sum(raw) & 0xFF])).hex().upper()
+
+      def ela(upper):
+        raw = bytes([2, 0, 0, 4]) + upper.to_bytes(2, 'big')
+        return ':' + (raw + bytes([-sum(raw) & 0xFF])).hex().upper()
       body = b'xxUF2 Bootloader 1.2.3\r\nModel'
-      recs = [body[i:i + 16] for i in range(0, len(body), 16)]
-      lines = []
-      for i, r in enumerate(recs):
-        raw = bytes([len(r), 0, i * 16, 0]) + r
-        lines.append(':' + (raw + bytes([-sum(raw) & 0xFF])).hex().upper())
+      lines = [record(0, b'\0'), record(0x1000, b'\0'), ela(0xF), record(0x4000, body[:16]),
+               record(0x4010, body[16:]), ela(0x1000), record(0x1014, (0xF4000).to_bytes(4, 'little'))]
       merged.write_text('\n'.join(lines) + '\n:00000001FF\n')
       got = ht.facts('pca10056', {'softdevice': f}, {'merged': merged}, d)
     self.assertEqual((got['appStart'], got['ramEnd'], got['vid'], got['pid'], got['boardId'], got['version'],
@@ -201,13 +238,21 @@ def transcript(*chunks):
 class Probe(unittest.TestCase):
   BOARD = {'flasher': {'name': 'jlink', 'args': '-device nrf52840_xxaa', 'uid': '683944004'}, 'device': 'nrf52840_xxaa'}
 
-  def probe(self, out):
+  def probe(self, out, cleanup='done'):
     """A Probe whose JLinkExe prints `out`, judged by the installed agentrc's hil_flash."""
-    p = ht.Probe(self.BOARD, tempfile.gettempdir(), Path(tempfile.gettempdir()) / 'hil_test_unit.log')
+    tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
+    p = ht.Probe(self.BOARD, tmp, ht.Tools(tmp, Path(tmp) / 'hil.log'))
 
-    def fake(cmd, timeout, cwd=None, quiet=True):
-      return mock.Mock(returncode=0, stdout=out, stderr='')
-    return p, mock.patch.object(ht.process(), 'run_cmd', side_effect=fake)
+    def fake(cmd, cwd=None, *, timeout, settle, state_dir, quiet):
+      return mock.Mock(returncode=0, stdout=out, stderr='', cleanup=cleanup, receipt=None)
+    return p, mock.patch.object(ht.process(), 'run_tracked', side_effect=fake)
+
+  def test_a_tool_not_proven_ended_stops_with_its_receipt(self):
+    p, patch = self.probe('', cleanup='unknown')
+    with patch, self.assertRaises(ht.NotEnded):
+      p.regs()
+    self.assertEqual(p.tools.receipts, [{'cmd': 'JLinkExe', 'cleanup': 'unknown', 'receipt': None}])
 
   def test_regs_parses_pc_r0_ipsr(self):
     regs = ('PC = 00026040, CycleCnt = 00000000\nR0 = 0000002A, R1 = 00000000\n'
@@ -216,7 +261,7 @@ class Probe(unittest.TestCase):
                      ('exit', 'Script processing completed.\n'))
     p, patch = self.probe(out)
     with patch:
-      self.assertEqual(p.regs(), {'pc': 0x26040, 'r0': 0x2A, 'ipsr': 0})
+      self.assertEqual(p.regs(), {'pc': 0x26040, 'r0': 0x2A, 'r1': 0, 'ipsr': 0})
 
   def test_a_failed_command_is_a_step_failure(self):
     out = transcript(('h', 'J-Link connection not established yet but required for command.\n'),
@@ -227,13 +272,78 @@ class Probe(unittest.TestCase):
 
   def test_install_requires_nvmc_ready_after_eraseall(self):
     f = {'hex': '/x.hex', 'runs': []}
-    cmds = [('r', 'Reset delay: 0 ms\nReset: Reset device via AIRCR.SYSRESETREQ.\n'), ('w4 4001E504 00000002', 'Writing 00000002 -> 4001E504\n'),
+    cmds = [('r', 'Reset delay: 0 ms\nReset: Reset device via AIRCR.SYSRESETREQ.\n'),
+            ('w4 4001E504 00000002', 'Writing 00000002 -> 4001E504\n'),
             ('w4 4001E50C 00000001', 'Writing 00000001 -> 4001E50C\n'), ('sleep 1000', 'Sleep(1000)\n'),
             ('mem32 4001E400 1', '4001E400 = 00000000 \n'), ('w4 4001E504 00000000', 'Writing 00000000 -> 4001E504\n'),
             ('loadfile /x.hex', 'O.K.\n'), ('exit', 'Script processing completed.\n')]
     p, patch = self.probe(transcript(*cmds))
     with patch, self.assertRaisesRegex(ht.StepFail, 'NVMC not ready'):
       p.install(f)
+
+
+class BatteryRun(unittest.TestCase):
+  def battery(self):
+    tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
+    bat = ht.Battery({'flasher': {'uid': '1'}, 'device': 'd', 'uid': 'u'}, FACTS, tmp, Path(tmp) / 'hil.log')
+    return bat
+
+  def test_app_ran_rejects_another_copys_marker(self):
+    bat = self.battery()
+    a, b = ht.fixture(FACTS, b'a' * 16), ht.fixture(FACTS, b'b' * 16)
+    samples = iter([{'pc': a['loop'], 'r0': 1, 'r1': a['marker'], 'ipsr': 0},
+                    {'pc': a['loop'], 'r0': 9, 'r1': a['marker'], 'ipsr': 0}] * 2)
+    with mock.patch.object(ht, 'stays_away'), mock.patch.object(ht.time, 'sleep'), \
+         mock.patch.object(bat.probe, 'regs', side_effect=lambda: next(samples)):
+      bat.app_ran(b'a' * 16)
+      with self.assertRaisesRegex(ht.StepFail, "copy's app"):
+        bat.app_ran(b'b' * 16)
+    self.assertNotEqual(a['marker'], b['marker'])
+
+  def run_cmd(self, fail):
+    """cmd_run with the battery raising `fail` after install touched the board; the lock helper mocked."""
+    helper = mock.Mock(take_board_lock=mock.Mock(return_value=mock.Mock()),
+                       hand_to_cleanup_holder=mock.Mock(return_value='tok'))
+    board = {'reentry': 'gpregret', 'uid': 'u', 'lock': 'nrf52840dk', 'flasher': {'uid': '1'}, 'device': 'd'}
+
+    def battery(bat):
+      bat.touched = True
+      raise fail
+    restored = []
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
+         mock.patch.object(ht, 'lock_helper', return_value=helper), \
+         mock.patch.object(ht, 'load_board', return_value=board), \
+         mock.patch.object(ht, 'admit', return_value=({'input': {'head': 'h'}}, {'sha256': {'merged': 'm'}}, {})), \
+         mock.patch.object(ht, 'facts', return_value={**FACTS, 'version': 'v', 'vid': 1, 'pid': 2}), \
+         mock.patch.object(ht, 'probe_users', return_value=[]), mock.patch.object(ht, 'publish'), \
+         mock.patch.object(ht.Battery, 'battery', battery), \
+         mock.patch.object(ht.Battery, 'restore', lambda bat: restored.append(1) or {'pass': True, 'state': 'x'}):
+      try:
+        code = ht.main(['run', '-b', 'pca10056', '--build-record', 'r', '--run-root', d, 'roster'])
+      except BaseException as e:
+        code = e
+    return code, helper, restored, out.getvalue()
+
+  def test_a_step_turns_an_unexpected_error_into_its_failure(self):
+    bat = self.battery()
+    with self.assertRaisesRegex(ht.StepFail, 'OSError: boom'):
+      bat.step('dfu', lambda: (_ for _ in ()).throw(OSError('boom')))
+    self.assertEqual((bat.steps[0]['step'], bat.steps[0]['pass']), ('dfu', False))
+
+  def test_an_error_outside_a_step_hands_the_board_to_a_cleanup_holder(self):
+    code, helper, restored, _ = self.run_cmd(OSError('boom'))
+    self.assertIsInstance(code, OSError)
+    self.assertEqual(restored, [])
+    helper.hand_to_cleanup_holder.assert_called_once()
+    helper.release_board_lock.assert_not_called()
+
+  def test_an_interrupt_after_touching_hands_the_board_to_a_cleanup_holder(self):
+    code, helper, restored, _ = self.run_cmd(KeyboardInterrupt())
+    self.assertIsInstance(code, KeyboardInterrupt)
+    self.assertEqual(restored, [])
+    helper.hand_to_cleanup_holder.assert_called_once()
+    helper.release_board_lock.assert_not_called()
 
 
 class Verdict(unittest.TestCase):
