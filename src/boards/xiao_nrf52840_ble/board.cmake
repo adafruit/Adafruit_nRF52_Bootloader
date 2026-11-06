@@ -1,2 +1,4 @@
 set(MCU_VARIANT nrf52840)
-set(SD_VERSION 7.3.0)
+if (NOT DEFINED SD_VERSION)
+  set(SD_VERSION 7.3.0)
+endif ()
