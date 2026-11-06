@@ -62,5 +62,22 @@ class Selected(unittest.TestCase):
         ab.fetch()
 
 
+class Api(unittest.TestCase):
+  def api_of(self, source):
+    with tempfile.TemporaryDirectory() as d:
+      path = Path(d) / ab.SOURCE
+      path.parent.mkdir(parents=True)
+      path.write_text(source, encoding='utf-8')
+      ab._api(Path(d), 'the remedy')
+
+  def test_the_api_this_checkout_speaks_is_accepted(self):
+    self.api_of(f'API = {ab.API}\n')
+
+  def test_an_unusable_or_other_api_is_refused_with_the_remedy(self):
+    for source in ('API = foo()\n', 'API = (\n', f'API = {ab.API + 1}\n', ''):
+      with self.assertRaisesRegex(ImportError, 'the remedy', msg=source):
+        self.api_of(source)
+
+
 if __name__ == '__main__':
   unittest.main()

@@ -182,7 +182,9 @@ def admit(record_path, board, roster_path, workdir):
   if not rec.get('pass') or len(rows) != 1 or 'hilRecord' not in rec or 'sha256' not in rows[0]:
     raise Refused(f'{record_path}: not a passing HIL record of {board} (check_build.py --board {board} --shared '
                   f'--hil-config {roster_path})')
-  row, inp = rows[0], rec['input']
+  row, inp = rows[0], rec.get('input')
+  if not isinstance(inp, dict):
+    raise Refused(f'{record_path}: no input record')
   config = row.get('config') or {}
   wrong = {k: config.get(k) for k, v in {**DEFAULT_CONFIG, 'BOARD': board}.items() if config.get(k) != v}
   if rec.get('defines') or wrong:
@@ -926,6 +928,8 @@ def cmd_run(args, argv):
         row['detail'] = f'{bat.steps[-1]["step"]}: {e}'
       row['cleanup'] = bat.restore()
       code = 0 if row['pass'] and row['cleanup']['pass'] else 1
+  except BaseException as e:   # an interrupt or an error outside a step: reported, the board handed over below
+    row['detail'] = f'{type(e).__name__}: {e}'
   finally:
     row['steps'] = bat.steps
     if row['cleanup'] is None:   # never restored: an interrupt, or nothing written

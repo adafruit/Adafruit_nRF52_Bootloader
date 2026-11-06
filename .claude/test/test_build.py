@@ -5,6 +5,8 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -90,11 +92,14 @@ class BoardConfig(unittest.TestCase):
 
   def test_every_board_mk_override_is_mirrored_in_board_cmake(self):
     for mk in (ROOT / 'src/boards').glob('*/board.mk'):
-      text = mk.read_text()
+      make_vars = dict(re.findall(r'^(\w+)\s*=\s*(\S+)', mk.read_text(), re.M))
       cmake = (mk.parent / 'board.cmake').read_text()
       for var in ('SD_VERSION', 'USE_NFCT'):
-        if var in text:
-          self.assertIn(f'if (NOT DEFINED {var})', cmake, mk.parent.name)
+        if var in make_vars:
+          m = re.search(rf'if \(NOT DEFINED {var}\)\s*set\({var}\s+([^)\s]+)\)', cmake)
+          self.assertTrue(m, (mk.parent.name, var))
+          want = {'yes': 'ON', 'no': 'OFF'}.get(make_vars[var], make_vars[var])
+          self.assertEqual(m[1], want, (mk.parent.name, var))
 
 
 class Select(unittest.TestCase):
@@ -152,12 +157,23 @@ class Cli(unittest.TestCase):
 
   def test_scope_directory_classifies_like_the_paths_inside_it(self):
     for scope, rule in (('.claude/test/', 'tests'), ('.claude/test', 'tests'),
-                        ('.claude/skills/build/scripts', 'contract-build'), ('test/hil', 'contract-hil'),
+                        ('.claude/skills/build/scripts', 'contract-build'), ('.claude/skills/build', 'contract-build'),
+                        ('.claude/skills/hil-contract', 'contract-hil'), ('test/hil', 'contract-hil'),
                         ('src/boards/pca10056', 'board'), ('src', 'shared'),
-                        ('lib/softdevice/s140_nrf52_6.1.1', 'softdevice')):
+                        ('lib/softdevice/s140_nrf52_6.1.1', 'softdevice'), ('lib/softdevice', 'softdevice')):
       res = run('--scope', scope, '--select-only')[1]
-      self.assertEqual(res['paths'][0]['rule'], rule, scope)
+      self.assertIn(rule, {p['rule'] for p in res['paths']}, scope)
     self.assertTrue(run('--scope', '.claude/test/', '--select-only')[1]['build']['tests'])
+
+  def test_scope_directory_selects_what_its_files_select(self):
+    for scope in ('.claude/skills/build', '.claude/skills/hil-contract'):
+      self.assertTrue(run('--scope', scope, '--select-only')[1]['build']['tests'], scope)
+    boards = run('--scope', 'lib/softdevice', '--select-only')[1]['build']['boards']
+    self.assertLessEqual({'pca10100', 'xiao_nrf52840_ble', 'bluemicro_nrf52833', 'pca10056'}, set(boards))
+
+  def test_scope_directory_without_files_keeps_its_slash(self):
+    res = run('--scope', 'src/no_such_dir/', '--select-only')[1]
+    self.assertEqual([p['path'] for p in res['paths']], ['src/no_such_dir/'])
 
   def test_docs_only_needs_no_toolchain(self):
     with mock.patch.object(cb.shutil, 'which', return_value=None):
@@ -184,6 +200,25 @@ class Cli(unittest.TestCase):
     self.assertEqual(run('--board', 'nope', '--select-only')[0], 2)
     self.assertEqual(run('--scope', 'src/main.c', '--shared')[0], 2)
     self.assertEqual(run('--scope', 'src/main.c', '--worktree')[0], 2)
+
+  def test_signed_fw_needs_tinycrypt(self):
+    with tempfile.TemporaryDirectory() as d, mock.patch.object(cb, 'ROOT', Path(d)), \
+         mock.patch.object(cb.shutil, 'which', return_value='/bin/true'), \
+         mock.patch.dict(sys.modules, {'intelhex': mock.Mock()}):
+      for sub in ('lib/tinyusb/src', 'lib/nrfx/mdk', 'lib/uf2/utils'):
+        (Path(d) / sub).mkdir(parents=True)
+      cb.prerequisites(defines=['DUALBANK_FW=ON'])
+      cb.prerequisites(defines=['SIGNED_FW=OFF'])
+      with self.assertRaisesRegex(cb.Refusal, r'lib/tinycrypt.*git submodule update --init'):
+        cb.prerequisites(defines=['SIGNED_FW=ON'])
+
+  def test_signed_fw_follows_cmake_truth(self):
+    for value in ('ON', '1', 'yes', 'TRUE', 'y'):
+      self.assertTrue(cb.signed_fw([f'SIGNED_FW={value}']), value)
+    for value in ('OFF', '0', 'no', 'false', 'n', '', 'x-NOTFOUND'):
+      self.assertFalse(cb.signed_fw([f'SIGNED_FW={value}']), value)
+    self.assertFalse(cb.signed_fw(['SIGNED_FW=ON', 'SIGNED_FW=OFF']))
+    self.assertFalse(cb.signed_fw(['SIGNED_FW_QX=1']))
 
   def test_malformed_roster_is_refused(self):
     with tempfile.NamedTemporaryFile('w', suffix='.json') as f:
@@ -213,6 +248,40 @@ class Artifacts(unittest.TestCase):
     self.assertIn('bootloader.elf missing', problems)
     self.assertIn('b_bootloader-*_s*.hex: 2 match(es)', problems)
     self.assertIn('update-b_bootloader-*_nosd.uf2: 0 match(es)', problems)
+
+
+class Make(unittest.TestCase):
+  def test_make_flags_are_scrubbed(self):
+    with tempfile.TemporaryDirectory() as d, mock.patch.dict(cb.os.environ, {'MAKEFLAGS': 'n', 'MFLAGS': '-n'}):
+      log = Path(d) / 'log'
+      cb.run_logged([sys.executable, '-c', 'import os; print(os.environ.get("MAKEFLAGS"), os.environ.get("MFLAGS"))'],
+                    log, False)
+      self.assertIn('None None', log.read_text())
+
+  def test_make_exit_0_without_its_outputs_fails_and_keeps_the_log(self):
+    with tempfile.TemporaryDirectory() as d, mock.patch.object(cb, 'ROOT', Path(d)), \
+         mock.patch.object(cb, 'run_logged', return_value=0):
+      row = cb.make_board('b', False)
+      self.assertEqual(row['status'], 'failed')
+      self.assertIn('b_bootloader-*.out: 0 match(es)', row['firstError'])
+      self.assertTrue((Path(d) / row['buildDir']).is_dir())
+      self.assertIn('log', row)
+
+  def test_make_with_every_output_passes(self):
+    names = ('b_bootloader-1.0.out', 'b_bootloader-1.0_nosd.hex', 'update-b_bootloader-1.0_nosd.uf2',
+             'b_bootloader-1.0_s140_6.1.1.hex', 'b_bootloader-1.0_s140_6.1.1.zip')
+
+    def fake_make(cmd, log, verbose):
+      bdir = Path(next(a for a in cmd if a.startswith('BUILD='))[6:])
+      for n in names:
+        (bdir / n).write_text('x')
+      return 0
+
+    with tempfile.TemporaryDirectory() as d, mock.patch.object(cb, 'ROOT', Path(d)), \
+         mock.patch.object(cb, 'run_logged', side_effect=fake_make):
+      row = cb.make_board('b', False)
+      self.assertEqual(row['status'], 'ok')
+      self.assertFalse((Path(d) / row['buildDir']).exists())
 
 
 if __name__ == '__main__':

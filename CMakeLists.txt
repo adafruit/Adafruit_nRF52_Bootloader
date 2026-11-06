@@ -366,10 +366,10 @@ target_compile_definitions(bootloader PUBLIC
 
 # Add bin/hex output
 add_custom_command(TARGET bootloader POST_BUILD
-  COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:bootloader> $<TARGET_FILE_DIR:bootloader>/bootloader.bin
-  COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE:bootloader> $<TARGET_FILE_DIR:bootloader>/bootloader.hex
-  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py --overlap=replace -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex $<TARGET_FILE_DIR:bootloader>/bootloader.hex ${MBR_HEX}
-  COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} -c -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2 $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex
+  COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:bootloader> ${CMAKE_CURRENT_BINARY_DIR}/bootloader.bin
+  COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE:bootloader> ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py --overlap=replace -o ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.hex ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex ${MBR_HEX}
+  COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} -c -o ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2 ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.hex
   BYPRODUCTS
     ${CMAKE_CURRENT_BINARY_DIR}/bootloader.bin
     ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex
@@ -425,7 +425,7 @@ add_custom_target(flash-bootloader
 
 add_custom_target(flash-uf2
   DEPENDS bootloader
-  COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} --deploy $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2
+  COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} --deploy ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2
   )
 
 add_custom_target(flash-sd

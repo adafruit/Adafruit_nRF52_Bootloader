@@ -197,6 +197,12 @@ class Admit(unittest.TestCase):
       f.flush()
       ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent')
 
+  def test_refuses_a_record_without_input(self):
+    for inp in ({}, {'input': None}, {'input': []}):
+      rec = {k: v for k, v in self.record().items() if k != 'input'}
+      with self.subTest(inp=inp), self.assertRaisesRegex(ht.Refused, 'no input record'):
+        self.admit({**rec, **inp})
+
   def test_refuses_a_dirty_record(self):
     with self.assertRaisesRegex(ht.Refused, 'rebuild on a clean HEAD'):
       self.admit(self.record())
@@ -417,19 +423,20 @@ class BatteryRun(unittest.TestCase):
       bat.step('dfu', lambda: (_ for _ in ()).throw(OSError('boom')))
     self.assertEqual((bat.steps[0]['step'], bat.steps[0]['pass']), ('dfu', False))
 
-  def test_an_error_outside_a_step_hands_the_board_to_a_cleanup_holder(self):
-    code, helper, restored, _ = self.run_cmd(OSError('boom'))
-    self.assertIsInstance(code, OSError)
+  def assert_handed_over(self, fail, detail):
+    code, helper, restored, out = self.run_cmd(fail)
+    self.assertEqual(code, 4)
     self.assertEqual(restored, [])
     helper.hand_to_cleanup_holder.assert_called_once()
     helper.release_board_lock.assert_not_called()
+    row = json.loads(out.splitlines()[-1])['results'][0]
+    self.assertEqual((row['detail'], row['cleanup']['state'], row['cleanup']['heldAfter']), (detail, 'unknown', True))
+
+  def test_an_error_outside_a_step_hands_the_board_to_a_cleanup_holder(self):
+    self.assert_handed_over(OSError('boom'), 'OSError: boom')
 
   def test_an_interrupt_after_touching_hands_the_board_to_a_cleanup_holder(self):
-    code, helper, restored, _ = self.run_cmd(KeyboardInterrupt())
-    self.assertIsInstance(code, KeyboardInterrupt)
-    self.assertEqual(restored, [])
-    helper.hand_to_cleanup_holder.assert_called_once()
-    helper.release_board_lock.assert_not_called()
+    self.assert_handed_over(KeyboardInterrupt(), 'KeyboardInterrupt: ')
 
 
 class Verdict(unittest.TestCase):

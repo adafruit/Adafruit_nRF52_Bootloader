@@ -35,10 +35,13 @@ REPRESENTATIVES = ('feather_nrf52840_express', 'feather_nrf52832', 'pca10100', '
 # ANT (ANT_LICENSE_KEY, SD_NAME=s340) is not offered: the s340 SoftDevice is license-excluded from the repository
 OPTIONS = ('DUALBANK_FW', 'DEFAULT_TO_OTA_DFU', 'SIGNED_FW', 'SIGNED_FW_QX', 'SIGNED_FW_QY', 'FORCE_UF2', 'SD_VERSION',
            'USE_NFCT')
-# compiler and CMake inputs from the environment would make a build CI never makes
+# compiler, CMake and make inputs from the environment would make a build CI never makes (MAKEFLAGS=n: no build)
 SCRUBBED_ENV = ('CFLAGS', 'CXXFLAGS', 'ASMFLAGS', 'LDFLAGS', 'CPPFLAGS', 'CPATH', 'C_INCLUDE_PATH', 'LIBRARY_PATH',
                 'COMPILER_PATH', 'GCC_EXEC_PREFIX', 'CMAKE_TOOLCHAIN_FILE', 'CMAKE_BUILD_TYPE', 'CMAKE_GENERATOR',
-                'CMAKE_C_COMPILER_LAUNCHER', 'CMAKE_PREFIX_PATH')
+                'CMAKE_C_COMPILER_LAUNCHER', 'CMAKE_PREFIX_PATH', 'MAKEFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS',
+                'MFLAGS')
+# CMake's false constants (`if(<variable>)` is true for any other value), compared case-insensitively
+CMAKE_FALSE = ('', '0', 'OFF', 'NO', 'FALSE', 'N', 'IGNORE', 'NOTFOUND')
 # the CMake cache entries a build record keeps: what configured the build
 RECORDED_CACHE = ('BOARD', 'CMAKE_BUILD_TYPE', 'CMAKE_GENERATOR', 'CMAKE_OBJCOPY', 'NRFUTIL',
                   'Python_EXECUTABLE', *OPTIONS)
@@ -99,11 +102,19 @@ def board_config(board):
   return mcu, f'{name}_nrf52_{version}'
 
 
+def scope_paths(p):
+  """A scope path as changed paths: a directory is every tracked and untracked file under it, so each selects what
+  it would alone; one with none (removed, ignored, inside a submodule) keeps its trailing '/'."""
+  rel = os.path.relpath(os.path.abspath(p), ROOT)
+  if not (os.path.isdir(p) or p.endswith('/')):
+    return [rel]
+  files = git('ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', rel, check=False).split('\0')
+  return [f for f in files if f] or [rel + '/']
+
+
 def changed_paths(args):
   if args.scope:
-    # a directory keeps its trailing '/' so it classifies like the paths inside it
-    return [os.path.relpath(os.path.abspath(p), ROOT) + ('/' if os.path.isdir(p) or p.endswith('/') else '')
-            for p in args.scope]
+    return list(dict.fromkeys(f for p in args.scope for f in scope_paths(p)))
   if args.diff_file:
     return [l.strip() for l in Path(args.diff_file).read_text().splitlines() if l.strip()]
   paths = []
@@ -206,7 +217,13 @@ def inputs():
                     'python': sys.version.split()[0]}}
 
 
-def prerequisites(make=False):
+def signed_fw(defines):
+  """Whether the -D options enable SIGNED_FW, as CMakeLists.txt's `if (SIGNED_FW)` evaluates them."""
+  values = [d.split('=', 1)[1].upper() for d in defines if d.split('=', 1)[0] == 'SIGNED_FW']
+  return bool(values) and values[-1] not in CMAKE_FALSE and not values[-1].endswith('-NOTFOUND')
+
+
+def prerequisites(make=False, defines=()):
   missing = [t for t in ('arm-none-eabi-gcc', 'cmake', 'ninja', 'adafruit-nrfutil') if not shutil.which(t)]
   if make and not shutil.which('make'):
     missing.append('make')
@@ -217,7 +234,10 @@ def prerequisites(make=False):
   if missing:
     raise Refusal(f'missing prerequisite(s) on PATH: {", ".join(missing)} (CI installs arm-gcc 12.3.Rel1 and '
                   f'`pip install adafruit-nrfutil intelhex ninja`)')
-  for path in ('lib/tinyusb/src', 'lib/nrfx/mdk', 'lib/uf2/utils'):
+  needed = ['lib/tinyusb/src', 'lib/nrfx/mdk', 'lib/uf2/utils']
+  if signed_fw(defines):
+    needed.append('lib/tinycrypt/lib/source')
+  for path in needed:
     if not (ROOT / path).is_dir():
       raise Refusal(f'{path} missing: git submodule update --init')
 
@@ -238,6 +258,19 @@ def expected_artifacts(bdir, board):
       found[k] = bdir / name
     else:
       problems.append(f'{name} missing')
+  more, more_problems = unique_matches(bdir, globs)
+  return {**found, **more}, problems + more_problems
+
+
+def make_artifacts(bdir, board):
+  """name -> path of every file the Makefile's `all` target produces, or a list of what is missing or ambiguous."""
+  return unique_matches(bdir, {'out': f'{board}_bootloader-*.out', 'hexNosd': f'{board}_bootloader-*_nosd.hex',
+                               'update': f'update-{board}_bootloader-*_nosd.uf2',
+                               'merged': f'{board}_bootloader-*_s*.hex', 'zip': f'{board}_bootloader-*_s*.zip'})
+
+
+def unique_matches(bdir, globs):
+  found, problems = {}, []
   for k, pattern in globs.items():
     hits = [Path(p) for p in glob.glob(str(bdir / pattern))]
     if len(hits) == 1:
@@ -314,8 +347,10 @@ def make_board(board, verbose):
   log = bdir / 'check_build.log'
   rc = run_logged(['make', '-j', f'BOARD={board}', f'BUILD={bdir}', 'all'], log, verbose)
   row = {'board': board, 'backend': 'make', 'buildDir': str(bdir.relative_to(ROOT))}
-  if rc:
-    row.update(status='failed', firstError=first_error(log) or f'exit {rc}', log=str(log.relative_to(ROOT)))
+  problems = [] if rc else make_artifacts(bdir, board)[1]
+  if rc or problems:
+    row.update(status='failed', firstError=(first_error(log) or f'exit {rc}') if rc else '; '.join(problems),
+               log=str(log.relative_to(ROOT)))
   else:
     row['status'] = 'ok'
     shutil.rmtree(bdir)
@@ -371,7 +406,7 @@ def main(argv=None):
     if record and args.defines:
       raise Refusal('a HIL record builds the default configuration: drop -D')
     if result['build']['boards'] or result['build']['make']:
-      prerequisites(make=bool(result['build']['make']))
+      prerequisites(make=bool(result['build']['make']), defines=args.defines)
     result['input'] = inputs()
     result['input']['sourceDateEpoch'] = os.environ.get('SOURCE_DATE_EPOCH')
     if record:
