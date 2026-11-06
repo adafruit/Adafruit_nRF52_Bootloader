@@ -221,10 +221,11 @@ class Admit(unittest.TestCase):
       lines = [record(0, b'\0'), record(0x1000, b'\0'), ela(0xF), record(0x4000, body[:16]),
                record(0x4010, body[16:]), ela(0x1000), record(0x1014, (0xF4000).to_bytes(4, 'little'))]
       merged.write_text('\n'.join(lines) + '\n:00000001FF\n')
-      got = ht.facts('pca10056', {'softdevice': f}, {'merged': merged}, d)
-    self.assertEqual((got['appStart'], got['ramEnd'], got['vid'], got['pid'], got['boardId'], got['version'],
-                      got['softdevice'], got['family']),
-                     (0x26000, 0x20040000, 0x239A, 0x00DA, 'nRF52840-pca10056-v1', '1.2.3', 'S140 6.1.1', 0xADA52840))
+      got = ht.facts('pca10056', {'softdevice': f}, {'merged': merged, 'update': Path(d) / 'u.uf2'}, d)
+    self.assertEqual((got['appStart'], got['ramEnd'], got['vid'], got['pid'], got['cdcPid'], got['boardId'],
+                      got['version'], got['softdevice'], got['family']),
+                     (0x26000, 0x20040000, 0x239A, 0x00DA, 0x00DA, 'nRF52840-pca10056-v1', '1.2.3', 'S140 6.1.1',
+                      0xADA52840))
 
   def test_facts_refuse_a_board_without_usb(self):
     with self.assertRaisesRegex(ht.Refused, 'no USB'):
@@ -317,7 +318,7 @@ class BatteryRun(unittest.TestCase):
     helper.PendingSessions.return_value.add.return_value = []
     board = {'reentry': 'gpregret', 'uid': 'u', 'lock': 'nrf52840dk', 'flasher': {'uid': '1'}, 'device': 'd'}
 
-    def battery(bat):
+    def battery(bat, base):
       bat.touched = True
       raise fail
     restored = []
@@ -327,10 +328,12 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(ht, 'admit', return_value=({'input': {'head': 'h'}}, {'sha256': {'merged': 'm'}}, {})), \
          mock.patch.object(ht, 'facts', return_value={**FACTS, 'version': 'v', 'vid': 1, 'pid': 2}), \
          mock.patch.object(ht, 'probe_users', return_value=[]), mock.patch.object(ht, 'publish'), \
+         mock.patch.object(ht, 'admit_base', return_value={'version': 'v', 'file': 'f', 'sha256': 's'}), \
+         mock.patch.object(ht.shutil, 'which', return_value='/bin/true'), \
          mock.patch.object(ht.Battery, 'battery', battery), \
          mock.patch.object(ht.Battery, 'restore', lambda bat: restored.append(1) or {'pass': True, 'state': 'x'}):
       try:
-        code = ht.main(['run', '-b', 'pca10056', '--build-record', 'r', '--run-root', d, 'roster'])
+        code = ht.main(['run', '-b', 'pca10056', '--build-record', 'r', '--base-dir', d, '--run-root', d, 'roster'])
       except BaseException as e:
         code = e
     return code, helper, restored, out.getvalue()
@@ -386,7 +389,8 @@ class Cli(unittest.TestCase):
          mock.patch.object(ht, 'publish'):
       roster = Path(d) / 'r.json'
       roster.write_text(json.dumps({'boards': [entry]}))
-      code = ht.main(['run', '-b', 'pca10056', '--build-record', '/nonexistent', '--run-root', d, str(roster)])
+      code = ht.main(['run', '-b', 'pca10056', '--build-record', '/nonexistent', '--base-dir', d, '--run-root', d,
+                      str(roster)])
     res = json.loads(buf.getvalue().splitlines()[-1])
     self.assertEqual((code, res['exitCode'], res['results'][0]['ran']), (2, 2, False))
     self.assertIn('pending commissioning', res['error'])

@@ -26,7 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hil_run_report as run_report  # noqa: E402
 
 TITLE = '## Hardware-in-the-loop (HIL) Test Report'
-STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b')   # hil_test.py's battery
+STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'serial', 'app-ran-c',
+         'update-base', 'update')   # hil_test.py's battery
 VERDICT = {'pass': '✅ passed', 'fail': '❌ failed', 'blocker': '⛔ blocked', 'not-run': '⚪ not run'}
 LEGEND = '✅ passed · ❌ failed · blank not run · cleanup: the candidate reinstalled and a benign app proven running'
 RUN_NAME = 'HIL PR #{}'   # hil.yml's run-name: a run's pull_requests lists every PR on its head, not the one it is for

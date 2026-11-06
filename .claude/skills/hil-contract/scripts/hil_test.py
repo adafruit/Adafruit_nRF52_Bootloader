@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """The bootloader's HIL battery on one rig board (.claude/skills/hil-contract/SKILL.md). The last stdout line is JSON.
 
-  hil_test.py run -b BOARD --build-record REC [--run-root DIR] [--lock-wait S] [--fail-at STEP] ROSTER
+  hil_test.py run -b BOARD --build-record REC --base-dir DIR [--run-root DIR] [--lock-wait S] [--fail-at STEP] ROSTER
   hil_test.py install -b BOARD --build-record REC --under-hold REASON ROSTER
   hil_test.py restore -b BOARD --build-record REC --under-hold REASON ROSTER
   hil_test.py fat-read --dev DEV --file NAME [--offset N] [--length N]   (child: one bounded FAT read)
@@ -34,20 +34,22 @@ import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
 PENDING_KIND = 'nrf52-bootloader'   # hil_lock.PendingSessions: <lock>.nrf52-bootloader-pending.json
-STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b')
+STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'serial', 'app-ran-c', 'update-base',
+         'update')
 REENTRY = ('gpregret',)
 # nRF52 NVMC (PS v1.7 4.3.9) and POWER.GPREGRET (5.3.7.16); the same offsets on nRF52832/833
 NVMC_READY, NVMC_CONFIG, NVMC_ERASEALL = 0x4001E400, 0x4001E504, 0x4001E50C
 CONFIG_REN, CONFIG_EEN = 0, 2
 GPREGRET = 0x4000051C
-DFU_MAGIC_UF2_RESET = 0x57   # src/main.c
+DFU_MAGIC_UF2_RESET, DFU_MAGIC_SERIAL_ONLY_RESET = 0x57, 0x4E   # src/main.c
+ADAFRUIT_DEVICE_TYPE = 0x0052   # src/dfu_init.c: every init packet's device type
 MBR_SIZE = 0x1000            # nrf_mbr.h
 APP_FAMILY = {'nrf52840': 0xADA52840, 'nrf52833': 0x621E937A}   # src/usb/uf2/uf2cfg.h CFG_UF2_FAMILY_APP_ID
 UF2_MAGIC = (0x0A324655, 0x9E5D5157, 0x0AB16F30)
 UF2_FLAG_FAMILY = 0x2000
 JLINK_SPEED = 4000
 ERASEALL_WAIT_MS = 1000      # tERASEALL is at most 169 ms (PS v1.7 4.3.10); READY is read after it
-PROBE_TIMEOUT, INSTALL_TIMEOUT = 60, 180
+PROBE_TIMEOUT, INSTALL_TIMEOUT, NRFUTIL_TIMEOUT = 60, 180, 120
 USB_TIMEOUT, UDEV_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 10, 30, 15, 3
 APP_SAMPLE_MS = 200
 LOCK_RETRY = 15
@@ -58,9 +60,8 @@ UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] 
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
-UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'CDC serial DFU',
-             'SIGNED_FW and dual-bank builds', 'a physical double reset', 'an interrupted update',
-             'bootloader self-update')
+UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW and dual-bank builds',
+             'a physical double reset', 'an interrupted update', 'a SoftDevice update')
 
 
 class Refused(Exception):
@@ -122,8 +123,28 @@ def load_board(roster_path, name):
   extra = entry.get('nrf52') or {}
   if extra.get('reentry') not in (None, *REENTRY):
     raise Refused(f'{name}: nrf52.reentry {extra.get("reentry")!r} is none of {REENTRY}')
+  base = extra.get('selfUpdateBase')
+  if base is not None and (not isinstance(base, dict) or set(base) != {'version', 'file', 'sha256'}
+                           or not all(isinstance(v, str) and v for v in base.values()) or '/' in base['file']):
+    raise Refused(f'{name}: nrf52.selfUpdateBase is not {{version, file, sha256}} of a release asset ({base!r})')
   return {'name': name, 'entry': resolved, 'flasher': flasher, 'device': m[1], 'lock': lock,
-          'uid': entry.get('uid'), 'reentry': extra.get('reentry')}
+          'uid': entry.get('uid'), 'reentry': extra.get('reentry'), 'base': base}
+
+
+def admit_base(board, base_dir, workdir):
+  """The roster's pinned release update UF2 (nrf52.selfUpdateBase), from `base_dir`, copied into `workdir` from bytes
+  that hash as pinned."""
+  base = board['base']
+  if not base:
+    raise Refused(f'{board["name"]} pins no nrf52.selfUpdateBase in the roster: commissioning.md')
+  src, copy = Path(base_dir) / base['file'], Path(workdir) / base['file']
+  if not src.is_file() or src.is_symlink() or sha256(src) != base['sha256']:
+    raise Refused(f'{src} is not the pinned {base["file"]} (sha256 {base["sha256"]}): download it from release '
+                  f'{base["version"]}')
+  shutil.copyfile(src, copy)
+  if sha256(copy) != base['sha256']:
+    raise Refused(f'{src} changed while it was copied')
+  return {**base, 'path': str(copy)}
 
 
 def sha256(path):
@@ -257,8 +278,9 @@ def facts(board, row, copies, workdir):
   ram = re.search(r'RAM\s*\(rwx\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+),\s*LENGTH\s*=\s*(0x[0-9A-Fa-f]+)', ld)
   bh = (ROOT / f'src/boards/{board}/board.h').read_text()
   vid, pid, board_id = define(bh, 'USB_DESC_VID'), define(bh, 'USB_DESC_UF2_PID'), define(bh, 'UF2_BOARD_ID')
-  if not (sd_size and ram and vid and pid and board_id):
-    raise Refused(f'{board}: cannot establish SD_FLASH_SIZE, RAM, USB_DESC_VID/UF2_PID or UF2_BOARD_ID')
+  cdc_pid = define(bh, 'USB_DESC_CDC_ONLY_PID')
+  if not (sd_size and ram and vid and pid and cdc_pid and board_id):
+    raise Refused(f'{board}: cannot establish SD_FLASH_SIZE, RAM, USB_DESC_VID/UF2_PID/CDC_ONLY_PID or UF2_BOARD_ID')
   merged = parse_hex(copies['merged'])
   flash = re.search(r'FLASH\s*\(rx\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+),\s*LENGTH\s*=\s*(0x[0-9A-Fa-f]+)', ld)
   boot = re.search(r'FLASH\s*\(rx\)\s*:\s*ORIGIN\s*=\s*(0x[0-9A-Fa-f]+)', (ROOT / f'linker/{mcu}.ld').read_text())
@@ -272,10 +294,10 @@ def facts(board, row, copies, workdir):
   for a, b in hex_runs:
     (Path(workdir) / f'run-{a:08x}.bin').write_bytes(b)
   return {'mcu': mcu, 'family': APP_FAMILY[mcu], 'appStart': MBR_SIZE + int(sd_size, 0),
-          'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0),
+          'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0), 'cdcPid': int(cdc_pid, 0),
           'boardId': board_id.strip('"'), 'version': versions.pop().decode(),
           'softdevice': f'S{row["softdevice"]["name"][1:]} {row["softdevice"]["version"]}',
-          'hex': str(copies['merged']), 'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
+          'hex': str(copies['merged']), 'update': str(copies['update']), 'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
 
 
 # ------------------------------------------------------------------ the fixture app
@@ -436,12 +458,12 @@ class Probe:
     return {'pc': one(r'\bPC = ([0-9A-F]{8})'), 'r0': one(r'\bR0 = ([0-9A-F]{8})'),
             'r1': one(r'\bR1 = ([0-9A-F]{8})'), 'ipsr': one(r'\bIPSR = ([0-9A-F]{3})')}
 
-  def reenter(self):
-    """GPREGRET = DFU_MAGIC_UF2_RESET, read back, then SYSRESETREQ: a soft reset keeps the retained register (PS
-    v1.7 5.3.6.8), and the bootloader enters UF2 DFU on it (src/main.c)."""
-    out = self.session(['h', f'w4 {GPREGRET:08X} {DFU_MAGIC_UF2_RESET:08X}', f'mem32 {GPREGRET:08X} 1', 'g'])
+  def reenter(self, magic=DFU_MAGIC_UF2_RESET):
+    """GPREGRET = `magic`, read back, then SYSRESETREQ: a soft reset keeps the retained register (PS v1.7 5.3.6.8), and
+    the bootloader enters UF2 DFU (0x57) or CDC-only serial DFU (0x4E) on it (src/main.c)."""
+    out = self.session(['h', f'w4 {GPREGRET:08X} {magic:08X}', f'mem32 {GPREGRET:08X} 1', 'g'])
     m = re.search(rf'^{GPREGRET:08X} = ([0-9A-F]{{8}})', out, re.M)
-    if not m or int(m[1], 16) & 0xFF != DFU_MAGIC_UF2_RESET:
+    if not m or int(m[1], 16) & 0xFF != magic:
       raise StepFail(f'GPREGRET reads back {m[1] if m else "nothing"}')
     op = provider().sysresetreq_jlink(self.b['flasher'], **self.profile, timeout=PROBE_TIMEOUT,
                                       run=self.tools.run)
@@ -465,6 +487,13 @@ def usb_device(vid, pid, serial):
   if len(hits) > 1:
     raise StepFail(f'{len(hits)} USB devices {vid:04x}:{pid:04x} with serial {serial}: {hits}')
   return hits[0] if hits else None
+
+
+def cdc_tty(usb_path):
+  ttys = sorted(p.name for p in Path('/sys/bus/usb/devices').glob(f'{usb_path}:*/tty/*'))
+  if len(ttys) > 1:
+    raise StepFail(f'{usb_path} has {len(ttys)} ttys: {ttys}')
+  return f'/dev/{ttys[0]}' if ttys else None
 
 
 def block_device(usb_path):
@@ -530,9 +559,10 @@ class Drive:
       raise StepFail(f'reading {name} failed', {'result': res, 'exit': code})
     return bytes.fromhex(res['data']), res
 
-  def info(self, dev):
+  def info(self, dev, version=None):
     text = self.read(dev, 'INFO_UF2.TXT')[0].decode(errors='replace')
-    want = {'UF2 Bootloader': self.f['version'], 'Board-ID:': self.f['boardId'], 'SoftDevice:': self.f['softdevice']}
+    want = {'UF2 Bootloader': version or self.f['version'], 'Board-ID:': self.f['boardId'],
+            'SoftDevice:': self.f['softdevice']}
     lines = text.splitlines()
     bad = {k: v for k, v in want.items() if not any(l.strip() == f'{k} {v}' for l in lines)}
     if bad:
@@ -540,7 +570,7 @@ class Drive:
     return lines
 
   def copy(self, dev, uf2, workdir):
-    path = Path(workdir) / 'app.uf2'
+    path = Path(workdir) / 'copy.uf2'
     path.write_bytes(uf2)
     code, out = self.tools.spawn(['mcopy', '-o', '-i', dev, path, '::APP.UF2'], 60)
     if code:
@@ -620,13 +650,55 @@ class Battery:
       raise StepFail('CURRENT.UF2 does not read back the copied app', {'read': len(got)})
     return {**ev, 'method': 'gpregret', 'readBack': len(got)}
 
+  def serial(self, nonce):
+    """App C through CDC-only serial DFU: GPREGRET 0x4E enumerates the bootloader as one CDC port and no drive
+    (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
+    fx = fixture(self.f, nonce)
+    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
+    usb = wait_for(lambda: usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), USB_TIMEOUT,
+                   f'serial DFU {self.f["vid"]:04x}:{self.f["cdcPid"]:04x} {self.b["uid"]}')
+    tty = wait_for(lambda: cdc_tty(usb), UDEV_TIMEOUT, f'the CDC tty of {usb}')
+    wait_for(lambda: os.access(tty, os.R_OK | os.W_OK), UDEV_TIMEOUT, f'read-write access to {tty}')
+    if block_device(usb):
+      raise StepFail(f'{usb} enumerated a drive in CDC-only serial DFU')
+    app, pkg = self.dir / 'app-serial.bin', self.dir / 'app-serial.zip'
+    app.write_bytes(fx['image'])
+    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
+    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200', '--singlebank'],
+                       'dfu serial')
+    if 'Device programmed.' not in out:   # it exits 0 on a failed upgrade too
+      raise StepFail('adafruit-nrfutil did not program the device', {'tail': out.strip().splitlines()[-8:]})
+    return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+
+  def nrfutil(self, argv, what):
+    code, out = self.tools.spawn(['adafruit-nrfutil', *argv], NRFUTIL_TIMEOUT)
+    if code:
+      raise StepFail(f'adafruit-nrfutil {what} exited {code}', {'tail': out.strip().splitlines()[-8:]})
+    return out
+
+  def update(self, uf2, version, nonce):
+    """A bootloader update UF2 copied to the drive: the bootloader stages it in the app region's top and has the MBR
+    copy it over itself (src/usb/uf2/ghostfat.c, src/usb/msc_uf2.c). The app `nonce` still runs after it, and
+    re-entered, the drive names `version`."""
+    ev = {}
+    if not self.drive.present():
+      ev['enter'] = self.probe.reenter()
+    dev = self.drive.wait()
+    ev['before'] = next((l for l in self.drive.read(dev, 'INFO_UF2.TXT')[0].decode(errors='replace').splitlines()
+                         if l.startswith('UF2 Bootloader')), None)
+    ev['copy'] = self.drive.copy(dev, Path(uf2).read_bytes(), self.dir)
+    ev['appRan'] = self.app_ran(nonce)
+    ev['reenter'] = self.probe.reenter()
+    ev['info'] = self.drive.info(self.drive.wait(), version)
+    return ev
+
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
     from USER_FLASH_START = MBR_SIZE (src/usb/uf2/ghostfat.c, uf2cfg.h)."""
     return (self.f['appStart'] - MBR_SIZE) // 256 * 512, length // 256 * 512
 
-  def battery(self):
-    a, b = os.urandom(16), os.urandom(16)
+  def battery(self, base):
+    a, b, c = os.urandom(16), os.urandom(16), os.urandom(16)
     self.step('install', self.install)
     self.step('dfu', self.dfu)
     self.step('copy', lambda: self.copy(a))
@@ -634,6 +706,10 @@ class Battery:
     self.step('reenter', lambda: self.reenter(a))
     self.step('copy-b', lambda: self.copy(b))
     self.step('app-ran-b', lambda: self.app_ran(b))
+    self.step('serial', lambda: self.serial(c))
+    self.step('app-ran-c', lambda: self.app_ran(c))
+    self.step('update-base', lambda: self.update(base['path'], base['version'], c))
+    self.step('update', lambda: self.update(self.f['update'], self.f['version'], c))
 
   def restore(self):
     """The candidate installed again and the benign fixture copied through it and running; never while a tool of the
@@ -749,9 +825,9 @@ def prove_cleanup_holder(board, pid):
 
 
 def tools_left():
-  """Every JLinkExe, mcopy and hil_test.py child on the host (recovery's host-wide check)."""
+  """Every JLinkExe, mcopy, adafruit-nrfutil and hil_test.py child on the host (recovery's host-wide check)."""
   found = []
-  for pattern in ('JLinkExe', 'mcopy', r'hil_test\.py (fat-read|flush)'):
+  for pattern in ('JLinkExe', 'mcopy', 'adafruit-nrfutil', r'hil_test\.py (fat-read|flush)'):
     out = subprocess.run(['pgrep', '-af', pattern], capture_output=True, text=True).stdout
     found += [l for l in out.splitlines() if l.split(maxsplit=1)[0] != str(os.getpid())]
   return found
@@ -801,8 +877,11 @@ def cmd_run(args, argv):
     f = facts(args.board, rrow, copies, run_dir)
     row['firmware'] = {'version': f['version'], 'buildRecord': args.build_record, 'merged': rrow['sha256']['merged'],
                        'head': rec['input']['head']}
-    if not shutil.which('mcopy'):
-      raise Refused('mcopy (mtools) must be on PATH')
+    base = admit_base(board, args.base_dir, run_dir)
+    row['selfUpdateBase'] = {k: base[k] for k in ('version', 'file', 'sha256')}
+    for tool, what in (('mcopy', 'mtools'), ('adafruit-nrfutil', 'the farm\'s hil-venv')):
+      if not shutil.which(tool):
+        raise Refused(f'{tool} ({what}) must be on PATH')
   except Refused as e:
     row['detail'] = result['error'] = str(e)
     return finish(2)
@@ -826,7 +905,7 @@ def cmd_run(args, argv):
     else:
       row['ran'] = True
       try:
-        bat.battery()
+        bat.battery(base)
         row['pass'] = True
       except StepFail as e:
         row['detail'] = f'{bat.steps[-1]["step"]}: {e}'
@@ -965,6 +1044,7 @@ def main(argv=None):
     p.add_argument('roster')
     if name == 'run':
       p.add_argument('--lock-wait', type=float, default=0)
+      p.add_argument('--base-dir', required=True, help="holds the roster's nrf52.selfUpdateBase file")
       p.add_argument('--fail-at', choices=STEPS)
     elif name == 'install':
       p.add_argument('--under-hold', required=True, metavar='REASON')
