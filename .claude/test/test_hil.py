@@ -314,6 +314,7 @@ class BatteryRun(unittest.TestCase):
     """cmd_run with the battery raising `fail` after install touched the board; the lock helper mocked."""
     helper = mock.Mock(take_board_lock=mock.Mock(return_value=mock.Mock()),
                        hand_to_cleanup_holder=mock.Mock(return_value='tok'))
+    helper.PendingSessions.return_value.add.return_value = []
     board = {'reentry': 'gpregret', 'uid': 'u', 'lock': 'nrf52840dk', 'flasher': {'uid': '1'}, 'device': 'd'}
 
     def battery(bat):
@@ -428,57 +429,64 @@ class Pending(unittest.TestCase):
   def mark(self):
     return self.helper.PendingSessions('nrf52840dk', ht.PENDING_KIND).read()
 
-  def test_a_claim_names_the_invocation_and_clears_once_it_ended(self):
-    ht.claim(self.board, self.ops)
-    self.assertEqual(self.mark()[0]['receipt']['pid'], ht.os.getpid())
-    ht.pending_clear(self.board)   # this invocation's own claim, its ops dir clean
+  def other(self, pid, start, ops):
+    self.helper.PendingSessions('nrf52840dk', ht.PENDING_KIND).add(
+      [{'receipt': {'ops': ops, 'pid': pid, 'start': start}, 'cmd': 'hil_test.py'}])
+
+  def test_a_claim_names_the_invocation_by_absolute_ops_and_unmark_clears_it(self):
+    with contextlib.chdir(self.tmp):
+      ht.claim(self.board, 'ops')
+    self.assertEqual(self.mark()[0]['receipt'], {'ops': ht.os.path.realpath(self.ops), 'pid': ht.os.getpid(),
+                                                 'start': self.helper.proc_start(ht.os.getpid())})
+    ht.unmark(self.board)
     self.assertEqual(self.mark(), [])
 
-  def test_a_live_invocations_claim_refuses_another(self):
-    ht.claim(self.board, self.ops)
-    with mock.patch.object(ht.os, 'getpid', return_value=1), self.assertRaisesRegex(ht.Refused, 'not proven ended'):
-      ht.pending_clear(self.board)
+  def test_a_live_invocation_refuses_a_later_claim(self):
+    parent = ht.os.getppid()
+    self.other(parent, self.helper.proc_start(parent), self.ops)
+    with self.assertRaisesRegex(ht.Refused, 'not proven ended'):
+      ht.claim(self.board, self.ops)
+    self.assertEqual(len(self.mark()), 2)   # both kept: the refused one ends with its process
 
   def test_a_dead_invocations_tool_left_unresolved_refuses_until_done(self):
-    ht.claim(self.board, self.ops)
+    self.other(999999999, '1', self.ops)
     Path(self.ops, 'hil_op_abc.log').write_text('')
-    with mock.patch.object(self.helper, 'proc_start', return_value=None), \
-         mock.patch.object(ht.process(), 'recheck', return_value='pending') as recheck:
+    with mock.patch.object(ht.process(), 'recheck', return_value='pending') as recheck:
       with self.assertRaisesRegex(ht.Refused, 'not proven ended'):
-        ht.pending_clear(self.board)
+        ht.claim(self.board, self.ops)
       self.assertEqual(recheck.call_args[0][0]['lock'], str(Path(self.ops, 'hil_op_abc.lock')))
       recheck.return_value = 'done'
-      ht.pending_clear(self.board)
+      ht.claim(self.board, self.ops)
+      ht.unmark(self.board)
     self.assertEqual(self.mark(), [])
+    self.assertFalse(Path(self.ops, 'hil_op_abc.log').exists())
 
-  def test_a_missing_ops_dir_is_not_ended(self):
-    ht.claim(self.board, str(Path(self.tmp) / 'gone'))
+  def test_an_ops_dir_gone_or_unlistable_is_not_ended(self):
+    self.other(999999999, '1', str(Path(self.tmp) / 'gone'))
     with self.assertRaisesRegex(ht.Refused, 'not proven ended'):
-      ht.pending_clear(self.board)
-
-  def test_an_ops_dir_this_user_cannot_list_is_not_ended(self):
-    ht.claim(self.board, self.ops)
-    with mock.patch.object(ht.os, 'listdir', side_effect=PermissionError(13, 'denied')), \
-         self.assertRaisesRegex(ht.Refused, 'not proven ended'):
-      ht.pending_clear(self.board)
-
-  def test_a_mark_that_cannot_be_removed_refuses(self):
-    with mock.patch.object(self.helper.PendingSessions, 'clear', side_effect=PermissionError(1, 'not ours')), \
-         self.assertRaisesRegex(ht.Refused, 'could not be cleared'):
-      ht.pending_clear(self.board)
+      ht.claim(self.board, self.ops)
 
   def test_a_claim_that_cannot_be_written_refuses_before_any_tool(self):
     with mock.patch.object(self.helper.PendingSessions, 'add', side_effect=OSError(28, 'No space left')), \
          self.assertRaisesRegex(ht.Refused, 'could not name this invocation'):
       ht.claim(self.board, self.ops)
 
-  def test_pending_clear_refuses_while_a_receipt_is_not_done(self):
-    class Refused(Exception):
-      pass
-    helper = mock.Mock(PendingRefused=Refused)
-    helper.PendingSessions.return_value.clear.side_effect = Refused('sessions [r] are not ended')
-    with mock.patch.object(ht, 'lock_helper', return_value=helper), self.assertRaisesRegex(ht.Refused, 'not ended'):
-      ht.pending_clear({'lock': 'nrf52840dk'})
+  def test_unmark_keeps_a_mark_it_cannot_clear(self):
+    with mock.patch.object(self.helper.PendingSessions, 'clear', side_effect=PermissionError(1, 'not ours')):
+      ht.unmark(self.board)
+
+  def test_a_supervisor_that_never_started_leaves_no_log(self):
+    tools = ht.Tools(self.tmp, Path(self.tmp) / 'hil.log')
+
+    def no_supervisor(*a, **kw):
+      Path(tools.dir, 'hil_op_abc.log').write_text('')
+      e = OSError(11, 'Resource temporarily unavailable')
+      e.cleanup, e.receipt = 'done', None
+      raise e
+    with mock.patch.object(ht.process(), 'run_tracked', side_effect=no_supervisor), self.assertRaises(OSError):
+      tools.run(['JLinkExe'], timeout=1)
+    self.assertEqual(ht.os.listdir(tools.dir), [])
+    self.assertEqual(tools.receipts, [])
 
 
 if __name__ == '__main__':

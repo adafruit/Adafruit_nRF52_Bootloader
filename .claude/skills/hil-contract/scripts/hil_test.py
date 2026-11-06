@@ -12,6 +12,7 @@ Exit: 0 pass (and cleaned up), 1 a step failed or the board did not run, 2 refus
 4 cleanup failed: the board stays held by a cleanup holder (SKILL.md Recovery).
 """
 import argparse
+import contextlib
 import errno
 import hashlib
 import json
@@ -340,10 +341,16 @@ class Tools:
     if env:
       raise ValueError('no tool here takes an environment')
     argv = [str(a) for a in cmd]
+    before = set(os.listdir(self.dir))
     try:
       r = process().run_tracked(argv, cwd=cwd, timeout=timeout, settle=SETTLE, state_dir=self.dir, quiet=True)
     except BaseException as e:
-      self.note(argv, getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None))
+      cleanup, receipt = getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None)
+      if cleanup == 'done' and receipt is None:   # proven ended; a supervisor that never started leaves its log
+        for name in set(os.listdir(self.dir)) - before:
+          with contextlib.suppress(OSError):
+            os.unlink(os.path.join(self.dir, name))
+      self.note(argv, cleanup, receipt)
       raise
     self.note(argv, r.cleanup, r.receipt)   # before anything else can fail
     with open(self.log, 'a') as fh:
@@ -665,16 +672,21 @@ def take_lock(board, run_dir, wait):
 
 
 def claim(board, ops):
-  """The board's pending mark names this invocation and its ops dir before its first tool starts, so a later one, a
-  recovery's included, refuses while this one lives or a tool it started is not proven ended (invocation_ended)."""
+  """The board's pending mark names this invocation and its ops dir before its first tool starts; refused while it
+  names another invocation not ended (invocation_ended), so a later one, a recovery's included, refuses while this one
+  lives or a tool it started is not proven ended. add() runs under the mark's mutex: of two invocations claiming at
+  once, the later one lists the earlier."""
   helper = lock_helper()
-  me = {'ops': ops, 'pid': os.getpid(), 'start': helper.proc_start(os.getpid())}
+  me = {'ops': os.path.realpath(ops), 'pid': os.getpid(), 'start': helper.proc_start(os.getpid())}
   try:
     if me['start'] is None:
       raise OSError('own start time unreadable')
-    helper.PendingSessions(board['lock'], PENDING_KIND).add([{'receipt': me, 'cmd': 'hil_test.py'}])
+    listed = helper.PendingSessions(board['lock'], PENDING_KIND).add([{'receipt': me, 'cmd': 'hil_test.py'}])
   except (OSError, ValueError, helper.PendingRefused) as e:
     raise Refused(f'the board\'s pending mark could not name this invocation: {type(e).__name__}: {e}')
+  left = [e['receipt'] for e in listed if e['receipt'] != me and not ended_quietly(e)]
+  if left:
+    raise Refused(f'an earlier invocation, or a tool it started, is not proven ended: {left}')
 
 
 def invocation_ended(session):
@@ -696,22 +708,20 @@ def invocation_ended(session):
   return True
 
 
-def pending_clear(board):
-  """Refused while the board's pending mark names an invocation not ended; the mark is removed once none is."""
-  helper = lock_helper()
+def ended_quietly(session):
   try:
-    helper.PendingSessions(board['lock'], PENDING_KIND).clear(invocation_ended)
-  except helper.PendingRefused as e:
-    raise Refused(f'an earlier invocation, or a tool it started, is not proven ended: {e}')
-  except OSError as e:   # another OS user's mark in the sticky lock dir
-    raise Refused(f'the board\'s pending mark could not be cleared: {type(e).__name__}: {e}')
+    return invocation_ended(session) is True
+  except Exception:
+    return False
 
 
 def unmark(board):
-  """This invocation's claim removed once it ended cleanly; left, the next invocation removes it (invocation_ended)."""
+  """The mark removed once every invocation it names, this one included, ended; kept otherwise, for the next claim
+  to judge."""
+  helper = lock_helper()
   try:
-    pending_clear(board)
-  except Exception:
+    helper.PendingSessions(board['lock'], PENDING_KIND).clear(invocation_ended)
+  except (OSError, helper.PendingRefused):
     pass
 
 
@@ -805,10 +815,8 @@ def cmd_run(args, argv):
   code, row['cleanup'] = 1, None
   try:
     try:
-      pending_clear(board)
+      claim(board, bat.tools.dir)
       blocked, users = None, probe_users(board)
-      if not users:
-        claim(board, bat.tools.dir)
     except Refused as e:
       blocked, users = str(e), []
     if blocked:
@@ -859,11 +867,10 @@ def cmd_manual(args, argv):
       holder = prove_cleanup_holder(board, args.recover_holder)
     _, rrow, copies = admit(args.build_record, args.board, args.roster, workdir)
     f = facts(args.board, rrow, copies, workdir)
-    pending_clear(board)
-    if probe_users(board):
-      raise Refused('another JLinkExe uses the probe')
     bat = Battery(board, f, workdir, workdir / 'hil.log')
     claim(board, bat.tools.dir)
+    if probe_users(board):
+      raise Refused('another JLinkExe uses the probe')
   except Refused as e:
     print(json.dumps({'pass': False, 'error': str(e)}))
     return 2
