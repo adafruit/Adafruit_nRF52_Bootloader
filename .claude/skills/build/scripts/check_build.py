@@ -182,14 +182,19 @@ def tool_version(cmd):
   return (p.stdout or p.stderr).strip().splitlines()[0] if p.returncode == 0 and (p.stdout or p.stderr) else None
 
 
+def tree_state():
+  """(HEAD, `git status --porcelain` text) of this checkout."""
+  return git('rev-parse', 'HEAD').strip(), git('status', '--porcelain', '--untracked-files=normal')
+
+
 def inputs():
-  status = git('status', '--porcelain', '--untracked-files=normal')
+  head, status = tree_state()
   subs = {}
   for line in git('submodule', 'status').splitlines():
     state, sha, path = line[0], *line[1:].split()[:2]
     subs[path] = {'commit': sha, 'dirty': state != ' '}
   cc = shutil.which('arm-none-eabi-gcc')
-  return {'head': git('rev-parse', 'HEAD').strip(), 'dirty': bool(status.strip()),
+  return {'head': head, 'dirty': bool(status.strip()),
           'dirtyInputs': sorted({l[3:] for l in status.splitlines()}), 'submodules': subs,
           'tools': {'arm-none-eabi-gcc': {'path': cc, 'version': tool_version([cc, '--version']) if cc else None},
                     'cmake': tool_version(['cmake', '--version']), 'ninja': tool_version(['ninja', '--version']),
@@ -316,10 +321,11 @@ def make_board(board, verbose):
 def load_roster(path):
   try:
     data = json.loads(Path(path).read_text())
-    names = [b['name'] for b in data['boards']]
+    if not all(isinstance(b, dict) and b.get('name') for b in data['boards']):
+      raise ValueError('an entry without a name')
   except (OSError, ValueError, KeyError, TypeError) as e:
     raise Refusal(f'{path}: not a roster ({e})') from None
-  return data, names
+  return data
 
 
 def main(argv=None):
@@ -345,7 +351,7 @@ def main(argv=None):
       raise Refusal('--worktree needs --base')
     if args.shared and not args.board:
       raise Refusal('--shared needs --board')
-    roster = load_roster(args.hil_config)[0] if args.hil_config else None
+    roster = load_roster(args.hil_config) if args.hil_config else None
     if args.board:
       unknown = [b for b in args.board if b not in boards]
       if unknown:
@@ -382,8 +388,8 @@ def main(argv=None):
     result['tests'] = {'pass': p.returncode == 0, 'tail': (p.stdout + p.stderr).strip().splitlines()[-3:]}
   result['boards'] = rows
   if record:
-    after = inputs()
-    if after['head'] != result['input']['head'] or after['dirty']:
+    head, status = tree_state()
+    if head != result['input']['head'] or status.strip():
       return out({**result, 'pass': False, 'error': 'the tree changed while building; build again'}, 2)
     if sha256(args.hil_config) != result['hilRecord']['roster']['sha256']:
       return out({**result, 'pass': False, 'error': f'{args.hil_config} changed while building; build again'}, 2)

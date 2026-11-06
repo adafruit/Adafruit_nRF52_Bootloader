@@ -272,7 +272,7 @@ class Probe(unittest.TestCase):
   def test_a_tool_not_proven_ended_stops_with_its_receipt(self):
     p, patch = self.probe('', cleanup='unknown')
     with patch, self.assertRaises(ht.NotEnded):
-      p.regs()
+      p.samples()
     self.assertEqual(p.tools.receipts, [{'cmd': 'JLinkExe', 'cleanup': 'unknown', 'receipt': None}])
 
   def test_a_receipt_is_kept_when_the_log_cannot_be_written(self):
@@ -284,21 +284,28 @@ class Probe(unittest.TestCase):
       tools.run(['JLinkExe'], timeout=1)
     self.assertEqual(tools.receipts, [{'cmd': 'JLinkExe', 'cleanup': 'pending', 'receipt': {'token': 'r'}}])
 
-  def test_regs_parses_pc_r0_ipsr(self):
-    regs = ('PC = 00026040, CycleCnt = 00000000\nR0 = 0000002A, R1 = 00000000\n'
+  @staticmethod
+  def regs(pc, r0):
+    return (f'PC = {pc:08X}, CycleCnt = 00000000\nR0 = {r0:08X}, R1 = 00000000\n'
             'XPSR = 61000000: APSR = nZCvq, EPSR = 01000000, IPSR = 000 (NoException)\n')
-    out = transcript(('h', 'PC = 00026040, CycleCnt = 00000000\n'), ('regs', regs), ('g', ''),
-                     ('exit', 'Script processing completed.\n'))
+
+  def test_samples_parse_each_regs_output_of_one_session(self):
+    out = transcript(('h', 'PC = 00026040, CycleCnt = 00000000\n'), ('regs', self.regs(0x26040, 0x2A)), ('g', ''),
+                     ('sleep 200', 'Sleep(200)\n'), ('h', 'PC = 00026042, CycleCnt = 00000000\n'),
+                     ('regs', self.regs(0x26042, 0x99)), ('g', ''), ('exit', 'Script processing completed.\n'))
     p, patch = self.probe(out)
     with patch:
-      self.assertEqual(p.regs(), {'pc': 0x26040, 'r0': 0x2A, 'r1': 0, 'ipsr': 0})
+      self.assertEqual(p.samples(), [{'pc': 0x26040, 'r0': 0x2A, 'r1': 0, 'ipsr': 0},
+                                     {'pc': 0x26042, 'r0': 0x99, 'r1': 0, 'ipsr': 0}])
 
   def test_a_failed_command_is_a_step_failure(self):
-    out = transcript(('h', 'J-Link connection not established yet but required for command.\n'),
+    out = transcript(('h', 'PC = 00026040, CycleCnt = 00000000\n'), ('regs', self.regs(0x26040, 0x2A)), ('g', ''),
+                     ('sleep 200', 'Sleep(200)\n'),
+                     ('h', 'J-Link connection not established yet but required for command.\n'),
                      ('regs', ''), ('g', ''), ('exit', 'Script processing completed.\n'))
     p, patch = self.probe(out)
     with patch, self.assertRaisesRegex(ht.StepFail, 'J-Link session failed'):
-      p.regs()
+      p.samples()
 
   def test_install_requires_nvmc_ready_after_eraseall(self):
     f = {'hex': '/x.hex', 'runs': []}
@@ -306,7 +313,9 @@ class Probe(unittest.TestCase):
             ('w4 4001E504 00000002', 'Writing 00000002 -> 4001E504\n'),
             ('w4 4001E50C 00000001', 'Writing 00000001 -> 4001E50C\n'), ('sleep 1000', 'Sleep(1000)\n'),
             ('mem32 4001E400 1', '4001E400 = 00000000 \n'), ('w4 4001E504 00000000', 'Writing 00000000 -> 4001E504\n'),
-            ('loadfile /x.hex', 'O.K.\n'), ('exit', 'Script processing completed.\n')]
+            ('loadfile /x.hex', 'O.K.\n'), ('h', 'PC = 00026040, CycleCnt = 00000000\n'),
+            ('r', 'Reset delay: 0 ms\nReset: Reset device via AIRCR.SYSRESETREQ.\n'), ('g', ''),
+            ('exit', 'Script processing completed.\n')]
     p, patch = self.probe(transcript(*cmds))
     with patch, self.assertRaisesRegex(ht.StepFail, 'NVMC not ready'):
       p.install(f)
@@ -369,7 +378,7 @@ class BatteryRun(unittest.TestCase):
     samples = iter([{'pc': a['loop'], 'r0': 1, 'r1': a['marker'], 'ipsr': 0},
                     {'pc': a['loop'], 'r0': 9, 'r1': a['marker'], 'ipsr': 0}] * 2)
     with mock.patch.object(ht, 'stays_away'), mock.patch.object(ht.time, 'sleep'), \
-         mock.patch.object(bat.probe, 'regs', side_effect=lambda: next(samples)):
+         mock.patch.object(bat.probe, 'samples', side_effect=lambda: [next(samples), next(samples)]):
       bat.app_ran(b'a' * 16)
       with self.assertRaisesRegex(ht.StepFail, "copy's app"):
         bat.app_ran(b'b' * 16)

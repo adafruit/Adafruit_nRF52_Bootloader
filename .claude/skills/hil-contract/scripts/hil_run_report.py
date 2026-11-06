@@ -5,6 +5,8 @@ the core's shared run rules. The core module is passed in, loaded through the ag
 (agentrc.py); verdict() needs no core. Stdlib only."""
 
 NAME, VERSION, STEM = 'nrf52-bootloader-hil-run', 1, 'hil_report'
+STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'serial', 'app-ran-c', 'update-base',
+         'update')   # hil_test.py's battery, in order
 STEP_MARK = {True: '✅', False: '❌'}
 TYPES = {'pass': bool, 'caveat': str, 'reportPath': str, 'error': str, 'exitCode': int, 'heldInProcess': bool,
          'uncovered': list}
@@ -57,12 +59,6 @@ def exit_of(body):
 def row_of(report, board):
   """`board`'s row of a runner report, None when it has none or there is no report."""
   return next((r for r in (report or {}).get('results', []) if r.get('board') == board), None)
-
-
-def fold_exit(verdicts):
-  """The one exit of a set of `hil` verdicts (SKILL.md Verdicts): 2 a blocker, 1 a fail or not-run, else 0."""
-  verdicts = set(verdicts)
-  return 2 if 'blocker' in verdicts else 1 if verdicts & {'fail', 'not-run'} else 0
 
 
 def verdict(code, report, board):

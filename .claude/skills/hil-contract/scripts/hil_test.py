@@ -34,8 +34,7 @@ import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
 PENDING_KIND = 'nrf52-bootloader'   # hil_lock.PendingSessions: <lock>.nrf52-bootloader-pending.json
-STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'serial', 'app-ran-c', 'update-base',
-         'update')
+STEPS = run_report.STEPS
 REENTRY = ('gpregret',)
 # nRF52 NVMC (PS v1.7 4.3.9) and POWER.GPREGRET (5.3.7.16); the same offsets on nRF52832/833
 NVMC_READY, NVMC_CONFIG, NVMC_ERASEALL = 0x4001E400, 0x4001E504, 0x4001E50C
@@ -54,7 +53,6 @@ USB_TIMEOUT, UDEV_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 10, 30, 15,
 APP_SAMPLE_MS = 200
 LOCK_RETRY = 15
 FLUSH_GONE = 3
-JLINK_CRASH_RCS = {139, -11, 134, -6}
 SETTLE = 1.0                 # s after a tool exits for its descendants to be proven gone (hil_process.run_tracked)
 UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] MBR parameter page
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
@@ -138,22 +136,39 @@ def admit_base(board, base_dir, workdir):
   if not base:
     raise Refused(f'{board["name"]} pins no nrf52.selfUpdateBase in the roster: commissioning.md')
   src, copy = Path(base_dir) / base['file'], Path(workdir) / base['file']
-  if not src.is_file() or src.is_symlink() or sha256(src) != base['sha256']:
-    raise Refused(f'{src} is not the pinned {base["file"]} (sha256 {base["sha256"]}): download it from release '
-                  f'{base["version"]}')
-  shutil.copyfile(src, copy)
-  if sha256(copy) != base['sha256']:
-    raise Refused(f'{src} changed while it was copied')
+  copy_pinned(src, copy, base['sha256'], f'{src} is not the pinned {base["file"]} (sha256 {base["sha256"]}): '
+                                         f'download it from release {base["version"]}')
   return {**base, 'path': str(copy)}
 
 
-def sha256(path):
-  return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+def copy_pinned(src, dst, digest, refusal):
+  """`src`'s bytes into `dst` once they hash as `digest`, read once so what is hashed is what is written; Refused
+  with `refusal` for anything else, a symlink included."""
+  try:
+    if not src.is_file() or src.is_symlink():
+      raise Refused(refusal)
+    data = src.read_bytes()
+    if hashlib.sha256(data).hexdigest() != digest:
+      raise Refused(refusal)
+    dst.write_bytes(data)
+  except OSError as e:
+    raise Refused(f'{refusal} ({e})')
+
+
+def build():
+  """The build contract's check_build module: its git, sha256 and board helpers."""
+  scripts = str(ROOT / '.claude/skills/build/scripts')
+  if scripts not in sys.path:
+    sys.path.insert(0, scripts)
+  import check_build
+  return check_build
 
 
 def git(*args):
-  env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-  return subprocess.run(['git', '-C', str(ROOT), *args], capture_output=True, text=True, env=env).stdout
+  try:
+    return build().git(*args)
+  except build().Refusal as e:
+    raise Refused(str(e))
 
 
 def admit(record_path, board, roster_path, workdir):
@@ -174,16 +189,17 @@ def admit(record_path, board, roster_path, workdir):
     raise Refused(f'{record_path}: not the default configuration (defines {rec.get("defines")}, {wrong})')
   if set(row.get('artifacts') or {}) != ARTIFACTS or set(row.get('sha256') or {}) != ARTIFACTS:
     raise Refused(f'{record_path}: artifacts {sorted(row.get("artifacts") or {})} are not {sorted(ARTIFACTS)}')
-  if inp.get('dirty') or inp.get('head') != git('rev-parse', 'HEAD').strip() or git('status', '--porcelain').strip():
+  head, dirty = git('rev-parse', 'HEAD').strip(), bool(git('status', '--porcelain').strip())
+  if inp.get('dirty') or inp.get('head') != head or dirty:
     raise Refused(f'{record_path} was built from {inp.get("head")} (dirty {inp.get("dirty")}); this checkout is '
-                  f'{git("rev-parse", "HEAD").strip()} (dirty {bool(git("status", "--porcelain").strip())}): rebuild '
-                  'on a clean HEAD')
+                  f'{head} (dirty {dirty}): rebuild on a clean HEAD')
   subs = {}
   for line in git('submodule', 'status').splitlines():
-    subs[line[1:].split()[1]] = line[1:].split()[0]
+    sha, path = line[1:].split()[:2]
+    subs[path] = sha
   if {p: s['commit'] for p, s in inp.get('submodules', {}).items()} != subs:
     raise Refused(f'{record_path}: submodules differ from this checkout ({subs})')
-  if rec['hilRecord']['roster']['sha256'] != sha256(roster_path):
+  if rec['hilRecord']['roster']['sha256'] != build().sha256(roster_path):
     raise Refused(f'{record_path} binds another roster than {roster_path}: rebuild')
   try:
     here = agentrc.identity()
@@ -195,12 +211,8 @@ def admit(record_path, board, roster_path, workdir):
   copies = {}
   for key, rel in row['artifacts'].items():
     src = ROOT / rel
-    if not src.is_file() or src.is_symlink() or sha256(src) != row['sha256'][key]:
-      raise Refused(f'{rel} does not hash as {record_path} records: rebuild')
     copies[key] = Path(workdir) / src.name
-    shutil.copyfile(src, copies[key])
-    if sha256(copies[key]) != row['sha256'][key]:
-      raise Refused(f'{rel} changed while it was copied')
+    copy_pinned(src, copies[key], row['sha256'][key], f'{rel} does not hash as {record_path} records: rebuild')
   return rec, row, copies
 
 
@@ -265,9 +277,7 @@ def define(text, name):
 
 def facts(board, row, copies, workdir):
   """What the battery checks the board against, all from the record's build and this checkout's sources."""
-  sys.path.insert(0, str(ROOT / '.claude/skills/build/scripts'))
-  import check_build
-  mcu, sd = check_build.board_config(board)
+  mcu, sd = build().board_config(board)
   if mcu not in APP_FAMILY:
     raise Refused(f'{board}: {mcu} has no USB, so no UF2 drive: the battery does not apply')
   if row['softdevice']['name'] + '_nrf52_' + row['softdevice']['version'] != sd:
@@ -414,9 +424,9 @@ class Probe:
                     'workdir': str(workdir)}
 
   def session(self, commands, timeout=PROBE_TIMEOUT, judge=True):
-    def crashed(a):   # the OB's libjlinkarm crash before any target access (agentrc hil_flash JLINK_CRASH_RCS)
+    def crashed(a):   # the OB's libjlinkarm crash before any target access
       out = process().cmd_stdout_text(a.result.stdout)
-      return a.result.returncode in JLINK_CRASH_RCS and 'Found Cortex' not in out
+      return a.result.returncode in provider().JLINK_CRASH_RCS and 'Found Cortex' not in out
     op = provider().run_jlink_commands(self.b['flasher'], list(commands), **self.profile, timeout=timeout,
                                        run=self.tools.run, retry_if=crashed, retry_delay=2)
     self.tools.check('JLinkExe')
@@ -428,49 +438,54 @@ class Probe:
       raise StepFail(f'J-Link session failed: {problem}', tail)
     return out
 
-  def mem32(self, addr):
-    out = self.session(['h', f'mem32 {addr:08X} 1', 'g'])
-    m = re.search(rf'^{addr:08X} = ([0-9A-F]{{8}})', out, re.M)
-    if not m:
-      raise StepFail(f'no value read at {addr:#010x}')
-    return int(m[1], 16)
-
   def install(self, f):
     """Erase all (NVMC, CPU halted: nRF52840 rev3 errata [184]), load the merged HEX, then verify every run of it.
     Reset and halt first: the bootloader write-protects its region through the ACL before it starts an app, which
     blocks ERASEALL, and only a reset clears the ACL (PS v1.7 6.3, 5.3.6.8)."""
     out = self.session(['r', f'w4 {NVMC_CONFIG:08X} {CONFIG_EEN:08X}', f'w4 {NVMC_ERASEALL:08X} 00000001',
                         f'sleep {ERASEALL_WAIT_MS}', f'mem32 {NVMC_READY:08X} 1', f'w4 {NVMC_CONFIG:08X} {CONFIG_REN:08X}',
-                        f'loadfile {f["hex"]}'], timeout=INSTALL_TIMEOUT)
-    ready = re.search(rf'^{NVMC_READY:08X} = ([0-9A-F]{{8}})', out, re.M)
-    if not ready or int(ready[1], 16) & 1 != 1:
-      raise StepFail(f'NVMC not ready after ERASEALL ({ready[1] if ready else "no read"})')
-    self.session(['h', *[f'verifybin {p} {a:08X}' for a, p in f['runs']], 'r', 'g'], timeout=INSTALL_TIMEOUT)
+                        f'loadfile {f["hex"]}', 'h', *[f'verifybin {p} {a:08X}' for a, p in f['runs']], 'r', 'g'],
+                       timeout=INSTALL_TIMEOUT)
+    ready = word_at(out, NVMC_READY)
+    if ready is None or ready & 1 != 1:
+      raise StepFail(f'NVMC not ready after ERASEALL ({"no read" if ready is None else f"{ready:08X}"})')
     return {'erased': True, 'verified': [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in f['runs']]}
 
-  def regs(self):
-    out = self.session(['h', 'regs', 'g'])
-    def one(pat):
-      m = re.search(pat, out)
+  def samples(self):
+    """Two register samples a commanded APP_SAMPLE_MS apart, the CPU running between them, in one session."""
+    out = self.session(['h', 'regs', 'g', f'sleep {APP_SAMPLE_MS}', 'h', 'regs', 'g'])
+    chunks = provider().jlink_after(out, 'regs')
+    if len(chunks) != 2:
+      raise StepFail(f'{len(chunks)} J-Link regs outputs, not 2')
+
+    def one(chunk, pat):
+      m = re.search(pat, chunk)
       if not m:
         raise StepFail(f'no {pat!r} in J-Link regs output')
       return int(m[1], 16)
-    return {'pc': one(r'\bPC = ([0-9A-F]{8})'), 'r0': one(r'\bR0 = ([0-9A-F]{8})'),
-            'r1': one(r'\bR1 = ([0-9A-F]{8})'), 'ipsr': one(r'\bIPSR = ([0-9A-F]{3})')}
+    return [{'pc': one(c, r'\bPC = ([0-9A-F]{8})'), 'r0': one(c, r'\bR0 = ([0-9A-F]{8})'),
+             'r1': one(c, r'\bR1 = ([0-9A-F]{8})'), 'ipsr': one(c, r'\bIPSR = ([0-9A-F]{3})')} for c in chunks]
 
   def reenter(self, magic=DFU_MAGIC_UF2_RESET):
     """GPREGRET = `magic`, read back, then SYSRESETREQ: a soft reset keeps the retained register (PS v1.7 5.3.6.8), and
     the bootloader enters UF2 DFU (0x57) or CDC-only serial DFU (0x4E) on it (src/main.c)."""
-    out = self.session(['h', f'w4 {GPREGRET:08X} {magic:08X}', f'mem32 {GPREGRET:08X} 1', 'g'])
-    m = re.search(rf'^{GPREGRET:08X} = ([0-9A-F]{{8}})', out, re.M)
-    if not m or int(m[1], 16) & 0xFF != magic:
-      raise StepFail(f'GPREGRET reads back {m[1] if m else "nothing"}')
+    value = word_at(self.session(['h', f'w4 {GPREGRET:08X} {magic:08X}', f'mem32 {GPREGRET:08X} 1', 'g']), GPREGRET)
+    if value is None or value & 0xFF != magic:
+      raise StepFail(f'GPREGRET reads back {"nothing" if value is None else f"{value:08X}"}')
     op = provider().sysresetreq_jlink(self.b['flasher'], **self.profile, timeout=PROBE_TIMEOUT,
                                       run=self.tools.run)
     self.tools.check('JLinkExe')
-    if op.attempts[-1].timed_out or 'Writing 05FA0004 -> E000ED0C' not in process().cmd_stdout_text(op.stdout):
+    # the reset may drop the connection mid-write, so the write is judged from its echo, not jlink_problem
+    issued = f'Writing {provider().AIRCR_SYSRESETREQ:08X} -> {provider().SCB_AIRCR:08X}'
+    if op.attempts[-1].timed_out or issued not in process().cmd_stdout_text(op.stdout):
       raise StepFail('the SYSRESETREQ write was not issued')
-    return {'gpregret': m[1]}
+    return {'gpregret': f'{value:08X}'}
+
+
+def word_at(out, addr):
+  """The word a J-Link `mem32 <addr> 1` printed in `out`, None when it printed none."""
+  m = re.search(rf'^{addr:08X} = ([0-9A-F]{{8}})', out, re.M)
+  return int(m[1], 16) if m else None
 
 
 # ------------------------------------------------------------------ USB drive
@@ -627,18 +642,16 @@ class Battery:
     two samples: thread mode, PC in the counting loop, r1 this copy's marker, r0 advancing."""
     fx = fixture(self.f, nonce)
     stays_away(self.drive.present, QUIET, 'the UF2 drive came back instead of the app')
-    first = self.probe.regs()
-    time.sleep(APP_SAMPLE_MS / 1000)
-    second = self.probe.regs()
+    first, second = self.probe.samples()
+    ev = {'samples': [{k: hex(v) for k, v in s.items()} for s in (first, second)]}
     loop = range(fx['loop'], fx['fault'])
     for s in (first, second):
       if s['ipsr'] or s['pc'] not in loop or s['r1'] != fx['marker']:
         raise StepFail('this copy\'s app is not counting in thread mode',
-                       {'samples': [{k: hex(v) for k, v in x.items()} for x in (first, second)],
-                        'loop': hex(fx['loop']), 'marker': hex(fx['marker'])})
+                       {**ev, 'loop': hex(fx['loop']), 'marker': hex(fx['marker'])})
     if (second['r0'] - first['r0']) & 0xFFFFFFFF == 0:
-      raise StepFail('r0 did not advance', {'samples': [first, second]})
-    return {'samples': [{k: hex(v) for k, v in s.items()} for s in (first, second)]}
+      raise StepFail('r0 did not advance', ev)
+    return ev
 
   def reenter(self, nonce):
     fx = fixture(self.f, nonce)
@@ -826,11 +839,9 @@ def prove_cleanup_holder(board, pid):
 
 def tools_left():
   """Every JLinkExe, mcopy, adafruit-nrfutil and hil_test.py child on the host (recovery's host-wide check)."""
-  found = []
-  for pattern in ('JLinkExe', 'mcopy', 'adafruit-nrfutil', r'hil_test\.py (fat-read|flush)'):
-    out = subprocess.run(['pgrep', '-af', pattern], capture_output=True, text=True).stdout
-    found += [l for l in out.splitlines() if l.split(maxsplit=1)[0] != str(os.getpid())]
-  return found
+  out = subprocess.run(['pgrep', '-af', r'JLinkExe|mcopy|adafruit-nrfutil|hil_test\.py (fat-read|flush)'],
+                       capture_output=True, text=True).stdout
+  return [l for l in out.splitlines() if l.split(maxsplit=1)[0] != str(os.getpid())]
 
 
 def probe_users(board):

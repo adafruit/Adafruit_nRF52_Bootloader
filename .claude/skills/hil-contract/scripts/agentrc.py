@@ -33,7 +33,8 @@ INSTALL = ('install agentrc (python3 <agentrc checkout>/install.py install), or 
 HIL_LOAD = 'skills/hil/scripts/hil_load.py'
 SOURCE = 'skills/hil/scripts/agentrc_source.py'
 API = 1   # agentrc_source.py's API this bootstrap speaks
-# every agentrc script this repository loads or runs; their closure is the identity a HIL record binds
+# roots of the identity a HIL record binds: their closure (each file's FILES, transitively) holds every agentrc script
+# this repository loads or runs
 SCRIPTS = (
   'skills/hil/scripts/hil_boards.py',
   'skills/hil/scripts/hil_flash.py',
@@ -144,12 +145,6 @@ def identity():
     except helper.SourceError as e:
       raise ImportError(f'{e} ({remedy})') from None
   return _LOADED[0]
-
-
-def helper():
-  """agentrc's agentrc_source module, loaded with the identity."""
-  identity()
-  return _LOADED[1]
 
 
 def _require(rel_path):
