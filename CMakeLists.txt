@@ -370,25 +370,46 @@ add_custom_command(TARGET bootloader POST_BUILD
   COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE:bootloader> $<TARGET_FILE_DIR:bootloader>/bootloader.hex
   COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py --overlap=replace -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex $<TARGET_FILE_DIR:bootloader>/bootloader.hex ${MBR_HEX}
   COMMAND ${Python_EXECUTABLE} ${UF2CONV_PY} -f ${UF2_FAMILY_ID_BOOTLOADER} -c -o $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2 $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.hex
+  BYPRODUCTS
+    ${CMAKE_CURRENT_BINARY_DIR}/bootloader.bin
+    ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex
+    ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.hex
+    ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2
   VERBATIM)
 
 # Release artifacts, named as the Makefile names them
+# Paths are spelled out: OUTPUT takes no generator expressions before CMake 3.20
 set(OUT_NAME ${BOARD}_bootloader-${GIT_VERSION})
 set(MERGED_NAME ${OUT_NAME}_${SD_NAME}_${SD_VERSION})
-add_custom_command(TARGET bootloader POST_BUILD
-  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py -o $<TARGET_FILE_DIR:bootloader>/${MERGED_NAME}.hex $<TARGET_FILE_DIR:bootloader>/bootloader.hex ${SD_HEX}
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:bootloader>/bootloader_mbr.uf2 $<TARGET_FILE_DIR:bootloader>/update-${OUT_NAME}_nosd.uf2
+set(BL_HEX ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex)
+set(BL_MBR_UF2 ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2)
+set(MERGED_HEX ${CMAKE_CURRENT_BINARY_DIR}/${MERGED_NAME}.hex)
+set(UPDATE_UF2 ${CMAKE_CURRENT_BINARY_DIR}/update-${OUT_NAME}_nosd.uf2)
+set(MERGED_ZIP ${CMAKE_CURRENT_BINARY_DIR}/${MERGED_NAME}.zip)
+
+add_custom_command(OUTPUT ${MERGED_HEX}
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py -o ${MERGED_HEX} ${BL_HEX} ${SD_HEX}
+  DEPENDS bootloader ${BL_HEX} ${SD_HEX} ${CMAKE_CURRENT_LIST_DIR}/tools/hexmerge.py
   VERBATIM)
+add_custom_command(OUTPUT ${UPDATE_UF2}
+  COMMAND ${CMAKE_COMMAND} -E copy ${BL_MBR_UF2} ${UPDATE_UF2}
+  DEPENDS bootloader ${BL_MBR_UF2}
+  VERBATIM)
+set(RELEASE_FILES ${MERGED_HEX} ${UPDATE_UF2})
 
 # DFU package (bootloader + SoftDevice) for adafruit-nrfutil over CDC/serial
 find_program(NRFUTIL adafruit-nrfutil)
 if (NRFUTIL)
-  add_custom_command(TARGET bootloader POST_BUILD
-    COMMAND ${NRFUTIL} dfu genpkg --dev-type 0x0052 --dev-revision ${DFU_DEV_REV} --bootloader $<TARGET_FILE_DIR:bootloader>/bootloader.hex --softdevice ${SD_HEX} $<TARGET_FILE_DIR:bootloader>/${MERGED_NAME}.zip
+  add_custom_command(OUTPUT ${MERGED_ZIP}
+    COMMAND ${NRFUTIL} dfu genpkg --dev-type 0x0052 --dev-revision ${DFU_DEV_REV} --bootloader ${BL_HEX} --softdevice ${SD_HEX} ${MERGED_ZIP}
+    DEPENDS bootloader ${BL_HEX} ${SD_HEX}
     VERBATIM)
+  list(APPEND RELEASE_FILES ${MERGED_ZIP})
 else ()
   message(WARNING "adafruit-nrfutil not found: ${MERGED_NAME}.zip is not built")
 endif ()
+
+add_custom_target(release ALL DEPENDS ${RELEASE_FILES})
 
 #----------------------------------
 # Flashing target

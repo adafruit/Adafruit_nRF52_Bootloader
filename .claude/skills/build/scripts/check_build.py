@@ -101,7 +101,9 @@ def board_config(board):
 
 def changed_paths(args):
   if args.scope:
-    return [os.path.relpath(os.path.abspath(p), ROOT) for p in args.scope]
+    # a directory keeps its trailing '/' so it classifies like the paths inside it
+    return [os.path.relpath(os.path.abspath(p), ROOT) + ('/' if os.path.isdir(p) or p.endswith('/') else '')
+            for p in args.scope]
   if args.diff_file:
     return [l.strip() for l in Path(args.diff_file).read_text().splitlines() if l.strip()]
   paths = []

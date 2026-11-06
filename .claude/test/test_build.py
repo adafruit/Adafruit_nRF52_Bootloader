@@ -144,6 +144,15 @@ class Cli(unittest.TestCase):
     res = run('--scope', 'src/boards/xiao_nrf52840_ble/', '--select-only')[1]
     self.assertIn('xiao_nrf52840_ble', res['build']['boards'])
 
+  def test_scope_directory_classifies_like_the_paths_inside_it(self):
+    for scope, rule in (('.claude/test/', 'tests'), ('.claude/test', 'tests'),
+                        ('.claude/skills/build/scripts', 'contract-build'), ('test/hil', 'contract-hil'),
+                        ('src/boards/pca10056', 'board'), ('src', 'shared'),
+                        ('lib/softdevice/s140_nrf52_6.1.1', 'softdevice')):
+      res = run('--scope', scope, '--select-only')[1]
+      self.assertEqual(res['paths'][0]['rule'], rule, scope)
+    self.assertTrue(run('--scope', '.claude/test/', '--select-only')[1]['build']['tests'])
+
   def test_docs_only_needs_no_toolchain(self):
     with mock.patch.object(cb.shutil, 'which', return_value=None):
       code, res = run('--scope', 'README.md')
