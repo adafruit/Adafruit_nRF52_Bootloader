@@ -856,7 +856,8 @@ def cmd_run(args, argv):
 
 def cmd_manual(args, argv):
   """install or restore under the caller's own hold, or restore under a cleanup holder, ended once it passed."""
-  workdir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / f'{args.cmd}-{time.strftime("%Y%m%d-%H%M%S")}'
+  workdir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / \
+    f'{args.cmd}-{time.strftime("%Y%m%d-%H%M%S")}-{os.getpid()}'
   workdir.mkdir(parents=True)
   try:
     board = load_board(args.roster, args.board)
