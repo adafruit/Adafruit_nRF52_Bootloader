@@ -590,6 +590,16 @@ def prove_hold(board, reason):
     raise Refused(f'{board["lock"]} is not held with reason {reason!r}: take it first (hil_lock.py hold)')
 
 
+def prove_cleanup_holder(board, pid):
+  """The board's lock record: a live cleanup holder `pid` (a failed run's, or a takeover's) of this board alone."""
+  helper = lock_helper()
+  rec = helper.read_record(board['lock'])
+  if not helper.is_cleanup_holder(rec) or rec.get('pid') != pid or not helper.holder_alive(rec) \
+     or rec.get('locks') != [board['lock']] or not rec.get('token'):
+    raise Refused(f'{board["lock"]} is not held by cleanup holder {pid} alone: {rec}')
+  return rec
+
+
 def probe_users(board):
   out = subprocess.run(['pgrep', '-af', 'JLinkExe'], capture_output=True, text=True).stdout
   return [l for l in out.splitlines() if board['flasher']['uid'] in l.split()]
@@ -676,12 +686,16 @@ def cmd_run(args, argv):
 
 
 def cmd_manual(args, argv):
-  """install or restore under the caller's own hold."""
+  """install or restore under the caller's own hold, or restore under a cleanup holder, ended once it passed."""
   workdir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / f'{args.cmd}-{time.strftime("%Y%m%d-%H%M%S")}'
   workdir.mkdir(parents=True)
   try:
     board = load_board(args.roster, args.board)
-    prove_hold(board, args.under_hold)
+    holder = None
+    if args.under_hold:
+      prove_hold(board, args.under_hold)
+    else:
+      holder = prove_cleanup_holder(board, args.recover_holder)
     _, rrow, copies = admit(args.build_record, args.board, args.roster, workdir)
     f = facts(args.board, rrow, copies, workdir)
     if probe_users(board):
@@ -700,6 +714,12 @@ def cmd_manual(args, argv):
   except StepFail as e:
     print(json.dumps({'pass': False, 'error': str(e), 'evidence': e.evidence}))
     return 4
+  if out['pass'] and holder:
+    try:
+      lock_helper().release_token(holder['token'])
+      out['recovered'] = {'holder': holder['pid'], 'released': True}
+    except lock_helper().ReleaseRefused as e:
+      out.update({'pass': False, 'recovered': {'holder': holder['pid'], 'released': False, 'error': str(e)}})
   print(json.dumps(out))
   return 0 if out['pass'] else 4
 
@@ -773,8 +793,12 @@ def main(argv=None):
     if name == 'run':
       p.add_argument('--lock-wait', type=float, default=0)
       p.add_argument('--fail-at', choices=STEPS)
-    else:
+    elif name == 'install':
       p.add_argument('--under-hold', required=True, metavar='REASON')
+    else:
+      hold = p.add_mutually_exclusive_group(required=True)
+      hold.add_argument('--under-hold', metavar='REASON')
+      hold.add_argument('--recover-holder', type=int, metavar='PID')
   p = sub.add_parser('fat-read')
   p.add_argument('--dev', required=True)
   p.add_argument('--file', required=True)
