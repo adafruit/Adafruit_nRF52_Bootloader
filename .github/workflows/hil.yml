@@ -1,0 +1,284 @@
+name: HIL
+# a pull request's run names its PR: hil_comment.py's fresh tells apart PRs that share a head (RUN_NAME)
+run-name: "${{ github.event.pull_request && format('HIL PR #{0}', github.event.pull_request.number) || 'HIL' }}"
+
+# The battery on the ci.lan rig (.claude/skills/hil-contract/SKILL.md, roster test/hil/ci.json) for the commissioned
+# boards a pull request's change reaches. A hosted runner builds each board's HIL record with CI's toolchain; the rig
+# has no toolchain and admits the record against its own checkout, roster and agentrc pin. A pull request from a fork
+# never reaches the rig. A dispatch runs named boards, with fail_at for the contract's acceptance only.
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      board:
+        description: roster board(s), space separated
+        required: true
+      fail_at:
+        description: 'acceptance only: fail this battery step (the contract, Execution)'
+        required: false
+        default: ''
+
+# never cancelled: a battery killed mid-run leaves the board for recovery, so a newer push waits its turn
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    outputs:
+      boards: ${{ steps.select.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # HEAD is the merge commit, HEAD^1 the base it merges into; what no ci.json board can run, and a selected board
+      # pending commissioning, is reported here, so a skipped rig job never hides it
+      - name: Select the boards the change reaches
+        id: select
+        env:
+          BOARD_INPUT: ${{ github.event.inputs.board }}
+        shell: bash   # -o pipefail: a failed selection must not become an empty, skipped rig job through tee
+        run: |
+          python3 - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, os, subprocess, sys
+          roster = {b['name']: b for b in json.load(open('test/hil/ci.json'))['boards']}
+          if os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch':
+              boards = sorted(set(os.environ['BOARD_INPUT'].split()))
+              if not boards or set(boards) - set(roster):
+                  sys.exit(f'not in test/hil/ci.json: {sorted(set(boards) - set(roster)) or "no board"}')
+              full, uncovered = False, []
+          else:
+              sel = subprocess.run([sys.executable, '.claude/skills/build/scripts/check_build.py', '--select-only',
+                                    '--base', 'HEAD^1', '--hil-config', 'test/hil/ci.json'], capture_output=True, text=True)
+              if sel.returncode:
+                  sys.exit(f'selection failed (exit {sel.returncode}): {sel.stdout or sel.stderr}')
+              hil = json.loads(sel.stdout.splitlines()[-1])['hil']
+              boards, full, uncovered = hil['boards'], hil['full'], hil['uncovered']
+          pending = [b for b in boards if not (roster[b].get('nrf52') or {}).get('reentry')]
+          boards = [b for b in boards if b not in pending]
+          uncovered += [f'{b}: pending commissioning (no nrf52.reentry), not run' for b in pending]
+          print('boards:', ' '.join(boards) or 'none')
+          for u in uncovered:
+              print(f'- {u}')
+          with open('hil-selection.json', 'w') as f:
+              json.dump({'boards': boards, 'full': full, 'uncovered': uncovered}, f)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'boards={" ".join(boards)}\n')
+          EOF
+
+      # for the pr-comment job; overwrite: a re-run of every job selects again under the same name
+      - name: Upload the selection
+        uses: actions/upload-artifact@v4
+        with:
+          name: hil-selection
+          path: hil-selection.json
+          overwrite: true
+
+  # the HIL record of each selected board, built as githubci.yml builds, packed as hil-build
+  hil-build:
+    needs: select
+    if: needs.select.outputs.boards != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BOARDS: ${{ needs.select.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Install ARM GCC
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '12.3.Rel1'
+
+      # agentrc at its pin: the HIL record binds its identity
+      - name: Install tools and fetch agentrc
+        run: |
+          pip3 install adafruit-nrfutil uritemplate requests intelhex setuptools ninja
+          python3 .claude/skills/hil-contract/scripts/agentrc.py fetch
+
+      - name: Build the HIL records
+        run: |
+          mkdir -p cmake-build
+          for b in $BOARDS; do
+            python3 .claude/skills/build/scripts/check_build.py --board "$b" --shared --hil-config test/hil/ci.json \
+              > "cmake-build/$b.hil.json" || { tail -c 2000 "cmake-build/$b.hil.json"; exit 1; }
+          done
+
+      # each board's nrf52.selfUpdateBase release asset, for the battery's self-update steps (hil_test.py --base-dir);
+      # a board without one is left to run's refusal
+      - name: Download the self-update bases
+        run: |
+          python3 - <<'EOF'
+          import hashlib, json, os, urllib.request
+          roster = {b['name']: b for b in json.load(open('test/hil/ci.json'))['boards']}
+          os.makedirs('cmake-build/hil-base', exist_ok=True)
+          for b in os.environ['BOARDS'].split():
+              base = (roster[b].get('nrf52') or {}).get('selfUpdateBase')
+              if not base:
+                  print(f'::warning::{b} pins no nrf52.selfUpdateBase')
+                  continue
+              url = (f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/"
+                     f"{base['version']}/{base['file']}")
+              data = urllib.request.urlopen(url, timeout=60).read()
+              if hashlib.sha256(data).hexdigest() != base['sha256']:
+                  raise SystemExit(f'{url} does not hash as test/hil/ci.json pins')
+              with open(os.path.join('cmake-build/hil-base', os.path.basename(base['file'])), 'wb') as f:
+                  f.write(data)
+          EOF
+
+      # the record and the artifacts it names, at the paths it names (cmake-build/ is the artifact's root)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hil-build
+          path: |
+            cmake-build/*.hil.json
+            cmake-build/cmake-build-*/bootloader.elf
+            cmake-build/cmake-build-*/bootloader.elf.map
+            cmake-build/cmake-build-*/bootloader.hex
+            cmake-build/cmake-build-*/bootloader_mbr.*
+            cmake-build/cmake-build-*/*_bootloader-*
+            cmake-build/cmake-build-*/update-*
+            cmake-build/hil-base/*
+          if-no-files-found: error
+          overwrite: true
+
+  # a board whose record admission refuses is not-run with its reason (exit 2)
+  hil-run:
+    needs: [select, hil-build]
+    if: ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.boards != '' }}
+    runs-on: [ self-hosted, Linux, X64, nrf52-bootloader ]
+    # a battery is ~3 min; the DK is shared with tinyusb and the Arduino HILs, so a run may wait up to 30 min for it
+    timeout-minutes: 60
+    # the attempt that uploaded the artifact: a re-run of failed jobs that does not re-run this job keeps its outputs
+    outputs:
+      attempt: ${{ github.run_attempt }}
+    env:
+      BOARDS: ${{ needs.select.outputs.boards }}
+      FAIL_AT: ${{ github.event.inputs.fail_at }}
+    steps:
+      # kept across runs, outside the workspace: every battery's run dir with its report and log
+      - name: Set the run directory
+        run: echo "HIL_OUT=$(dirname "$GITHUB_WORKSPACE")/hil-state/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      # a file the ssh user (in this runner's group) leaves under its own group, such as a __pycache__, cannot be removed
+      # here: move the tree aside so the job still checks out clean, and name what stays for the rig's owner
+      - name: Clean workspace
+        run: |
+          ws="${{ github.workspace }}"
+          if [ -e "$ws" ]; then mv "$ws" "$ws.stale-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"; fi
+          rm -rf "$ws".stale-* 2>/dev/null ||
+            echo "::warning::$(find "$ws".stale-* ! -user "$(id -un)" -print -quit) is another user's; remove $ws.stale-* on the rig"
+          mkdir -p "$ws"
+
+      # the rig keeps state between jobs: no token stays in its checkout
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # what admission compares the record with: lib/nrfx for the facts, agentrc at its pin
+      - name: Fetch the run inputs
+        run: |
+          git submodule update --init --depth 1 lib/nrfx
+          python3 .claude/skills/hil-contract/scripts/agentrc.py fetch
+
+      - name: Fetch the hosted build
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: hil-build
+          path: cmake-build
+
+      - name: Battery on the rig
+        run: |
+          rc=0
+          for b in $BOARDS; do
+            python3 .claude/skills/hil-contract/scripts/hil_test.py run -b "$b" --build-record "cmake-build/$b.hil.json" \
+              --base-dir cmake-build/hil-base --lock-wait 1800 --run-root "$HIL_OUT/$b" \
+              ${FAIL_AT:+--fail-at "$FAIL_AT"} test/hil/ci.json || rc=1
+          done
+          exit $rc
+
+      - name: Upload the reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hil-run-${{ github.run_attempt }}
+          path: ${{ env.HIL_OUT }}
+          if-no-files-found: ignore
+
+  # the sticky report comment, posted only by the newest attempt of the newest run for the PR's current head, so an
+  # older run finishing late never replaces a newer report
+  pr-comment:
+    needs: [select, hil-run]
+    if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read   # the checkout; a job's permissions replace the workflow's
+      pull-requests: write
+    env:
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      # the attempt the rig job last ran in, whose artifact this is; this attempt when the rig job was skipped
+      RIG_ATTEMPT: ${{ needs.hil-run.outputs.attempt || github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the selection
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: hil-selection
+          path: hil-selection
+
+      - name: Check this run is the newest for the PR head
+        id: fresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if why=$(python3 .claude/skills/hil-contract/scripts/hil_comment.py fresh --repo "$GITHUB_REPOSITORY" \
+                     --pr "$PR" --head "$HEAD_SHA" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"); then
+            echo "post=true" >> "$GITHUB_OUTPUT"
+          else
+            code=$?
+            [ "$code" = 1 ] || exit "$code"
+            echo "::notice title=HIL report not posted::$why"
+          fi
+
+      - name: Download the reports and logs
+        if: steps.fresh.outputs.post == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: hil-run-${{ env.RIG_ATTEMPT }}
+          path: hil-out
+
+      # the report core the comment judges each report with (hil_comment.py render)
+      - name: Fetch agentrc
+        if: steps.fresh.outputs.post == 'true'
+        run: python3 .claude/skills/hil-contract/scripts/agentrc.py fetch
+
+      - name: Render the report
+        if: steps.fresh.outputs.post == 'true'
+        run: |
+          python3 .claude/skills/hil-contract/scripts/hil_comment.py render --reports hil-out \
+            --selection hil-selection/hil-selection.json --head "$HEAD_SHA" --tested "$GITHUB_SHA" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$RIG_ATTEMPT" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$RIG_ATTEMPT" --out comment.md
+
+      - name: Post the report
+        if: steps.fresh.outputs.post == 'true'
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
+        with:
+          header: hil-report
+          path: comment.md
+          number: ${{ github.event.pull_request.number }}

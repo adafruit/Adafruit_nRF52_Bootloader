@@ -134,8 +134,9 @@ cd Adafruit_nRF52_Bootloader
 git submodule update --init
 ```
 
-#### Build using `make`
-Then build it with `make BOARD={board} all`, for example:
+#### Build using `make` (legacy)
+The Makefile is kept for existing workflows; CI and releases build with CMake (below), which produces the same images.
+Build with `make BOARD={board} all`, for example:
 
 ```
 make BOARD=feather_nrf52840_express all
@@ -152,7 +153,8 @@ Makefile:90: *** BOARD not defined.  Stop
 
 #### Build using `cmake`
 
-Firstly initialize your build environment by passing your board to `cmake` via `-DBOARD={board}`:
+CI and releases build with CMake. Initialize your build environment by passing your board to `cmake` via
+`-DBOARD={board}`:
 
 ```bash
 mkdir build
@@ -173,6 +175,11 @@ To list all supported targets, run:
 ```bash
 cmake --build . --target help
 ``` 
+
+The build directory then holds the release artifacts: `{board}_bootloader-{version}_{sd}_{sdversion}.hex` (bootloader,
+MBR and SoftDevice), the matching `.zip` DFU package (needs `adafruit-nrfutil`) and
+`update-{board}_bootloader-{version}_nosd.uf2` (bootloader self-update). Options: `-DDUALBANK_FW=ON`,
+`-DDEFAULT_TO_OTA_DFU=ON`, `-DSIGNED_FW=ON -DSIGNED_FW_QX=... -DSIGNED_FW_QY=...`, `-DFORCE_UF2=ON`.
 
 To build individual targets, you can specify it directly with `make` or using `cmake --build`:
 

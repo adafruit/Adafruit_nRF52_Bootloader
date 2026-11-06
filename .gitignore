@@ -69,3 +69,9 @@ Makefile.user
 
 # Exclude all SoftDevice S340 files
 lib/softdevice/s340*
+
+# agent tooling
+cmake-build/
+__pycache__/
+/lib/agentrc
+/test/hil/local.json

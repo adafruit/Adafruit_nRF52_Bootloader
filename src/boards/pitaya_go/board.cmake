@@ -1,1 +1,4 @@
 set(MCU_VARIANT nrf52840)
+if (NOT DEFINED USE_NFCT)
+  set(USE_NFCT ON)
+endif ()

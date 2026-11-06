@@ -1,1 +1,4 @@
 set(MCU_VARIANT nrf52833)
+if (NOT DEFINED SD_VERSION)
+  set(SD_VERSION 7.2.0)
+endif ()

@@ -1,0 +1,17 @@
+{
+  "boards": [
+    {
+      "name": "pca10056",
+      "uid": "2467EB236E0E4F2D",
+      "probe": "683944004",
+      "nrf52": {
+        "reentry": "gpregret",
+        "selfUpdateBase": {
+          "version": "0.11.0",
+          "file": "update-pca10056_bootloader-0.11.0_nosd.uf2",
+          "sha256": "be4b37d4a45b0c7e8844be0848f1be1923b4e1a7439adf44528e50d6f48ac19c"
+        }
+      }
+    }
+  ]
+}
