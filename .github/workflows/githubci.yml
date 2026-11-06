@@ -14,6 +14,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  agent-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Agent skill script tests
+      run: python3 -m unittest discover -s .claude/test -p 'test_*.py'
+
   set-matrix:
     runs-on: ubuntu-latest
     outputs:
