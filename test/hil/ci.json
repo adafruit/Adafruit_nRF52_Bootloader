@@ -4,7 +4,7 @@
       "name": "pca10056",
       "uid": "2467EB236E0E4F2D",
       "probe": "683944004",
-      "nrf52": {}
+      "nrf52": {"reentry": "gpregret"}
     }
   ]
 }
