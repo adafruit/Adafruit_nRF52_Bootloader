@@ -46,7 +46,7 @@ UF2_FLAG_FAMILY = 0x2000
 JLINK_SPEED = 4000
 ERASEALL_WAIT_MS = 1000      # tERASEALL is at most 169 ms (PS v1.7 4.3.10); READY is read after it
 PROBE_TIMEOUT, INSTALL_TIMEOUT = 60, 180
-USB_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 30, 15, 3
+USB_TIMEOUT, UDEV_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 10, 30, 15, 3
 APP_SAMPLE_MS = 200
 LOCK_RETRY = 15
 FLUSH_GONE = 3
@@ -440,6 +440,8 @@ class Drive:
 
   def wait(self):
     dev = wait_for(self.present, USB_TIMEOUT, f'UF2 drive {self.f["vid"]:04x}:{self.f["pid"]:04x} {self.b["uid"]}')
+    # the node appears before udev's rule gives it the rig's group
+    wait_for(lambda: os.access(dev, os.R_OK | os.W_OK), UDEV_TIMEOUT, f'read-write access to {dev}')
     exclusive(dev)
     return dev
 
