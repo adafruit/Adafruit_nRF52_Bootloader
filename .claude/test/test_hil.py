@@ -227,7 +227,7 @@ class Probe(unittest.TestCase):
 
   def test_install_requires_nvmc_ready_after_eraseall(self):
     f = {'hex': '/x.hex', 'runs': []}
-    cmds = [('h', 'PC = 00000A80, CycleCnt = 0\n'), ('w4 4001E504 00000002', 'Writing 00000002 -> 4001E504\n'),
+    cmds = [('r', 'Reset delay: 0 ms\nReset: Reset device via AIRCR.SYSRESETREQ.\n'), ('w4 4001E504 00000002', 'Writing 00000002 -> 4001E504\n'),
             ('w4 4001E50C 00000001', 'Writing 00000001 -> 4001E50C\n'), ('sleep 1000', 'Sleep(1000)\n'),
             ('mem32 4001E400 1', '4001E400 = 00000000 \n'), ('w4 4001E504 00000000', 'Writing 00000000 -> 4001E504\n'),
             ('loadfile /x.hex', 'O.K.\n'), ('exit', 'Script processing completed.\n')]

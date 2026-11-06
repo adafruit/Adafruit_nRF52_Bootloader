@@ -339,8 +339,10 @@ class Probe:
     return int(m[1], 16)
 
   def install(self, f):
-    """Erase all (NVMC, CPU halted: nRF52840 rev3 errata [184]), load the merged HEX, then verify every run of it."""
-    out = self.session(['h', f'w4 {NVMC_CONFIG:08X} {CONFIG_EEN:08X}', f'w4 {NVMC_ERASEALL:08X} 00000001',
+    """Erase all (NVMC, CPU halted: nRF52840 rev3 errata [184]), load the merged HEX, then verify every run of it.
+    Reset and halt first: the bootloader write-protects its region through the ACL before it starts an app, which
+    blocks ERASEALL, and only a reset clears the ACL (PS v1.7 6.3, 5.3.6.8)."""
+    out = self.session(['r', f'w4 {NVMC_CONFIG:08X} {CONFIG_EEN:08X}', f'w4 {NVMC_ERASEALL:08X} 00000001',
                         f'sleep {ERASEALL_WAIT_MS}', f'mem32 {NVMC_READY:08X} 1', f'w4 {NVMC_CONFIG:08X} {CONFIG_REN:08X}',
                         f'loadfile {f["hex"]}'], timeout=INSTALL_TIMEOUT)
     ready = re.search(rf'^{NVMC_READY:08X} = ([0-9A-F]{{8}})', out, re.M)
