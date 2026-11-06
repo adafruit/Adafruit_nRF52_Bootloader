@@ -773,15 +773,18 @@ def claim(board, ops):
     listed = helper.PendingSessions(board['lock'], PENDING_KIND).add([{'receipt': me, 'cmd': 'hil_test.py'}])
   except (OSError, ValueError, helper.PendingRefused) as e:
     raise Refused(f'the board\'s pending mark could not name this invocation: {type(e).__name__}: {e}')
-  left = [e['receipt'] for e in listed if e['receipt'] != me and not ended_quietly(e)]
+  left = [e['receipt'] for e in listed if e['receipt'] != me and not ended_quietly(board, e)]
   if left:
     raise Refused(f'an earlier invocation, or a tool it started, is not proven ended: {left}')
 
 
-def invocation_ended(session):
+def invocation_ended(board, session):
   """A claim's invocation is gone (or is this one) and every tool it started rechecks done: run_tracked removes a
   child's files once it is, so each hil_op_*.log left in its ops dir is one to recheck. An ops dir this user cannot
-  list, another user's or gone, is not ended (the listing raises)."""
+  list, another user's or gone, is not ended (the listing raises). A receipt the board's holder names keeps its files:
+  a cleanup holder's release rechecks them."""
+  rec = lock_helper().read_record(board['lock'])
+  held = {h.get('token') for h in rec.get('receipts') or [] if isinstance(h, dict)} if isinstance(rec, dict) else set()
   r = session['receipt']
   if r['pid'] != os.getpid() and lock_helper().proc_start(r['pid']) == r['start']:
     return False
@@ -793,13 +796,14 @@ def invocation_ended(session):
                'record': f'{base}.json', 'log': f'{base}.log'}
     if process().recheck(receipt) != 'done':
       return False
-    process().tidy(receipt)
+    if receipt['token'] not in held:
+      process().tidy(receipt)
   return True
 
 
-def ended_quietly(session):
+def ended_quietly(board, session):
   try:
-    return invocation_ended(session) is True
+    return invocation_ended(board, session) is True
   except Exception:
     return False
 
@@ -809,7 +813,7 @@ def unmark(board):
   to judge."""
   helper = lock_helper()
   try:
-    helper.PendingSessions(board['lock'], PENDING_KIND).clear(invocation_ended)
+    helper.PendingSessions(board['lock'], PENDING_KIND).clear(lambda s: invocation_ended(board, s))
   except (OSError, helper.PendingRefused):
     pass
 

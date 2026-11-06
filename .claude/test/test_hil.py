@@ -538,6 +538,23 @@ class Pending(unittest.TestCase):
     self.assertEqual(self.mark(), [])
     self.assertFalse(Path(self.ops, 'hil_op_abc.log').exists())
 
+  def test_a_claim_keeps_the_receipts_a_cleanup_holder_releases_on(self):
+    self.other(999999999, '1', self.ops)
+    base = Path(self.ops, 'hil_op_abc')
+    receipt = {'token': 'abc', 'supervisor': None, 'lock': f'{base}.lock', 'record': f'{base}.json',
+               'log': f'{base}.log'}
+    for k in ('lock', 'log'):
+      Path(receipt[k]).touch(mode=0o600)
+    st = Path(receipt['lock']).stat()
+    Path(receipt['record']).write_text(json.dumps({'token': 'abc', 'lock': [st.st_dev, st.st_ino], 'cleanup': 'done'}))
+    Path(receipt['record']).chmod(0o600)
+    holder = {'role': 'cleanup-holder', 'locks': ['nrf52840dk'], 'receipts': [receipt]}
+    with mock.patch.object(self.helper, 'read_record', return_value=holder):
+      ht.claim(self.board, self.ops)
+    self.assertEqual(self.helper._receipts_blocker([receipt], None), '')
+    ht.unmark(self.board)   # the holder released: nothing names them now
+    self.assertFalse(Path(receipt['log']).exists())
+
   def test_an_ops_dir_gone_or_unlistable_is_not_ended(self):
     self.other(999999999, '1', str(Path(self.tmp) / 'gone'))
     with self.assertRaisesRegex(ht.Refused, 'not proven ended'):
