@@ -76,6 +76,17 @@ JSON report and its exit is final. The battery, each step judged from its own ev
 flush) runs under agentrc's `hil_process.run_tracked`; one whose process tree is not proven ended stops the battery,
 skips the restore and hands its receipt to the cleanup holder.
 
+### CI
+
+`.github/workflows/hil.yml` runs the battery for a pull request from this repository (never a fork) and for a
+dispatch naming boards (`fail_at` for acceptance only). `select` runs the selector above against the merge base and
+reports a board pending commissioning as uncovered; `hil-build` builds each board's HIL record on a hosted runner with
+CI's arm-gcc and the agentrc pin and uploads the record and its artifacts; `hil-run`, on the rig's `nrf52-bootloader`
+runner (agentrc `hil-farm-setup`), checks out the same commit, fetches `lib/nrfx` and the pin, and runs `run` per board
+with a 30-minute lock wait into `$(dirname "$GITHUB_WORKSPACE")/hil-state/<run>-<attempt>`, uploaded as
+`hil-run-<attempt>`; the rig builds nothing. `pr-comment` posts the sticky `hil-report` comment (`hil_comment.py`) only
+from the newest attempt of the newest run for the PR's head. Runs are never cancelled: a newer push waits.
+
 ## Reservation
 
 - Lock helper: agentrc's `hil_lock.py` through `scripts/agentrc.py`; lock name `nrf52840dk` from the registry.
