@@ -62,8 +62,9 @@ class Classify(unittest.TestCase):
     self.assertIn('removed', reason)
 
   def test_shared_code_and_unknown_paths_build_the_representatives(self):
-    for p in ('src/main.c', 'CMakeLists.txt', 'cmake/toolchain/arm_gcc.cmake', 'linker/nrf52840.ld', 'lib/tinyusb',
-              'tools/hexmerge.py', 'some/new/file.c'):
+    for p in ('src/main.c', 'src/boards/boards.c', 'src/boards/boards.h', 'CMakeLists.txt',
+              'cmake/toolchain/arm_gcc.cmake', 'linker/nrf52840.ld', 'lib/tinyusb', 'tools/hexmerge.py',
+              'some/new/file.c'):
       self.assertEqual(self.rule(p)[2].get('boards'), set(cb.REPRESENTATIVES), p)
 
   def test_softdevice_selects_its_users(self):
@@ -139,6 +140,11 @@ class Cli(unittest.TestCase):
     self.assertEqual(code, 0)
     self.assertEqual(res['build']['boards'], sorted(cb.REPRESENTATIVES))
     self.assertEqual([p['rule'] for p in res['paths']], ['shared', 'docs'])
+
+  def test_shared_board_code_selects_every_roster_board(self):
+    res = run('--scope', 'src/boards/boards.c', 'src/boards/boards.h', '--select-only')[1]
+    self.assertEqual([p['rule'] for p in res['paths']], ['shared', 'shared'])
+    self.assertTrue(cb.select(['src/boards/boards.c'], BOARDS, ROSTER)['hil']['full'])
 
   def test_scope_directory_with_a_trailing_slash(self):
     res = run('--scope', 'src/boards/xiao_nrf52840_ble/', '--select-only')[1]

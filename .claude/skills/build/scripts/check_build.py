@@ -125,6 +125,8 @@ def classify(path, boards):
       continue
     if rule in ('board', 'board-make'):
       board = m.group(1)
+      if path == f'src/boards/{board}' and board not in boards:
+        continue   # a file beside the boards (boards.c, boards.h) is shared code
       if board not in boards:
         return rule, f'{board} is no board in this tree (removed): nothing to build', {}
       sel = {'boards': {board}, 'direct': {board}}
