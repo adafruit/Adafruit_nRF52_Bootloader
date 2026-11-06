@@ -317,11 +317,21 @@ def uf2_payload(blob, base, length):
 
 # ------------------------------------------------------------------ processes
 
+def private_dir(path):
+  """`path` created as a directory nobody else can write, in a parent likewise (run_tracked's state dir), whatever
+  the umask."""
+  path = Path(path)
+  path.mkdir(parents=True, exist_ok=True)
+  os.chmod(path.parent, 0o755)
+  os.chmod(path, 0o700)
+  return str(path)
+
+
 class Tools:
   """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
   a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder."""
   def __init__(self, workdir, log):
-    self.dir, self.log, self.receipts = str(workdir), log, []
+    self.dir, self.log, self.receipts = private_dir(Path(workdir) / 'ops'), log, []
 
   def run(self, cmd, cwd=None, *, env=None, timeout):
     """hil_flash's runner contract: a CompletedProcess carrying `cleanup` and `receipt`."""
