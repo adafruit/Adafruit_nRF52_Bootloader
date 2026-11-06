@@ -330,9 +330,10 @@ def private_dir(path):
 
 class Tools:
   """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
-  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder."""
-  def __init__(self, workdir, log, lock=None):
-    self.dir, self.log, self.lock, self.receipts = private_dir(Path(workdir) / 'ops'), log, lock, []
+  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder.
+  run_tracked keeps a child's files in `dir` until it is proven ended: the board's pending mark names `dir` (claim)."""
+  def __init__(self, workdir, log):
+    self.dir, self.log, self.receipts = private_dir(Path(workdir) / 'ops'), log, []
 
   def run(self, cmd, cwd=None, *, env=None, timeout):
     """hil_flash's runner contract: a CompletedProcess carrying `cleanup` and `receipt`."""
@@ -351,17 +352,8 @@ class Tools:
     return r
 
   def note(self, argv, cleanup, receipt):
-    """Keep a tool not proven ended; one with a receipt also goes into the board's pending mark at once, so every later
-    invocation, a recovery's included, refuses until it rechecks done (pending_clear)."""
-    if cleanup == 'done' and receipt is None:
-      return
-    entry = {'cmd': argv[0], 'cleanup': cleanup, 'receipt': receipt}
-    if receipt is not None and self.lock:
-      try:
-        lock_helper().PendingSessions(self.lock, PENDING_KIND).add([{'receipt': receipt, 'cmd': argv[0]}])
-      except Exception as e:   # the board stays held by its cleanup holder either way
-        entry['markError'] = f'{type(e).__name__}: {e}'
-    self.receipts.append(entry)
+    if cleanup != 'done' or receipt is not None:
+      self.receipts.append({'cmd': argv[0], 'cleanup': cleanup, 'receipt': receipt})
 
   def check(self, what):
     if self.receipts:
@@ -558,7 +550,7 @@ class Drive:
 class Battery:
   def __init__(self, board, f, workdir, log, fail_at=None):
     self.b, self.f, self.dir, self.fail_at = board, f, Path(workdir), fail_at
-    self.tools = Tools(workdir, log, board.get('lock'))
+    self.tools = Tools(workdir, log)
     self.probe, self.drive = Probe(board, workdir, self.tools), Drive(board, f, self.tools)
     self.steps, self.touched = [], False
 
@@ -672,14 +664,55 @@ def take_lock(board, run_dir, wait):
       time.sleep(min(LOCK_RETRY, max(0, end - time.monotonic())))
 
 
+def claim(board, ops):
+  """The board's pending mark names this invocation and its ops dir before its first tool starts, so a later one, a
+  recovery's included, refuses while this one lives or a tool it started is not proven ended (invocation_ended)."""
+  helper = lock_helper()
+  me = {'ops': ops, 'pid': os.getpid(), 'start': helper.proc_start(os.getpid())}
+  try:
+    if me['start'] is None:
+      raise OSError('own start time unreadable')
+    helper.PendingSessions(board['lock'], PENDING_KIND).add([{'receipt': me, 'cmd': 'hil_test.py'}])
+  except (OSError, ValueError, helper.PendingRefused) as e:
+    raise Refused(f'the board\'s pending mark could not name this invocation: {type(e).__name__}: {e}')
+
+
+def invocation_ended(session):
+  """A claim's invocation is gone (or is this one) and every tool it started rechecks done: run_tracked removes a
+  child's files once it is, so each hil_op_*.log left in its ops dir is one to recheck. An ops dir this user cannot
+  list, another user's or gone, is not ended (the listing raises)."""
+  r = session['receipt']
+  if r['pid'] != os.getpid() and lock_helper().proc_start(r['pid']) == r['start']:
+    return False
+  for name in os.listdir(r['ops']):
+    if not (name.startswith('hil_op_') and name.endswith('.log')):
+      continue
+    base = os.path.join(r['ops'], name[:-len('.log')])
+    receipt = {'token': name[len('hil_op_'):-len('.log')], 'supervisor': None, 'lock': f'{base}.lock',
+               'record': f'{base}.json', 'log': f'{base}.log'}
+    if process().recheck(receipt) != 'done':
+      return False
+    process().tidy(receipt)
+  return True
+
+
 def pending_clear(board):
-  """Refused while the board's pending mark lists a tool whose receipt does not recheck done; the mark is removed
-  once every one does."""
+  """Refused while the board's pending mark names an invocation not ended; the mark is removed once none is."""
   helper = lock_helper()
   try:
-    helper.PendingSessions(board['lock'], PENDING_KIND).clear(lambda s: process().recheck(s['receipt']) == 'done')
+    helper.PendingSessions(board['lock'], PENDING_KIND).clear(invocation_ended)
   except helper.PendingRefused as e:
-    raise Refused(f'a tool of an earlier invocation is not proven ended: {e}')
+    raise Refused(f'an earlier invocation, or a tool it started, is not proven ended: {e}')
+  except OSError as e:   # another OS user's mark in the sticky lock dir
+    raise Refused(f'the board\'s pending mark could not be cleared: {type(e).__name__}: {e}')
+
+
+def unmark(board):
+  """This invocation's claim removed once it ended cleanly; left, the next invocation removes it (invocation_ended)."""
+  try:
+    pending_clear(board)
+  except Exception:
+    pass
 
 
 def prove_hold(board, reason):
@@ -774,6 +807,8 @@ def cmd_run(args, argv):
     try:
       pending_clear(board)
       blocked, users = None, probe_users(board)
+      if not users:
+        claim(board, bat.tools.dir)
     except Refused as e:
       blocked, users = str(e), []
     if blocked:
@@ -805,6 +840,7 @@ def cmd_run(args, argv):
       fh.close()
       code = 4
     else:
+      unmark(board)
       lock_helper().release_board_lock(fh)
   result['pass'] = code == 0
   return finish(code)
@@ -826,10 +862,11 @@ def cmd_manual(args, argv):
     pending_clear(board)
     if probe_users(board):
       raise Refused('another JLinkExe uses the probe')
+    bat = Battery(board, f, workdir, workdir / 'hil.log')
+    claim(board, bat.tools.dir)
   except Refused as e:
     print(json.dumps({'pass': False, 'error': str(e)}))
     return 2
-  bat = Battery(board, f, workdir, workdir / 'hil.log')
   bat.touched = True
   try:
     if args.cmd == 'install':
@@ -846,6 +883,8 @@ def cmd_manual(args, argv):
       out['recovered'] = {'holder': holder['pid'], 'released': True}
     except lock_helper().ReleaseRefused as e:
       out.update({'pass': False, 'recovered': {'holder': holder['pid'], 'released': False, 'error': str(e)}})
+  if out['pass']:
+    unmark(board)
   print(json.dumps(out))
   return 0 if out['pass'] else 4
 

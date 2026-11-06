@@ -74,9 +74,11 @@ JSON report and its exit is final. The battery, each step judged from its own ev
 
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, the FAT reader and
 flush) runs under agentrc's `hil_process.run_tracked`; one whose process tree is not proven ended stops the battery,
-skips the restore and hands its receipt to the cleanup holder; a receipt also goes at once into the board's pending
-mark (`hil_lock.PendingSessions`, `<lock>.nrf52-bootloader-pending.json`), which every later `run`, `install` and
-`restore` rechecks before touching the board and refuses on while any receipt is not `done`.
+skips the restore and hands its receipt to the cleanup holder. Before its first tool, every `run`, `install` and
+`restore` names itself (pid, start time, ops dir) in the board's pending mark (`hil_lock.PendingSessions`,
+`<lock>.nrf52-bootloader-pending.json`) or refuses; a later one refuses while a named invocation lives or a tool it
+started does not recheck `done` (run_tracked keeps a child's files in the ops dir until then), and removes the mark
+once none is left. An invocation that ends cleanly removes its own entry.
 
 ### CI
 
