@@ -107,10 +107,19 @@ written); blocker (exit 4, `heldAfter`, a recovery blocker, another probe user, 
 
 ## Recovery
 
-- Exit 4 or `heldAfter`: the board is held by the cleanup holder (`hil_lock.py status` shows `role:
-  cleanup-holder`). A `hw-validator` or the human takes it over (`hil_lock.py hold --take-over nrf52840dk --reason
-  <reason>`), runs `restore --under-hold <reason>` with a record of a known-good HEAD, and releases only after it
-  passes. A failing restore leaves the board held and goes to the human.
+- Exit 4 or `heldAfter`: the board is held by the failed run's cleanup holder (`hil_lock.py status` shows `role:
+  cleanup-holder` and its pid). Once no `JLinkExe`, `mcopy` or `hil_test.py` of that run is left on the host, a
+  `hw-validator` or the human runs, with that run's record or one rebuilt on a known-good clean HEAD:
+
+  ```bash
+  python3 .claude/skills/hil-contract/scripts/hil_test.py restore -b pca10056 --build-record <record> \
+    --recover-holder <pid> test/hil/ci.json
+  ```
+
+  It proves `<pid>` is the board's live cleanup holder, restores under it, and only after the restore passed ends the
+  holder by its token (`recovered.released`). A failed restore (exit 4) leaves the holder: the board goes to the human.
+- A dead holder (its record left on a free lock): `hil_lock.py hold --take-over nrf52840dk --reason <reason>` holds it
+  as a cleanup holder of its own, then `restore --recover-holder <that hold's pid>` as above.
 - A J-Link that no longer connects: agentrc's `usb-kernel-recover` rungs, then the registry's `flasher_recover`
   (openocd `nrf52.cfg`). An APPROTECT recover is never automatic.
 - A UF2 drive that never enumerates after a passing `install`: check the DK's nRF USB cable (J3) and the hub port;

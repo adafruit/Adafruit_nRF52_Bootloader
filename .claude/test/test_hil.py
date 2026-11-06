@@ -272,5 +272,20 @@ class Cli(unittest.TestCase):
     self.assertIn('pending commissioning', res['error'])
 
 
+  def test_recovery_refuses_a_lock_not_held_by_that_cleanup_holder(self):
+    board = {'lock': 'nrf52840dk'}
+    for rec in (None, {'role': 'cleanup-holder', 'pid': 2, 'token': 't', 'locks': ['nrf52840dk']},
+                {'role': 'hold', 'pid': 1, 'token': 't', 'locks': ['nrf52840dk']},
+                {'role': 'cleanup-holder', 'pid': 1, 'token': 't', 'locks': ['nrf52840dk', 'other']}):
+      helper = mock.Mock(read_record=mock.Mock(return_value=rec), holder_alive=mock.Mock(return_value=True),
+                         is_cleanup_holder=lambda r: isinstance(r, dict) and r.get('role') == 'cleanup-holder')
+      with mock.patch.object(ht, 'lock_helper', return_value=helper), self.assertRaises(ht.Refused):
+        ht.prove_cleanup_holder(board, 1)
+    rec = {'role': 'cleanup-holder', 'pid': 1, 'token': 't', 'locks': ['nrf52840dk']}
+    helper.read_record.return_value = rec
+    with mock.patch.object(ht, 'lock_helper', return_value=helper):
+      self.assertEqual(ht.prove_cleanup_holder(board, 1), rec)
+
+
 if __name__ == '__main__':
   unittest.main()
