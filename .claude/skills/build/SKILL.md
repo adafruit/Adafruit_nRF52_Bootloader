@@ -29,8 +29,9 @@ versions. Exit 0 pass, 1 a build or the tests failed, 2 usage, resolution or a m
 
 `--select-only` prints the selection (`build.{boards,make,tests}`, `paths`) and stops before any toolchain check. With
 `--hil-config <the host's roster>` it adds `hil.{boards,full,uncovered}`: the roster boards the change puts under the
-HIL battery, and as uncovered each MCU variant (shared change) or board (board change) no roster board on this host
-covers.
+HIL battery, and as uncovered each board a change reaches directly (its own files, a SoftDevice it uses) and, for a
+shared change, each MCU variant that no roster board on this host covers. The mandated boards a build adds are build
+coverage, not HIL scope.
 
 ## Reporting
 
@@ -41,20 +42,24 @@ a build that ran. Exit 1 or 2 quotes `firstError` (and `error`).
 ## Judgment
 
 - **Selection is the script's**, first match per path; `paths[].reason` says why. A mixed change takes the union.
-  - A board's files (`src/boards/<board>/`) build that board; its `board.mk` also a legacy make build of it.
+  - A board's files (`src/boards/<board>/`, the directory itself included) build that board; its `board.mk` also a
+    legacy make build of it and of the mandated boards.
   - Shared code (`src/`, `lib/`, `linker/`, `CMakeLists.txt`, `cmake/`, `tools/hexmerge.py`) and anything
     unclassified build the representatives: one board per MCU variant (feather_nrf52840_express, feather_nrf52832,
     pca10100 for nRF52833) and the rig's pca10056. A SoftDevice under `lib/softdevice/<sd>/` builds the boards that
     use it.
   - Every selection that builds firmware also builds feather_nrf52840_express and feather_nrf52832.
   - `Makefile` and `tools/build_all.py` are legacy: a make build of those two boards.
-  - This script builds the mandated boards and runs the contract tests; the HIL contract's scripts, `test/hil/` and
-    `hil.yml` run the tests and select every roster board for HIL; `githubci.yml` runs the tests and the mandated
+  - This script, the HIL contract's scripts, `test/hil/` (the fixture included) and `hil.yml` run the contract tests,
+    build the representatives and select every roster board for HIL; `githubci.yml` runs the tests and the mandated
     boards; `.claude/test/` and `.pre-commit-config.yaml` the tests alone. No firmware build verifies workflow syntax.
   - Docs and agent, editor and repo metadata (`*.md` at the top level and under `.claude/skills/<skill>/`, `.idea/`,
     `.github/ISSUE_TEMPLATE/`, ...) build nothing.
 - **Builds are CI's.** `cmake -S . -B <dir> -G Ninja -DBOARD=<board>` then `cmake --build <dir>`, the build type
-  CMakeLists.txt defaults (MinSizeRel), with `CFLAGS`, `LDFLAGS` and similar variables removed from the environment.
+  CMakeLists.txt defaults (MinSizeRel), with compiler and CMake inputs (`CFLAGS`, `LDFLAGS`, `CPATH`,
+  `LIBRARY_PATH`, `CMAKE_*` and the like, `SCRUBBED_ENV`) removed from the environment. Each board's `config` records
+  the CMake cache entries that configured it (board, generator, build type, objcopy, nrfutil, options), and
+  `input.sourceDateEpoch` the `SOURCE_DATE_EPOCH` the build saw.
   A board passes only with every artifact (`expected_artifacts()`): `bootloader.elf` and its map, `bootloader.hex`,
   `bootloader_mbr.hex` and `.uf2`, and the release files `<board>_bootloader-<version>_<sd>_<sdversion>.hex`
   (bootloader, MBR and SoftDevice), its `.zip` DFU package and `update-<board>_bootloader-<version>_nosd.uf2`. CI's
@@ -64,19 +69,20 @@ a build that ran. Exit 1 or 2 quotes `firstError` (and `error`).
   `-D` wins, as make's command line does). `__DATE__`/`__TIME__` (`src/usb/uf2/compile_date.h`) differ between any two
   builds; set `SOURCE_DATE_EPOCH` on both when comparing images.
 - **`-D`** takes `NAME=VALUE` for the options CMakeLists.txt defines (`DUALBANK_FW`, `DEFAULT_TO_OTA_DFU`, `SIGNED_FW`
-  with `SIGNED_FW_QX`/`SIGNED_FW_QY`, `FORCE_UF2`, `SD_VERSION`, `USE_NFCT`, `ANT_LICENSE_KEY`); anything else is
-  refused. ANT needs the s340 SoftDevice, which the repository does not ship.
+  with `SIGNED_FW_QX`/`SIGNED_FW_QY`, `FORCE_UF2`, `SD_VERSION`, `USE_NFCT`); anything else is refused. ANT
+  (`ANT_LICENSE_KEY`, `SD_NAME=s340`) is not offered: the s340 SoftDevice is license-excluded from the repository.
 - **A HIL record** (`--board <b> --shared --hil-config <roster>`) is the default configuration of a clean tree: `-D`
   and a dirty tree are refused. It adds `hilRecord` (the roster's path and sha256, and `agentrc`, the identity of the
   agentrc the HIL contract's `scripts/agentrc.py` selects), each board's `sha256` of every artifact and `softdevice`
-  (name, version, hex and its sha256), and fails with exit 2 when HEAD, the tree or an agentrc closure file changed
-  while it built.
+  (name, version, hex and its sha256), and fails with exit 2 when HEAD, the tree, the roster or an agentrc
+  closure file changed while it built.
 - **Private dirs for parallel agents.** Each build starts from an empty `cmake-build/cmake-build-agent-<pid>-<board>`
   and is removed when it passes; its `artifacts` say what it produced, nothing is left to flash. A failed one is kept
   for its log (`<buildDir>/check_build.log`; `-v` also streams it to stderr). `--shared` rebuilds
   `cmake-build/cmake-build-<board>` from clean and keeps it; it needs exclusive ownership of that board.
 - **Dependencies are never fetched here.** `lib/tinyusb`, `lib/nrfx`, `lib/uf2` and `lib/tinycrypt` are submodules
-  (`git submodule update --init`); `adafruit-nrfutil` and Python `intelhex` must be installed.
+  (`git submodule update --init`); a firmware build needs arm-none-eabi-gcc, cmake, ninja, `adafruit-nrfutil` and
+  Python `intelhex`, checked only when a board is selected (a docs or tests-only change needs none).
 - **Debug builds** for a probe session: `cmake -S . -B <dir> -G Ninja -DBOARD=<b> -DCMAKE_BUILD_TYPE=Debug` uses the
   `_debug.ld` linker scripts and RTT (`CFG_DEBUG`), with a larger bootloader region; the legacy make `DEBUG=1` is its
   equivalent. A debug image is never a HIL record.

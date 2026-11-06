@@ -8,6 +8,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('check_build', ROOT / '.claude/skills/build/scripts/check_build.py')
@@ -42,13 +43,18 @@ class Classify(unittest.TestCase):
     self.assertEqual(self.rule('test/hil/fixture/main.c')[0], 'contract-hil')
     self.assertEqual(self.rule('.claude/test/test_build.py')[0], 'tests')
 
-  def test_board_files_select_the_board(self):
-    rule, _, sel = self.rule('src/boards/pca10100/board.h')
-    self.assertEqual((rule, sel), ('board', {'boards': {'pca10100'}}))
+  def test_board_files_and_the_board_directory_select_the_board(self):
+    for p in ('src/boards/pca10100/board.h', 'src/boards/pca10100'):
+      rule, _, sel = self.rule(p)
+      self.assertEqual((rule, sel['boards']), ('board', {'pca10100'}), p)
 
-  def test_board_mk_adds_a_make_build_of_that_board(self):
+  def test_board_mk_adds_make_builds_of_that_board_and_the_mandated_boards(self):
     rule, _, sel = self.rule('src/boards/nrfmicro/board.mk')
-    self.assertEqual((rule, sel['boards'], sel['make']), ('board-make', {'nrfmicro'}, {'nrfmicro'}))
+    self.assertEqual((rule, sel['boards'], sel['make']), ('board-make', {'nrfmicro'}, {'nrfmicro', *cb.MANDATED}))
+
+  def test_contract_changes_build_the_representatives(self):
+    for p in ('.claude/skills/build/scripts/check_build.py', 'test/hil/fixture/main.c', '.github/workflows/hil.yml'):
+      self.assertEqual(self.rule(p)[2]['boards'], set(cb.REPRESENTATIVES), p)
 
   def test_removed_board_builds_nothing(self):
     rule, reason, sel = self.rule('src/boards/no_such_board/board.h')
@@ -115,6 +121,11 @@ class Select(unittest.TestCase):
     hil = cb.select(['.claude/skills/hil-contract/scripts/hil_test.py'], BOARDS, ROSTER)['hil']
     self.assertEqual((hil['boards'], hil['full']), (['pca10056'], True))
 
+  def test_a_mandated_board_changed_directly_is_hil_scope(self):
+    hil = cb.select(['src/boards/feather_nrf52840_express/board.h'], BOARDS, ROSTER)['hil']
+    self.assertEqual((hil['boards'], hil['uncovered']),
+                     ([], ['feather_nrf52840_express: no roster board on this host']))
+
   def test_docs_select_no_hil_board(self):
     self.assertEqual(cb.select(['CLAUDE.md'], BOARDS, ROSTER)['hil']['boards'], [])
 
@@ -128,6 +139,18 @@ class Cli(unittest.TestCase):
     self.assertEqual(code, 0)
     self.assertEqual(res['build']['boards'], sorted(cb.REPRESENTATIVES))
     self.assertEqual([p['rule'] for p in res['paths']], ['shared', 'docs'])
+
+  def test_scope_directory_with_a_trailing_slash(self):
+    res = run('--scope', 'src/boards/xiao_nrf52840_ble/', '--select-only')[1]
+    self.assertIn('xiao_nrf52840_ble', res['build']['boards'])
+
+  def test_docs_only_needs_no_toolchain(self):
+    with mock.patch.object(cb.shutil, 'which', return_value=None):
+      code, res = run('--scope', 'README.md')
+    self.assertEqual((code, res['pass'], res['boards']), (0, True, []))
+
+  def test_ant_is_not_offered(self):
+    self.assertEqual(run('--board', 'pca10056', '--select-only', '-D', 'ANT_LICENSE_KEY=x')[0], 2)
 
   def test_unknown_option_define_is_refused(self):
     code, res = run('--board', 'pca10056', '--select-only', '-D', 'CMAKE_C_FLAGS=-O0')

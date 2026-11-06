@@ -32,11 +32,16 @@ BOARDS_DIR = ROOT / 'src' / 'boards'
 MANDATED = ('feather_nrf52840_express', 'feather_nrf52832')
 # one board per MCU variant (nRF52840, nRF52832, nRF52833) plus the HIL rig's DK
 REPRESENTATIVES = ('feather_nrf52840_express', 'feather_nrf52832', 'pca10100', 'pca10056')
+# ANT (ANT_LICENSE_KEY, SD_NAME=s340) is not offered: the s340 SoftDevice is license-excluded from the repository
 OPTIONS = ('DUALBANK_FW', 'DEFAULT_TO_OTA_DFU', 'SIGNED_FW', 'SIGNED_FW_QX', 'SIGNED_FW_QY', 'FORCE_UF2', 'SD_VERSION',
-           'USE_NFCT', 'ANT_LICENSE_KEY')
-# compiler flags in the environment would reach CMake's initial flags, a build CI never makes
-SCRUBBED_ENV = ('CFLAGS', 'CXXFLAGS', 'ASMFLAGS', 'LDFLAGS', 'CPPFLAGS', 'CMAKE_TOOLCHAIN_FILE', 'CMAKE_BUILD_TYPE',
-                'CMAKE_GENERATOR')
+           'USE_NFCT')
+# compiler and CMake inputs from the environment would make a build CI never makes
+SCRUBBED_ENV = ('CFLAGS', 'CXXFLAGS', 'ASMFLAGS', 'LDFLAGS', 'CPPFLAGS', 'CPATH', 'C_INCLUDE_PATH', 'LIBRARY_PATH',
+                'COMPILER_PATH', 'GCC_EXEC_PREFIX', 'CMAKE_TOOLCHAIN_FILE', 'CMAKE_BUILD_TYPE', 'CMAKE_GENERATOR',
+                'CMAKE_C_COMPILER_LAUNCHER', 'CMAKE_PREFIX_PATH')
+# the CMake cache entries a build record keeps: what configured the build
+RECORDED_CACHE = ('BOARD', 'CMAKE_BUILD_TYPE', 'CMAKE_GENERATOR', 'CMAKE_OBJCOPY', 'NRFUTIL',
+                  'Python_EXECUTABLE', *OPTIONS)
 TESTS = ('python3', '-m', 'unittest', 'discover', '-s', '.claude/test', '-p', 'test_*.py')
 MCU_NAMES = {'nrf52': 'nRF52832', 'nrf52833': 'nRF52833', 'nrf52840': 'nRF52840'}
 
@@ -46,11 +51,12 @@ DOCS = re.compile(r'^(README\.md|changelog\.md|CODE_OF_CONDUCT\.md|LICENSE|suppo
                   r'|\.claude/skills/[^/]+/[^/]+\.md)$')
 # (pattern, rule, what it selects); first match wins
 RULES = (
-  (r'^src/boards/([^/]+)/board\.mk$', 'board-make', 'the board, plus a legacy make build of it'),
-  (r'^src/boards/([^/]+)/', 'board', 'the board'),
-  (r'^\.claude/skills/build/scripts/', 'contract-build', 'contract tests, the mandated boards and every roster board'),
-  (r'^(\.claude/skills/hil-contract/scripts/|test/hil/)', 'contract-hil', 'contract tests and every roster board'),
-  (r'^\.github/workflows/hil\.yml$', 'contract-hil', 'contract tests and every roster board'),
+  (r'^src/boards/([^/]+)/board\.mk$', 'board-make', 'the board, plus legacy make builds of it and the mandated boards'),
+  (r'^src/boards/([^/]+)(/|$)', 'board', 'the board'),
+  (r'^\.claude/skills/build/scripts/', 'contract-build', 'contract tests, the representatives and every roster board'),
+  (r'^(\.claude/skills/hil-contract/scripts/|test/hil/)', 'contract-hil',
+   'contract tests, the representatives and every roster board'),
+  (r'^\.github/workflows/hil\.yml$', 'contract-hil', 'contract tests, the representatives and every roster board'),
   (r'^(\.claude/test/|\.pre-commit-config\.yaml$)', 'tests', 'contract tests'),
   (r'^\.github/workflows/githubci\.yml$', 'ci', 'contract tests and the mandated boards'),
   (r'^(Makefile|tools/build_all\.py)$', 'make', 'a legacy make build of the mandated boards'),
@@ -95,7 +101,7 @@ def board_config(board):
 
 def changed_paths(args):
   if args.scope:
-    return [os.path.relpath(os.path.abspath(p), ROOT) if os.path.isabs(p) else p.rstrip('/') for p in args.scope]
+    return [os.path.relpath(os.path.abspath(p), ROOT) for p in args.scope]
   if args.diff_file:
     return [l.strip() for l in Path(args.diff_file).read_text().splitlines() if l.strip()]
   paths = []
@@ -119,15 +125,15 @@ def classify(path, boards):
       board = m.group(1)
       if board not in boards:
         return rule, f'{board} is no board in this tree (removed): nothing to build', {}
-      sel = {'boards': {board}}
+      sel = {'boards': {board}, 'direct': {board}}
       if rule == 'board-make':
-        sel['make'] = {board}
+        sel['make'] = {board, *MANDATED}
       return rule, f'{what}', sel
     if rule == 'softdevice':
       users = {b for b in boards if board_config(b)[1] == m.group(1)}
-      return rule, f'{what}: {", ".join(sorted(users)) or "none"}', {'boards': users}
-    sel = {'contract-build': {'tests': True, 'boards': set(MANDATED), 'hil_full': True},
-           'contract-hil': {'tests': True, 'hil_full': True},
+      return rule, f'{what}: {", ".join(sorted(users)) or "none"}', {'boards': users, 'direct': users}
+    sel = {'contract-build': {'tests': True, 'boards': set(REPRESENTATIVES), 'hil_full': True},
+           'contract-hil': {'tests': True, 'boards': set(REPRESENTATIVES), 'hil_full': True},
            'tests': {'tests': True},
            'ci': {'tests': True, 'boards': set(MANDATED)},
            'make': {'make': set(MANDATED)},
@@ -138,7 +144,7 @@ def classify(path, boards):
 
 
 def select(paths, boards, roster=None):
-  sel = {'boards': set(), 'make': set(), 'tests': False, 'shared': False, 'hil_full': False}
+  sel = {'boards': set(), 'direct': set(), 'make': set(), 'tests': False, 'shared': False, 'hil_full': False}
   rows = []
   for path in paths:
     rule, reason, s = classify(path, boards)
@@ -159,13 +165,12 @@ def select(paths, boards, roster=None):
 def hil_selection(sel, roster, boards):
   rig = [b['name'] for b in roster['boards']]
   full = sel['hil_full'] or sel['shared']
-  chosen = set(rig) if full else sel['boards'] & set(rig)
-  uncovered = []
+  # only boards a change reaches directly: the mandated pair added to every build is build coverage, not HIL scope
+  chosen = set(rig) if full else sel['direct'] & set(rig)
+  uncovered = [f'{b}: no roster board on this host' for b in sorted(sel['direct'] - set(rig))]
   if full:
     covered = {board_config(b)[0] for b in rig if b in boards}
     uncovered += [f'{MCU_NAMES[m]}: no roster board on this host' for m in MCU_NAMES if m not in covered]
-  else:
-    uncovered += [f'{b}: no roster board on this host' for b in sorted(sel['boards'] - set(rig) - set(MANDATED))]
   return {'boards': sorted(chosen), 'full': full, 'uncovered': uncovered}
 
 
@@ -233,6 +238,16 @@ def expected_artifacts(bdir, board):
   return found, problems
 
 
+def cmake_config(bdir):
+  """RECORDED_CACHE entries of a configured build dir, the generator and build type included."""
+  found = {}
+  for line in (bdir / 'CMakeCache.txt').read_text().splitlines():
+    m = re.match(r'^(\w+):\w+=(.*)$', line)
+    if m and m[1] in RECORDED_CACHE:
+      found[m[1]] = m[2]
+  return found
+
+
 def first_error(log):
   for line in Path(log).read_text(errors='replace').splitlines():
     if re.search(r'\berror\b|Error|FAILED|No such file', line):
@@ -270,6 +285,7 @@ def build_board(board, defines, shared, verbose):
     return row
   row['status'] = 'ok'
   row['artifacts'] = {k: str(p.relative_to(ROOT)) for k, p in sorted(found.items())}
+  row['config'] = cmake_config(bdir)
   if shared:
     row['sha256'] = {k: sha256(p) for k, p in sorted(found.items())}
     sd = re.search(r'_(s\d+)_([0-9.]+)\.hex$', found['merged'].name)
@@ -344,8 +360,10 @@ def main(argv=None):
     record = bool(args.hil_config and args.shared)
     if record and args.defines:
       raise Refusal('a HIL record builds the default configuration: drop -D')
-    prerequisites(make=bool(result['build']['make']))
+    if result['build']['boards'] or result['build']['make']:
+      prerequisites(make=bool(result['build']['make']))
     result['input'] = inputs()
+    result['input']['sourceDateEpoch'] = os.environ.get('SOURCE_DATE_EPOCH')
     if record:
       if result['input']['dirty']:
         raise Refusal(f'a HIL record needs a clean tree: {", ".join(result["input"]["dirtyInputs"])}')
@@ -367,6 +385,8 @@ def main(argv=None):
     after = inputs()
     if after['head'] != result['input']['head'] or after['dirty']:
       return out({**result, 'pass': False, 'error': 'the tree changed while building; build again'}, 2)
+    if sha256(args.hil_config) != result['hilRecord']['roster']['sha256']:
+      return out({**result, 'pass': False, 'error': f'{args.hil_config} changed while building; build again'}, 2)
     try:
       for script in agentrc.SCRIPTS:
         agentrc.path_of(script)   # every closure file still has the bytes the record's identity took
