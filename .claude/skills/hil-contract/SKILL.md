@@ -16,8 +16,9 @@ contract under agentrc's `hil` skill, which is read first.
   where no probe with the roster's serial is found, before anything is written.
 - An entry: `name` the bootloader's board (`src/boards/<name>/`), `uid` the bootloader's USB serial (FICR DEVICEID as
   16 hex digits, `src/usb/usb_desc.c`), `probe` the J-Link serial registered in agentrc's board registry, which gives
-  the flasher (`-device nrf52840_xxaa`) and the lock name, and `nrf52.reentry` (`gpregret`) once commissioned
-  (`commissioning.md`). An entry without it is refused by `run`.
+  the flasher (`-device nrf52840_xxaa`) and the lock name, and once commissioned (`commissioning.md`)
+  `nrf52.reentry` (`gpregret`) and `nrf52.selfUpdateBase`, the `{version, file, sha256}` of a released
+  `update-<board>_bootloader-<version>_nosd.uf2`. `run` refuses an entry without them.
 - The DK (`pca10056`, probe 683944004, lock `nrf52840dk`) is shared with tinyusb, Adafruit TinyUSB Arduino and the
   Adafruit nRF52 Arduino core, each taking the same lock.
 
@@ -43,9 +44,9 @@ HEAD, submodules, roster or agentrc, not of the default configuration, or whose 
 hash as recorded, and copies the artifacts into the run dir before use. Before any hardware access it checks the merged
 HEX's spans: only flash and UICR NRFFW, runs at 0 (MBR), 0x1000 (SoftDevice) and the bootloader start, nothing in the
 app region, and NRFFW[0] pointing at the bootloader. What the battery checks comes from the record and this checkout:
-the version from the image's `UF2 Bootloader <version>` string, VID/PID and `UF2_BOARD_ID` from `board.h`, the app start
-(`MBR_SIZE` plus the SoftDevice's `SD_FLASH_SIZE`) and the RAM end from the record's SoftDevice and the MCU's linker
-script.
+the version from the image's `UF2 Bootloader <version>` string, VID, the UF2 and CDC-only PIDs and `UF2_BOARD_ID` from
+`board.h`, the app start (`MBR_SIZE` plus the SoftDevice's `SD_FLASH_SIZE`) and the RAM end from the record's SoftDevice
+and the MCU's linker script.
 
 ## Execution
 
@@ -53,11 +54,13 @@ On the rig, from a clean checkout at the record's HEAD (exit 2 otherwise):
 
 ```bash
 python3 .claude/skills/hil-contract/scripts/hil_test.py run -b pca10056 \
-  --build-record cmake-build/pca10056.hil.json [--lock-wait S] [--run-root DIR] test/hil/ci.json
+  --build-record cmake-build/pca10056.hil.json --base-dir <dir> [--lock-wait S] [--run-root DIR] test/hil/ci.json
 ```
 
-`run` takes the lock itself (no pre-hold) and runs one board for up to about four minutes; its last stdout line is the
-JSON report and its exit is final. The battery, each step judged from its own evidence:
+`--base-dir` holds the roster's `selfUpdateBase` file, downloaded from that release; `run` refuses bytes that do not
+hash as pinned and copies them into the run dir. `adafruit-nrfutil` (the farm's hil-venv) and `mcopy` must be on
+`PATH`. `run` takes the lock itself (no pre-hold) and runs one board for up to about five minutes; its last stdout line
+is the JSON report and its exit is final. The battery, each step judged from its own evidence:
 
 1. `install`: ERASEALL through NVMC with the CPU halted (nRF52840 errata [184]), `READY` read back, the merged HEX
    (MBR, SoftDevice, bootloader, UICR) loaded and each of its runs verified with `verifybin`, then reset.
@@ -71,27 +74,35 @@ JSON report and its exit is final. The battery, each step judged from its own ev
 5. `reenter`: GPREGRET = 0x57 written and read back, then SYSRESETREQ (a soft reset keeps GPREGRET); the drive returns
    and `CURRENT.UF2` reads back A's bytes at the app start. Forced entry, not a double reset.
 6. `copy-b`, `app-ran-b`: app B, with another nonce and marker, runs, so a stale image cannot pass.
+7. `serial`, `app-ran-c`: GPREGRET = 0x4E and SYSRESETREQ enumerate the bootloader as the CDC-only device (its PID and
+   the roster serial, one tty, no drive); `adafruit-nrfutil dfu genpkg --dev-type 0x0052` packages app C and `dfu
+   serial --singlebank` sends it ("Device programmed." required: it exits 0 on a failed upgrade); app C runs.
+8. `update-base`: from the drive (re-entered through GPREGRET), the pinned release's update UF2 copied: the bootloader
+   stages it at the top of the app region and the MBR copies it over itself; app C still runs, and re-entered, the
+   drive names the release's version. `update`: the record's `update-*_nosd.uf2` the same way, back to the candidate's
+   version, so the candidate both updates and is updated.
 
-`--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, the FAT reader and
-flush) runs under agentrc's `hil_process.run_tracked`; one whose process tree is not proven ended stops the battery,
-skips the restore and hands its receipt to the cleanup holder. Before its first tool, every `run`, `install` and
-`restore` adds itself (pid, start time, absolute ops dir) to the board's pending mark (`hil_lock.PendingSessions`,
+`--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, adafruit-nrfutil, the FAT
+reader and flush) runs under agentrc's `hil_process.run_tracked`; one whose process tree is not proven ended stops the
+battery, skips the restore and hands its receipt to the cleanup holder. Before its first tool, every `run`, `install`
+and `restore` adds itself (pid, start time, absolute ops dir) to the board's pending mark (`hil_lock.PendingSessions`,
 `<lock>.nrf52-bootloader-pending.json`), and refuses when it cannot, or when the mark names another invocation that
-lives or a tool it started that does not recheck `done` (run_tracked keeps a child's files in the ops dir until
-then); adds are serialized, so of two at once the later refuses. An invocation that ends cleanly removes the mark
-once every invocation it names has ended.
+lives or a tool it started that does not recheck `done` (run_tracked keeps a child's files in the ops dir until then);
+adds are serialized, so of two at once the later refuses. An invocation that ends cleanly removes the mark once every
+invocation it names has ended.
 
 ### CI
 
-`.github/workflows/hil.yml` runs the battery for a pull request from this repository (never a fork) and for a
-dispatch naming boards (`fail_at` for acceptance only). `select` runs the selector above against the merge base and
-reports a board pending commissioning as uncovered; `hil-build` builds each board's HIL record on a hosted runner with
-CI's arm-gcc and the agentrc pin and uploads the record and its artifacts; `hil-run`, on the rig's `nrf52-bootloader`
-runner (agentrc `hil-farm-setup`), checks out the same commit, fetches `lib/nrfx` and the pin, and runs `run` per board
-with a 30-minute lock wait into `$(dirname "$GITHUB_WORKSPACE")/hil-state/<run>-<attempt>/<board>`, uploaded as
-`hil-run-<attempt>`; the rig builds nothing. `pr-comment` posts the sticky `hil-report` comment (`hil_comment.py`) only
-from the newest attempt of the newest run for the PR's head, judging each board's newest report by the report core's
-shared run rules. Runs are never cancelled: a newer push waits.
+`.github/workflows/hil.yml` runs the battery for a pull request from this repository (never a fork) and for a dispatch
+naming boards (`fail_at` for acceptance only). `select` runs the selector above against the merge base and reports a
+board pending commissioning as uncovered; `hil-build` builds each board's HIL record on a hosted runner with CI's
+arm-gcc and the agentrc pin, downloads each board's `selfUpdateBase` release asset into `cmake-build/hil-base/`, and
+uploads them with the record's artifacts; `hil-run`, on the rig's `nrf52-bootloader` runner (agentrc `hil-farm-setup`),
+checks out the same commit, fetches `lib/nrfx` and the pin, and runs `run` per board with `--base-dir
+cmake-build/hil-base` and a 30-minute lock wait into `$(dirname "$GITHUB_WORKSPACE")/hil-state/<run>-<attempt>/<board>`,
+uploaded as `hil-run-<attempt>`; the rig builds nothing. `pr-comment` posts the sticky `hil-report` comment
+(`hil_comment.py`) only from the newest attempt of the newest run for the PR's head, judging each board's newest report
+by the report core's shared run rules. Runs are never cancelled: a newer push waits.
 
 ## Reservation
 
@@ -133,8 +144,8 @@ written); blocker (exit 4, `heldAfter`, a recovery blocker, another probe user, 
 ## Recovery
 
 - Exit 4 or `heldAfter`: the board is held by the failed run's cleanup holder (`hil_lock.py status` shows `role:
-  cleanup-holder` and its pid). Once no `JLinkExe`, `mcopy` or `hil_test.py` of that run is left on the host, a
-  `hw-validator` or the human runs, with that run's record or one rebuilt on a known-good clean HEAD:
+  cleanup-holder` and its pid). Once no `JLinkExe`, `mcopy`, `adafruit-nrfutil` or `hil_test.py` of that run is left on
+  the host, a `hw-validator` or the human runs, with that run's record or one rebuilt on a known-good clean HEAD:
 
   ```bash
   python3 .claude/skills/hil-contract/scripts/hil_test.py restore -b pca10056 --build-record <record> \
@@ -152,8 +163,9 @@ written); blocker (exit 4, `heldAfter`, a recovery blocker, another probe user, 
 
 ## Limits
 
-- Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry and readback. Uncovered, named
-  pending in every report that needs them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA, CDC serial DFU,
-  SIGNED_FW, dual bank, a physical double reset, an interrupted update and bootloader self-update.
+- Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
+  readback, CDC serial DFU of an app, and bootloader self-update from the pinned release and back. Uncovered, named
+  pending in every report that needs them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA, SIGNED_FW, dual
+  bank, a physical double reset, an interrupted update and a SoftDevice update.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.

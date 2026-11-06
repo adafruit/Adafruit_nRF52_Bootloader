@@ -113,6 +113,28 @@ jobs:
               > "cmake-build/$b.hil.json" || { tail -c 2000 "cmake-build/$b.hil.json"; exit 1; }
           done
 
+      # each board's nrf52.selfUpdateBase release asset, for the battery's self-update steps (hil_test.py --base-dir);
+      # a board without one is left to run's refusal
+      - name: Download the self-update bases
+        run: |
+          python3 - <<'EOF'
+          import hashlib, json, os, urllib.request
+          roster = {b['name']: b for b in json.load(open('test/hil/ci.json'))['boards']}
+          os.makedirs('cmake-build/hil-base', exist_ok=True)
+          for b in os.environ['BOARDS'].split():
+              base = (roster[b].get('nrf52') or {}).get('selfUpdateBase')
+              if not base:
+                  print(f'::warning::{b} pins no nrf52.selfUpdateBase')
+                  continue
+              url = (f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/releases/download/"
+                     f"{base['version']}/{base['file']}")
+              data = urllib.request.urlopen(url, timeout=60).read()
+              if hashlib.sha256(data).hexdigest() != base['sha256']:
+                  raise SystemExit(f'{url} does not hash as test/hil/ci.json pins')
+              with open(os.path.join('cmake-build/hil-base', os.path.basename(base['file'])), 'wb') as f:
+                  f.write(data)
+          EOF
+
       # the record and the artifacts it names, at the paths it names (cmake-build/ is the artifact's root)
       - uses: actions/upload-artifact@v4
         with:
@@ -125,6 +147,7 @@ jobs:
             cmake-build/cmake-build-*/bootloader_mbr.*
             cmake-build/cmake-build-*/*_bootloader-*
             cmake-build/cmake-build-*/update-*
+            cmake-build/hil-base/*
           if-no-files-found: error
           overwrite: true
 
@@ -133,7 +156,7 @@ jobs:
     needs: [select, hil-build]
     if: ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.boards != '' }}
     runs-on: [ self-hosted, Linux, X64, nrf52-bootloader ]
-    # a battery is ~2 min; the DK is shared with tinyusb and the Arduino HILs, so a run may wait up to 30 min for it
+    # a battery is ~3 min; the DK is shared with tinyusb and the Arduino HILs, so a run may wait up to 30 min for it
     timeout-minutes: 60
     # the attempt that uploaded the artifact: a re-run of failed jobs that does not re-run this job keeps its outputs
     outputs:
@@ -179,7 +202,8 @@ jobs:
           rc=0
           for b in $BOARDS; do
             python3 .claude/skills/hil-contract/scripts/hil_test.py run -b "$b" --build-record "cmake-build/$b.hil.json" \
-              --lock-wait 1800 --run-root "$HIL_OUT/$b" ${FAIL_AT:+--fail-at "$FAIL_AT"} test/hil/ci.json || rc=1
+              --base-dir cmake-build/hil-base --lock-wait 1800 --run-root "$HIL_OUT/$b" \
+              ${FAIL_AT:+--fail-at "$FAIL_AT"} test/hil/ci.json || rc=1
           done
           exit $rc
 

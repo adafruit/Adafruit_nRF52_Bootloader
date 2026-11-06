@@ -155,6 +155,26 @@ class Roster(unittest.TestCase):
   def test_the_committed_roster_names_the_dk(self):
     entry = json.loads((ROOT / 'test/hil/ci.json').read_text())['boards'][0]
     self.assertEqual((entry['name'], entry['probe']), ('pca10056', '683944004'))
+    self.assertEqual(self.board(entry)['base']['file'], 'update-pca10056_bootloader-0.11.0_nosd.uf2')
+
+  def test_refuses_a_malformed_self_update_pin(self):
+    for base in ('0.11.0', {'version': '0.11.0', 'file': 'x.uf2'},
+                 {'version': '0.11.0', 'file': '../x.uf2', 'sha256': 'ab'}):
+      with self.subTest(base=base), self.assertRaisesRegex(ht.Refused, 'selfUpdateBase'):
+        self.board({**REGISTRY_ENTRY, 'nrf52': {'reentry': 'gpregret', 'selfUpdateBase': base}})
+
+  def test_admits_only_the_pinned_base_bytes(self):
+    with tempfile.TemporaryDirectory() as d:
+      src, run = Path(d) / 'src', Path(d) / 'run'
+      src.mkdir(), run.mkdir()
+      (src / 'b.uf2').write_bytes(b'base')
+      pin = {'version': '0.11.0', 'file': 'b.uf2', 'sha256': ht.hashlib.sha256(b'base').hexdigest()}
+      got = ht.admit_base({'name': 'pca10056', 'base': pin}, src, run)
+      self.assertEqual((got['path'], Path(got['path']).read_bytes()), (str(run / 'b.uf2'), b'base'))
+      with self.assertRaisesRegex(ht.Refused, 'not the pinned'):
+        ht.admit_base({'name': 'pca10056', 'base': {**pin, 'sha256': '0' * 64}}, src, run)
+      with self.assertRaisesRegex(ht.Refused, 'pins no'):
+        ht.admit_base({'name': 'pca10056', 'base': None}, src, run)
 
 
 class Admit(unittest.TestCase):
@@ -298,6 +318,50 @@ class BatteryRun(unittest.TestCase):
     self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
     bat = ht.Battery({'flasher': {'uid': '1'}, 'device': 'd', 'uid': 'u'}, FACTS, tmp, Path(tmp) / 'hil.log')
     return bat
+
+  def serial_run(self, out, drive=None):
+    bat = self.battery()
+    bat.f = {**FACTS, 'vid': 0x239A, 'cdcPid': 0xDA}
+    calls = []
+
+    def spawn(argv, timeout):
+      calls.append([str(a) for a in argv])
+      return 0, out if 'serial' in argv else ''
+    with mock.patch.object(bat.probe, 'reenter', return_value={'gpregret': '0000004E'}) as reenter, \
+         mock.patch.object(ht, 'usb_device', return_value='1-1'), \
+         mock.patch.object(ht, 'cdc_tty', return_value='/dev/ttyACM9'), \
+         mock.patch.object(ht.os, 'access', return_value=True), \
+         mock.patch.object(ht, 'block_device', return_value=drive), \
+         mock.patch.object(bat.tools, 'spawn', side_effect=spawn):
+      ev = bat.serial(b'c' * 16)
+    reenter.assert_called_once_with(ht.DFU_MAGIC_SERIAL_ONLY_RESET)
+    return ev, calls
+
+  def test_serial_dfu_packages_for_the_adafruit_device_type_and_needs_programmed(self):
+    ev, calls = self.serial_run('Upgrading target\nDevice programmed.\n')
+    self.assertEqual(ev['tty'], '/dev/ttyACM9')
+    self.assertEqual(calls[0][:5], ['adafruit-nrfutil', 'dfu', 'genpkg', '--dev-type', '0x0052'])
+    self.assertEqual(calls[1][-7:], ['--package', calls[0][-1], '-p', '/dev/ttyACM9', '-b', '115200', '--singlebank'])
+    with self.assertRaisesRegex(ht.StepFail, 'did not program'):
+      self.serial_run('Failed to upgrade target. Error is: timeout\n')
+    with self.assertRaisesRegex(ht.StepFail, 'enumerated a drive'):
+      self.serial_run('Device programmed.\n', drive='/dev/sdz')
+
+  def test_update_enters_dfu_when_the_app_runs_and_checks_the_version(self):
+    bat = self.battery()
+    with tempfile.NamedTemporaryFile(suffix='.uf2') as uf2, \
+         mock.patch.object(bat.drive, 'present', return_value=None), \
+         mock.patch.object(bat.probe, 'reenter', return_value={}) as reenter, \
+         mock.patch.object(bat.drive, 'wait', return_value='/dev/sdz'), \
+         mock.patch.object(bat.drive, 'read', return_value=(b'UF2 Bootloader 1.0\r\n', {})), \
+         mock.patch.object(bat.drive, 'copy', return_value={}) as copy, \
+         mock.patch.object(bat, 'app_ran', return_value={}) as app_ran, \
+         mock.patch.object(bat.drive, 'info', return_value=['UF2 Bootloader 0.11.0']) as info:
+      ev = bat.update(uf2.name, '0.11.0', b'c' * 16)
+    self.assertEqual((reenter.call_count, ev['before']), (2, 'UF2 Bootloader 1.0'))
+    copy.assert_called_once()
+    app_ran.assert_called_once_with(b'c' * 16)
+    info.assert_called_once_with('/dev/sdz', '0.11.0')
 
   def test_app_ran_rejects_another_copys_marker(self):
     bat = self.battery()
