@@ -119,6 +119,35 @@ class Images(unittest.TestCase):
         self.assertEqual(z.read('app.dat'), bytes.fromhex('5200ffffffffffff0100feff9a29'))
         self.assertEqual(z.read('app.bin'), b'img')
 
+  def test_the_signing_key_gives_the_public_key_the_build_compiles_in(self):
+    key = json.loads((ROOT / 'test/hil/signed-fw-test-key.json').read_text())
+    self.assertEqual(ht.public_key(ht.signing_key()), bytes.fromhex(key['qx'] + key['qy']))
+
+  def test_a_signed_init_packet_verifies_as_dfu_init_c_checks_it(self):
+    dat, image, d = bytes.fromhex('5200ffffffffffff0100feff65d6'), b'\x01' * 4352, ht.signing_key()
+    pkt = ht.signed_init_packet(dat, image, d)
+    self.assertEqual(len(pkt), 12 + 40 + 64)   # init fields, ECDS id, length, SHA-256; r || s
+    self.assertEqual(pkt[:12], dat[:-2])
+    self.assertEqual(struct.unpack_from('<II', pkt, 12), (2, len(image)))
+    self.assertEqual(pkt[20:52], __import__('hashlib').sha256(image).digest())
+    try:
+      from cryptography.hazmat.primitives import hashes
+      from cryptography.hazmat.primitives.asymmetric import ec
+      from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+    except ImportError:
+      self.skipTest('no cryptography to cross-check the signature')
+    pub = ec.EllipticCurvePublicNumbers(*(int.from_bytes(ht.public_key(d)[i:i + 32], 'big') for i in (0, 32)),
+                                        ec.SECP256R1()).public_key()
+    r, s_ = (int.from_bytes(pkt[52 + i:84 + i], 'big') for i in (0, 32))
+    pub.verify(encode_dss_signature(r, s_), pkt[:52], ec.ECDSA(hashes.SHA256()))
+
+  def test_tampering_after_signing_changes_the_image_not_its_signed_hash(self):
+    dat, image = bytes.fromhex('5200ffffffffffff0100feff65d6'), b'\x01' * 256
+    pkt, changed = ht.tampered_after_signing(ht.signing_key())(dat, image)
+    self.assertNotEqual(changed, image)
+    self.assertEqual(len(changed), len(image))
+    self.assertEqual(pkt[20:52], __import__('hashlib').sha256(image).digest())
+
   def test_current_span_is_the_app_blocks_of_current_uf2(self):
     bat = ht.Battery.__new__(ht.Battery)
     bat.f = FACTS
@@ -552,7 +581,7 @@ class BatteryRun(unittest.TestCase):
 
   def dual(self):
     bat = self.battery()
-    bat.f = {**FACTS, 'vid': 0x239A, 'cdcPid': 0xDA, 'bank1': 0x88000}
+    bat.f = {**FACTS, 'vid': 0x239A, 'pid': 0xDA, 'cdcPid': 0xDA, 'bank1': 0x88000}
     return bat
 
   def test_serial_dfu_omits_singlebank_for_a_dual_bank_build(self):
@@ -578,7 +607,8 @@ class BatteryRun(unittest.TestCase):
     bat, calls = self.dual(), []
     sessions, session = self.bank_session()
     fx = ht.fixture(bat.f, b'a' * 16)
-    with mock.patch.object(bat, 'serial', side_effect=lambda n, singlebank: calls.append(('serial', singlebank)) or {}), \
+    serial = mock.Mock(side_effect=lambda n, singlebank: calls.append(('serial', singlebank)) or {})
+    with mock.patch.object(bat, 'serial', serial), \
          mock.patch.object(ht, 'usb_device', return_value=None), \
          mock.patch.object(bat.probe, 'session', side_effect=session):
       ev = bat.banked(b'a' * 16)
@@ -649,6 +679,53 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(bat, 'app_ran'), mock.patch.object(bat, 'refused'), mock.patch.object(bat, 'cut_short'):
       bat.battery({})
     self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['dualbank'])
+
+  def signed_refusal(self, written, words=None, settings=0x0000_00FF):
+    bat, calls, sessions = self.dual(), [], []
+    fx = ht.fixture(bat.f, b'c' * 16)
+    words = words if words is not None else (struct.unpack_from('<4I', fx['image']) if written else (0xFFFFFFFF,) * 4)
+
+    def session(cmds):
+      sessions.append(cmds)
+      return (f'{ht.DHCSR:08X} = 00030003 \n{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n'
+              f'{bat.f["appStart"]:08X} = ' + ' '.join(f'{w:08X}' for w in words) + ' \n')
+    with mock.patch.object(bat.probe, 'reenter', return_value={}), \
+         mock.patch.object(bat, 'cdc_only', side_effect=lambda pid=None: calls.append(('cdc', pid)) or '/dev/ttyACM9'), \
+         mock.patch.object(bat, 'package', return_value=Path('/p.zip')), \
+         mock.patch.object(ht, 'repackage_image', return_value=fx['image']), \
+         mock.patch.object(bat.tools, 'spawn', return_value=(1, 'Exception: port gone\n')) as spawn, \
+         mock.patch.object(bat.probe, 'session', side_effect=session):
+      ev = bat.refused_signed(b'c' * 16, None, written)
+    self.assertIn('--singlebank', spawn.call_args.args[0])
+    self.assertEqual(calls, [('cdc', None), ('cdc', bat.f['pid'])])
+    self.assertEqual((sessions[0][0], sessions[0][1], sessions[0][-2:]), (f'mem32 {ht.DHCSR:08X} 1', 'h', ['r', 'g']))
+    return ev
+
+  def test_a_refused_signed_package_leaves_bank_0_invalid_and_the_bootloader_in_dfu(self):
+    ev = self.signed_refusal(written=False)
+    self.assertEqual((ev['bank0']['state'], ev['haltedBefore'], ev['nrfutil']['exit']), (0xFF, True, 1))
+    self.signed_refusal(written=True)
+    for kw in ({'written': False, 'settings': 0x01}, {'written': True, 'words': (0xFFFFFFFF,) * 4},
+               {'written': False, 'words': (1, 2, 3, 4)}):
+      with self.subTest(**kw), self.assertRaisesRegex(ht.StepFail, 'not marked invalid'):
+        self.signed_refusal(**kw)
+
+  def test_signed_dfu_is_one_cdc_port_on_the_uf2_pid(self):
+    bat = self.dual()
+    bat.f['pid'] = 0xDB
+    with mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9') as cdc:
+      self.assertEqual(bat.cdc_dfu(), {'tty': '/dev/ttyACM9'})
+    cdc.assert_called_once_with(0xDB)
+
+  def test_signed_runs_its_profile_steps_in_order(self):
+    bat = self.dual()
+    bat.profile = 'signed'
+    with mock.patch.object(bat, 'install'), mock.patch.object(bat, 'cdc_dfu'), mock.patch.object(bat, 'serial'), \
+         mock.patch.object(bat, 'app_ran'), mock.patch.object(bat, 'refused_signed') as refused:
+      bat.battery({})
+    self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['signed'])
+    self.assertEqual([c.kwargs['written'] for c in refused.call_args_list], [False, False, True])
+    self.assertIsNone(refused.call_args_list[0].args[1])
 
   def test_a_profiles_cleanup_reinstalls_the_default_image(self):
     tmp = tempfile.mkdtemp()

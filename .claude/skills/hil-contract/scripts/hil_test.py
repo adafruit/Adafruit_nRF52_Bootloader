@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import socket
 import struct
@@ -51,7 +52,8 @@ ADAFRUIT_DEVICE_TYPE = 0x0052   # src/dfu_init.c: every init packet's device typ
 MBR_SIZE = 0x1000            # nrf_mbr.h
 PAGE = 0x1000                # nRF52840 flash: 256 pages of 4 kB (PS v1.7 4.2.2); src/flash_nrf5x.c buffers one page
 BOOTLOADER_SETTINGS = 0x000FF000   # dfu_types.h, nRF52840: bootloader_settings_t, bank_0 and bank_0_crc its first word
-BANK_VALID_APP = 0x01        # bootloader_types.h
+BANK_VALID_APP, BANK_INVALID_APP = 0x01, 0xFF   # bootloader_types.h
+DHCSR, DHCSR_S_HALT = 0xE000EDF0, 1 << 17   # ARMv7-M ARM DDI 0403D C1.6.2: the core in Debug state
 APP_FAMILY = {'nrf52840': 0xADA52840, 'nrf52833': 0x621E937A}   # src/usb/uf2/uf2cfg.h CFG_UF2_FAMILY_APP_ID
 UF2_MAGIC = (0x0A324655, 0x9E5D5157, 0x0AB16F30)
 UF2_FLAG_FAMILY = 0x2000
@@ -73,8 +75,9 @@ UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] 
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
-UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW builds',
-             'another SoftDevice version than the build\'s', 'a SoftDevice or bootloader update on a dual-bank build')
+UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU',
+             'another SoftDevice version than the build\'s',
+             'a SoftDevice or bootloader update on a dual-bank or SIGNED_FW build')
 
 
 class Refused(Exception):
@@ -338,7 +341,8 @@ def facts(board, row, copies, workdir):
   for a, b in hex_runs:
     (Path(workdir) / f'run-{a:08x}.bin').write_bytes(b)
   return {'mcu': mcu, 'family': APP_FAMILY[mcu], 'appStart': MBR_SIZE + int(sd_size, 0),
-          'bank1': bank1, 'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0), 'cdcPid': int(cdc_pid, 0),
+          'bank1': bank1, 'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0),
+          'cdcPid': int(cdc_pid, 0),
           'boardId': board_id.strip('"'), 'version': versions.pop().decode(),
           'softdevice': f'S{row["softdevice"]["name"][1:]} {row["softdevice"]["version"]}',
           'hex': str(copies['merged']), 'update': str(copies['update']), 'zip': str(copies['zip']),
@@ -356,13 +360,20 @@ def bank_1_start(mcu, app_start, boot_start):
   return app_start + (full - full % (2 * PAGE)) // 2
 
 
+def repackage_image(pkg):
+  """The application image a genpkg package `pkg` carries."""
+  with zipfile.ZipFile(pkg) as z:
+    app = json.loads(z.read('manifest.json'))['manifest']['application']
+    return z.read(app['bin_file'])
+
+
 def repackage(src, dst, edit):
-  """genpkg package `src` written again to `dst`, each init packet (.dat) replaced by edit(dat, image)."""
+  """genpkg package `src` written again to `dst`, each init packet and image replaced by edit(dat, image)."""
   with zipfile.ZipFile(src) as z:
     files = {n: z.read(n) for n in z.namelist()}
   for part in json.loads(files['manifest.json'])['manifest'].values():
     if isinstance(part, dict) and 'dat_file' in part:
-      files[part['dat_file']] = edit(files[part['dat_file']], files[part['bin_file']])
+      files[part['dat_file']], files[part['bin_file']] = edit(files[part['dat_file']], files[part['bin_file']])
   with zipfile.ZipFile(dst, 'w') as z:
     for n, data in files.items():
       z.writestr(n, data)
@@ -371,7 +382,7 @@ def repackage(src, dst, edit):
 
 def flip_crc(dat, image):
   """An unsigned init packet whose trailing CRC-16 (dfu_init.c postvalidate) no longer matches `image`."""
-  return dat[:-2] + bytes(b ^ 0xFF for b in dat[-2:])
+  return dat[:-2] + bytes(b ^ 0xFF for b in dat[-2:]), image
 
 
 # ------------------------------------------------------------------ the fixture app
@@ -411,6 +422,88 @@ def uf2_payload(blob, base, length):
     if (m0, m1) == UF2_MAGIC[:2] and base <= addr < base + length:
       got[addr] = blob[off + 32:off + 32 + size]
   return b''.join(got[a] for a in sorted(got))
+
+
+# ------------------------------------------------------------------ signed packages (SIGNED_FW profile)
+
+# NIST P-256 (FIPS 186-4 D.1.2.3), the curve src/dfu_init.c verifies with (tinycrypt uECC_secp256r1)
+P256_P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+P256_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+P256_G = (0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
+          0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5)
+DFU_INIT_USES_ECDS = 2   # src/dfu_init.c DFU_INIT_PACKET_USES_ECDS
+
+
+def ec_add(a, b):
+  """a + b on P-256 in affine coordinates, None the point at infinity."""
+  if a is None or b is None:
+    return a or b
+  if a[0] == b[0] and (a[1] + b[1]) % P256_P == 0:
+    return None
+  if a == b:
+    m = 3 * (a[0] * a[0] - 1) * pow(2 * a[1], -1, P256_P)   # curve a = -3
+  else:
+    m = (b[1] - a[1]) * pow(b[0] - a[0], -1, P256_P)
+  x = (m * m - a[0] - b[0]) % P256_P
+  return x, (m * (a[0] - x) - a[1]) % P256_P
+
+
+def ec_mul(k, point=P256_G):
+  out = None
+  while k:
+    if k & 1:
+      out = ec_add(out, point)
+    point, k = ec_add(point, point), k >> 1
+  return out
+
+
+def public_key(d):
+  """The 64-byte X || Y (big endian) of private key `d`, as SIGNED_FW_QX/QY take it."""
+  x, y = ec_mul(d)
+  return x.to_bytes(32, 'big') + y.to_bytes(32, 'big')
+
+
+def ecdsa_sign(d, message):
+  """ECDSA P-256 with SHA-256 over `message`: r || s, 32 bytes each big endian, as uECC_verify takes it."""
+  z = int.from_bytes(hashlib.sha256(message).digest(), 'big')
+  while True:
+    k = secrets.randbelow(P256_N - 1) + 1
+    r = ec_mul(k)[0] % P256_N
+    s = pow(k, -1, P256_N) * (z + r * d) % P256_N
+    if r and s:
+      return r.to_bytes(32, 'big') + s.to_bytes(32, 'big')
+
+
+def signed_init_packet(dat, image, d):
+  """An init packet `src/dfu_init.c` verifies under SIGNED_FW from adafruit-nrfutil's CRC16 one (`dat`): its fields
+  without the CRC, then the ECDS identifier, the image length and SHA-256, signed with `d` over all of that."""
+  signed = dat[:-2] + struct.pack('<II', DFU_INIT_USES_ECDS, len(image)) + hashlib.sha256(image).digest()
+  return signed + ecdsa_sign(d, signed)
+
+
+def signed_by(d):
+  """A repackage edit signing each init packet with private key `d`."""
+  return lambda dat, image: (signed_init_packet(dat, image, d), image)
+
+
+def tampered_after_signing(d):
+  """A repackage edit signing each image with `d`, then flipping the image's last byte."""
+  return lambda dat, image: (signed_init_packet(dat, image, d), image[:-1] + bytes([image[-1] ^ 0xFF]))
+
+
+def signing_key():
+  """The private key of the signed profile's test key (check_build.SIGNED_FW_TEST_KEY), checked against its public
+  key, which the build compiles in."""
+  path = build().SIGNED_FW_TEST_KEY
+  try:
+    key = json.loads(path.read_text())
+    d = int(key['d'], 16)
+    ok = public_key(d) == bytes.fromhex(key['qx'] + key['qy'])
+  except (OSError, ValueError, KeyError, TypeError) as e:
+    raise Refused(f'{path.name}: not a key ({e})') from None
+  if not ok:
+    raise Refused(f'{path.name}: d does not give qx, qy')
+  return d
 
 
 # ------------------------------------------------------------------ processes
@@ -763,30 +856,32 @@ class Battery:
       raise StepFail('CURRENT.UF2 does not read back the copied app', {'read': len(got)})
     return {**ev, 'method': 'gpregret', 'readBack': len(got)}
 
-  def serial(self, nonce, singlebank=True):
+  def serial(self, nonce, singlebank=True, edit=None):
     """App C through CDC-only serial DFU: GPREGRET 0x4E enumerates the bootloader as one CDC port and no drive
     (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
     fx = fixture(self.f, nonce)
     ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
     tty = self.cdc_only()
-    self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}'), tty, singlebank)
+    self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}', edit), tty, singlebank)
     return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
   def package(self, image, name, edit=None):
-    """An adafruit-nrfutil genpkg app package of `image`, each init packet replaced by edit(dat, image) when given."""
+    """An adafruit-nrfutil genpkg app package of `image`, rewritten by repackage's edit(dat, image) when given."""
     app, pkg = self.dir / f'{name}.bin', self.dir / f'{name}.zip'
     app.write_bytes(image)
     self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
     return repackage(pkg, pkg, edit) if edit else pkg
 
-  def cdc_only(self):
-    """The tty of the bootloader in CDC-only serial DFU: its CDC PID and the roster serial, one tty, no drive. The UF2
-    enumeration still up from before the reset can carry the same PID (pca10056), so its drive must drop first."""
-    want = f'serial DFU {self.f["vid"]:04x}:{self.f["cdcPid"]:04x} {self.b["uid"]}'
+  def cdc_only(self, pid=None):
+    """The tty of the bootloader in CDC-only serial DFU (`pid` default its CDC PID) and the roster serial, one tty, no
+    drive. The UF2 enumeration still up from before the reset can carry the same PID (pca10056), so its drive must
+    drop first."""
+    pid = pid or self.f['cdcPid']
+    want = f'serial DFU {self.f["vid"]:04x}:{pid:04x} {self.b["uid"]}'
     seen = {}
 
     def cdc():
-      usb = usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid'])
+      usb = usb_device(self.f['vid'], pid, self.b['uid'])
       seen['drive'] = usb and block_device(usb)
       return usb if usb and not seen['drive'] and cdc_tty(usb) else None
     try:
@@ -831,9 +926,9 @@ class Battery:
     return ev
 
   def interrupted(self, nonce):
-    """An interrupted UF2 transfer. App D, longer than two flash pages, is copied only up to the first block of its third
-    page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two pages are
-    in flash, read back, and the third is not; then a J-Link reset interrupts it. The outcome: bank 0 stays marked valid
+    """An interrupted UF2 transfer. App D, longer than two flash pages, is copied only up to the first block of its
+    third page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two
+    pages are in flash, read back, and the third is not; then a J-Link reset interrupts it. The outcome: bank 0 stays marked valid
     with CRC 0, which no transport computes (dfu_single_bank.c m_image_crc, src/usb/msc_uf2.c), so
     bootloader_app_is_valid checks nothing and the bootloader starts the mixed image; D's vectors and code lie in its
     first page, so D runs. Then the whole of D copies through the drive, verifies and runs."""
@@ -956,13 +1051,47 @@ class Battery:
       ev['notWritten'] = f'{end:#010x}'
     return ev
 
+  def cdc_dfu(self):
+    """SIGNED_FW without FORCE_UF2 has no drive (src/usb/tusb_config.h, usb_desc.c): with no app the bootloader stays
+    in DFU as one CDC port on its UF2 PID."""
+    return {'tty': self.cdc_only(self.f['pid'])}
+
+  def refused_signed(self, nonce, edit, written):
+    """A package SIGNED_FW must refuse, through CDC-only serial DFU. The start packet already erased bank 0 and marked
+    it invalid (dfu_single_bank.c, DFU_BANK_0_ERASED). An init packet unsigned or signed by another key fails
+    dfu_init_prevalidate, which ends in app_error_fault_handler (src/main.c: BKPT with a debugger's C_DEBUGEN set,
+    else a reset); an image changed after signing is received and fails dfu_init_postvalidate's SHA-256, so the
+    bootloader stays in DFU. Either way J-Link reads bank 0 marked invalid and, at the app start, nothing (`written`
+    False) or the received image's first words; after a reset, the bootloader is back in DFU, no app to start."""
+    fx = fixture(self.f, nonce)
+    ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
+    tty = self.cdc_only()
+    pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', edit)
+    code, out = self.tools.spawn(['adafruit-nrfutil', '--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b',
+                                  '115200', '--singlebank'], NRFUTIL_TIMEOUT)
+    ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}   # judged by the board, not its report
+    image = repackage_image(pkg)
+    out = self.probe.session([f'mem32 {DHCSR:08X} 1', 'h', f'mem32 {BOOTLOADER_SETTINGS:08X} 1',
+                              f'mem32 {self.f["appStart"]:08X} 4', 'r', 'g'])
+    dhcsr, settings, app = word_at(out, DHCSR), word_at(out, BOOTLOADER_SETTINGS), words_at(out, self.f['appStart'], 4)
+    if settings is None or app is None:
+      raise StepFail('the bootloader settings or the app start did not read back', {'tail': out.splitlines()[-8:]})
+    ev['haltedBefore'] = None if dhcsr is None else bool(dhcsr & DHCSR_S_HALT)
+    ev['bank0'] = {'state': settings & 0xFFFF, 'appStart': [f'{w:08X}' for w in app]}
+    want = struct.unpack_from('<4I', image) if written else (0xFFFFFFFF,) * 4
+    if settings & 0xFFFF != BANK_INVALID_APP or tuple(app) != want:
+      raise StepFail('bank 0 is not marked invalid with ' + ('the received image' if written else 'the app erased'),
+                     {**ev, 'want': [f'{w:08X}' for w in want]})
+    ev['dfu'] = self.cdc_dfu()
+    return {**ev, 'package': pkg.name, 'nonce': nonce.hex()}
+
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
     from USER_FLASH_START = MBR_SIZE (src/usb/uf2/ghostfat.c, uf2cfg.h)."""
     return (self.f['appStart'] - MBR_SIZE) // 256 * 512, length // 256 * 512
 
   def battery(self, base):
-    {'default': self.default, 'dualbank': self.dualbank}[self.profile](base)
+    {'default': self.default, 'dualbank': self.dualbank, 'signed': self.signed}[self.profile](base)
 
   def default(self, base):
     a, b, c, d, e = (os.urandom(16) for _ in range(5))
@@ -991,6 +1120,19 @@ class Battery:
     self.step('app-ran-b', lambda: self.app_ran(b))
     self.step('refused', lambda: self.refused(c, b))
     self.step('interrupted', lambda: self.cut_short(d, b))
+
+  def signed(self, base):
+    a, b, c, d, e = (os.urandom(16) for _ in range(5))
+    key, other = signing_key(), secrets.randbelow(P256_N - 1) + 1
+    self.step('install', self.install)
+    self.step('dfu', self.cdc_dfu)
+    self.step('serial', lambda: self.serial(a, edit=signed_by(key)))
+    self.step('app-ran', lambda: self.app_ran(a))
+    self.step('unsigned', lambda: self.refused_signed(c, None, written=False))
+    self.step('wrong-key', lambda: self.refused_signed(d, signed_by(other), written=False))
+    self.step('tampered', lambda: self.refused_signed(e, tampered_after_signing(key), written=True))
+    self.step('serial-b', lambda: self.serial(b, edit=signed_by(key)))
+    self.step('app-ran-b', lambda: self.app_ran(b))
 
   def restore(self):
     """The candidate installed again and the benign fixture copied through it and running; never while a tool of the

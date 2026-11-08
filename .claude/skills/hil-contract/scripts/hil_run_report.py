@@ -10,6 +10,7 @@ STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 
 PROFILE_STEPS = {   # each profile's battery (check_build.hil_profiles), in order
   'default': STEPS,
   'dualbank': ('install', 'dfu', 'serial', 'app-ran', 'serial-b', 'app-ran-b', 'refused', 'interrupted'),
+  'signed': ('install', 'dfu', 'serial', 'app-ran', 'unsigned', 'wrong-key', 'tampered', 'serial-b', 'app-ran-b'),
 }
 STEP_MARK = {True: '✅', False: '❌'}
 TYPES = {'pass': bool, 'caveat': str, 'reportPath': str, 'error': str, 'exitCode': int, 'uncovered': list}

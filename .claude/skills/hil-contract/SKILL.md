@@ -120,6 +120,25 @@ The `dualbank` battery (`DUALBANK_FW=ON`, `dfu_dual_bank.c`), its cleanup reinst
    ends it (`CUT_AFTER`: about 6 s of erase wait and 16 s of sending at the DK's ~15 KB/s); J-Link verifies D's first
    page in bank 1 and not the start of its last, B in bank 0 still marked valid, then resets, and B runs.
 
+The `signed` battery (`SIGNED_FW=ON` with the public key of `test/hil/signed-fw-test-key.json`, a test-only key;
+`src/dfu_init.c`), its cleanup reinstalling the `default` image. The harness signs: adafruit-nrfutil's init packet
+without its CRC-16, then the ECDS identifier, the image length and SHA-256, and an ECDSA P-256 signature (r || s) over
+all of that, which `dfu_init_prevalidate` verifies before any data and `dfu_init_postvalidate` checks the image
+against:
+
+1. `install` as above; `dfu`: with no app and no drive in this build (`src/usb/tusb_config.h`), one CDC port on the UF2
+   PID.
+2. `serial`, `app-ran`: app A, signed with the test key, through CDC-only serial DFU; A runs.
+3. `unsigned`, `wrong-key`, `tampered`: app C unsigned, app D signed by a random key, app E whose image changed after
+   signing, each through CDC-only serial DFU. The start packet already erased bank 0 and marked it invalid
+   (`dfu_single_bank.c`, `DFU_BANK_0_ERASED`), so a refused package leaves no app. The first two fail the signature
+   check, which ends in `app_error_fault_handler`: a reset, or `BKPT` while a debugger left DHCSR's `C_DEBUGEN` set,
+   which halts the core in Debug state (ARMv7-M ARM DDI 0403D C1.5, C1.6.2), so DHCSR's `S_HALT` is recorded. The
+   third is received and fails the SHA-256 check, never activated. J-Link reads bank 0 marked invalid (`0xFF`) and at
+   the app start erased flash, or E's received image, then resets; the bootloader is back in DFU. adafruit-nrfutil's
+   own report is not judged.
+4. `serial-b`, `app-ran-b`: app B, signed with the test key, installs and runs.
+
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, adafruit-nrfutil, the FAT
 reader and flush) runs under agentrc's `hil_process.run_tracked` with its files in the run dir's `ops`
 (`hil_process.state_dir`); one whose process tree is not proven ended stops the battery, skips the restore and its
@@ -224,9 +243,10 @@ retries a fail once per `hil` Caller rules.
 - Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
   readback, a double reset on the reset pin, CDC serial DFU of an app, bootloader self-update from the pinned release
   and back, an interrupted UF2 transfer (the bootloader starts the partly written image), a same-version SoftDevice
-  and bootloader rewrite through the release package, and on a dual-bank build an app's serial DFU, a refused and an
-  interrupted one. Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only, no USB),
-  nRF52833, BLE OTA, SIGNED_FW, another SoftDevice version than the build's, and a SoftDevice or bootloader update on
-  a dual-bank build.
+  and bootloader rewrite through the release package; on a dual-bank build an app's serial DFU, a refused and an
+  interrupted one; on a SIGNED_FW build a signed app and the refusal of unsigned, wrong-key and tampered packages.
+  Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA,
+  another SoftDevice version than the build's, and a SoftDevice or bootloader update on a dual-bank or SIGNED_FW
+  build.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.
