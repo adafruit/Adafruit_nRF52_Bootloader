@@ -48,6 +48,9 @@ GPREGRET = 0x4000051C
 DFU_MAGIC_UF2_RESET, DFU_MAGIC_SERIAL_ONLY_RESET = 0x57, 0x4E   # src/main.c
 ADAFRUIT_DEVICE_TYPE = 0x0052   # src/dfu_init.c: every init packet's device type
 MBR_SIZE = 0x1000            # nrf_mbr.h
+PAGE = 0x1000                # nRF52840 flash: 256 pages of 4 kB (PS v1.7 4.2.2); src/flash_nrf5x.c buffers one page
+BOOTLOADER_SETTINGS = 0x000FF000   # dfu_types.h, nRF52840: bootloader_settings_t, bank_0 and bank_0_crc its first word
+BANK_VALID_APP = 0x01        # bootloader_types.h
 APP_FAMILY = {'nrf52840': 0xADA52840, 'nrf52833': 0x621E937A}   # src/usb/uf2/uf2cfg.h CFG_UF2_FAMILY_APP_ID
 UF2_MAGIC = (0x0A324655, 0x9E5D5157, 0x0AB16F30)
 UF2_FLAG_FAMILY = 0x2000
@@ -67,7 +70,7 @@ ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
 UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW and dual-bank builds',
-             'an interrupted update', 'a SoftDevice update')
+             'a SoftDevice update')
 
 
 class Refused(Exception):
@@ -339,10 +342,10 @@ def facts(board, row, copies, workdir):
 
 # ------------------------------------------------------------------ the fixture app
 
-def fixture(f, nonce):
+def fixture(f, nonce, pattern=0x1000):
   """An app the probe can prove ran, and which one: SP and reset vectors, every other vector a fault loop, a reset
-  handler that loads a word of `nonce` into r1 and counts in r0 forever, then a 4 KiB pattern from `nonce`, so an
-  earlier copy's image reads back different."""
+  handler that loads a word of `nonce` into r1 and counts in r0 forever, then a `pattern`-byte pattern from `nonce`
+  (a multiple of 32), so an earlier copy's image reads back different."""
   start, table = f['appStart'], 64
   handler = start + table
   loop, fault = handler + 2, handler + 6
@@ -350,7 +353,7 @@ def fixture(f, nonce):
   vectors = [f['ramEnd'], handler | 1] + [fault | 1] * (table // 4 - 2)
   # ldr r1, [pc, #4] (the marker) ; loop: adds r0, #1 ; b loop ; fault: b . ; marker
   code = struct.pack('<HHHHI', 0x4901, 0x3001, 0xE7FD, 0xE7FE, marker)
-  pattern = b''.join(hashlib.sha256(nonce + i.to_bytes(4, 'little')).digest() for i in range(128))
+  pattern = b''.join(hashlib.sha256(nonce + i.to_bytes(4, 'little')).digest() for i in range(pattern // 32))
   img = struct.pack(f'<{len(vectors)}I', *vectors) + code + pattern
   img += b'\xff' * (-len(img) % 256)
   return {'image': img, 'handler': handler, 'loop': loop, 'fault': fault, 'marker': marker, 'start': start}
@@ -517,8 +520,14 @@ class Probe:
 
 def word_at(out, addr):
   """The word a J-Link `mem32 <addr> 1` printed in `out`, None when it printed none."""
-  m = re.search(rf'^{addr:08X} = ([0-9A-F]{{8}})', out, re.M)
-  return int(m[1], 16) if m else None
+  words = words_at(out, addr, 1)
+  return words[0] if words else None
+
+
+def words_at(out, addr, n):
+  """The `n` words a J-Link `mem32 <addr> <n>` printed in `out` (n <= 4, one line), None when it printed fewer."""
+  m = re.search(rf'^{addr:08X} = ((?:[0-9A-F]{{8}} ?){{{n}}})', out, re.M)
+  return [int(w, 16) for w in m[1].split()] if m else None
 
 
 # ------------------------------------------------------------------ USB drive
@@ -621,7 +630,9 @@ class Drive:
       raise StepFail(f'INFO_UF2.TXT does not name {bad}', {'info': lines})
     return lines
 
-  def copy(self, dev, uf2, workdir):
+  def copy(self, dev, uf2, workdir, leaves=True):
+    """`uf2` copied to the drive and flushed; the drive then leaves, or with `leaves` False (a transfer the
+    bootloader cannot complete) stays."""
     path = Path(workdir) / 'copy.uf2'
     path.write_bytes(uf2)
     code, out = self.tools.spawn(['mcopy', '-o', '-i', dev, path, '::APP.UF2'], 60)
@@ -630,6 +641,9 @@ class Drive:
     code, res = self.tools.child_json(['flush', '--dev', dev], CHILD_TIMEOUT, 'flush')
     if code not in (0, FLUSH_GONE):
       raise StepFail('flush failed', {'result': res})
+    if not leaves:
+      stays_away(lambda: not self.present(), QUIET, 'the drive left after a copy it cannot complete')
+      return {'flush': 'flushed' if code == 0 else 'device gone before flush', 'stayed': QUIET}
     wait_for(self.absent, LEAVE_TIMEOUT, 'the drive leaving after the copy')
     return {'flush': 'flushed' if code == 0 else 'device gone before flush'}
 
@@ -720,20 +734,29 @@ class Battery:
     (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
     fx = fixture(self.f, nonce)
     ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
+    tty = self.cdc_only()
+    app, pkg = self.dir / 'app-serial.bin', self.dir / 'app-serial.zip'
+    app.write_bytes(fx['image'])
+    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
+    self.dfu_serial(pkg, tty)
+    return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+
+  def cdc_only(self):
+    """The tty of the bootloader in CDC-only serial DFU: its CDC PID and the roster serial, one tty, no drive."""
     usb = wait_for(lambda: usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), USB_TIMEOUT,
                    f'serial DFU {self.f["vid"]:04x}:{self.f["cdcPid"]:04x} {self.b["uid"]}')
     tty = wait_for(lambda: cdc_tty(usb), UDEV_TIMEOUT, f'the CDC tty of {usb}')
     wait_for(lambda: os.access(tty, os.R_OK | os.W_OK), UDEV_TIMEOUT, f'read-write access to {tty}')
     if block_device(usb):
       raise StepFail(f'{usb} enumerated a drive in CDC-only serial DFU')
-    app, pkg = self.dir / 'app-serial.bin', self.dir / 'app-serial.zip'
-    app.write_bytes(fx['image'])
-    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
+    return tty
+
+  def dfu_serial(self, pkg, tty):
     out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200', '--singlebank'],
                        'dfu serial')
     if 'Device programmed.' not in out:   # it exits 0 on a failed upgrade too
       raise StepFail('adafruit-nrfutil did not program the device', {'tail': out.strip().splitlines()[-8:]})
-    return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return out
 
   def nrfutil(self, argv, what):
     code, out = self.tools.spawn(['adafruit-nrfutil', *argv], NRFUTIL_TIMEOUT)
@@ -757,6 +780,36 @@ class Battery:
     ev['info'] = self.drive.info(self.drive.wait(), version)
     return ev
 
+  def interrupted(self, nonce):
+    """An interrupted UF2 transfer. The running app came through serial DFU, whose completion stored its CRC in the
+    bootloader settings (read back first). App D, longer than two flash pages, is copied only up to the first block of
+    its third page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two
+    pages are in flash, read back, and the third is not; then a J-Link reset interrupts it. The bootloader's outcome
+    (bootloader.c bootloader_app_is_valid): bank 0's stored CRC no longer matches, so it stays in DFU and the drive
+    comes back by itself. Then the whole of D copies and runs."""
+    fx = fixture(self.f, nonce, pattern=3 * PAGE)
+    uf2 = make_uf2(fx['image'], fx['start'], self.f['family'])
+    written = Path(self.dir) / 'interrupted-written.bin'
+    written.write_bytes(fx['image'][:2 * PAGE])
+    ev = {'enter': self.probe.reenter()}
+    ev['partial'] = self.drive.copy(self.drive.wait(), uf2[:(2 * PAGE // 256 + 1) * 512], self.dir, leaves=False)
+    third = fx['start'] + 2 * PAGE
+    out = self.probe.session(['h', f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'verifybin {written} {fx["start"]:08X}',
+                              f'mem32 {third:08X} 4', 'r', 'g'])
+    settings, after = word_at(out, BOOTLOADER_SETTINGS), words_at(out, third, 4)
+    if settings is None or after is None:
+      raise StepFail('the bootloader settings or the third page did not read back', {'tail': out.splitlines()[-8:]})
+    ev['bank0'] = {'state': settings & 0xFFFF, 'crc': settings >> 16}
+    if ev['bank0']['state'] != BANK_VALID_APP or not ev['bank0']['crc']:
+      raise StepFail('bank 0 does not hold a CRC-checked app before the transfer', ev)
+    if b''.join(w.to_bytes(4, 'little') for w in after) == fx['image'][2 * PAGE:2 * PAGE + 16]:
+      raise StepFail("D's third page is in flash: the transfer was not cut short", ev)
+    ev['readBack'] = {'written': f'{fx["start"]:#010x}+{2 * PAGE}', 'notWritten': f'{third:#010x}'}
+    dev = self.drive.wait()
+    ev['copy'] = self.drive.copy(dev, uf2, self.dir)
+    ev['appRan'] = self.app_ran(nonce)
+    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
     from USER_FLASH_START = MBR_SIZE (src/usb/uf2/ghostfat.c, uf2cfg.h)."""
@@ -766,7 +819,7 @@ class Battery:
     {'default': self.default}[self.profile](base)
 
   def default(self, base):
-    a, b, c = os.urandom(16), os.urandom(16), os.urandom(16)
+    a, b, c, d = (os.urandom(16) for _ in range(4))
     self.step('install', self.install)
     self.step('dfu', self.dfu)
     self.step('copy', lambda: self.copy(a))
@@ -779,6 +832,7 @@ class Battery:
     self.step('app-ran-c', lambda: self.app_ran(c))
     self.step('update-base', lambda: self.update(base['path'], base['version'], c))
     self.step('update', lambda: self.update(self.f['update'], self.f['version'], c))
+    self.step('interrupted', lambda: self.interrupted(d))
 
   def restore(self):
     """The candidate installed again and the benign fixture copied through it and running; never while a tool of the

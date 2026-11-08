@@ -425,6 +425,59 @@ class BatteryRun(unittest.TestCase):
                              ('pulse', [150]), ('drive',)])
     self.assertEqual(ev['inWindow']['info'], ['UF2 Bootloader x'])
 
+  def interrupted(self, third=None, settings=0x1234_0001):
+    """Battery.interrupted with the probe and drive mocked: the J-Link session reads `settings` back, and the third
+    page's first 16 bytes as `third`, by default bytes D does not hold there."""
+    bat, copies, sessions = self.battery(), [], []
+    nonce = b'd' * 16
+    fx = ht.fixture(FACTS, nonce, pattern=3 * ht.PAGE)
+    words = third if third is not None else fx['image'][2 * ht.PAGE:2 * ht.PAGE + 16][::-1]
+    third_addr = FACTS['appStart'] + 2 * ht.PAGE
+
+    def session(cmds):
+      sessions.append(cmds)
+      line = ' '.join(f'{int.from_bytes(words[i:i + 4], "little"):08X}' for i in range(0, 16, 4))
+      return f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n{third_addr:08X} = {line} \n'
+    with mock.patch.object(bat.probe, 'reenter', return_value={}), \
+         mock.patch.object(bat.probe, 'session', side_effect=session), \
+         mock.patch.object(bat.drive, 'wait', return_value='/dev/sdz'), \
+         mock.patch.object(bat.drive, 'copy', side_effect=lambda dev, uf2, d, leaves=True: copies.append(
+           (len(uf2), leaves)) or {}), \
+         mock.patch.object(bat, 'app_ran', return_value={}) as app_ran:
+      ev = bat.interrupted(nonce)
+    app_ran.assert_called_once_with(nonce)
+    return ev, copies, sessions, fx
+
+  def test_interrupted_reads_back_two_pages_then_resets_and_copies_whole(self):
+    ev, copies, sessions, fx = self.interrupted()
+    self.assertEqual(copies, [(33 * 512, False), (len(fx['image']) * 2, True)])
+    cmds = sessions[0]
+    self.assertEqual((cmds[0], cmds[-2:]), ('h', ['r', 'g']))
+    verify = next(c for c in cmds if c.startswith('verifybin'))
+    self.assertTrue(verify.endswith(f'{FACTS["appStart"]:08X}'))
+    self.assertEqual(Path(verify.split()[1]).read_bytes(), fx['image'][:2 * ht.PAGE])
+    self.assertEqual(ev['bank0'], {'state': 1, 'crc': 0x1234})
+
+  def test_interrupted_refuses_a_whole_third_page_or_an_unchecked_bank(self):
+    fx = ht.fixture(FACTS, b'd' * 16, pattern=3 * ht.PAGE)
+    with self.assertRaisesRegex(ht.StepFail, 'not cut short'):
+      self.interrupted(third=fx['image'][2 * ht.PAGE:2 * ht.PAGE + 16])
+    for settings in (0x1234_00FF, 0x0000_0001):
+      with self.subTest(settings=hex(settings)), self.assertRaisesRegex(ht.StepFail, 'CRC-checked app'):
+        self.interrupted(settings=settings)
+
+  def test_a_copy_the_bootloader_cannot_complete_keeps_the_drive(self):
+    bat = self.battery()
+    bat.f = {**FACTS, 'vid': 1, 'pid': 2}
+    with mock.patch.object(bat.tools, 'spawn', return_value=(0, '')), \
+         mock.patch.object(bat.tools, 'child_json', return_value=(0, {'ok': True})), \
+         mock.patch.object(ht, 'QUIET', 0.3):
+      with mock.patch.object(bat.drive, 'present', return_value='/dev/sdz'):
+        self.assertEqual(bat.drive.copy('/dev/sdz', b'x', bat.dir, leaves=False)['stayed'], 0.3)
+      with mock.patch.object(bat.drive, 'present', return_value=None), \
+           self.assertRaisesRegex(ht.StepFail, 'left after a copy it cannot complete'):
+        bat.drive.copy('/dev/sdz', b'x', bat.dir, leaves=False)
+
   def test_app_ran_rejects_another_copys_marker(self):
     bat = self.battery()
     a, b = ht.fixture(FACTS, b'a' * 16), ht.fixture(FACTS, b'b' * 16)
