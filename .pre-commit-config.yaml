@@ -6,4 +6,4 @@ repos:
     entry: python3 -m unittest discover -s .claude/test -p 'test_*.py'
     language: system
     pass_filenames: false
-    files: ^(\.claude/|\.github/workflows/|src/boards/|test/hil/|CMakeLists\.txt$)
+    files: ^(\.claude/|\.github/workflows/|src/boards/|test/hil/|cmake/|CMakeLists\.txt$|Makefile$)

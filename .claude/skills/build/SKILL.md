@@ -48,7 +48,8 @@ a build that ran. Exit 1 or 2 quotes `firstError` (and `error`).
     pca10100 for nRF52833) and the rig's pca10056. A SoftDevice under `lib/softdevice/<sd>/` builds the boards that
     use it.
   - Every selection that builds firmware also builds feather_nrf52840_express and feather_nrf52832.
-  - `Makefile`, the CMake wrapper: a build of those two boards through it; `tools/build_all.py` those two boards.
+  - `Makefile`, the CMake wrapper: the contract tests (`test_makefile.py` runs it with stub flash tools) and a build of
+    those two boards through it; `tools/build_all.py` those two boards.
   - This script, the HIL contract's scripts, `test/hil/` (the fixture included) and `hil.yml` run the contract tests,
     build the representatives and select every roster board for HIL; `githubci.yml` runs the tests and the mandated
     boards; `.claude/test/` and `.pre-commit-config.yaml` the tests alone. No firmware build verifies workflow syntax.

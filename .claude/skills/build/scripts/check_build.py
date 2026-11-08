@@ -61,7 +61,7 @@ RULES = (
   (r'^\.github/workflows/hil\.yml$', 'contract-hil', 'contract tests, the representatives and every roster board'),
   (r'^(\.claude/test/|\.pre-commit-config\.yaml$)', 'tests', 'contract tests'),
   (r'^\.github/workflows/githubci\.yml$', 'ci', 'contract tests and the mandated boards'),
-  (r'^Makefile$', 'make', 'a build of the mandated boards through the Makefile wrapper'),
+  (r'^Makefile$', 'make', 'contract tests and a build of the mandated boards through the Makefile wrapper'),
   (r'^tools/build_all\.py$', 'tools', 'the mandated boards'),
   (r'^lib/softdevice/(s\d+_nrf52_[0-9.]+)/', 'softdevice', 'the boards that use this SoftDevice'),
   (r'^(CMakeLists\.txt|cmake/|src/|lib/|linker/|tools/hexmerge\.py$)', 'shared', 'the representatives'),
@@ -148,7 +148,7 @@ def classify(path, boards):
            'contract-hil': {'tests': True, 'boards': set(REPRESENTATIVES), 'hil_full': True},
            'tests': {'tests': True},
            'ci': {'tests': True, 'boards': set(MANDATED)},
-           'make': {'make': set(MANDATED)},
+           'make': {'tests': True, 'make': set(MANDATED)},
            'tools': {'boards': set(MANDATED)},
            'shared': {'boards': set(REPRESENTATIVES), 'shared': True}}[rule]
     return rule, what, sel

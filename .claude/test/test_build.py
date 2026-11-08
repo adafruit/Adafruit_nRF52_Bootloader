@@ -70,7 +70,7 @@ class Classify(unittest.TestCase):
     self.assertEqual(self.rule('lib/softdevice/s340_nrf52_7.0.1/readme.md')[2]['boards'], set())
 
   def test_makefile_selects_a_wrapper_build_and_build_all_the_mandated_boards(self):
-    self.assertEqual(self.rule('Makefile')[2], {'make': set(cb.MANDATED)})
+    self.assertEqual(self.rule('Makefile')[2], {'tests': True, 'make': set(cb.MANDATED)})
     self.assertEqual(self.rule('tools/build_all.py')[2], {'boards': set(cb.MANDATED)})
 
 
