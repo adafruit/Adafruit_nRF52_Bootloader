@@ -31,6 +31,13 @@ rr = load('hil_run_report')
 FACTS = {'appStart': 0x26000, 'ramEnd': 0x20040000, 'family': 0xADA52840}
 
 
+def mem32_line(addr, *words):
+  """What J-Link prints for `mem32 <addr> <n>`: each word an int, or 16 bytes read as four little-endian words."""
+  if len(words) == 1 and isinstance(words[0], bytes):
+    words = struct.unpack('<4I', words[0])
+  return f'{addr:08X} = ' + ' '.join(f'{w:08X}' for w in words) + ' \n'
+
+
 def ghostfat(files):
   """A FAT16 volume laid out as src/usb/uf2/ghostfat.c lays it: 1 reserved sector, 2 FATs, 64 root entries, one
   sector per cluster, each file contiguous from cluster 2."""
@@ -505,8 +512,7 @@ class BatteryRun(unittest.TestCase):
     def session(cmds):
       sessions.append(cmds)
       calls.append('probe')
-      line = ' '.join(f'{int.from_bytes(words[i:i + 4], "little"):08X}' for i in range(0, 16, 4))
-      return f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n{third_addr:08X} = {line} \n'
+      return mem32_line(ht.BOOTLOADER_SETTINGS, settings) + mem32_line(third_addr, words)
 
     def copy(dev, uf2, d, leaves=True):
       copies.append((len(uf2), leaves))
@@ -634,11 +640,10 @@ class BatteryRun(unittest.TestCase):
 
     def session(cmds):
       sessions.append(cmds)
-      out = f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n'
+      out = mem32_line(ht.BOOTLOADER_SETTINGS, settings)
       mem = [c for c in cmds if c.startswith('mem32') and not c.startswith(f'mem32 {ht.BOOTLOADER_SETTINGS:08X}')]
       if mem and tail is not None:
-        out += f'{mem[0].split()[1]} = ' + ' '.join(f'{int.from_bytes(tail[i:i + 4], "little"):08X}'
-                                                   for i in range(0, 16, 4)) + ' \n'
+        out += mem32_line(int(mem[0].split()[1], 16), tail)
       return out
     return sessions, session
 
@@ -658,7 +663,8 @@ class BatteryRun(unittest.TestCase):
     self.assertEqual(Path(cmds[2].split()[1]).read_bytes(), fx['image'])
     self.assertEqual(ev['bank0']['state'], 1)
     sessions, session = self.bank_session(settings=0xFF)
-    with mock.patch.object(bat, 'serial', return_value={}), mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
+    with mock.patch.object(bat, 'serial', return_value={}), \
+         mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
          mock.patch.object(bat.probe, 'session', side_effect=session), self.assertRaisesRegex(ht.StepFail, 'valid'):
       bat.banked(b'a' * 16)
 
@@ -711,14 +717,6 @@ class BatteryRun(unittest.TestCase):
     with self.assertRaisesRegex(ht.StepFail, 'holds the whole image'):
       self.cut(tail=fx['image'][ht.CUT_PAGES * ht.PAGE:][:16])
 
-  def test_dualbank_runs_its_profile_steps_in_order(self):
-    bat = self.dual()
-    bat.profile = 'dualbank'
-    with mock.patch.object(bat, 'install'), mock.patch.object(bat, 'dfu'), mock.patch.object(bat, 'banked'), \
-         mock.patch.object(bat, 'app_ran'), mock.patch.object(bat, 'refused'), mock.patch.object(bat, 'cut_short'):
-      bat.battery({})
-    self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['dualbank'])
-
   def signed_refusal(self, received, words=None, settings=0x0000_00FF, dhcsr=0x00010001, reas=ht.RESETREAS_SREQ,
                      nrfutil=(1, 'Exception: port gone\n'), verify_fails=False):
     """Battery.refused_signed with the probe and tools mocked: the read-back session returns `dhcsr`, `reas`,
@@ -732,12 +730,11 @@ class BatteryRun(unittest.TestCase):
       sessions.append(cmds)
       calls.append('probe')
       if cmds[0].startswith('w4'):
-        return f'{ht.RESETREAS:08X} = 00000000 \n'
+        return mem32_line(ht.RESETREAS, 0)
       if verify_fails and any(c.startswith('verifybin') for c in cmds):
         raise ht.StepFail('J-Link session failed: Verify failed')
-      return (f'{ht.DHCSR:08X} = {dhcsr:08X} \n{ht.RESETREAS:08X} = {reas:08X} \n'
-              f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n'
-              f'{bat.f["appStart"]:08X} = ' + ' '.join(f'{w:08X}' for w in words) + ' \n')
+      return (mem32_line(ht.DHCSR, dhcsr) + mem32_line(ht.RESETREAS, reas)
+              + mem32_line(ht.BOOTLOADER_SETTINGS, settings) + mem32_line(bat.f['appStart'], *words))
     with mock.patch.object(bat, 'serial', side_effect=lambda n, edit: calls.append('fresh') or {}), \
          mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append('ran') or {}), \
          mock.patch.object(bat.probe, 'reenter', return_value={}), \
@@ -747,7 +744,7 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(ht, 'repackage_image', return_value=fx['image']), \
          mock.patch.object(bat.tools, 'spawn', side_effect=lambda argv, t: calls.append(argv) or nrfutil), \
          mock.patch.object(bat.probe, 'session', side_effect=session):
-      ev = bat.refused_signed(b'c' * 16, None, received, 1)
+      ev = bat.refused_image(b'c' * 16, 1) if received else bat.refused_init(b'c' * 16, None, 1)
     self.assertEqual(calls[:4], ['fresh', 'ran', ('cdc', None), 'probe'])   # a fresh app, then RESETREAS cleared
     self.assertIn('--singlebank', calls[4])
     self.assertEqual(calls[5:], ['probe', ('cdc', bat.f['pid'])])
@@ -789,15 +786,14 @@ class BatteryRun(unittest.TestCase):
       self.assertEqual(bat.cdc_dfu(), {'tty': '/dev/ttyACM9'})
     cdc.assert_called_once_with(0xDB, ())
 
-  def test_signed_runs_its_profile_steps_in_order(self):
-    bat = self.dual()
-    bat.profile = 'signed'
-    with mock.patch.object(bat, 'install'), mock.patch.object(bat, 'cdc_dfu'), mock.patch.object(bat, 'serial'), \
-         mock.patch.object(bat, 'app_ran'), mock.patch.object(bat, 'refused_signed') as refused:
-      bat.battery({})
-    self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['signed'])
-    self.assertEqual([c.args[2] for c in refused.call_args_list], [False, False, True])
-    self.assertIsNone(refused.call_args_list[0].args[1])
+  def test_each_profile_runs_its_steps_in_order(self):
+    for profile, steps in rr.PROFILE_STEPS.items():
+      with self.subTest(profile):
+        bat, names = self.dual(), []
+        bat.profile = profile
+        with mock.patch.object(bat, 'step', side_effect=lambda name, fn: names.append(name)):
+          bat.battery({})
+        self.assertEqual(tuple(names), steps)
 
   def test_a_profiles_cleanup_reinstalls_the_default_image(self):
     tmp = tempfile.mkdtemp()

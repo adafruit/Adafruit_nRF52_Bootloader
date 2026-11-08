@@ -986,7 +986,7 @@ class Battery:
     ev['bank0'] = {'state': settings & 0xFFFF, 'crc': settings >> 16}
     if ev['bank0'] != {'state': BANK_VALID_APP, 'crc': 0}:
       raise StepFail('bank 0 is not a valid app without a CRC: this outcome does not apply', ev)
-    if b''.join(w.to_bytes(4, 'little') for w in after) == fx['image'][2 * PAGE:2 * PAGE + 16]:
+    if struct.pack('<4I', *after) == fx['image'][2 * PAGE:2 * PAGE + 16]:
       raise StepFail("D's third page is in flash: the transfer was not cut short", ev)
     ev['readBack'] = {'written': f'{fx["start"]:#010x}+{2 * PAGE}', 'notWritten': f'{third:#010x}'}
     wait_for(self.drive.absent, USB_TIMEOUT, 'the drive leaving on the reset')
@@ -1085,7 +1085,7 @@ class Battery:
           'verified': len(bank0)}
     if whole:
       got = words_at(out, end, 4)
-      if got is None or b''.join(w.to_bytes(4, 'little') for w in got) == whole[last:last + 16]:
+      if got is None or struct.pack('<4I', *got) == whole[last:last + 16]:
         raise StepFail("bank 1's last page did not read back or holds the whole image: not cut short",
                        {**ev, 'tail': out.splitlines()[-8:]})
       ev['notWritten'] = f'{end:#010x}'
@@ -1096,16 +1096,28 @@ class Battery:
     in DFU as one CDC port on its UF2 PID; `stale` as for cdc_only."""
     return {'tty': self.cdc_only(self.f['pid'], stale)}
 
-  def refused_signed(self, nonce, edit, received, key):
-    """A package SIGNED_FW must refuse, through CDC-only serial DFU, each after a fresh app signed with `key` installs
-    and runs. The start packet erases bank 0 and marks it invalid (dfu_single_bank.c, DFU_BANK_0_ERASED). An init
-    packet unsigned or signed by another key fails dfu_init_prevalidate, which ends in app_error_fault_handler
-    (src/main.c): a soft reset, or BKPT, which halts the core while a debugger left C_DEBUGEN set. RESETREAS, cleared
-    before the transfer, then shows SREQ (no pin reset here, so errata [136] does not apply), or DHCSR S_HALT; the app
-    is erased. An image changed after signing (`received`) passes it: every byte is written, adafruit-nrfutil sends
-    the stop packet that requests validation ("Activating new firmware"), dfu_init_postvalidate fails its SHA-256 and
-    dfu_image_activate refuses, so nothing resets and bank 0 stays invalid holding the whole received image. Either
-    way, after a J-Link reset the bootloader is back in DFU, no app to start."""
+  def refused_init(self, nonce, edit, key):
+    """An init packet SIGNED_FW refuses (unsigned, or signed by another key): the fresh app erased, bank 0 invalid,
+    and the bootloader reset (RESETREAS SREQ) or halted at BKPT (DHCSR S_HALT)."""
+    ev, rb = self.signed_transfer(nonce, edit, key, False)
+    if rb['app'] != (0xFFFFFFFF,) * 4 or not (ev['halted'] or rb['reset']):
+      raise StepFail('no init packet refusal: the app is not erased, or the bootloader neither reset nor halted', ev)
+    return self.back_in_dfu(ev, rb)
+
+  def refused_image(self, nonce, key):
+    """An image changed after signing with `key`: received whole, its validation requested, then refused: no reset, no
+    halt, bank 0 invalid and holding it."""
+    ev, rb = self.signed_transfer(nonce, tampered_after_signing(key), key, True)
+    if ev['halted'] or rb['reset']:
+      raise StepFail('the bootloader halted or reset on a received image instead of refusing its activation', ev)
+    ev['verified'] = f'{self.f["appStart"]:#010x}+{rb["image"].stat().st_size}'
+    return self.back_in_dfu(ev, rb)
+
+  def signed_transfer(self, nonce, edit, key, received):
+    """A fresh app signed with `key` installed and running, then RESETREAS cleared and app `nonce`'s package, rewritten
+    by `edit`, sent through CDC-only serial DFU; then, halted after DHCSR is read, RESETREAS, the settings and the
+    app start read back (with `received`, the whole received image verified there) and a reset. (evidence, the
+    read-back) once bank 0 reads invalid; with `received`, adafruit-nrfutil must have sent the stop packet."""
     fresh = os.urandom(16)
     ev = {'before': {'serial': self.serial(fresh, edit=signed_by(key)), 'appRan': self.app_ran(fresh)}}
     fx = fixture(self.f, nonce)
@@ -1129,19 +1141,16 @@ class Battery:
     if dhcsr is None or reas is None or settings is None or app is None:
       raise StepFail('DHCSR, RESETREAS, the settings or the app start did not read back',
                      {'tail': out.splitlines()[-8:]})
-    halted, reset = bool(dhcsr & DHCSR_S_HALT), bool(reas & RESETREAS_SREQ)
-    ev.update(halted=halted, resetreas=f'{reas:08X}',
-              bank0={'state': settings & 0xFFFF, 'appStart': [f'{w:08X}' for w in app]})
+    ev.update(halted=bool(dhcsr & DHCSR_S_HALT), resetreas=f'{reas:08X}',
+              bank0={'state': settings & 0xFFFF, 'appStart': [f'{w:08X}' for w in app]}, package=pkg.name,
+              nonce=nonce.hex())
     if settings & 0xFFFF != BANK_INVALID_APP:
       raise StepFail('bank 0 is not marked invalid', ev)
-    if received:
-      if halted or reset:
-        raise StepFail('the bootloader halted or reset on a received image instead of refusing its activation', ev)
-      ev['verified'] = f'{self.f["appStart"]:#010x}+{image.stat().st_size}'
-    elif tuple(app) != (0xFFFFFFFF,) * 4 or not (halted or reset):
-      raise StepFail('no init packet refusal: the app is not erased, or the bootloader neither reset nor halted', ev)
-    ev['dfu'] = self.cdc_dfu(stale)
-    return {**ev, 'package': pkg.name, 'nonce': nonce.hex()}
+    return ev, {'app': tuple(app), 'reset': bool(reas & RESETREAS_SREQ), 'image': image, 'stale': stale}
+
+  def back_in_dfu(self, ev, rb):
+    ev['dfu'] = self.cdc_dfu(rb['stale'])
+    return ev
 
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
@@ -1186,9 +1195,9 @@ class Battery:
     self.step('dfu', self.cdc_dfu)
     self.step('serial', lambda: self.serial(a, edit=signed_by(key)))
     self.step('app-ran', lambda: self.app_ran(a))
-    self.step('unsigned', lambda: self.refused_signed(c, None, False, key))
-    self.step('wrong-key', lambda: self.refused_signed(d, signed_by(other), False, key))
-    self.step('tampered', lambda: self.refused_signed(e, tampered_after_signing(key), True, key))
+    self.step('unsigned', lambda: self.refused_init(c, None, key))
+    self.step('wrong-key', lambda: self.refused_init(d, signed_by(other), key))
+    self.step('tampered', lambda: self.refused_image(e, key))
     self.step('serial-b', lambda: self.serial(b, edit=signed_by(key)))
     self.step('app-ran-b', lambda: self.app_ran(b))
 
