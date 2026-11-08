@@ -97,12 +97,12 @@ battery. The `default` battery, each step judged from its own evidence:
    valid with CRC 0, which no transport computes (`m_image_crc` in `dfu_single_bank.c`, `src/usb/msc_uf2.c`), so
    `bootloader_app_is_valid` checks nothing and the bootloader starts the mixed image; D's vectors and code lie in its
    first page, so D runs. Then the whole of D, copied through the re-entered drive, verifies and runs.
-11. `softdevice`: the record's release package (`genpkg --softdevice --bootloader`) through CDC-only serial DFU, a
-   same-version rewrite of S140 6.1.1 and the candidate (no other SoftDevice is documented for a 6.1.1 build). The
-   bootloader erases the app region to receive them, swaps them in through the MBR on the next boot and marks bank 0
-   invalid (`DFU_UPDATE_SD_SWAPPED`), so it comes back in DFU by itself; every run of the merged HEX, SoftDevice and
-   bootloader included, verifies, `INFO_UF2.TXT` names the candidate and SoftDevice, and app E copied through the
-   drive runs.
+11. `softdevice`: a same-image transfer and validation. The record's release package (`genpkg --softdevice
+   --bootloader`: the installed S140 6.1.1 and the candidate; no other SoftDevice is documented for a 6.1.1 build)
+   through CDC-only serial DFU. The bootloader erases the app region to receive them; on the next boot
+   `bootloader_dfu_sd_update_continue` finds both equal to the installed ones, so the MBR copies nothing, and marks
+   bank 0 invalid (`DFU_UPDATE_SD_SWAPPED`), so it comes back in DFU by itself; every run of the merged HEX verifies,
+   `INFO_UF2.TXT` names the candidate and SoftDevice, and app E copied through the drive runs.
 
 The `dualbank` battery (`DUALBANK_FW=ON`, `dfu_dual_bank.c`), its cleanup reinstalling the `default` image:
 
@@ -129,14 +129,17 @@ against:
 1. `install` as above; `dfu`: with no app and no drive in this build (`src/usb/tusb_config.h`), one CDC port on the UF2
    PID.
 2. `serial`, `app-ran`: app A, signed with the test key, through CDC-only serial DFU; A runs.
-3. `unsigned`, `wrong-key`, `tampered`: app C unsigned, app D signed by a random key, app E whose image changed after
-   signing, each through CDC-only serial DFU. The start packet already erased bank 0 and marked it invalid
-   (`dfu_single_bank.c`, `DFU_BANK_0_ERASED`), so a refused package leaves no app. The first two fail the signature
-   check, which ends in `app_error_fault_handler`: a reset, or `BKPT` while a debugger left DHCSR's `C_DEBUGEN` set,
-   which halts the core in Debug state (ARMv7-M ARM DDI 0403D C1.5, C1.6.2), so DHCSR's `S_HALT` is recorded. The
-   third is received and fails the SHA-256 check, never activated. J-Link reads bank 0 marked invalid (`0xFF`) and at
-   the app start erased flash, or E's received image, then resets; the bootloader is back in DFU. adafruit-nrfutil's
-   own report is not judged.
+3. `unsigned`, `wrong-key`, `tampered`: each first installs and runs a fresh app signed with the test key, then clears
+   RESETREAS (nRF52840 PS v1.7 5.3.7.11: cumulative, a field cleared by writing 1) and sends app C unsigned, app D
+   signed by a random key or app E whose image changed after signing through CDC-only serial DFU. The start packet
+   erases bank 0 and marks it invalid (`dfu_single_bank.c`, `DFU_BANK_0_ERASED`), so a refused package leaves no
+   app. The first two fail the signature check, which ends in `app_error_fault_handler`: a soft reset, or `BKPT`
+   while a debugger left DHCSR's `C_DEBUGEN` set, which halts the core in Debug state (ARMv7-M ARM DDI 0403D C1.5,
+   C1.6.2). J-Link must read RESETREAS `SREQ` (no pin reset in this battery, so errata [136] does not apply) or DHCSR
+   `S_HALT`, the fresh app erased and bank 0 invalid (`0xFF`). The third passes the signature check: adafruit-nrfutil
+   must exit 0 having sent the stop packet that requests validation ("Activating new firmware"), the bootloader's
+   SHA-256 check fails and `dfu_image_activate` refuses, so J-Link must read neither a reset nor a halt, bank 0
+   invalid and the whole received image in it (`verifybin`). Then a J-Link reset brings the bootloader back in DFU.
 4. `serial-b`, `app-ran-b`: app B, signed with the test key, installs and runs.
 
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, adafruit-nrfutil, the FAT
@@ -244,11 +247,11 @@ retries a fail once per `hil` Caller rules.
 
 - Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
   readback, a double reset on the reset pin, CDC serial DFU of an app, bootloader self-update from the pinned release
-  and back, an interrupted UF2 transfer (the bootloader starts the partly written image), a same-version SoftDevice
-  and bootloader rewrite through the release package; on a dual-bank build an app's serial DFU, a refused and an
-  interrupted one; on a SIGNED_FW build a signed app and the refusal of unsigned, wrong-key and tampered packages.
-  Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA,
-  another SoftDevice version than the build's, and a SoftDevice or bootloader update on a dual-bank or SIGNED_FW
-  build.
+  and back, an interrupted UF2 transfer (the bootloader starts the partly written image), a same-image SoftDevice and
+  bootloader transfer and validation through the release package; on a dual-bank build an app's serial DFU, a refused
+  and an interrupted one; on a SIGNED_FW build a signed app and the refusal of unsigned, wrong-key and tampered
+  packages. Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only, no USB), nRF52833,
+  BLE OTA, another SoftDevice version than the build's, copying a different SoftDevice or bootloader through serial
+  DFU, and a SoftDevice or bootloader update on a dual-bank or SIGNED_FW build.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.

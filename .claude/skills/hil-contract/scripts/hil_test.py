@@ -54,6 +54,7 @@ PAGE = 0x1000                # nRF52840 flash: 256 pages of 4 kB (PS v1.7 4.2.2)
 BOOTLOADER_SETTINGS = 0x000FF000   # dfu_types.h, nRF52840: bootloader_settings_t, bank_0 and bank_0_crc its first word
 BANK_VALID_APP, BANK_INVALID_APP = 0x01, 0xFF   # bootloader_types.h
 DHCSR, DHCSR_S_HALT = 0xE000EDF0, 1 << 17   # ARMv7-M ARM DDI 0403D C1.6.2: the core in Debug state
+RESETREAS, RESETREAS_SREQ = 0x40000400, 1 << 2   # nRF52840 PS v1.7 5.3.7.11: cumulative, write 1 to clear
 APP_FAMILY = {'nrf52840': 0xADA52840, 'nrf52833': 0x621E937A}   # src/usb/uf2/uf2cfg.h CFG_UF2_FAMILY_APP_ID
 UF2_MAGIC = (0x0A324655, 0x9E5D5157, 0x0AB16F30)
 UF2_FLAG_FAMILY = 0x2000
@@ -77,6 +78,8 @@ DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAU
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
 UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU',
              'another SoftDevice version than the build\'s',
+             'copying a different SoftDevice or bootloader through serial DFU (the softdevice step sends the '
+             'installed images, which the bootloader finds equal and does not copy)',
              'a SoftDevice or bootloader update on a dual-bank or SIGNED_FW build')
 
 
@@ -968,11 +971,12 @@ class Battery:
     return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
   def softdevice(self, nonce):
-    """The record's release package through CDC-only serial DFU: adafruit-nrfutil genpkg --softdevice --bootloader,
-    the same S140 6.1.1 and the candidate rewritten (no other SoftDevice is documented for this build). The bootloader
-    erases the app region to receive them (dfu_single_bank.c), swaps them in through the MBR on the next boot and
-    marks bank 0 invalid (bootloader.c, DFU_UPDATE_SD_SWAPPED), so it comes back in DFU by itself. Every run of the
-    merged HEX, SoftDevice and bootloader included, then verifies, and app E copied through the drive runs."""
+    """A same-image transfer and validation: the record's release package (genpkg --softdevice --bootloader, the
+    installed S140 6.1.1 and the candidate; no other SoftDevice is documented for this build) through CDC-only serial
+    DFU. The bootloader erases the app region to receive them (dfu_single_bank.c) and on the next boot
+    bootloader_dfu_sd_update_continue finds both equal to the installed ones, so nothing is copied; it marks bank 0
+    invalid (bootloader.c, DFU_UPDATE_SD_SWAPPED) and comes back in DFU by itself. Every run of the merged HEX then
+    verifies, and app E copied through the drive runs."""
     ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
     ev['tty'] = self.cdc_only()
     self.dfu_serial(self.f['zip'], ev['tty'])
@@ -1064,32 +1068,51 @@ class Battery:
     in DFU as one CDC port on its UF2 PID."""
     return {'tty': self.cdc_only(self.f['pid'])}
 
-  def refused_signed(self, nonce, edit, written):
-    """A package SIGNED_FW must refuse, through CDC-only serial DFU. The start packet already erased bank 0 and marked
-    it invalid (dfu_single_bank.c, DFU_BANK_0_ERASED). An init packet unsigned or signed by another key fails
-    dfu_init_prevalidate, which ends in app_error_fault_handler (src/main.c: BKPT with a debugger's C_DEBUGEN set,
-    else a reset); an image changed after signing is received and fails dfu_init_postvalidate's SHA-256, so the
-    bootloader stays in DFU. Either way J-Link reads bank 0 marked invalid and, at the app start, nothing (`written`
-    False) or the received image's first words; after a reset, the bootloader is back in DFU, no app to start."""
+  def refused_signed(self, nonce, edit, received, key):
+    """A package SIGNED_FW must refuse, through CDC-only serial DFU, each after a fresh app signed with `key` installs
+    and runs. The start packet erases bank 0 and marks it invalid (dfu_single_bank.c, DFU_BANK_0_ERASED). An init
+    packet unsigned or signed by another key fails dfu_init_prevalidate, which ends in app_error_fault_handler
+    (src/main.c): a soft reset, or BKPT, which halts the core while a debugger left C_DEBUGEN set. RESETREAS, cleared
+    before the transfer, then shows SREQ (no pin reset here, so errata [136] does not apply), or DHCSR S_HALT; the app
+    is erased. An image changed after signing (`received`) passes it: every byte is written, adafruit-nrfutil sends
+    the stop packet that requests validation ("Activating new firmware"), dfu_init_postvalidate fails its SHA-256 and
+    dfu_image_activate refuses, so nothing resets and bank 0 stays invalid holding the whole received image. Either
+    way, after a J-Link reset the bootloader is back in DFU, no app to start."""
+    fresh = os.urandom(16)
+    ev = {'before': {'serial': self.serial(fresh, edit=signed_by(key)), 'appRan': self.app_ran(fresh)}}
     fx = fixture(self.f, nonce)
-    ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
+    ev['enter'] = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
     tty = self.cdc_only()
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', edit)
+    image = Path(self.dir) / f'refused-{nonce.hex()[:8]}-image.bin'
+    image.write_bytes(repackage_image(pkg))
+    out = self.probe.session([f'w4 {RESETREAS:08X} FFFFFFFF', f'mem32 {RESETREAS:08X} 1'])
+    if word_at(out, RESETREAS) != 0:
+      raise StepFail('RESETREAS did not clear', {'tail': out.splitlines()[-4:]})
     code, out = self.tools.spawn(['adafruit-nrfutil', '--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b',
                                   '115200', '--singlebank'], NRFUTIL_TIMEOUT)
-    ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}   # judged by the board, not its report
-    image = repackage_image(pkg)
-    out = self.probe.session([f'mem32 {DHCSR:08X} 1', 'h', f'mem32 {BOOTLOADER_SETTINGS:08X} 1',
-                              f'mem32 {self.f["appStart"]:08X} 4', 'r', 'g'])
-    dhcsr, settings, app = word_at(out, DHCSR), word_at(out, BOOTLOADER_SETTINGS), words_at(out, self.f['appStart'], 4)
-    if settings is None or app is None:
-      raise StepFail('the bootloader settings or the app start did not read back', {'tail': out.splitlines()[-8:]})
-    ev['haltedBefore'] = None if dhcsr is None else bool(dhcsr & DHCSR_S_HALT)
-    ev['bank0'] = {'state': settings & 0xFFFF, 'appStart': [f'{w:08X}' for w in app]}
-    want = struct.unpack_from('<4I', image) if written else (0xFFFFFFFF,) * 4
-    if settings & 0xFFFF != BANK_INVALID_APP or tuple(app) != want:
-      raise StepFail('bank 0 is not marked invalid with ' + ('the received image' if written else 'the app erased'),
-                     {**ev, 'want': [f'{w:08X}' for w in want]})
+    ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}
+    if received and (code or 'Activating new firmware' not in out):
+      raise StepFail('adafruit-nrfutil did not send the whole image and its stop packet', ev)
+    out = self.probe.session([f'mem32 {DHCSR:08X} 1', 'h', f'mem32 {RESETREAS:08X} 1',
+                              f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'mem32 {self.f["appStart"]:08X} 4',
+                              *([f'verifybin {image} {self.f["appStart"]:08X}'] if received else []), 'r', 'g'])
+    dhcsr, reas, settings = word_at(out, DHCSR), word_at(out, RESETREAS), word_at(out, BOOTLOADER_SETTINGS)
+    app = words_at(out, self.f['appStart'], 4)
+    if dhcsr is None or reas is None or settings is None or app is None:
+      raise StepFail('DHCSR, RESETREAS, the settings or the app start did not read back',
+                     {'tail': out.splitlines()[-8:]})
+    halted, reset = bool(dhcsr & DHCSR_S_HALT), bool(reas & RESETREAS_SREQ)
+    ev.update(halted=halted, resetreas=f'{reas:08X}',
+              bank0={'state': settings & 0xFFFF, 'appStart': [f'{w:08X}' for w in app]})
+    if settings & 0xFFFF != BANK_INVALID_APP:
+      raise StepFail('bank 0 is not marked invalid', ev)
+    if received:
+      if halted or reset:
+        raise StepFail('the bootloader halted or reset on a received image instead of refusing its activation', ev)
+      ev['verified'] = f'{self.f["appStart"]:#010x}+{image.stat().st_size}'
+    elif tuple(app) != (0xFFFFFFFF,) * 4 or not (halted or reset):
+      raise StepFail('no init packet refusal: the app is not erased, or the bootloader neither reset nor halted', ev)
     ev['dfu'] = self.cdc_dfu()
     return {**ev, 'package': pkg.name, 'nonce': nonce.hex()}
 
@@ -1136,9 +1159,9 @@ class Battery:
     self.step('dfu', self.cdc_dfu)
     self.step('serial', lambda: self.serial(a, edit=signed_by(key)))
     self.step('app-ran', lambda: self.app_ran(a))
-    self.step('unsigned', lambda: self.refused_signed(c, None, written=False))
-    self.step('wrong-key', lambda: self.refused_signed(d, signed_by(other), written=False))
-    self.step('tampered', lambda: self.refused_signed(e, tampered_after_signing(key), written=True))
+    self.step('unsigned', lambda: self.refused_signed(c, None, False, key))
+    self.step('wrong-key', lambda: self.refused_signed(d, signed_by(other), False, key))
+    self.step('tampered', lambda: self.refused_signed(e, tampered_after_signing(key), True, key))
     self.step('serial-b', lambda: self.serial(b, edit=signed_by(key)))
     self.step('app-ran-b', lambda: self.app_ran(b))
 

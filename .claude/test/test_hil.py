@@ -687,35 +687,67 @@ class BatteryRun(unittest.TestCase):
       bat.battery({})
     self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['dualbank'])
 
-  def signed_refusal(self, written, words=None, settings=0x0000_00FF):
+  def signed_refusal(self, received, words=None, settings=0x0000_00FF, dhcsr=0x00010001, reas=ht.RESETREAS_SREQ,
+                     nrfutil=(1, 'Exception: port gone\n'), verify_fails=False):
+    """Battery.refused_signed with the probe and tools mocked: the read-back session returns `dhcsr`, `reas`,
+    `settings` and the app start's `words` (by default what the case leaves); `verify_fails` makes its verifybin fail
+    as the J-Link session's judge would."""
     bat, calls, sessions = self.dual(), [], []
     fx = ht.fixture(bat.f, b'c' * 16)
-    words = words if words is not None else (struct.unpack_from('<4I', fx['image']) if written else (0xFFFFFFFF,) * 4)
+    words = words if words is not None else (struct.unpack_from('<4I', fx['image']) if received else (0xFFFFFFFF,) * 4)
 
     def session(cmds):
       sessions.append(cmds)
-      return (f'{ht.DHCSR:08X} = 00030003 \n{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n'
+      calls.append('probe')
+      if cmds[0].startswith('w4'):
+        return f'{ht.RESETREAS:08X} = 00000000 \n'
+      if verify_fails and any(c.startswith('verifybin') for c in cmds):
+        raise ht.StepFail('J-Link session failed: Verify failed')
+      return (f'{ht.DHCSR:08X} = {dhcsr:08X} \n{ht.RESETREAS:08X} = {reas:08X} \n'
+              f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n'
               f'{bat.f["appStart"]:08X} = ' + ' '.join(f'{w:08X}' for w in words) + ' \n')
-    with mock.patch.object(bat.probe, 'reenter', return_value={}), \
+    with mock.patch.object(bat, 'serial', side_effect=lambda n, edit: calls.append('fresh') or {}), \
+         mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append('ran') or {}), \
+         mock.patch.object(bat.probe, 'reenter', return_value={}), \
          mock.patch.object(bat, 'cdc_only', side_effect=lambda pid=None: calls.append(('cdc', pid)) or '/dev/ttyACM9'), \
          mock.patch.object(bat, 'package', return_value=Path('/p.zip')), \
          mock.patch.object(ht, 'repackage_image', return_value=fx['image']), \
-         mock.patch.object(bat.tools, 'spawn', return_value=(1, 'Exception: port gone\n')) as spawn, \
+         mock.patch.object(bat.tools, 'spawn', side_effect=lambda argv, t: calls.append(argv) or nrfutil), \
          mock.patch.object(bat.probe, 'session', side_effect=session):
-      ev = bat.refused_signed(b'c' * 16, None, written)
-    self.assertIn('--singlebank', spawn.call_args.args[0])
-    self.assertEqual(calls, [('cdc', None), ('cdc', bat.f['pid'])])
-    self.assertEqual((sessions[0][0], sessions[0][1], sessions[0][-2:]), (f'mem32 {ht.DHCSR:08X} 1', 'h', ['r', 'g']))
+      ev = bat.refused_signed(b'c' * 16, None, received, 1)
+    self.assertEqual(calls[:4], ['fresh', 'ran', ('cdc', None), 'probe'])   # a fresh app, then RESETREAS cleared
+    self.assertIn('--singlebank', calls[4])
+    self.assertEqual(calls[5:], ['probe', ('cdc', bat.f['pid'])])
+    self.assertEqual(sessions[0], [f'w4 {ht.RESETREAS:08X} FFFFFFFF', f'mem32 {ht.RESETREAS:08X} 1'])
+    self.assertEqual((sessions[1][0], sessions[1][1], sessions[1][-2:]), (f'mem32 {ht.DHCSR:08X} 1', 'h', ['r', 'g']))
+    self.assertEqual(any(c.startswith('verifybin') for c in sessions[1]), received)
     return ev
 
-  def test_a_refused_signed_package_leaves_bank_0_invalid_and_the_bootloader_in_dfu(self):
-    ev = self.signed_refusal(written=False)
-    self.assertEqual((ev['bank0']['state'], ev['haltedBefore'], ev['nrfutil']['exit']), (0xFF, True, 1))
-    self.signed_refusal(written=True)
-    for kw in ({'written': False, 'settings': 0x01}, {'written': True, 'words': (0xFFFFFFFF,) * 4},
-               {'written': False, 'words': (1, 2, 3, 4)}):
-      with self.subTest(**kw), self.assertRaisesRegex(ht.StepFail, 'not marked invalid'):
-        self.signed_refusal(**kw)
+  def test_an_init_packet_refusal_erases_the_fresh_app_and_resets_or_halts(self):
+    ev = self.signed_refusal(False)
+    self.assertEqual((ev['bank0']['state'], ev['halted'], ev['resetreas']), (0xFF, False, '00000004'))
+    self.assertTrue(self.signed_refusal(False, dhcsr=0x00030003, reas=0)['halted'])
+    with self.assertRaisesRegex(ht.StepFail, 'not marked invalid'):
+      self.signed_refusal(False, settings=0x01)
+
+  def test_no_refusal_without_a_reset_or_halt_or_with_the_app_kept(self):
+    # nrfutil failing before it sent anything leaves the bootloader idle: no reset, no halt
+    with self.assertRaisesRegex(ht.StepFail, 'no init packet refusal'):
+      self.signed_refusal(False, reas=0)
+    with self.assertRaisesRegex(ht.StepFail, 'no init packet refusal'):
+      self.signed_refusal(False, words=(1, 2, 3, 4))
+
+  def test_a_tampered_image_is_received_whole_and_never_activated(self):
+    done = (0, 'Sending firmware file\nActivating new firmware\nDevice programmed.\n')
+    ev = self.signed_refusal(True, reas=0, nrfutil=done)
+    self.assertEqual(ev['verified'], '0x00026000+4352')
+    # cut short after its first page: no stop packet, so validation was never requested
+    with self.assertRaisesRegex(ht.StepFail, 'stop packet'):
+      self.signed_refusal(True, reas=0, nrfutil=(124, 'Sending firmware file\n####\n'))
+    with self.assertRaisesRegex(ht.StepFail, 'Verify failed'):
+      self.signed_refusal(True, reas=0, nrfutil=done, verify_fails=True)
+    with self.assertRaisesRegex(ht.StepFail, 'halted or reset'):
+      self.signed_refusal(True, nrfutil=done)
 
   def test_signed_dfu_is_one_cdc_port_on_the_uf2_pid(self):
     bat = self.dual()
@@ -731,7 +763,7 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(bat, 'app_ran'), mock.patch.object(bat, 'refused_signed') as refused:
       bat.battery({})
     self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['signed'])
-    self.assertEqual([c.kwargs['written'] for c in refused.call_args_list], [False, False, True])
+    self.assertEqual([c.args[2] for c in refused.call_args_list], [False, False, True])
     self.assertIsNone(refused.call_args_list[0].args[1])
 
   def test_a_profiles_cleanup_reinstalls_the_default_image(self):
