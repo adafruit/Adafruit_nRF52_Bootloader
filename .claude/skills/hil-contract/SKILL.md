@@ -88,14 +88,13 @@ is the JSON report and its exit is final. The battery, each step judged from its
    stages it at the top of the app region and the MBR copies it over itself; app C still runs, and re-entered, the
    drive names the release's version. `update`: the record's `update-*_nosd.uf2` the same way, back to the candidate's
    version, so the candidate both updates and is updated.
-10. `interrupted`: an interrupted UF2 transfer. App C came through serial DFU, whose completion stored its CRC in the
-   bootloader settings (`0xFF000` read back: bank 0 valid with a CRC). From the drive, app D, three flash pages and more
-   (nRF52840 PS v1.7 4.2.2: 4 kB pages), is copied only up to the first block of its third page; the drive stays, the
-   bootloader having written a page only once the transfer moved past it (`src/flash_nrf5x.c`). J-Link reads D's first
-   two pages back (`verifybin`) and not its third, then resets. The outcome (`bootloader_app_is_valid`): bank 0's CRC no
-   longer matches, so the bootloader stays in DFU and the drive comes back by itself; then the whole of D copies and
-   runs. A transfer cut short after a UF2-installed app is not this case: a UF2 completion stores no CRC (0), so the
-   bootloader would start the partly written image.
+10. `interrupted`: an interrupted UF2 transfer. From the drive, app D, three flash pages and more (nRF52840 PS v1.7
+   4.2.2: 4 kB pages), is copied only up to the first block of its third page; the drive stays, the bootloader having
+   written a page only once the transfer moved past it (`src/flash_nrf5x.c`). J-Link reads the bootloader settings
+   (`0xFF000`) and D's first two pages back (`verifybin`) and not its third, then resets. The outcome: bank 0 stays
+   valid with CRC 0, which no transport computes (`m_image_crc` in `dfu_single_bank.c`, `src/usb/msc_uf2.c`), so
+   `bootloader_app_is_valid` checks nothing and the bootloader starts the mixed image; D's vectors and code lie in its
+   first page, so D runs. Then the whole of D, copied through the re-entered drive, verifies and runs.
 11. `softdevice`: the record's release package (`genpkg --softdevice --bootloader`) through CDC-only serial DFU, a
    same-version rewrite of S140 6.1.1 and the candidate (no other SoftDevice is documented for a 6.1.1 build). The
    bootloader erases the app region to receive them, swaps them in through the MBR on the next boot and marks bank 0
@@ -206,8 +205,9 @@ retries a fail once per `hil` Caller rules.
 
 - Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
   readback, a double reset on the reset pin, CDC serial DFU of an app, bootloader self-update from the pinned release
-  and back, an interrupted UF2 transfer after a serial-DFU app, and a same-version SoftDevice and bootloader rewrite
-  through the release package. Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only,
-  no USB), nRF52833, BLE OTA, SIGNED_FW, dual bank, and another SoftDevice version than the build's.
+  and back, an interrupted UF2 transfer (the bootloader starts the partly written image), and a same-version
+  SoftDevice and bootloader rewrite through the release package. Uncovered, named pending in every report that needs
+  them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA, SIGNED_FW, dual bank, and another SoftDevice version
+  than the build's.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.

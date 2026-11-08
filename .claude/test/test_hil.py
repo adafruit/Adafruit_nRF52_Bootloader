@@ -436,10 +436,10 @@ class BatteryRun(unittest.TestCase):
                              ('pulse', [150]), ('drive',)])
     self.assertEqual(ev['inWindow']['info'], ['UF2 Bootloader x'])
 
-  def interrupted(self, third=None, settings=0x1234_0001):
-    """Battery.interrupted with the probe and drive mocked: the J-Link session reads `settings` back, and the third
-    page's first 16 bytes as `third`, by default bytes D does not hold there."""
-    bat, copies, sessions = self.battery(), [], []
+  def interrupted(self, third=None, settings=0x0000_0001):
+    """Battery.interrupted with the probe and drive mocked: the first J-Link session reads `settings` back, and the
+    third page's first 16 bytes as `third`, by default bytes D does not hold there."""
+    bat, copies, sessions, calls = self.battery(), [], [], []
     nonce = b'd' * 16
     fx = ht.fixture(FACTS, nonce, pattern=3 * ht.PAGE)
     words = third if third is not None else fx['image'][2 * ht.PAGE:2 * ht.PAGE + 16][::-1]
@@ -447,34 +447,42 @@ class BatteryRun(unittest.TestCase):
 
     def session(cmds):
       sessions.append(cmds)
+      calls.append('probe')
       line = ' '.join(f'{int.from_bytes(words[i:i + 4], "little"):08X}' for i in range(0, 16, 4))
       return f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n{third_addr:08X} = {line} \n'
-    with mock.patch.object(bat.probe, 'reenter', return_value={}), \
+
+    def copy(dev, uf2, d, leaves=True):
+      copies.append((len(uf2), leaves))
+      calls.append('copy')
+      return {}
+    with mock.patch.object(bat.probe, 'reenter', side_effect=lambda: calls.append('enter') or {}), \
          mock.patch.object(bat.probe, 'session', side_effect=session), \
          mock.patch.object(bat.drive, 'wait', return_value='/dev/sdz'), \
-         mock.patch.object(bat.drive, 'copy', side_effect=lambda dev, uf2, d, leaves=True: copies.append(
-           (len(uf2), leaves)) or {}), \
-         mock.patch.object(bat, 'app_ran', return_value={}) as app_ran:
+         mock.patch.object(bat.drive, 'copy', side_effect=copy), \
+         mock.patch.object(bat.drive, 'absent', return_value=True), \
+         mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}):
       ev = bat.interrupted(nonce)
-    app_ran.assert_called_once_with(nonce)
-    return ev, copies, sessions, fx
+    return ev, copies, sessions, fx, calls
 
-  def test_interrupted_reads_back_two_pages_then_resets_and_copies_whole(self):
-    ev, copies, sessions, fx = self.interrupted()
+  def test_interrupted_reads_back_two_pages_runs_the_mixed_image_then_copies_whole(self):
+    ev, copies, sessions, fx, calls = self.interrupted()
+    nonce = b'd' * 16
+    self.assertEqual(calls, ['enter', 'copy', 'probe', ('app', nonce), 'enter', 'copy', 'probe', ('app', nonce)])
     self.assertEqual(copies, [(33 * 512, False), (len(fx['image']) * 2, True)])
     cmds = sessions[0]
     self.assertEqual((cmds[0], cmds[-2:]), ('h', ['r', 'g']))
     verify = next(c for c in cmds if c.startswith('verifybin'))
     self.assertTrue(verify.endswith(f'{FACTS["appStart"]:08X}'))
     self.assertEqual(Path(verify.split()[1]).read_bytes(), fx['image'][:2 * ht.PAGE])
-    self.assertEqual(ev['bank0'], {'state': 1, 'crc': 0x1234})
+    self.assertEqual(Path(sessions[1][1].split()[1]).read_bytes(), fx['image'])
+    self.assertEqual(ev['bank0'], {'state': 1, 'crc': 0})
 
-  def test_interrupted_refuses_a_whole_third_page_or_an_unchecked_bank(self):
+  def test_interrupted_refuses_a_whole_third_page_or_another_bank_state(self):
     fx = ht.fixture(FACTS, b'd' * 16, pattern=3 * ht.PAGE)
     with self.assertRaisesRegex(ht.StepFail, 'not cut short'):
       self.interrupted(third=fx['image'][2 * ht.PAGE:2 * ht.PAGE + 16])
-    for settings in (0x1234_00FF, 0x0000_0001):
-      with self.subTest(settings=hex(settings)), self.assertRaisesRegex(ht.StepFail, 'CRC-checked app'):
+    for settings in (0x0000_00FF, 0x1234_0001):
+      with self.subTest(settings=hex(settings)), self.assertRaisesRegex(ht.StepFail, 'without a CRC'):
         self.interrupted(settings=settings)
 
   def test_softdevice_sends_the_release_package_then_verifies_every_run(self):

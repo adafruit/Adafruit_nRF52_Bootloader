@@ -793,16 +793,17 @@ class Battery:
     return ev
 
   def interrupted(self, nonce):
-    """An interrupted UF2 transfer. The running app came through serial DFU, whose completion stored its CRC in the
-    bootloader settings (read back first). App D, longer than two flash pages, is copied only up to the first block of
-    its third page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two
-    pages are in flash, read back, and the third is not; then a J-Link reset interrupts it. The bootloader's outcome
-    (bootloader.c bootloader_app_is_valid): bank 0's stored CRC no longer matches, so it stays in DFU and the drive
-    comes back by itself. Then the whole of D copies and runs."""
+    """An interrupted UF2 transfer. App D, longer than two flash pages, is copied only up to the first block of its third
+    page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two pages are
+    in flash, read back, and the third is not; then a J-Link reset interrupts it. The outcome: bank 0 stays marked valid
+    with CRC 0, which no transport computes (dfu_single_bank.c m_image_crc, src/usb/msc_uf2.c), so
+    bootloader_app_is_valid checks nothing and the bootloader starts the mixed image; D's vectors and code lie in its
+    first page, so D runs. Then the whole of D copies through the drive, verifies and runs."""
     fx = fixture(self.f, nonce, pattern=3 * PAGE)
     uf2 = make_uf2(fx['image'], fx['start'], self.f['family'])
-    written = Path(self.dir) / 'interrupted-written.bin'
+    written, whole = Path(self.dir) / 'interrupted-written.bin', Path(self.dir) / 'interrupted-whole.bin'
     written.write_bytes(fx['image'][:2 * PAGE])
+    whole.write_bytes(fx['image'])
     ev = {'enter': self.probe.reenter()}
     ev['partial'] = self.drive.copy(self.drive.wait(), uf2[:(2 * PAGE // 256 + 1) * 512], self.dir, leaves=False)
     third = fx['start'] + 2 * PAGE
@@ -812,13 +813,16 @@ class Battery:
     if settings is None or after is None:
       raise StepFail('the bootloader settings or the third page did not read back', {'tail': out.splitlines()[-8:]})
     ev['bank0'] = {'state': settings & 0xFFFF, 'crc': settings >> 16}
-    if ev['bank0']['state'] != BANK_VALID_APP or not ev['bank0']['crc']:
-      raise StepFail('bank 0 does not hold a CRC-checked app before the transfer', ev)
+    if ev['bank0'] != {'state': BANK_VALID_APP, 'crc': 0}:
+      raise StepFail('bank 0 is not a valid app without a CRC: this outcome does not apply', ev)
     if b''.join(w.to_bytes(4, 'little') for w in after) == fx['image'][2 * PAGE:2 * PAGE + 16]:
       raise StepFail("D's third page is in flash: the transfer was not cut short", ev)
     ev['readBack'] = {'written': f'{fx["start"]:#010x}+{2 * PAGE}', 'notWritten': f'{third:#010x}'}
-    dev = self.drive.wait()
-    ev['copy'] = self.drive.copy(dev, uf2, self.dir)
+    wait_for(self.drive.absent, USB_TIMEOUT, 'the drive leaving on the reset')
+    ev['mixedRan'] = self.app_ran(nonce)
+    ev['reenter'] = self.probe.reenter()
+    ev['copy'] = self.drive.copy(self.drive.wait(), uf2, self.dir)
+    self.probe.session(['h', f'verifybin {whole} {fx["start"]:08X}', 'g'])
     ev['appRan'] = self.app_ran(nonce)
     return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
