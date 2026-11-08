@@ -12,10 +12,13 @@ if (NOT DEFINED SD_VERSION)
   endif ()
 endif ()
 
-if (MCU_VARIANT STREQUAL "nrf52")
-  set(SD_NAME s132)
-elseif (NOT DEFINED SD_NAME)
-  set(SD_NAME s140)
+# SD_NAME can be overwritten by board.cmake or -D, as make's command line overrode it
+if (NOT DEFINED SD_NAME)
+  if (MCU_VARIANT STREQUAL "nrf52")
+    set(SD_NAME s132)
+  else ()
+    set(SD_NAME s140)
+  endif ()
 endif ()
 
 set(SD_FILENAME ${SD_NAME}_nrf52_${SD_VERSION})

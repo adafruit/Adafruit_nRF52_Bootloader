@@ -167,6 +167,11 @@ class FlashWithoutBuild(unittest.TestCase):
     p, _ = self.run_targets('BOARD=pca10056', 'SD_VERSION=7.3.0', 'flash-sd')
     self.assertIn(f'{SD}/s140_nrf52_7.3.0/s140_nrf52_7.3.0_softdevice.hex', p.stdout)
 
+  def test_sd_name_on_the_command_line_wins_on_nrf52832(self):
+    p, _ = self.run_targets('BOARD=feather_nrf52832', 'SD_NAME=s332', 'flash-sd')
+    self.assertEqual(p.returncode, 0, p.stderr)
+    self.assertIn(f'{SD}/s332_nrf52_6.1.1/s332_nrf52_6.1.1_softdevice.hex', p.stdout)
+
   def test_relative_sd_hex_resolves_against_the_checkout(self):
     rel = 'lib/softdevice/s140_nrf52_7.3.0/s140_nrf52_7.3.0_softdevice.hex'
     p, board_vars = self.run_targets('BOARD=pca10056', f'SD_HEX={rel}', 'flash-sd')
