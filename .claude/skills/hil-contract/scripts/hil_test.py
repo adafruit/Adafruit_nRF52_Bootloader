@@ -336,17 +336,25 @@ def facts(board, row, copies, workdir):
   bank1 = bank_1_start(mcu, MBR_SIZE + int(sd_size, 0), int(boot[1], 16))
   hex_runs = runs(merged)
   versions = {v for _, data in hex_runs for v in re.findall(rb'UF2 Bootloader ([^\r\n\x00]+)\r\n', data)}
-  if len(versions) != 1:
-    raise Refused(f'{copies["merged"].name}: expected one "UF2 Bootloader <version>" string, found {len(versions)}')
+  drive = has_drive(row)
+  if len(versions) != int(drive):
+    raise Refused(f'{copies["merged"].name}: expected {int(drive)} "UF2 Bootloader <version>" string, found '
+                  f'{len(versions)}')
   for a, b in hex_runs:
     (Path(workdir) / f'run-{a:08x}.bin').write_bytes(b)
   return {'mcu': mcu, 'family': APP_FAMILY[mcu], 'appStart': MBR_SIZE + int(sd_size, 0),
           'bank1': bank1, 'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0),
           'cdcPid': int(cdc_pid, 0),
-          'boardId': board_id.strip('"'), 'version': versions.pop().decode(),
+          'boardId': board_id.strip('"'), 'version': versions.pop().decode() if drive else None, 'drive': drive,
           'softdevice': f'S{row["softdevice"]["name"][1:]} {row["softdevice"]["version"]}',
           'hex': str(copies['merged']), 'update': str(copies['update']), 'zip': str(copies['zip']),
           'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
+
+
+def has_drive(row):
+  """Whether the record row's build has the UF2 drive: SIGNED_FW drops it unless FORCE_UF2 (src/usb/tusb_config.h)."""
+  defines = row.get('defines') or []
+  return 'SIGNED_FW=ON' not in defines or 'FORCE_UF2=ON' in defines
 
 
 def bank_1_start(mcu, app_start, boot_start):
@@ -928,8 +936,8 @@ class Battery:
   def interrupted(self, nonce):
     """An interrupted UF2 transfer. App D, longer than two flash pages, is copied only up to the first block of its
     third page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two
-    pages are in flash, read back, and the third is not; then a J-Link reset interrupts it. The outcome: bank 0 stays marked valid
-    with CRC 0, which no transport computes (dfu_single_bank.c m_image_crc, src/usb/msc_uf2.c), so
+    pages are in flash, read back, and the third is not; then a J-Link reset interrupts it. The outcome: bank 0 stays
+    marked valid with CRC 0, which no transport computes (dfu_single_bank.c m_image_crc, src/usb/msc_uf2.c), so
     bootloader_app_is_valid checks nothing and the bootloader starts the mixed image; D's vectors and code lie in its
     first page, so D runs. Then the whole of D copies through the drive, verifies and runs."""
     fx = fixture(self.f, nonce, pattern=3 * PAGE)

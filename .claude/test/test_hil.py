@@ -321,6 +321,13 @@ class Admit(unittest.TestCase):
                       got['version'], got['softdevice'], got['family']),
                      (0x26000, 0x20040000, 0x239A, 0x00DA, 0x00DA, 'nRF52840-pca10056-v1', '1.2.3', 'S140 6.1.1',
                       0xADA52840))
+    self.assertTrue(got['drive'])
+    self.assertEqual(got['bank1'], 0x88000)
+
+  def test_a_signed_build_has_no_drive_and_no_version_string(self):
+    self.assertFalse(ht.has_drive({'defines': ['SIGNED_FW=ON', 'SIGNED_FW_QX=0x01']}))
+    self.assertTrue(ht.has_drive({'defines': ['SIGNED_FW=ON', 'FORCE_UF2=ON']}))
+    self.assertTrue(ht.has_drive({'defines': ['DUALBANK_FW=ON']}))
 
   def test_facts_refuse_a_board_without_usb(self):
     with self.assertRaisesRegex(ht.Refused, 'no USB'):

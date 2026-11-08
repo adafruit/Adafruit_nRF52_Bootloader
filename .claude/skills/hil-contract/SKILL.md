@@ -43,12 +43,12 @@ HIL profile (`.claude/skills/build/SKILL.md`, A HIL record). `hil_test.py` refus
 of another HEAD, submodules, roster or agentrc, whose profile is not built as this checkout defines it (options, test
 key) or whose artifacts are incomplete or no longer hash as recorded, and copies the profile's artifacts into the run
 dir's `<profile>/` before use; a profile other than `default` also admits the default's, which its cleanup
-reinstalls. Before any hardware access it checks the merged
-HEX's spans: only flash and UICR NRFFW, runs at 0 (MBR), 0x1000 (SoftDevice) and the bootloader start, nothing in the
-app region, and NRFFW[0] pointing at the bootloader. What the battery checks comes from the record and this checkout:
-the version from the image's `UF2 Bootloader <version>` string, VID, the UF2 and CDC-only PIDs and `UF2_BOARD_ID` from
-`board.h`, the app start (`MBR_SIZE` plus the SoftDevice's `SD_FLASH_SIZE`) and the RAM end from the record's SoftDevice
-and the MCU's linker script.
+reinstalls. Before any hardware access it checks the merged HEX's spans: only flash and UICR NRFFW, runs at 0 (MBR),
+0x1000 (SoftDevice) and the bootloader start, nothing in the app region, and NRFFW[0] pointing at the bootloader. What
+the battery checks comes from the record and this checkout: the version from the image's `UF2 Bootloader <version>`
+string (none in a SIGNED_FW build, which has no drive), VID, the UF2 and CDC-only PIDs and `UF2_BOARD_ID` from
+`board.h`, the app start (`MBR_SIZE` plus the SoftDevice's `SD_FLASH_SIZE`) and the RAM end from the record's
+SoftDevice and the MCU's linker script.
 
 ## Execution
 
