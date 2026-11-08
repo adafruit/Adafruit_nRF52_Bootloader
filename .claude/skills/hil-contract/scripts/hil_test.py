@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 """The bootloader's HIL battery on one rig board (.claude/skills/hil-contract/SKILL.md). The last stdout line is JSON.
 
-  hil_test.py run -b BOARD --build-record REC --base-dir DIR [--run-root DIR] [--lock-wait S] [--fail-at STEP] ROSTER
+  hil_test.py run -b BOARD --build-record REC --base-dir DIR [--profile P] [--run-root DIR] [--lock-wait S]
+                [--fail-at STEP] ROSTER
   hil_test.py install -b BOARD --build-record REC --under-hold REASON ROSTER
   hil_test.py restore -b BOARD --build-record REC --under-hold REASON ROSTER
   hil_test.py fat-read --dev DEV --file NAME [--offset N] [--length N]   (child: one bounded FAT read)
@@ -38,7 +39,7 @@ REASON = 'hil_test.py'
 # entries were claims already
 CLAIM_KIND = 'nrf52-bootloader'
 CLAIM_SETTLE = 30            # s an earlier invocation's unproven tools get to end before an attempt gives the board up
-STEPS = run_report.STEPS
+PROFILE_STEPS = run_report.PROFILE_STEPS
 REENTRY = ('gpregret',)
 # nRF52 NVMC (PS v1.7 4.3.9) and POWER.GPREGRET (5.3.7.16); the same offsets on nRF52832/833
 NVMC_READY, NVMC_CONFIG, NVMC_ERASEALL = 0x4001E400, 0x4001E504, 0x4001E50C
@@ -179,24 +180,35 @@ def git(*args):
     raise Refused(str(e))
 
 
-def admit(record_path, board, roster_path, workdir):
-  """The build record's row for `board`, checked against this checkout, the roster and the agentrc loaded here, its
-  artifacts copied into `workdir` from bytes that hash as recorded. Refused otherwise."""
+def admit(record_path, board, roster_path, workdir, profile='default'):
+  """The build record's row for `board` in `profile` (check_build.hil_profiles), checked against this checkout, the
+  roster and the agentrc loaded here, its artifacts copied into `workdir`/`profile` from bytes that hash as recorded.
+  Refused otherwise."""
   try:
     rec = json.loads(Path(record_path).read_text())
   except (OSError, ValueError) as e:
     raise Refused(f'build record {record_path}: {e}')
-  rows = [r for r in rec.get('boards', []) if r.get('board') == board and r.get('status') == 'ok']
+  rows = [r for r in rec.get('boards', []) if r.get('board') == board and r.get('profile') == profile
+          and r.get('status') == 'ok']
   if not rec.get('pass') or len(rows) != 1 or 'hilRecord' not in rec or 'sha256' not in rows[0]:
-    raise Refused(f'{record_path}: not a passing HIL record of {board} (check_build.py --board {board} --shared '
-                  f'--hil-config {roster_path})')
+    raise Refused(f'{record_path}: not a passing HIL record of {board} in profile {profile} (check_build.py --board '
+                  f'{board} --shared --hil-config {roster_path})')
   row, inp = rows[0], rec.get('input')
   if not isinstance(inp, dict):
     raise Refused(f'{record_path}: no input record')
+  try:
+    want, key = build().hil_profiles()[profile], build().SIGNED_FW_TEST_KEY
+  except build().Refusal as e:
+    raise Refused(str(e))
+  bound = rec['hilRecord']
+  if (bound.get('profiles') or {}).get(profile) != want or row.get('defines') != want or \
+     (bound.get('signedFwKey') or {}).get('sha256') != build().sha256(key):
+    raise Refused(f'{record_path}: profile {profile} is not built as this checkout defines it ({want}): rebuild')
   config = row.get('config') or {}
-  wrong = {k: config.get(k) for k, v in {**DEFAULT_CONFIG, 'BOARD': board}.items() if config.get(k) != v}
+  expected = {**DEFAULT_CONFIG, 'BOARD': board, **dict(d.split('=', 1) for d in want)}
+  wrong = {k: config.get(k) for k, v in expected.items() if config.get(k) != v}
   if rec.get('defines') or wrong:
-    raise Refused(f'{record_path}: not the default configuration (defines {rec.get("defines")}, {wrong})')
+    raise Refused(f'{record_path}: not profile {profile}\'s configuration (defines {rec.get("defines")}, {wrong})')
   if set(row.get('artifacts') or {}) != ARTIFACTS or set(row.get('sha256') or {}) != ARTIFACTS:
     raise Refused(f'{record_path}: artifacts {sorted(row.get("artifacts") or {})} are not {sorted(ARTIFACTS)}')
   head, dirty = git('rev-parse', 'HEAD').strip(), bool(git('status', '--porcelain').strip())
@@ -218,11 +230,12 @@ def admit(record_path, board, roster_path, workdir):
   bound = rec['hilRecord'].get('agentrc') or {}
   if (bound.get('commit'), bound.get('sha256')) != (here.get('commit'), here.get('sha256')):
     raise Refused(f'{record_path} binds agentrc {bound.get("commit")}, this run loads {here.get("commit")}: rebuild')
-  copies = {}
-  for key, rel in row['artifacts'].items():
+  copies, into = {}, Path(workdir) / profile
+  into.mkdir(exist_ok=True)
+  for name, rel in row['artifacts'].items():
     src = ROOT / rel
-    copies[key] = Path(workdir) / src.name
-    copy_pinned(src, copies[key], row['sha256'][key], f'{rel} does not hash as {record_path} records: rebuild')
+    copies[name] = into / src.name
+    copy_pinned(src, copies[name], row['sha256'][name], f'{rel} does not hash as {record_path} records: rebuild')
   return rec, row, copies
 
 
@@ -317,7 +330,8 @@ def facts(board, row, copies, workdir):
           'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0), 'cdcPid': int(cdc_pid, 0),
           'boardId': board_id.strip('"'), 'version': versions.pop().decode(),
           'softdevice': f'S{row["softdevice"]["name"][1:]} {row["softdevice"]["version"]}',
-          'hex': str(copies['merged']), 'update': str(copies['update']), 'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
+          'hex': str(copies['merged']), 'update': str(copies['update']), 'zip': str(copies['zip']),
+          'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
 
 
 # ------------------------------------------------------------------ the fixture app
@@ -604,8 +618,11 @@ class Drive:
 # ------------------------------------------------------------------ the battery
 
 class Battery:
-  def __init__(self, board, f, workdir, log, fail_at=None):
-    self.b, self.f, self.dir, self.fail_at = board, f, Path(workdir), fail_at
+  """One profile's battery (hil_run_report.PROFILE_STEPS) on the image `f` describes; cleanup restores `home`, the
+  default profile's image, `f` itself when that is the default."""
+  def __init__(self, board, f, workdir, log, fail_at=None, profile='default', home=None):
+    self.b, self.f, self.dir, self.fail_at, self.profile = board, f, Path(workdir), fail_at, profile
+    self.home = home or f
     self.tools = Tools(workdir, log)
     self.probe, self.drive = Probe(board, workdir, self.tools), Drive(board, f, self.tools)
     self.steps, self.touched = [], False
@@ -715,6 +732,9 @@ class Battery:
     return (self.f['appStart'] - MBR_SIZE) // 256 * 512, length // 256 * 512
 
   def battery(self, base):
+    {'default': self.default}[self.profile](base)
+
+  def default(self, base):
     a, b, c = os.urandom(16), os.urandom(16), os.urandom(16)
     self.step('install', self.install)
     self.step('dfu', self.dfu)
@@ -737,6 +757,7 @@ class Battery:
       return {'pass': False, 'state': 'unknown', 'detail': 'a tool is not proven ended; not restored',
               'receipts': self.tools.receipts}
     ev, nonce = {}, b'restore'.ljust(16, b'\0')
+    self.f, self.drive = self.home, Drive(self.b, self.home, self.tools)
     try:
       ev['install'] = self.probe.install(self.f)
       ev['dfu'] = self.dfu()
@@ -950,7 +971,7 @@ def cmd_run(args, argv):
   run_dir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / f'run-{time.strftime("%Y%m%d-%H%M%S")}-{os.getpid()}'
   run_dir.mkdir(parents=True)
   log = run_dir / 'hil.log'
-  row = {'board': args.board, 'ran': False, 'pass': False, 'locked': False, 'steps': [],
+  row = {'board': args.board, 'profile': args.profile, 'ran': False, 'pass': False, 'locked': False, 'steps': [],
          'cleanup': {'pass': True, 'state': 'untouched'}}
   result = {'pass': False, 'caveat': '', 'results': [row], 'reportPath': str(run_dir / 'hil_report.json'),
             'uncovered': list(UNCOVERED)}
@@ -965,17 +986,23 @@ def cmd_run(args, argv):
     board = load_board(args.roster, args.board)
     if not board['reentry']:
       raise Refused(f'{args.board} is pending commissioning (no nrf52.reentry): commissioning.md')
-    rec, rrow, copies = admit(args.build_record, args.board, args.roster, run_dir)
-    f = facts(args.board, rrow, copies, run_dir)
+    if args.fail_at and args.fail_at not in PROFILE_STEPS[args.profile]:
+      raise Refused(f'--fail-at {args.fail_at} is no step of profile {args.profile}: {PROFILE_STEPS[args.profile]}')
+    rec, rrow, copies = admit(args.build_record, args.board, args.roster, run_dir, args.profile)
+    f = facts(args.board, rrow, copies, run_dir / args.profile)
+    home = None
+    if args.profile != 'default':
+      _, hrow, hcopies = admit(args.build_record, args.board, args.roster, run_dir)
+      home = facts(args.board, hrow, hcopies, run_dir / 'default')
     row['firmware'] = {'version': f['version'], 'buildRecord': args.build_record, 'merged': rrow['sha256']['merged'],
-                       'head': rec['input']['head']}
+                       'head': rec['input']['head'], 'profile': args.profile}
     base = admit_base(board, args.base_dir, run_dir)
     row['selfUpdateBase'] = {k: base[k] for k in ('version', 'file', 'sha256')}
     for tool, what in (('mcopy', 'mtools'), ('adafruit-nrfutil', 'the farm\'s hil-venv')):
       if not shutil.which(tool):
         raise Refused(f'{tool} ({what}) must be on PATH')
     try:
-      bat = Battery(board, f, run_dir, log, args.fail_at)
+      bat = Battery(board, f, run_dir, log, args.fail_at, args.profile, home)
     except OSError as e:
       raise Refused(f'ops dir in {run_dir}: {type(e).__name__}: {e}')
   except Refused as e:
@@ -1039,7 +1066,7 @@ def cmd_manual(args, argv):
       holder = prove_cleanup_holder(board, args.recover_holder)
     found = helper.open_cleanup_failures(board['lock'])
     _, rrow, copies = admit(args.build_record, args.board, args.roster, workdir)
-    f = facts(args.board, rrow, copies, workdir)
+    f = facts(args.board, rrow, copies, workdir / 'default')
     try:
       bat = Battery(board, f, workdir, workdir / 'hil.log')
     except OSError as e:
@@ -1150,7 +1177,8 @@ def main(argv=None):
     if name == 'run':
       p.add_argument('--lock-wait', type=float, default=0)
       p.add_argument('--base-dir', required=True, help="holds the roster's nrf52.selfUpdateBase file")
-      p.add_argument('--fail-at', choices=STEPS)
+      p.add_argument('--profile', choices=list(PROFILE_STEPS), default='default')
+      p.add_argument('--fail-at', choices=sorted({s for steps in PROFILE_STEPS.values() for s in steps}))
     elif name == 'install':
       p.add_argument('--under-hold', required=True, metavar='REASON')
     else:

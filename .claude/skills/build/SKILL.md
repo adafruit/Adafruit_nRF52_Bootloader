@@ -71,11 +71,14 @@ a build that ran. Exit 1 or 2 quotes `firstError` (and `error`).
 - **`-D`** takes `NAME=VALUE` for the options CMakeLists.txt defines (`DUALBANK_FW`, `DEFAULT_TO_OTA_DFU`, `SIGNED_FW`
   with `SIGNED_FW_QX`/`SIGNED_FW_QY`, `FORCE_UF2`, `SD_VERSION`, `USE_NFCT`); anything else is refused. ANT
   (`ANT_LICENSE_KEY`, `SD_NAME=s340`) is not offered: the s340 SoftDevice is license-excluded from the repository.
-- **A HIL record** (`--board <b> --shared --hil-config <roster>`) is the default configuration of a clean tree: `-D`
-  and a dirty tree are refused. It adds `hilRecord` (the roster's path and sha256, and `agentrc`, the identity of the
-  agentrc the HIL contract's `scripts/agentrc.py` selects), each board's `sha256` of every artifact and `softdevice`
-  (name, version, hex and its sha256), and fails with exit 2 when HEAD, the tree, the roster or an agentrc
-  closure file changed while it built.
+- **A HIL record** (`--board <b> --shared --hil-config <roster>`) builds every HIL profile of a clean tree, each in its
+  own dir: `default` in `cmake-build/cmake-build-<b>`, `dualbank` (`DUALBANK_FW=ON`) and `signed` (`SIGNED_FW=ON` with
+  the published test key `test/hil/signed-fw-test-key.json`, never for a product) in `cmake-build-<b>-<profile>`
+  (`hil_profiles()`); `-D` and a dirty tree are refused. It adds `hilRecord` (the roster's path and sha256, `agentrc`,
+  the identity of the agentrc the HIL contract's `scripts/agentrc.py` selects, `profiles` and the test key's sha256),
+  a row per board and profile with its `profile`, `defines`, `sha256` of every artifact and `softdevice` (name,
+  version, hex and its sha256), and fails with exit 2 when HEAD, the tree, the roster or an agentrc closure file
+  changed while it built.
 - **Private dirs for parallel agents.** Each build starts from an empty `cmake-build/cmake-build-agent-<pid>-<board>`
   and is removed when it passes; its `artifacts` say what it produced, nothing is left to flash. A failed one is kept
   for its log (`<buildDir>/check_build.log`; `-v` also streams it to stderr). `--shared` rebuilds

@@ -179,7 +179,15 @@ class Cli(unittest.TestCase):
       f.flush()
       code, res = run('--board', 'pca10056', '--shared', '--hil-config', f.name, '-D', 'DUALBANK_FW=ON')
     self.assertEqual(code, 2)
-    self.assertIn('default configuration', res['error'])
+    self.assertIn('builds its profiles: drop -D', res['error'])
+
+  def test_hil_profiles_build_the_published_test_key(self):
+    profiles = cb.hil_profiles()
+    self.assertEqual(list(profiles), ['default', 'dualbank', 'signed'])
+    key = json.loads(cb.SIGNED_FW_TEST_KEY.read_text())
+    qx = dict(d.split('=', 1) for d in profiles['signed'])['SIGNED_FW_QX']
+    self.assertEqual(bytes(int(b, 16) for b in qx.split(',')), bytes.fromhex(key['qx']))
+    self.assertIn('TEST ONLY', key['use'])
 
   def test_unknown_board_and_shared_without_board_are_refused(self):
     self.assertEqual(run('--board', 'nope', '--select-only')[0], 2)

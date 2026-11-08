@@ -38,10 +38,12 @@ mkdir -p cmake-build && python3 .claude/skills/build/scripts/check_build.py --bo
   --hil-config test/hil/ci.json > cmake-build/pca10056.hil.json
 ```
 
-The record binds HEAD, the submodules, the roster's sha256, the agentrc identity and every artifact's sha256
-(`.claude/skills/build/SKILL.md`, A HIL record). `hil_test.py` refuses a record that is not passing, dirty, of another
-HEAD, submodules, roster or agentrc, not of the default configuration, or whose artifacts are incomplete or no longer
-hash as recorded, and copies the artifacts into the run dir before use. Before any hardware access it checks the merged
+The record binds HEAD, the submodules, the roster's sha256, the agentrc identity and every artifact's sha256 of each
+HIL profile (`.claude/skills/build/SKILL.md`, A HIL record). `hil_test.py` refuses a record that is not passing, dirty,
+of another HEAD, submodules, roster or agentrc, whose profile is not built as this checkout defines it (options, test
+key) or whose artifacts are incomplete or no longer hash as recorded, and copies the profile's artifacts into the run
+dir's `<profile>/` before use; a profile other than `default` also admits the default's, which its cleanup
+reinstalls. Before any hardware access it checks the merged
 HEX's spans: only flash and UICR NRFFW, runs at 0 (MBR), 0x1000 (SoftDevice) and the bootloader start, nothing in the
 app region, and NRFFW[0] pointing at the bootloader. What the battery checks comes from the record and this checkout:
 the version from the image's `UF2 Bootloader <version>` string, VID, the UF2 and CDC-only PIDs and `UF2_BOARD_ID` from

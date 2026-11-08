@@ -186,17 +186,20 @@ class Admit(unittest.TestCase):
       with self.assertRaisesRegex(ht.Refused, 'not a passing HIL record'):
         ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent')
 
-  def record(self, **row):
-    keys = dict.fromkeys(ht.ARTIFACTS, 'x')
-    row = {'board': 'pca10056', 'status': 'ok', 'artifacts': keys, 'sha256': keys,
-           'config': {**ht.DEFAULT_CONFIG, 'BOARD': 'pca10056'}, **row}
-    return {'pass': True, 'hilRecord': {}, 'input': {'dirty': True, 'head': 'x'}, 'boards': [row]}
+  def record(self, profile='default', **row):
+    keys, profiles = dict.fromkeys(ht.ARTIFACTS, 'x'), ht.build().hil_profiles()
+    config = {**ht.DEFAULT_CONFIG, 'BOARD': 'pca10056', **dict(d.split('=', 1) for d in profiles[profile])}
+    row = {'board': 'pca10056', 'profile': profile, 'defines': profiles[profile], 'status': 'ok', 'artifacts': keys,
+           'sha256': keys, 'config': config, **row}
+    key = {'sha256': ht.build().sha256(ht.build().SIGNED_FW_TEST_KEY)}
+    return {'pass': True, 'hilRecord': {'profiles': profiles, 'signedFwKey': key},
+            'input': {'dirty': True, 'head': 'x'}, 'boards': [row]}
 
-  def admit(self, rec):
+  def admit(self, rec, profile='default'):
     with tempfile.NamedTemporaryFile('w', suffix='.json') as f:
       json.dump(rec, f)
       f.flush()
-      ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent')
+      ht.admit(f.name, 'pca10056', ROOT / 'test/hil/ci.json', '/nonexistent', profile)
 
   def test_refuses_a_record_without_input(self):
     for inp in ({}, {'input': None}, {'input': []}):
@@ -212,12 +215,27 @@ class Admit(unittest.TestCase):
     cfg = {**ht.DEFAULT_CONFIG, 'BOARD': 'pca10056'}
     for bad in ({'config': {**cfg, 'SIGNED_FW': 'ON'}}, {'config': {**cfg, 'CMAKE_BUILD_TYPE': 'Debug'}},
                 {'config': {**cfg, 'BOARD': 'pca10100'}}):
-      with self.subTest(bad=bad), self.assertRaisesRegex(ht.Refused, 'not the default configuration'):
+      with self.subTest(bad=bad), self.assertRaisesRegex(ht.Refused, "not profile default's configuration"):
         self.admit(self.record(**bad))
-    with self.assertRaisesRegex(ht.Refused, 'not the default configuration'):
+    with self.assertRaisesRegex(ht.Refused, "not profile default's configuration"):
       self.admit({**self.record(), 'defines': ['DUALBANK_FW=ON']})
     with self.assertRaisesRegex(ht.Refused, 'artifacts'):
       self.admit(self.record(artifacts={}))
+
+  def test_a_profile_binds_its_row_its_options_and_the_test_key(self):
+    rec = self.record('signed')
+    with self.assertRaisesRegex(ht.Refused, 'rebuild on a clean HEAD'):   # every binding before it held
+      self.admit(rec, 'signed')
+    with self.assertRaisesRegex(ht.Refused, 'not a passing HIL record of pca10056 in profile signed'):
+      self.admit(self.record('dualbank'), 'signed')
+    other_key = dict(rec, hilRecord=dict(rec['hilRecord'], signedFwKey={'sha256': '0' * 64}))
+    stale = dict(rec, boards=[dict(rec['boards'][0], defines=['SIGNED_FW=ON'])])
+    for bad in (other_key, stale):
+      with self.subTest(bad=bad['hilRecord']['signedFwKey']), self.assertRaisesRegex(ht.Refused, 'rebuild'):
+        self.admit(bad, 'signed')
+    wrong = self.record('dualbank', config={**ht.DEFAULT_CONFIG, 'BOARD': 'pca10056'})
+    with self.assertRaisesRegex(ht.Refused, "not profile dualbank's configuration"):
+      self.admit(wrong, 'dualbank')
 
   def test_spans(self):
     good = {a: 0 for a in (0, 0x1000, 0xF4000)}
@@ -248,7 +266,8 @@ class Admit(unittest.TestCase):
       lines = [record(0, b'\0'), record(0x1000, b'\0'), ela(0xF), record(0x4000, body[:16]),
                record(0x4010, body[16:]), ela(0x1000), record(0x1014, (0xF4000).to_bytes(4, 'little'))]
       merged.write_text('\n'.join(lines) + '\n:00000001FF\n')
-      got = ht.facts('pca10056', {'softdevice': f}, {'merged': merged, 'update': Path(d) / 'u.uf2'}, d)
+      got = ht.facts('pca10056', {'softdevice': f}, {'merged': merged, 'update': Path(d) / 'u.uf2',
+                                                     'zip': Path(d) / 'p.zip'}, d)
     self.assertEqual((got['appStart'], got['ramEnd'], got['vid'], got['pid'], got['cdcPid'], got['boardId'],
                       got['version'], got['softdevice'], got['family']),
                      (0x26000, 0x20040000, 0x239A, 0x00DA, 0x00DA, 'nRF52840-pca10056-v1', '1.2.3', 'S140 6.1.1',
@@ -390,6 +409,21 @@ class BatteryRun(unittest.TestCase):
       with self.assertRaisesRegex(ht.StepFail, "copy's app"):
         bat.app_ran(b'b' * 16)
     self.assertNotEqual(a['marker'], b['marker'])
+
+  def test_a_profiles_cleanup_reinstalls_the_default_image(self):
+    tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
+    home = {**FACTS, 'version': 'default'}
+    bat = ht.Battery({'flasher': {'uid': '1'}, 'device': 'd', 'uid': 'u'}, {**FACTS, 'version': 'signed'}, tmp,
+                     Path(tmp) / 'hil.log', profile='signed', home=home)
+    bat.touched = True
+    with mock.patch.object(bat.probe, 'install', return_value={}) as install, \
+         mock.patch.object(ht.Battery, 'dfu', return_value={}), \
+         mock.patch.object(ht.Battery, 'copy', return_value={}), \
+         mock.patch.object(ht.Battery, 'app_ran', return_value={}):
+      self.assertTrue(bat.restore()['pass'])
+    install.assert_called_once_with(home)
+    self.assertIs(bat.drive.f, home)
 
   def test_a_step_turns_an_unexpected_error_into_its_failure(self):
     bat = self.battery()
@@ -625,6 +659,18 @@ class Cli(unittest.TestCase):
     res = json.loads(buf.getvalue().splitlines()[-1])
     self.assertEqual((code, res['exitCode'], res['results'][0]['ran']), (2, 2, False))
     self.assertIn('pending commissioning', res['error'])
+
+  def test_run_refuses_a_step_its_profile_does_not_run(self):
+    buf = io.StringIO()
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(buf), \
+         mock.patch.object(ht, 'load_board', return_value={'reentry': 'gpregret', 'uid': 'x'}), \
+         mock.patch.object(ht, 'PROFILE_STEPS', {'default': ('install',), 'other': ('dfu',)}), \
+         mock.patch.object(ht, 'publish'):
+      code = ht.main(['run', '-b', 'pca10056', '--build-record', '/nonexistent', '--base-dir', d, '--run-root', d,
+                      '--profile', 'other', '--fail-at', 'install', 'r.json'])
+    res = json.loads(buf.getvalue().splitlines()[-1])
+    self.assertEqual((code, res['results'][0]['profile']), (2, 'other'))
+    self.assertIn('--fail-at install is no step of profile other', res['error'])
 
 
   def test_recovery_refuses_a_lock_not_held_by_that_cleanup_holder(self):
