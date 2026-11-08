@@ -70,7 +70,7 @@ ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
 UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW and dual-bank builds',
-             'a SoftDevice update')
+             'another SoftDevice version than the build\'s')
 
 
 class Refused(Exception):
@@ -810,6 +810,24 @@ class Battery:
     ev['appRan'] = self.app_ran(nonce)
     return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
+  def softdevice(self, nonce):
+    """The record's release package through CDC-only serial DFU: adafruit-nrfutil genpkg --softdevice --bootloader,
+    the same S140 6.1.1 and the candidate rewritten (no other SoftDevice is documented for this build). The bootloader
+    erases the app region to receive them (dfu_single_bank.c), swaps them in through the MBR on the next boot and
+    marks bank 0 invalid (bootloader.c, DFU_UPDATE_SD_SWAPPED), so it comes back in DFU by itself. Every run of the
+    merged HEX, SoftDevice and bootloader included, then verifies, and app E copied through the drive runs."""
+    ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
+    ev['tty'] = self.cdc_only()
+    self.dfu_serial(self.f['zip'], ev['tty'])
+    dev = self.drive.wait()
+    self.probe.session(['h', *[f'verifybin {p} {a:08X}' for a, p in self.f['runs']], 'g'])
+    ev['verified'] = [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in self.f['runs']]
+    ev['info'] = self.drive.info(dev)
+    fx = fixture(self.f, nonce)
+    ev['copy'] = self.drive.copy(dev, make_uf2(fx['image'], fx['start'], self.f['family']), self.dir)
+    ev['appRan'] = self.app_ran(nonce)
+    return {**ev, 'package': Path(self.f['zip']).name, 'nonce': nonce.hex()}
+
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
     from USER_FLASH_START = MBR_SIZE (src/usb/uf2/ghostfat.c, uf2cfg.h)."""
@@ -819,7 +837,7 @@ class Battery:
     {'default': self.default}[self.profile](base)
 
   def default(self, base):
-    a, b, c, d = (os.urandom(16) for _ in range(4))
+    a, b, c, d, e = (os.urandom(16) for _ in range(5))
     self.step('install', self.install)
     self.step('dfu', self.dfu)
     self.step('copy', lambda: self.copy(a))
@@ -833,6 +851,7 @@ class Battery:
     self.step('update-base', lambda: self.update(base['path'], base['version'], c))
     self.step('update', lambda: self.update(self.f['update'], self.f['version'], c))
     self.step('interrupted', lambda: self.interrupted(d))
+    self.step('softdevice', lambda: self.softdevice(e))
 
   def restore(self):
     """The candidate installed again and the benign fixture copied through it and running; never while a tool of the

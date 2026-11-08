@@ -96,6 +96,12 @@ is the JSON report and its exit is final. The battery, each step judged from its
    longer matches, so the bootloader stays in DFU and the drive comes back by itself; then the whole of D copies and
    runs. A transfer cut short after a UF2-installed app is not this case: a UF2 completion stores no CRC (0), so the
    bootloader would start the partly written image.
+11. `softdevice`: the record's release package (`genpkg --softdevice --bootloader`) through CDC-only serial DFU, a
+   same-version rewrite of S140 6.1.1 and the candidate (no other SoftDevice is documented for a 6.1.1 build). The
+   bootloader erases the app region to receive them, swaps them in through the MBR on the next boot and marks bank 0
+   invalid (`DFU_UPDATE_SD_SWAPPED`), so it comes back in DFU by itself; every run of the merged HEX, SoftDevice and
+   bootloader included, verifies, `INFO_UF2.TXT` names the candidate and SoftDevice, and app E copied through the
+   drive runs.
 
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, adafruit-nrfutil, the FAT
 reader and flush) runs under agentrc's `hil_process.run_tracked` with its files in the run dir's `ops`
@@ -200,7 +206,8 @@ retries a fail once per `hil` Caller rules.
 
 - Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
   readback, a double reset on the reset pin, CDC serial DFU of an app, bootloader self-update from the pinned release
-  and back, and an interrupted UF2 transfer after a serial-DFU app. Uncovered, named pending in every report that
-  needs them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA, SIGNED_FW, dual bank and a SoftDevice update.
+  and back, an interrupted UF2 transfer after a serial-DFU app, and a same-version SoftDevice and bootloader rewrite
+  through the release package. Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only,
+  no USB), nRF52833, BLE OTA, SIGNED_FW, dual bank, and another SoftDevice version than the build's.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.

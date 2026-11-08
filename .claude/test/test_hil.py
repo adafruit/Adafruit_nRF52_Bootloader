@@ -466,6 +466,27 @@ class BatteryRun(unittest.TestCase):
       with self.subTest(settings=hex(settings)), self.assertRaisesRegex(ht.StepFail, 'CRC-checked app'):
         self.interrupted(settings=settings)
 
+  def test_softdevice_sends_the_release_package_then_verifies_every_run(self):
+    bat = self.battery()
+    bat.f = {**FACTS, 'zip': '/r/pca10056_bootloader-1_s140_6.1.1.zip',
+             'runs': [(0, '/w/run-00000000.bin'), (0x1000, '/w/run-00001000.bin')]}
+    calls = []
+    with mock.patch.object(bat.probe, 'reenter', side_effect=lambda m: calls.append(('enter', m)) or {}), \
+         mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9'), \
+         mock.patch.object(bat, 'dfu_serial', side_effect=lambda pkg, tty: calls.append(('dfu', pkg, tty))), \
+         mock.patch.object(bat.drive, 'wait', side_effect=lambda: calls.append(('drive',)) or '/dev/sdz'), \
+         mock.patch.object(bat.probe, 'session', side_effect=lambda c: calls.append(('probe', c)) or ''), \
+         mock.patch.object(ht.Path, 'stat', return_value=mock.Mock(st_size=4)), \
+         mock.patch.object(bat.drive, 'info', return_value=[]), \
+         mock.patch.object(bat.drive, 'copy', side_effect=lambda *a: calls.append(('copy',)) or {}), \
+         mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}):
+      ev = bat.softdevice(b'e' * 16)
+    self.assertEqual(calls, [('enter', ht.DFU_MAGIC_SERIAL_ONLY_RESET), ('dfu', bat.f['zip'], '/dev/ttyACM9'),
+                             ('drive',), ('probe', ['h', 'verifybin /w/run-00000000.bin 00000000',
+                                                    'verifybin /w/run-00001000.bin 00001000', 'g']),
+                             ('copy',), ('app', b'e' * 16)])
+    self.assertEqual(ev['package'], 'pca10056_bootloader-1_s140_6.1.1.zip')
+
   def test_a_copy_the_bootloader_cannot_complete_keeps_the_drive(self):
     bat = self.battery()
     bat.f = {**FACTS, 'vid': 1, 'pid': 2}
