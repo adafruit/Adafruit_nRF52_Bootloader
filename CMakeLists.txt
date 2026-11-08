@@ -255,9 +255,6 @@ else ()
     )
 endif ()
 
-# startup assembled last: make links it after the C objects
-target_sources(bootloader PUBLIC ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S)
-
 #----------------------------------------------------
 # MCU Variant differences
 # Supported are: nrf52 (nrf52832), nrf52833, nrf52840
@@ -326,6 +323,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 else ()
   target_compile_definitions(bootloader PUBLIC DFU_APP_DATA_RESERVED=${DFU_APP_DATA_RESERVED})
 endif ()
+
+# startup assembled last: make links it after the C objects (SEGGER_RTT.c in a debug build included)
+target_sources(bootloader PUBLIC ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S)
 
 #----------------------------------
 # ANT_LICENSE_KEY handling
