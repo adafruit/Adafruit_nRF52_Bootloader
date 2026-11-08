@@ -180,7 +180,7 @@ target_compile_options(bootloader PUBLIC
   )
 
 # Nordic SoftDevice headers have inline asm with broken constraints: gcc-11's IPA-modref pass drops the
-# arguments of SVCALL() wrappers and breaks the bootloader (see Makefile)
+# arguments of SVCALL() wrappers and breaks the bootloader
 include(CheckCCompilerFlag)
 check_c_compiler_flag(-fno-ipa-modref HAS_FNO_IPA_MODREF)
 if (HAS_FNO_IPA_MODREF)
@@ -297,7 +297,9 @@ else ()
 endif ()
 
 set(SD_FILENAME ${SD_NAME}_nrf52_${SD_VERSION})
-set(SD_HEX ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_softdevice.hex)
+if (NOT DEFINED SD_HEX)
+  set(SD_HEX ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_softdevice.hex)
+endif ()
 
 string(TOUPPER ${SD_NAME} SD_NAME_UPPER)
 target_compile_definitions(bootloader PUBLIC ${SD_NAME_UPPER})
@@ -377,12 +379,14 @@ add_custom_command(TARGET bootloader POST_BUILD
     ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2
   VERBATIM)
 
-# Release artifacts, named as the Makefile names them
+# Release artifacts, with the names the make build gave them
 # Paths are spelled out: OUTPUT takes no generator expressions before CMake 3.20
 set(OUT_NAME ${BOARD}_bootloader-${GIT_VERSION})
 set(MERGED_NAME ${OUT_NAME}_${SD_NAME}_${SD_VERSION})
 set(BL_HEX ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex)
+set(BL_MBR_HEX ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.hex)
 set(BL_MBR_UF2 ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2)
+set(NOSD_HEX ${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}_nosd.hex)
 set(MERGED_HEX ${CMAKE_CURRENT_BINARY_DIR}/${MERGED_NAME}.hex)
 set(UPDATE_UF2 ${CMAKE_CURRENT_BINARY_DIR}/update-${OUT_NAME}_nosd.uf2)
 set(MERGED_ZIP ${CMAKE_CURRENT_BINARY_DIR}/${MERGED_NAME}.zip)
@@ -395,7 +399,11 @@ add_custom_command(OUTPUT ${UPDATE_UF2}
   COMMAND ${CMAKE_COMMAND} -E copy ${BL_MBR_UF2} ${UPDATE_UF2}
   DEPENDS bootloader ${BL_MBR_UF2}
   VERBATIM)
-set(RELEASE_FILES ${MERGED_HEX} ${UPDATE_UF2})
+add_custom_command(OUTPUT ${NOSD_HEX}
+  COMMAND ${CMAKE_COMMAND} -E copy ${BL_MBR_HEX} ${NOSD_HEX}
+  DEPENDS bootloader ${BL_MBR_HEX}
+  VERBATIM)
+set(RELEASE_FILES ${MERGED_HEX} ${UPDATE_UF2} ${NOSD_HEX})
 
 # DFU package (bootloader + SoftDevice) for adafruit-nrfutil over CDC/serial
 find_program(NRFUTIL adafruit-nrfutil)
@@ -410,6 +418,18 @@ else ()
 endif ()
 
 add_custom_target(release ALL DEPENDS ${RELEASE_FILES})
+
+# what the Makefile wrapper's flash, debug and copy recipes need, read by its sub-make
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/make_vars.mk
+  "MCU_VARIANT = ${MCU_VARIANT}\n"
+  "SD_HEX = ${SD_HEX}\n"
+  "MBR_HEX = ${MBR_HEX}\n"
+  "BL_ELF = ${CMAKE_CURRENT_BINARY_DIR}/bootloader${CMAKE_EXECUTABLE_SUFFIX}\n"
+  "NOSD_HEX = ${NOSD_HEX}\n"
+  "UPDATE_UF2 = ${UPDATE_UF2}\n"
+  "MERGED_HEX = ${MERGED_HEX}\n"
+  "MERGED_ZIP = ${MERGED_ZIP}\n"
+  )
 
 #----------------------------------
 # Flashing target

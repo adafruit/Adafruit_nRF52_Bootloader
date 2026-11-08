@@ -1,98 +1,73 @@
 #------------------------------------------------------------------------------
-# CONFIGURE
-# - SDK_PATH     : path to SDK directory
+# Wrapper over the CMake build (CMakeLists.txt): configures $(BUILD) with CMake and Ninja, then builds through it.
 #
+# - BOARD              : board to build, a directory under src/boards
+# - BUILD              : build directory, default _build/build-$(BOARD)
+# - BIN                : copy-artifact's directory, default _bin/$(BOARD)
+# - DEBUG              : 1 for a debug build (RTT, *_debug.ld linker script)
 # - SD_NAME            : e.g s132, s140
 # - SD_VERSION         : SoftDevice version e.g 6.0.0
-# - SD_HEX             : to bootloader hex binary
+# - SD_HEX             : SoftDevice hex merged with the bootloader and written by flash-sd
 # - SIGNED_FW          : if bootloader will ONLY accept signed firmware
 # - SIGNED_FW_QX       : Qx for signed firmware verification
 # - SIGNED_FW_QY       : Qy for signed firmware verification
 # - DUALBANK_FW        : If bootloader will implement a dual bank feature to allow autorecover from failed
 # - FORCE_UF2          : if SIGNED_FW is 1, will force to include UF2 support (UNSECURE, UF2 does NOT validate signature!)
 # - DEFAULT_TO_OTA_DFU : if entering DFU, by default enter OTA DFU instead of Serial DFU
+# - USE_NFCT           : yes if the board uses the NFC pins as NFC, no if as GPIO (default from board.cmake)
+# - ANT_LICENSE_KEY    : ANT license key, with SD_NAME=s340
+# - TRACE_ETM          : 1 to set up ETM trace
+# - CROSS_COMPILE      : toolchain prefix, default arm-none-eabi-
+# - NRFUTIL            : adafruit-nrfutil command
+# - FLASHER            : nrfjprog (default) or pyocd
+# - SERIAL             : serial port for flash-dfu e.g /dev/ttyACM0
 #------------------------------------------------------------------------------
 
-PYTHON = python
+THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
 
 # local customization
 -include Makefile.user
 
-# Board specific
--include src/boards/$(BOARD)/board.mk
+BOARD_LIST := $(sort $(patsubst src/boards/%/board.cmake,%,$(wildcard src/boards/*/board.cmake)))
 
-SDK_PATH     = lib/sdk/components
-SDK11_PATH   = lib/sdk11/components
-TUSB_PATH    = lib/tinyusb/src
-TCRYPT_PATH  = lib/tinycrypt/lib
-NRFX_PATH    = lib/nrfx
-SD_PATH      = lib/softdevice/$(SD_FILENAME)
-
-# SD_VERSION can be overwritten by board.mk
-ifndef SD_VERSION
-	ifeq ($(MCU_SUB_VARIANT),nrf52833)
-	SD_VERSION = 7.3.0
-	else
-	SD_VERSION = 6.1.1
-	endif
+ifeq ($(BOARD),)
+  $(info You must provide a BOARD parameter with 'BOARD=')
+  $(info Supported boards are:)
+  $(foreach b,$(BOARD_LIST),$(info - $(b)))
+  $(error BOARD not defined)
+else ifeq ($(filter $(BOARD),$(BOARD_LIST)),)
+  $(info Unknown board '$(BOARD)'. Supported boards are:)
+  $(foreach b,$(BOARD_LIST),$(info - $(b)))
+  $(error Invalid BOARD specified)
 endif
 
-SD_FILENAME  = $(SD_NAME)_nrf52_$(SD_VERSION)
-SD_HEX       = $(SD_PATH)/$(SD_FILENAME)_softdevice.hex
-
-MBR_HEX			 = lib/softdevice/mbr/hex/mbr_nrf52_2.4.1_mbr.hex
-
-# Detect the operating system
-# The "OS" environment variable on Windows is always "Windows_NT"
-# when running under a modern shell like cmd.exe or powershell
-ifeq ($(OS),Windows_NT)
-	NULL_DEVICE = NUL
-else
-	NULL_DEVICE = /dev/null
+ifneq ($(filter flash-dfu dfu-flash,$(MAKECMDGOALS)),)
+  ifeq ($(SERIAL),)
+    $(error Undefined make flag: SERIAL (example: SERIAL=/dev/ttyACM0))
+  endif
 endif
 
-# linker by MCU eg. nrf52840.ld
-ifeq ($(DEBUG), 1)
-  LD_FILE = linker/$(MCU_SUB_VARIANT)_debug.ld
-else
-  LD_FILE = linker/$(MCU_SUB_VARIANT).ld
-endif
+# Build directory
+BUILD = _build/build-$(BOARD)
+BIN = _bin/$(BOARD)
 
-GIT_VERSION := $(shell git describe --dirty --always --tags)
-
-# compiled file name
-OUT_NAME = $(BOARD)_bootloader-$(GIT_VERSION)
-
-# merged file = compiled + sd
-MERGED_FILE = $(OUT_NAME)_$(SD_NAME)_$(SD_VERSION)
-
-UF2_FAMILY_ID_BOOTLOADER = 0xd663823c
-
-#------------------------------------------------------------------------------
-# Tool Configure
-#------------------------------------------------------------------------------
-
-# Toolchain commands
-# Should be added to your PATH
 CROSS_COMPILE ?= arm-none-eabi-
-CC      = $(CROSS_COMPILE)gcc
-AS      = $(CROSS_COMPILE)as
-OBJCOPY = $(CROSS_COMPILE)objcopy
-SIZE    = $(CROSS_COMPILE)size
-GDB     = $(CROSS_COMPILE)gdb
+NRFUTIL ?= adafruit-nrfutil
 
-# Set make directory command, Windows tries to create a directory named "-p" if that flag is there.
-ifneq ($(OS), Windows_NT)
-  MKDIR = mkdir -p
-else
-  MKDIR = mkdir
-endif
+# Each configure starts from an empty CMake cache (also what lets CROSS_COMPILE change the compiler), so only this
+# invocation's variables apply. Flags are on only for 1 and USE_NFCT only for yes, as the make build had them.
+flag = -D$(1)=$(if $(filter 1,$($(1))),ON,OFF)
+optional = $(if $($(1)),"-D$(1)=$($(1))")
+CMAKE_ARGS = -G Ninja -DBOARD=$(BOARD) "-DCROSS_COMPILE=$(CROSS_COMPILE)" "-DNRFUTIL:STRING=$(NRFUTIL)" \
+  -DCMAKE_BUILD_TYPE=$(if $(filter 1,$(DEBUG)),Debug,MinSizeRel) \
+  $(foreach v,SIGNED_FW DUALBANK_FW FORCE_UF2 DEFAULT_TO_OTA_DFU,$(call flag,$(v))) \
+  $(if $(USE_NFCT),-DUSE_NFCT=$(if $(filter yes,$(USE_NFCT)),ON,OFF)) \
+  $(foreach v,SD_NAME SD_VERSION SD_HEX SIGNED_FW_QX SIGNED_FW_QY ANT_LICENSE_KEY TRACE_ETM,$(call optional,$(v)))
 
-RM = rm -rf
-CP = cp
+# make's DEBUG=1 build kept -Os; CMake's Debug type alone compiles with -O0
+CMAKE_ARGS += -DCMAKE_C_FLAGS_DEBUG=-Os -DCMAKE_ASM_FLAGS_DEBUG=-Os
 
 # Flasher utility options
-NRFUTIL = adafruit-nrfutil
 NRFJPROG = nrfjprog
 FLASHER ?= nrfjprog
 PYOCD ?= pyocd
@@ -104,487 +79,82 @@ ifeq ($(FLASHER),nrfjprog)
   FLASH_NOUICR_CMD = $(NRFJPROG) --program $1 -f nrf52 --sectorerase --reset
   FLASH_ERASE_CMD = $(NRFJPROG) -f nrf52 --eraseall
 else ifeq ($(FLASHER),pyocd)
-  FLASH_CMD = $(PYOCD) flash -t $(MCU_SUB_VARIANT) $1
-  FLASH_NOUICR_CMD = $(PYOCD) flash -t $(MCU_SUB_VARIANT) $1
-  FLASH_ERASE_CMD = $(PYOCD) erase -t $(MCU_SUB_VARIANT) --chip
+  FLASH_CMD = $(PYOCD) flash -t $(MCU_VARIANT) $1
+  FLASH_NOUICR_CMD = $(PYOCD) flash -t $(MCU_VARIANT) $1
+  FLASH_ERASE_CMD = $(PYOCD) erase -t $(MCU_VARIANT) --chip
 else
   $(error Unsupported flash utility: "$(FLASHER)")
 endif
 
 # auto-detect BMP on macOS, otherwise have to specify
+GDB = $(CROSS_COMPILE)gdb
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
 GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
 
-# Build directory
-BUILD = _build/build-$(BOARD)
-BIN = _bin/$(BOARD)
+# CMake resolves the artifact names and the SoftDevice hex and writes them to $(BUILD)/make_vars.mk while
+# configuring; the recipes that need them run in a sub-make that reads it.
+SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f "$(BUILD)/make_vars.mk"
 
-# MCU_SUB_VARIANT can be nrf52 (nrf52832), nrf52833, nrf52840
-ifeq ($(MCU_SUB_VARIANT),nrf52)
-  CFLAGS += -DNRF52 -DNRF52832_XXAA
-  SD_NAME = s132
-  DFU_DEV_REV = 0xADAF
-  DFU_APP_DATA_RESERVED=7*4096
-else ifeq ($(MCU_SUB_VARIANT),nrf52833)
-  CFLAGS += -DNRF52833_XXAA
-  DFU_DEV_REV = 52833
-  DFU_APP_DATA_RESERVED=7*4096
-  ifndef SD_NAME
-		SD_NAME = s140
-	endif
-else ifeq ($(MCU_SUB_VARIANT),nrf52840)
-  CFLAGS += -DNRF52840_XXAA
-  DFU_DEV_REV = 52840
-  # App reserved 40KB (8+32) to match circuitpython for 840
-  DFU_APP_DATA_RESERVED=10*4096
-  ifndef SD_NAME
-		SD_NAME = s140
-	endif
-else
-  $(error Sub Variant $(MCU_SUB_VARIANT) is unknown)
-endif
+.PHONY: all configure clean flash flash-dfu dfu-flash flash-sd sd flash-mbr mbr flash-uf2 erase copy-artifact \
+  linkermap gdbflash gdb
 
-SD_NAME_UPPER = $(subst s,S,${SD_NAME})
-CFLAGS += -D$(SD_NAME_UPPER)
+all: configure
+	cmake --build "$(BUILD)"
 
-#----------------------------------
-# ANT_LICENSE_KEY handling
-#----------------------------------
-ifdef ANT_LICENSE_KEY
-  CFLAGS += -DANT_LICENSE_KEY=\"$(ANT_LICENSE_KEY)\"
-endif
-
-#------------------------------------------------------------------------------
-# SOURCE FILES
-#------------------------------------------------------------------------------
-
-# all files in src
-C_SRC += \
-  src/dfu_ble_svc.c \
-  src/dfu_init.c \
-  src/flash_nrf5x.c \
-  src/main.c \
-  src/screen.c \
-  src/images.c \
-
-# if using a signed firmware
-ifeq ($(SIGNED_FW), 1)
-C_SRC += \
-  $(TCRYPT_PATH)/source/sha256.c \
-  $(TCRYPT_PATH)/source/ecc.c \
-  $(TCRYPT_PATH)/source/ecc_dsa.c \
-  $(TCRYPT_PATH)/source/utils.c
-endif
-
-# all files in boards
-C_SRC += src/boards/boards.c
-
-# nrfx
-C_SRC += $(NRFX_PATH)/drivers/src/nrfx_power.c
-C_SRC += $(NRFX_PATH)/drivers/src/nrfx_nvmc.c
-C_SRC += $(NRFX_PATH)/mdk/system_$(MCU_SUB_VARIANT).c
-
-# SDK 11 files: serial + OTA DFU
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader.c
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_settings.c
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/bootloader_util.c
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_serial.c
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_transport_ble.c
-ifeq ($(DUALBANK_FW), 1)
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_dual_bank.c
-else
-C_SRC += $(SDK11_PATH)/libraries/bootloader_dfu/dfu_single_bank.c
-endif
-C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dfu/ble_dfu.c
-C_SRC += $(SDK11_PATH)/ble/ble_services/ble_dis/ble_dis.c
-C_SRC += $(SDK11_PATH)/drivers_nrf/pstorage/pstorage_raw.c
-
-# Latest SDK files: peripheral drivers
-C_SRC += $(SDK_PATH)/libraries/timer/app_timer.c
-C_SRC += $(SDK_PATH)/libraries/scheduler/app_scheduler.c
-C_SRC += $(SDK_PATH)/libraries/util/app_error.c
-C_SRC += $(SDK_PATH)/libraries/util/app_util_platform.c
-C_SRC += $(SDK_PATH)/libraries/crc16/crc16.c
-C_SRC += $(SDK_PATH)/libraries/hci/hci_mem_pool.c
-C_SRC += $(SDK_PATH)/libraries/hci/hci_slip.c
-C_SRC += $(SDK_PATH)/libraries/hci/hci_transport.c
-C_SRC += $(SDK_PATH)/libraries/util/nrf_assert.c
-
-# UART or USB Serial
-ifeq ($(MCU_SUB_VARIANT),nrf52)
-
-C_SRC += $(SDK_PATH)/libraries/uart/app_uart.c
-C_SRC += $(SDK_PATH)/drivers_nrf/uart/nrf_drv_uart.c
-C_SRC += $(SDK_PATH)/drivers_nrf/common/nrf_drv_common.c
-
-IPATH += $(SDK11_PATH)/libraries/util
-IPATH += $(SDK_PATH)/drivers_nrf/common
-IPATH += $(SDK_PATH)/drivers_nrf/uart
-
-else
-
-# pinconfig is required for 840 for CF2
-C_SRC += src/boards/$(BOARD)/pinconfig.c
-
-# USB Application ( MSC + UF2 )
-C_SRC += \
-	src/usb/usb_desc.c \
-	src/usb/msc_uf2.c \
-	src/usb/uf2/ghostfat.c \
-	src/usb/usb.c
-
-# TinyUSB stack
-C_SRC += \
-	$(TUSB_PATH)/portable/nordic/nrf5x/dcd_nrf5x.c \
-	$(TUSB_PATH)/common/tusb_fifo.c \
-	$(TUSB_PATH)/device/usbd.c \
-	$(TUSB_PATH)/device/usbd_control.c \
-	$(TUSB_PATH)/class/cdc/cdc_device.c \
-	$(TUSB_PATH)/class/msc/msc_device.c \
-	$(TUSB_PATH)/tusb.c
-endif
-
-
-#------------------------------------------------------------------------------
-# Assembly Files
-#------------------------------------------------------------------------------
-ASM_SRC = $(NRFX_PATH)/mdk/gcc_startup_$(MCU_SUB_VARIANT).S
-
-#------------------------------------------------------------------------------
-# INCLUDE PATH
-#------------------------------------------------------------------------------
-
-# src
-IPATH += \
-  src \
-  src/boards \
-  src/boards/$(BOARD) \
-  src/cmsis/include \
-  src/usb \
-  $(TUSB_PATH)
-
-ifeq ($(SIGNED_FW), 1)
-IPATH += \
-  $(TCRYPT_PATH)/include
-endif
-
-# nrfx
-IPATH += \
-  $(NRFX_PATH) \
-  $(NRFX_PATH)/mdk \
-  $(NRFX_PATH)/hal \
-  $(NRFX_PATH)/drivers/include \
-  $(NRFX_PATH)/drivers/src
-
-# sdk11 for cdc/ble dfu
-IPATH += \
-  $(SDK11_PATH)/libraries/bootloader_dfu/hci_transport \
-  $(SDK11_PATH)/libraries/bootloader_dfu \
-  $(SDK11_PATH)/drivers_nrf/pstorage \
-  $(SDK11_PATH)/ble/common \
-  $(SDK11_PATH)/ble/ble_services/ble_dfu \
-  $(SDK11_PATH)/ble/ble_services/ble_dis
-
-# later sdk with updated drivers
-IPATH += \
-  $(SDK_PATH)/libraries/timer \
-  $(SDK_PATH)/libraries/scheduler \
-  $(SDK_PATH)/libraries/crc16 \
-  $(SDK_PATH)/libraries/util \
-  $(SDK_PATH)/libraries/hci/config \
-  $(SDK_PATH)/libraries/uart \
-  $(SDK_PATH)/libraries/hci \
-  $(SDK_PATH)/drivers_nrf/delay
-
-# SoftDevice
-IPATH += \
-  $(SD_PATH)/$(SD_FILENAME)_API/include \
-  $(SD_PATH)/$(SD_FILENAME)_API/include/nrf52
-
-#------------------------------------------------------------------------------
-# Compiler Flags
-#------------------------------------------------------------------------------
-
-#flags common to all targets
-CFLAGS += \
-	-mthumb \
-	-mabi=aapcs \
-	-mcpu=cortex-m4 \
-	-mfloat-abi=hard \
-	-mfpu=fpv4-sp-d16 \
-	-ggdb \
-	-Os \
-	-ffunction-sections \
-	-fdata-sections \
-	-fno-builtin \
-	-fshort-enums \
-	-fstack-usage \
-	-fno-strict-aliasing \
-	-Wall \
-	-Wextra \
-	-Werror \
-	-Wfatal-errors \
-	-Werror-implicit-function-declaration \
-	-Wfloat-equal \
-	-Wundef \
-	-Wshadow \
-	-Wwrite-strings \
-	-Wsign-compare \
-	-Wmissing-format-attribute \
-	-Wno-endif-labels \
-	-Wunreachable-code
-
-# Suppress warning caused by SDK
-CFLAGS += -Wno-unused-parameter -Wno-expansion-to-defined
-
-# Nordic Softdevice SDK header files contains inline assembler that has
-# broken constraints. As a result the IPA-modref pass, introduced in gcc-11,
-# is able to "prove" that arguments to wrapper functions generated with
-# the SVCALL() macro are unused and, as a result, the optimizer will remove
-# code within the callers that sets up these arguments (which results in
-# a broken bootloader). The broken headers come from Nordic-supplied zip
-# files and are not trivial to patch so, for now, we'll simply disable the
-# new gcc-11 inter-procedural optimizations.
-ifeq (,$(findstring unrecognized,$(shell $(CC) $(CFLAGS) -fno-ipa-modref 2>&1)))
-CFLAGS += -fno-ipa-modref
-endif
-
-# Defined Symbol (MACROS)
-CFLAGS += -D__HEAP_SIZE=0
-CFLAGS += -DCONFIG_GPIO_AS_PINRESET
-
-# Skip defining CONFIG_NFCT_PINS_AS_GPIOS if the device uses the NFCT.
-ifneq ($(USE_NFCT),yes)
-  CFLAGS += -DCONFIG_NFCT_PINS_AS_GPIOS
-endif
-
-CFLAGS += -DSOFTDEVICE_PRESENT
-CFLAGS += -DUF2_VERSION='"$(GIT_VERSION)"'
-CFLAGS += -DBLEDIS_FW_VERSION='"$(GIT_VERSION) $(SD_NAME) $(SD_VERSION)"'
-
-ifeq ($(SIGNED_FW), 1)
-CFLAGS += -DSIGNED_FW
-CFLAGS += -DSIGNED_FW_QX='$(SIGNED_FW_QX)'
-CFLAGS += -DSIGNED_FW_QY='$(SIGNED_FW_QY)'
-endif
-
-ifeq ($(FORCE_UF2), 1)
-CFLAGS += -DFORCE_UF2
-endif
-
-ifeq ($(DEFAULT_TO_OTA_DFU), 1)
-CFLAGS += -DDEFAULT_TO_OTA_DFU
-endif
-
-# Extract semantic version numbers (MAJOR.MINOR.PATCH) from GIT_VERSION.
-# Supports tags like:
-#   v1.2.3
-#   1.2.3
-#   1.2.3-147-gd71abcd
-# If the version string does not match MAJOR.MINOR.PATCH, defaults to 0.0.0.
-_VER3 := $(shell echo "$(GIT_VERSION)" | sed -E 's/^v?([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 \2 \3/; t; s/.*/0 0 0/')
-
-# Split extracted version into individual numeric components
-_VER_MAJ := $(word 1,$(_VER3))
-_VER_MIN := $(word 2,$(_VER3))
-_VER_PAT := $(word 3,$(_VER3))
-
-# Pack MAJOR.MINOR.PATCH into a single 32-bit integer:
-#   [31:16] MAJOR
-#   [15:8]  MINOR
-#   [7:0]   PATCH
-# This value is stored in the bootloader version register and must be a valid C integer constant.
-CFLAGS += -DMK_BOOTLOADER_VERSION='((($(_VER_MAJ)<<16)|($(_VER_MIN)<<8)|($(_VER_PAT))))'
-
-# Debug option use RTT for printf
-ifeq ($(DEBUG), 1)
-  CFLAGS += -DCFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
-  RTT_SRC = lib/SEGGER_RTT
-  IPATH += $(RTT_SRC)/RTT
-  C_SRC += $(RTT_SRC)/RTT/SEGGER_RTT.c
-  DFU_APP_DATA_RESERVED = 0
-
-	# expand bootloader address to 28KB/40KB of reserved app
-  ifeq ($(MCU_SUB_VARIANT),nrf52840)
-    CFLAGS += -DBOOTLOADER_REGION_START=0xEA000
-  else
-    CFLAGS += -DBOOTLOADER_REGION_START=0x6D000
-  endif
-endif
-
-CFLAGS += -DDFU_APP_DATA_RESERVED=$(DFU_APP_DATA_RESERVED)
-
-#------------------------------------------------------------------------------
-# Linker Flags
-#------------------------------------------------------------------------------
-
-LDFLAGS += \
-	$(CFLAGS) \
-	-Wl,-L,linker -Wl,-T,$(LD_FILE) \
-	-Wl,--print-memory-usage \
-	-Wl,-Map=$@.map -Wl,-cref -Wl,-gc-sections \
-	-specs=nosys.specs -specs=nano.specs
-
-LIBS += -lm -lc
-
-#------------------------------------------------------------------------------
-# Assembler flags
-#------------------------------------------------------------------------------
-
-ASFLAGS += $(CFLAGS)
-
-#function for removing duplicates in a list
-remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-out $(firstword $1),$1))))
-
-C_SOURCE_FILE_NAMES = $(notdir $(C_SRC))
-C_PATHS = $(call remduplicates, $(dir $(C_SRC) ) )
-C_OBJECTS = $(addprefix $(BUILD)/, $(C_SOURCE_FILE_NAMES:.c=.o) )
-
-ASM_SOURCE_FILE_NAMES = $(notdir $(ASM_SRC))
-ASM_PATHS = $(call remduplicates, $(dir $(ASM_SRC) ))
-ASM_OBJECTS = $(addprefix $(BUILD)/, $(ASM_SOURCE_FILE_NAMES:.S=.o) )
-
-vpath %.c $(C_PATHS)
-vpath %.S $(ASM_PATHS)
-
-OBJECTS = $(C_OBJECTS) $(ASM_OBJECTS)
-
-INC_PATHS = $(addprefix -I,$(IPATH))
-
-#------------------------------------------------------------------------------
-# BUILD TARGETS
-#------------------------------------------------------------------------------
-
-.PHONY: all clean flash flash-dfu flash-sd flash-mbr dfu-flash sd mbr gdbflash gdb
-
-# default target to build
-all: $(BUILD)/$(OUT_NAME).out $(BUILD)/$(OUT_NAME)_nosd.hex $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BUILD)/$(MERGED_FILE).hex $(BUILD)/$(MERGED_FILE).zip
-
-# Print out the value of a make variable.
-# https://stackoverflow.com/questions/16467718/how-to-print-out-a-variable-in-makefile
-print-%:
-	@echo $* = $($*)
-
-#------------------- Compile rules -------------------
-
-# Create build directories
-$(BUILD):
-	@$(MKDIR) "$@"
+configure:
+	@cmake -E rm -f "$(BUILD)/CMakeCache.txt"
+	cmake -S . -B "$(BUILD)" $(CMAKE_ARGS)
 
 clean:
-	@$(RM) $(BUILD)
-	@$(RM) $(BIN)
+	@cmake -E rm -rf "$(BUILD)" "$(BIN)"
 
-# linkermap must be install previously at https://github.com/hathach/linkermap
-linkermap: $(BUILD)/$(OUT_NAME).out
-	@linkermap -v $<.map
+flash flash-dfu gdbflash gdb linkermap: all
+	@$(SUBMAKE) _$@
 
-# Create objects from C SRC files
-$(BUILD)/%.o: %.c
-	@echo CC $(notdir $<)
-	@$(CC) $(CFLAGS) $(INC_PATHS) -c -o $@ $<
+flash-sd flash-mbr erase copy-artifact: configure
+	@$(SUBMAKE) _$@
 
-# Assemble files
-$(BUILD)/%.o: %.S
-	@echo AS $(notdir $<)
-	@$(CC) -x assembler-with-cpp $(ASFLAGS) $(INC_PATHS) -c -o $@ $<
-
-# Link
-$(BUILD)/$(OUT_NAME).out: $(BUILD) $(OBJECTS)
-	@echo LD $(notdir $@)
-	@$(CC) -o $@ $(LDFLAGS) $(OBJECTS) -Wl,--start-group $(LIBS) -Wl,--end-group
-	@$(SIZE) $@
-
-#------------------- Binary generator -------------------
-
-# Create hex file (no sd, no mbr)
-$(BUILD)/$(OUT_NAME).hex: $(BUILD)/$(OUT_NAME).out
-	@echo Create $(notdir $@)
-	@$(OBJCOPY) -O ihex $< $@
-
-# Hex file with mbr (still no SD)
-$(BUILD)/$(OUT_NAME)_nosd.hex: $(BUILD)/$(OUT_NAME).hex
-	@echo Create $(notdir $@)
-	@$(PYTHON) tools/hexmerge.py --overlap=replace -o $@ $< $(MBR_HEX)
-
-# Bootolader self-update uf2
-$(BUILD)/update-$(OUT_NAME)_nosd.uf2: $(BUILD)/$(OUT_NAME)_nosd.hex
-	@echo Create $(notdir $@)
-	$(PYTHON) lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) -c -o $@ $^
-
-# merge bootloader and sd hex together
-$(BUILD)/$(MERGED_FILE).hex: $(BUILD)/$(OUT_NAME).hex
-	@echo Create $(notdir $@)
-	@$(PYTHON) tools/hexmerge.py -o $@ $< $(SD_HEX)
-
-# Create pkg zip file for bootloader+SD combo to use with DFU CDC
-$(BUILD)/$(MERGED_FILE).zip: $(BUILD)/$(OUT_NAME).hex
-	@$(NRFUTIL) dfu genpkg --dev-type 0x0052 --dev-revision $(DFU_DEV_REV) --bootloader $< --softdevice $(SD_HEX) $@
-
-#-------------- Artifacts --------------
-$(BIN):
-	@$(MKDIR) -p $@
-
-copy-artifact: $(BIN)
-	@$(CP) $(BUILD)/update-$(OUT_NAME)_nosd.uf2 $(BIN)
-	@$(CP) $(BUILD)/$(MERGED_FILE).hex $(BIN)
-	@$(CP) $(BUILD)/$(MERGED_FILE).zip $(BIN)
-
-#--------------------------------------
-# Flash Target
-#--------------------------------------
-
-check_defined = \
-    $(strip $(foreach 1,$1, \
-    $(call __check_defined,$1,$(strip $(value 2)))))
-__check_defined = \
-    $(if $(value $1),, \
-    $(error Undefined make flag: $1$(if $2, ($2))))
-
-# erase chip
-erase:
-	@echo Erasing flash
-	$(call FLASH_ERASE_CMD)
-
-# Flash the compiled
-flash: $(BUILD)/$(OUT_NAME)_nosd.hex
-	@echo Flashing: $(notdir $<)
-	$(call FLASH_CMD,$<)
-
-# flash SD only
 sd: flash-sd
-flash-sd:
-	@echo Flashing: $(SD_HEX)
-	$(call FLASH_NOUICR_CMD,$(SD_HEX))
-
-# flash MBR only
 mbr: flash-mbr
-flash-mbr:
-	@echo Flashing: $(MBR_HEX)
-	$(call FLASH_NOUICR_CMD,$(MBR_HEX))
+dfu-flash: flash-dfu
 
-# flash using uf2
-flash-uf2: $(BUILD)/update-$(OUT_NAME)_nosd.uf2
-	@echo Flashing: $(notdir $<)
-	python lib/uf2/utils/uf2conv.py -f $(UF2_FAMILY_ID_BOOTLOADER) --deploy $<
+# deploys bootloader_mbr.uf2, the same bytes as update-*_nosd.uf2
+flash-uf2: configure
+	cmake --build "$(BUILD)" --target flash-uf2
+
+#------------------- recipes run by the sub-make -------------------
+
+_flash:
+	@echo Flashing: $(notdir $(lastword $(NOSD_HEX)))
+	$(call FLASH_CMD,"$(NOSD_HEX)")
+
+_flash-sd:
+	@echo Flashing: $(SD_HEX)
+	$(call FLASH_NOUICR_CMD,"$(SD_HEX)")
+
+_flash-mbr:
+	@echo Flashing: $(MBR_HEX)
+	$(call FLASH_NOUICR_CMD,"$(MBR_HEX)")
+
+_erase:
+	@echo Erasing flash
+	$(FLASH_ERASE_CMD)
 
 # dfu with adafruit-nrfutil using CDC interface
-dfu-flash: flash-dfu
-flash-dfu: $(BUILD)/$(MERGED_FILE).zip
-	@:$(call check_defined, SERIAL, example: SERIAL=/dev/ttyACM0)
-	$(NRFUTIL) --verbose dfu serial --package $< -p $(SERIAL) -b 115200 --singlebank --touch 1200
+_flash-dfu:
+	$(NRFUTIL) --verbose dfu serial --package "$(MERGED_ZIP)" -p $(SERIAL) -b 115200 --singlebank --touch 1200
 
-# flash skip crc magic ( app valid = 0x0001, crc = 0x0000 )
-#flash-skip-crc:
-# nrfjprog --memwr $(BOOT_SETTING_ADDR) --val 0x00000001 -f nrf52
-#	nrfjprog --memwr 0xFF000 --val 0x00000001 -f nrf52
-#	nrfjprog --memwr 0x7F000 --val 0x00000001 -f nrf52
+_copy-artifact:
+	@cmake -E make_directory "$(BIN)"
+	@cmake -E copy "$(UPDATE_UF2)" "$(MERGED_HEX)" "$(MERGED_ZIP)" "$(BIN)"
 
-#------------------- Debugging -------------------
+# linkermap must be install previously at https://github.com/hathach/linkermap
+_linkermap:
+	@linkermap -v "$(BL_ELF).map"
 
-gdbflash: $(BUILD)/$(MERGED_FILE).hex
-	@echo Flashing: $<
-	@$(GDB_BMP) -nx --batch -ex 'load $<' -ex 'compare-sections' -ex 'kill'
+_gdbflash:
+	@echo Flashing: $(MERGED_HEX)
+	@$(GDB_BMP) -nx --batch -ex 'load $(MERGED_HEX)' -ex 'compare-sections' -ex 'kill'
 
-gdb: $(BUILD)/$(OUT_NAME).out
-	$(GDB_BMP) $<
+_gdb:
+	$(GDB_BMP) "$(BL_ELF)"
