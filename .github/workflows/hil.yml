@@ -198,25 +198,20 @@ jobs:
           name: hil-build
           path: cmake-build
 
-      # every profile of each board (hil_run_report.PROFILE_STEPS); fail_at goes to the profiles that have that step
+      # every profile of each board (hil_run_report.py profiles); fail_at goes to the profiles that have that step, and
+      # a step of no profile, or a plan that cannot be made, fails the job before any battery
       - name: Battery on the rig
         run: |
-          profiles() {
-            python3 -c 'import sys; sys.path.insert(0, ".claude/skills/hil-contract/scripts"); import hil_run_report as r
-          print("\n".join(p + " " + " ".join(s) for p, s in r.PROFILE_STEPS.items()))'
-          }
-          if [ -n "$FAIL_AT" ] && ! profiles | cut -d' ' -f2- | tr ' ' '\n' | grep -qxF -- "$FAIL_AT"; then
-            echo "::error::fail_at $FAIL_AT is no step of any profile's battery"; exit 1
-          fi
+          plan=$(python3 .claude/skills/hil-contract/scripts/hil_run_report.py profiles ${FAIL_AT:+--fail-at "$FAIL_AT"}) ||
+            { echo "::error::no battery plan (fail_at '$FAIL_AT')"; exit 1; }
+          [ -n "$plan" ] || { echo "::error::empty battery plan"; exit 1; }
           rc=0
           for b in $BOARDS; do
-            while read -r p steps; do
-              fail=()
-              case " $steps " in *" $FAIL_AT "*) [ -n "$FAIL_AT" ] && fail=(--fail-at "$FAIL_AT") ;; esac
+            while read -r p fail; do
               python3 .claude/skills/hil-contract/scripts/hil_test.py run -b "$b" --build-record "cmake-build/$b.hil.json" \
                 --base-dir cmake-build/hil-base --profile "$p" --lock-wait 1800 --run-root "$HIL_OUT/$b/$p" \
-                "${fail[@]}" test/hil/ci.json < /dev/null || rc=1
-            done < <(profiles)
+                ${fail:+--fail-at "$fail"} test/hil/ci.json < /dev/null || rc=1
+            done <<< "$plan"
           done
           exit $rc
 

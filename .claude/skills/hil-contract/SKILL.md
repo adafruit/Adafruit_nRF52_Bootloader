@@ -163,7 +163,7 @@ commissioning as uncovered; `hil-build` builds each board's HIL record, every pr
 arm-gcc and the agentrc pin, downloads each board's `selfUpdateBase` release asset into `cmake-build/hil-base/`, and
 uploads them with the record's artifacts; `hil-run`, on the rig's `nrf52-bootloader` runner (agentrc
 `hil-farm-setup`), checks out the same commit, fetches `lib/nrfx` and the pin, and runs `run` per board and profile
-(`hil_run_report.PROFILE_STEPS`) with `--base-dir cmake-build/hil-base` and a 30-minute lock wait each into
+(`hil_run_report.py profiles`) with `--base-dir cmake-build/hil-base` and a 30-minute lock wait each into
 `$(dirname "$GITHUB_WORKSPACE")/hil-state/<run>-<attempt>/<board>/<profile>`, uploaded as `hil-run-<attempt>`; the rig
 builds nothing. `pr-comment` posts the sticky `hil-report` comment (`hil_comment.py`), one table per board and profile,
 only from the newest attempt of the newest run for the PR's head, judging each newest report by the report core's

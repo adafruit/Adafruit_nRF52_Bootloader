@@ -984,6 +984,49 @@ class Manual(unittest.TestCase):
     helper.release_token.assert_not_called()
 
 
+class Plan(unittest.TestCase):
+  """hil_run_report.py profiles and hil.yml's battery step, which runs each board's profiles from it."""
+  def test_fail_at_goes_to_the_profiles_that_have_the_step(self):
+    self.assertEqual(rr.plan(), [(p, None) for p in rr.PROFILE_STEPS])
+    self.assertEqual(rr.plan('refused'), [('default', None), ('dualbank', 'refused'), ('signed', None)])
+    with self.assertRaises(ValueError):
+      rr.plan('bogus')
+    with contextlib.redirect_stdout(io.StringIO()) as out:
+      self.assertEqual(rr.main(['profiles', '--fail-at', 'app-ran']), 0)
+    self.assertEqual(out.getvalue().splitlines(), [f'{p} app-ran' for p in rr.PROFILE_STEPS])
+    with contextlib.redirect_stderr(io.StringIO()):
+      self.assertEqual(rr.main(['profiles', '--fail-at', 'bogus']), 2)
+
+  def battery_step(self, fail_at='', producer=None):
+    """hil.yml's 'Battery on the rig' script under bash -e with python3 stubbed: hil_run_report.py runs for real
+    unless `producer` replaces its output and exit, hil_test.py only records its argv. (exit, recorded argvs)."""
+    import re
+    import subprocess
+    text = (ROOT / '.github/workflows/hil.yml').read_text()
+    body = re.search(r'- name: Battery on the rig\n\s+run: \|\n((?:          .*\n|\n)+)', text)[1]
+    script = '\n'.join(line[10:] for line in body.splitlines())
+    with tempfile.TemporaryDirectory() as d:
+      stub = Path(d, 'python3')
+      fake = f'printf %s {json.dumps(producer[0])}; exit {producer[1]}' if producer else f'exec {sys.executable} "$@"'
+      stub.write_text(f'#!/bin/sh\ncase "$1" in\n  *hil_test.py) echo "$*" >> {d}/runs ;;\n  *) {fake} ;;\nesac\n')
+      stub.chmod(0o755)
+      env = {'PATH': f'{d}:/usr/bin:/bin', 'BOARDS': 'pca10056', 'FAIL_AT': fail_at, 'HIL_OUT': '/o'}
+      p = subprocess.run(['bash', '-e', '-c', script], cwd=ROOT, env=env, capture_output=True, text=True)
+      runs = Path(d, 'runs').read_text().splitlines() if Path(d, 'runs').exists() else []
+    return p.returncode, runs
+
+  def test_the_workflow_runs_every_profile_with_fail_at_where_it_applies(self):
+    code, runs = self.battery_step('refused')
+    self.assertEqual(code, 0)
+    self.assertEqual([r.split('--profile ')[1].split()[0] for r in runs], list(rr.PROFILE_STEPS))
+    self.assertEqual(['--fail-at refused' in r for r in runs], [False, True, False])
+
+  def test_the_workflow_fails_without_a_plan(self):
+    self.assertEqual(self.battery_step('bogus'), (1, []))
+    self.assertEqual(self.battery_step(producer=('default\n', 1)), (1, []))   # a producer that fails
+    self.assertEqual(self.battery_step(producer=('', 0)), (1, []))
+
+
 class Verdict(unittest.TestCase):
   def row(self, **kw):
     return {'results': [{'board': 'pca10056', 'ran': True, 'pass': False, 'steps': [], 'cleanup': {'pass': True}, **kw}]}

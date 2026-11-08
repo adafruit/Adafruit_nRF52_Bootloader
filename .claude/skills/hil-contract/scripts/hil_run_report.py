@@ -2,13 +2,19 @@
 """The bootloader's run report as agentrc's report core (`hil` Reporting) reads and writes it: the body schema, its Markdown
 view of the steps, the native `hil` verdict of a board's row (SKILL.md Results, Verdicts) and its rows normalised for
 the core's shared run rules. The core module is passed in, loaded through the agentrc bootstrap
-(agentrc.py); verdict() needs no core. Stdlib only."""
+(agentrc.py); verdict() needs no core. Stdlib only.
+
+  hil_run_report.py profiles [--fail-at STEP]
+
+prints one line per profile, in order: its name, then STEP when its battery has that step (hil.yml's plan); exit 2
+when no profile's battery has STEP."""
+import argparse
+import sys
 
 NAME, VERSION, STEM = 'nrf52-bootloader-hil-run', 1, 'hil_report'
-STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'double-reset', 'serial', 'app-ran-c',
-         'update-base', 'update', 'interrupted', 'softdevice')   # hil_test.py's default battery, in order
-PROFILE_STEPS = {   # each profile's battery (check_build.hil_profiles), in order
-  'default': STEPS,
+PROFILE_STEPS = {   # each profile's battery (check_build.hil_profiles, hil_test.py), in order
+  'default': ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'double-reset', 'serial',
+              'app-ran-c', 'update-base', 'update', 'interrupted', 'softdevice'),
   'dualbank': ('install', 'dfu', 'serial', 'app-ran', 'serial-b', 'app-ran-b', 'refused', 'interrupted'),
   'signed': ('install', 'dfu', 'serial', 'app-ran', 'unsigned', 'wrong-key', 'tampered', 'serial-b', 'app-ran-b'),
 }
@@ -131,3 +137,29 @@ def shared_run(core, code, reading, requested):
   termination = reading.meta['termination']
   return core.apply_run_rules(schema(core), requested, run_rows(code, reading.body, requested), termination,
                               reading.body.get('caveat', ''))
+
+
+def plan(fail_at=None):
+  """hil.yml's runs: (profile, the --fail-at step or None) per profile; ValueError when no battery has `fail_at`."""
+  if fail_at and not any(fail_at in steps for steps in PROFILE_STEPS.values()):
+    raise ValueError(f'{fail_at} is no step of any profile\'s battery')
+  return [(p, fail_at if fail_at in steps else None) for p, steps in PROFILE_STEPS.items()]
+
+
+def main(argv=None):
+  ap = argparse.ArgumentParser(description='hil.yml\'s plan: one line per profile')
+  sub = ap.add_subparsers(dest='cmd', required=True)
+  sub.add_parser('profiles').add_argument('--fail-at')
+  args = ap.parse_args(argv)
+  try:
+    runs = plan(args.fail_at)
+  except ValueError as e:
+    print(e, file=sys.stderr)
+    return 2
+  for profile, step in runs:
+    print(profile if step is None else f'{profile} {step}')
+  return 0
+
+
+if __name__ == '__main__':
+  sys.exit(main())
