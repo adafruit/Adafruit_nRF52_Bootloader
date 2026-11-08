@@ -671,16 +671,13 @@ def words_at(out, addr, n):
 # ------------------------------------------------------------------ USB drive
 
 def usb_device(vid, pid, serial):
-  hits = []
-  for d in Path('/sys/bus/usb/devices').iterdir():
-    try:
-      if (int((d / 'idVendor').read_text(), 16), int((d / 'idProduct').read_text(), 16)) == (vid, pid) and \
-         (d / 'serial').read_text().strip() == serial:
-        hits.append(d.name)
-    except (OSError, ValueError):
-      continue
+  """The one enumerated USB device vid:pid whose serial is exactly `serial`, as agentrc usb_observe.usb_scan gives it
+  ({busport, ino, ...}; ino, the kernfs enumeration_id, changes on every re-enumeration), None when there is none.
+  A device whose serial cannot be read is not returned (usb_absent counts it as maybe present)."""
+  hits = [d for d in usb().usb_scan(vid_pid=(f'{vid:04x}', f'{pid:04x}'), serial=serial) if d['serial'] == serial]
   if len(hits) > 1:
-    raise StepFail(f'{len(hits)} USB devices {vid:04x}:{pid:04x} with serial {serial}: {hits}')
+    raise StepFail(f'{len(hits)} USB devices {vid:04x}:{pid:04x} with serial {serial}: '
+                   f'{[d["busport"] for d in hits]}')
   return hits[0] if hits else None
 
 
@@ -689,14 +686,6 @@ def cdc_tty(usb_path):
   if len(ttys) > 1:
     raise StepFail(f'{usb_path} has {len(ttys)} ttys: {ttys}')
   return f'/dev/{ttys[0]}' if ttys else None
-
-
-def usb_devnum(usb_path):
-  """The kernel's device number of a USB device, None when it is gone; a new enumeration gets another."""
-  try:
-    return (Path('/sys/bus/usb/devices') / usb_path / 'devnum').read_text().strip()
-  except OSError:
-    return None
 
 
 def block_device(usb_path):
@@ -746,7 +735,7 @@ class Drive:
 
   def present(self):
     usb = usb_device(self.f['vid'], self.f['pid'], self.b['uid'])
-    return block_device(usb) if usb else None
+    return block_device(usb['busport']) if usb else None
 
   def absent(self):
     """No bootloader device with the board's serial enumerated: one whose serial cannot be read may be it."""
@@ -900,10 +889,11 @@ class Battery:
 
     def cdc():
       usb = usb_device(self.f['vid'], pid, self.b['uid'])
-      if usb and (usb, usb_devnum(usb)) in stale:
+      seen['drive'] = None
+      if not usb or (usb['busport'], usb['ino']) in stale:
         return None
-      seen['drive'] = usb and block_device(usb)
-      return usb if usb and not seen['drive'] and cdc_tty(usb) else None
+      seen['drive'] = block_device(usb['busport'])
+      return usb['busport'] if not seen['drive'] and cdc_tty(usb['busport']) else None
     try:
       usb = wait_for(cdc, USB_TIMEOUT, want)
     except StepFail:
@@ -917,9 +907,9 @@ class Battery:
     return tty
 
   def enumerations(self):
-    """The board's USB enumerations now, on its UF2 and CDC PIDs: (sysfs path, devnum), which a new one changes."""
+    """The board's USB enumerations now, on its UF2 and CDC PIDs: (busport, ino), which a new one changes."""
     found = (usb_device(self.f['vid'], pid, self.b['uid']) for pid in {self.f['pid'], self.f['cdcPid']})
-    return {(usb, usb_devnum(usb)) for usb in found if usb}
+    return {(usb['busport'], usb['ino']) for usb in found if usb}
 
   def enter_cdc(self):
     """GPREGRET 0x4E and a reset, then the tty of the new CDC-only enumeration."""
@@ -1028,7 +1018,7 @@ class Battery:
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
     out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200'], 'dfu serial')
     ev['nrfutil'] = out.strip().splitlines()[-2:]   # it reports success either way
-    stays_away(lambda: not usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), QUIET,
+    stays_away(self.cdc_absent, QUIET,
                'the bootloader reset as if it activated the refused package')
     ev['bank0'] = self.bank_check(fx['image'], fixture(self.f, running)['image'], ['r', 'g'])
     self.cdc_gone('the bootloader leaving on the reset')
@@ -1055,7 +1045,11 @@ class Battery:
     return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
   def cdc_gone(self, what):
-    wait_for(lambda: not usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), USB_TIMEOUT, what)
+    wait_for(self.cdc_absent, USB_TIMEOUT, what)
+
+  def cdc_absent(self):
+    """No CDC-only bootloader with the board's serial enumerated: one whose serial cannot be read may be it."""
+    return usb().usb_absent(vid_pid=(f'{self.f["vid"]:04x}', f'{self.f["cdcPid"]:04x}'), serial=self.b['uid'])
 
   def bank_check(self, bank1, bank0, then, whole=None):
     """Halted, bank 1 verifies `bank1`, bank 0 `bank0` and the settings mark bank 0 valid; with `whole`, the first 16

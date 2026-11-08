@@ -435,8 +435,8 @@ class BatteryRun(unittest.TestCase):
       calls.append([str(a) for a in argv])
       return 0, out if 'serial' in argv else ''
     with mock.patch.object(bat.probe, 'reenter', return_value={'gpregret': '0000004E'}) as reenter, \
-         mock.patch.object(ht, 'usb_device', return_value='1-1'), \
-         mock.patch.object(ht, 'usb_devnum', side_effect=lambda usb, n=iter(range(99)): str(min(next(n), 2))), \
+         mock.patch.object(ht, 'usb_device',
+                           side_effect=lambda *a, n=iter(range(99)): {'busport': '1-1', 'ino': min(next(n), 2)}), \
          mock.patch.object(ht, 'cdc_tty', return_value='/dev/ttyACM9'), \
          mock.patch.object(ht.os, 'access', return_value=True), \
          mock.patch.object(ht, 'block_device', return_value=drive), \
@@ -458,7 +458,7 @@ class BatteryRun(unittest.TestCase):
   def test_cdc_only_waits_for_the_previous_drive_to_drop(self):
     bat = self.battery()
     bat.f = {**FACTS, 'vid': 0x239A, 'cdcPid': 0xDA}
-    with mock.patch.object(ht, 'usb_device', return_value='1-1'), \
+    with mock.patch.object(ht, 'usb_device', return_value={'busport': '1-1', 'ino': 1}), \
          mock.patch.object(ht, 'cdc_tty', return_value='/dev/ttyACM9'), \
          mock.patch.object(ht.os, 'access', return_value=True), \
          mock.patch.object(ht.time, 'sleep'), \
@@ -553,6 +553,7 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(bat.drive, 'wait', side_effect=lambda: calls.append(('drive',)) or '/dev/sdz'), \
          mock.patch.object(bat.probe, 'session', side_effect=lambda c: calls.append(('probe', c)) or ''), \
          mock.patch.object(ht.Path, 'stat', return_value=mock.Mock(st_size=4)), \
+         mock.patch.object(bat, 'enumerations', return_value=set()), \
          mock.patch.object(bat.drive, 'info', return_value=[]), \
          mock.patch.object(bat.drive, 'copy', side_effect=lambda *a: calls.append(('copy',)) or {}), \
          mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}):
@@ -592,11 +593,28 @@ class BatteryRun(unittest.TestCase):
     bat.f = {**FACTS, 'vid': 0x239A, 'pid': 0xDA, 'cdcPid': 0xDA, 'bank1': 0x88000}
     return bat
 
+  def test_usb_device_takes_the_exact_serial_and_refuses_two(self):
+    scan = [{'busport': '1-1', 'ino': 5, 'serial': 'ABC'}, {'busport': '1-2', 'ino': 6, 'serial': 'abc'}]
+    with mock.patch.object(ht.usb(), 'usb_scan', return_value=scan) as us:
+      self.assertEqual(ht.usb_device(0x239A, 0xDA, 'ABC')['busport'], '1-1')   # usb_scan matches case aside
+      self.assertEqual(us.call_args.kwargs, {'vid_pid': ('239a', '00da'), 'serial': 'ABC'})
+    with mock.patch.object(ht.usb(), 'usb_scan', return_value=scan[:1] * 2), \
+         self.assertRaisesRegex(ht.StepFail, '2 USB devices'):
+      ht.usb_device(0x239A, 0xDA, 'ABC')
+
+  def test_an_unreadable_serial_is_neither_the_board_nor_proof_it_left(self):
+    bat = self.dual()
+    with mock.patch.object(ht.usb(), 'usb_devices', return_value=[{'dir': '/x/1-1', 'ino': 5}]), \
+         mock.patch.object(ht.usb(), 'read_sysfs', return_value=None):
+      self.assertIsNone(ht.usb_device(0x239A, 0xDA, 'u'))
+      self.assertFalse(bat.cdc_absent())
+      with mock.patch.object(ht, 'USB_TIMEOUT', 0.3), self.assertRaisesRegex(ht.StepFail, 'not seen'):
+        bat.cdc_gone('the bootloader leaving')
+
   def test_enter_cdc_skips_the_enumeration_from_before_the_reset(self):
     bat = self.dual()
-    devnums = iter(['7', '7', '7', '9', '9'])   # before the reset, twice still the old one, then the new one
-    with mock.patch.object(ht, 'usb_device', return_value='1-1'), \
-         mock.patch.object(ht, 'usb_devnum', side_effect=lambda usb: next(devnums)), \
+    inos = iter([7, 7, 7, 9])   # before the reset (one PID on pca10056), twice still the old one, then the new one
+    with mock.patch.object(ht, 'usb_device', side_effect=lambda *a: {'busport': '1-1', 'ino': next(inos)}), \
          mock.patch.object(ht, 'cdc_tty', side_effect=['/dev/ttyACM9', '/dev/ttyACM9']) as tty, \
          mock.patch.object(ht, 'block_device', return_value=None), \
          mock.patch.object(ht.os, 'access', return_value=True), \
@@ -630,7 +648,7 @@ class BatteryRun(unittest.TestCase):
     fx = ht.fixture(bat.f, b'a' * 16)
     serial = mock.Mock(side_effect=lambda n, singlebank: calls.append(('serial', singlebank)) or {})
     with mock.patch.object(bat, 'serial', serial), \
-         mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
          mock.patch.object(bat.probe, 'session', side_effect=session):
       ev = bat.banked(b'a' * 16)
     self.assertEqual(calls, [('serial', False)])
@@ -640,7 +658,7 @@ class BatteryRun(unittest.TestCase):
     self.assertEqual(Path(cmds[2].split()[1]).read_bytes(), fx['image'])
     self.assertEqual(ev['bank0']['state'], 1)
     sessions, session = self.bank_session(settings=0xFF)
-    with mock.patch.object(bat, 'serial', return_value={}), mock.patch.object(ht, 'usb_device', return_value=None), \
+    with mock.patch.object(bat, 'serial', return_value={}), mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
          mock.patch.object(bat.probe, 'session', side_effect=session), self.assertRaisesRegex(ht.StepFail, 'valid'):
       bat.banked(b'a' * 16)
 
@@ -653,7 +671,7 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(bat, 'package', side_effect=lambda img, name, edit=None: calls.append(edit) or '/p.zip'), \
          mock.patch.object(bat, 'nrfutil', side_effect=lambda argv, what: calls.append(argv) or 'Device programmed.'), \
          mock.patch.object(ht, 'stays_away', side_effect=lambda *a: calls.append('stays')), \
-         mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
          mock.patch.object(bat.probe, 'session', side_effect=session), \
          mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}):
       bat.refused(b'c' * 16, b'b' * 16)
@@ -673,7 +691,7 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9'), \
          mock.patch.object(bat, 'package', return_value='/p.zip'), \
          mock.patch.object(bat.tools, 'spawn', return_value=(code, 'Sending DFU start packet\n')) as spawn, \
-         mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
          mock.patch.object(bat.probe, 'session', side_effect=session), \
          mock.patch.object(bat, 'app_ran', return_value={}) as app_ran:
       ev = bat.cut_short(b'd' * 16, b'b' * 16)
