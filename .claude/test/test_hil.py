@@ -576,18 +576,28 @@ class Pending(unittest.TestCase):
     with mock.patch.object(self.helper.PendingSessions, 'clear', side_effect=PermissionError(1, 'not ours')):
       ht.unmark(self.board)
 
-  def test_a_supervisor_that_never_started_leaves_no_log(self):
-    tools = ht.Tools(self.tmp, Path(self.tmp) / 'hil.log')
 
-    def no_supervisor(*a, **kw):
-      Path(tools.dir, 'hil_op_abc.log').write_text('')
-      e = OSError(11, 'Resource temporarily unavailable')
-      e.cleanup, e.receipt = 'done', None
-      raise e
-    with mock.patch.object(ht.process(), 'run_tracked', side_effect=no_supervisor), self.assertRaises(OSError):
+
+class Tools(unittest.TestCase):
+  def setUp(self):
+    self.tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(self.tmp))
+
+  def test_the_ops_dir_is_private_whatever_the_umask(self):
+    old = ht.os.umask(0o002)
+    try:
+      tools = ht.Tools(Path(self.tmp) / 'run', Path(self.tmp) / 'hil.log')
+    finally:
+      ht.os.umask(old)
+    self.assertEqual((ht.os.stat(tools.dir).st_mode & 0o777, (Path(self.tmp) / 'run').stat().st_mode & 0o777),
+                     (0o700, 0o755))
+
+  def test_a_supervisor_that_never_started_leaves_nothing(self):
+    tools = ht.Tools(self.tmp, Path(self.tmp) / 'hil.log')
+    with mock.patch.object(ht.process().subprocess, 'Popen', side_effect=OSError(11, 'EAGAIN')), \
+         self.assertRaises(OSError):
       tools.run(['JLinkExe'], timeout=1)
-    self.assertEqual(ht.os.listdir(tools.dir), [])
-    self.assertEqual(tools.receipts, [])
+    self.assertEqual((ht.os.listdir(tools.dir), tools.receipts), ([], []))
 
 
 if __name__ == '__main__':

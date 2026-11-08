@@ -12,7 +12,6 @@ Exit: 0 pass (and cleaned up), 1 a step failed or the board did not run, 2 refus
 4 cleanup failed: the board stays held by a cleanup holder (SKILL.md Recovery).
 """
 import argparse
-import contextlib
 import errno
 import hashlib
 import json
@@ -353,38 +352,22 @@ def uf2_payload(blob, base, length):
 
 # ------------------------------------------------------------------ processes
 
-def private_dir(path):
-  """`path` created as a directory nobody else can write, in a parent likewise (run_tracked's state dir), whatever
-  the umask."""
-  path = Path(path)
-  path.mkdir(parents=True, exist_ok=True)
-  os.chmod(path.parent, 0o755)
-  os.chmod(path, 0o700)
-  return str(path)
-
-
 class Tools:
   """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
   a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder.
   run_tracked keeps a child's files in `dir` until it is proven ended: the board's pending mark names `dir` (claim)."""
   def __init__(self, workdir, log):
-    self.dir, self.log, self.receipts = private_dir(Path(workdir) / 'ops'), log, []
+    self.dir, self.log, self.receipts = process().state_dir(str(workdir), 'ops'), log, []
 
   def run(self, cmd, cwd=None, *, env=None, timeout):
     """hil_flash's runner contract: a CompletedProcess carrying `cleanup` and `receipt`."""
     if env:
       raise ValueError('no tool here takes an environment')
     argv = [str(a) for a in cmd]
-    before = set(os.listdir(self.dir))
     try:
       r = process().run_tracked(argv, cwd=cwd, timeout=timeout, settle=SETTLE, state_dir=self.dir, quiet=True)
     except BaseException as e:
-      cleanup, receipt = getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None)
-      if cleanup == 'done' and receipt is None:   # proven ended; a supervisor that never started leaves its log
-        for name in set(os.listdir(self.dir)) - before:
-          with contextlib.suppress(OSError):
-            os.unlink(os.path.join(self.dir, name))
-      self.note(argv, cleanup, receipt)
+      self.note(argv, getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None))
       raise
     self.note(argv, r.cleanup, r.receipt)   # before anything else can fail
     with open(self.log, 'a') as fh:
