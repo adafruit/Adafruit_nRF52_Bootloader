@@ -561,7 +561,7 @@ class BatteryRun(unittest.TestCase):
     self.assertEqual(calls, [('enter', ht.DFU_MAGIC_SERIAL_ONLY_RESET), ('dfu', bat.f['zip'], '/dev/ttyACM9'),
                              ('drive',), ('probe', ['h', 'verifybin /w/run-00000000.bin 00000000',
                                                     'verifybin /w/run-00001000.bin 00001000', 'g']),
-                             ('copy',), ('app', b'e' * 16)])
+                             ('drive',), ('copy',), ('app', b'e' * 16)])
     self.assertEqual(ev['package'], 'pca10056_bootloader-1_s140_6.1.1.zip')
 
   def test_a_copy_the_bootloader_cannot_complete_keeps_the_drive(self):

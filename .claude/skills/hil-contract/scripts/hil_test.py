@@ -371,6 +371,13 @@ def bank_1_start(mcu, app_start, boot_start):
   return app_start + (full - full % (2 * PAGE)) // 2
 
 
+def serial_argv(pkg, tty, singlebank):
+  """adafruit-nrfutil's arguments sending genpkg package `pkg` over CDC `tty`; `singlebank` for a single-bank build,
+  where it skips the bank 1 to bank 0 copy's wait."""
+  return ['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200',
+          *(['--singlebank'] if singlebank else [])]
+
+
 def repackage_image(pkg):
   """The application image a genpkg package `pkg` carries."""
   with zipfile.ZipFile(pkg) as z:
@@ -413,6 +420,11 @@ def fixture(f, nonce, pattern=0x1000):
   img = struct.pack(f'<{len(vectors)}I', *vectors) + code + pattern
   img += b'\xff' * (-len(img) % 256)
   return {'image': img, 'handler': handler, 'loop': loop, 'fault': fault, 'marker': marker, 'start': start}
+
+
+def shown(fx, nonce):
+  """A step's evidence naming fixture `fx`: its span and the nonce it came from."""
+  return {'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
 
 def make_uf2(img, base, family):
@@ -574,6 +586,12 @@ class Tools:
 
 # ------------------------------------------------------------------ probe
 
+def verify_runs(f):
+  """(J-Link verifybin commands, evidence) for every run of the merged HEX `f` describes."""
+  return ([f'verifybin {p} {a:08X}' for a, p in f['runs']],
+          [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in f['runs']])
+
+
 class Probe:
   """J-Link sessions through agentrc's provider, each command judged from its own output."""
   def __init__(self, board, workdir, tools):
@@ -602,12 +620,12 @@ class Probe:
     blocks ERASEALL, and only a reset clears the ACL (PS v1.7 6.3, 5.3.6.8)."""
     out = self.session(['r', f'w4 {NVMC_CONFIG:08X} {CONFIG_EEN:08X}', f'w4 {NVMC_ERASEALL:08X} 00000001',
                         f'sleep {ERASEALL_WAIT_MS}', f'mem32 {NVMC_READY:08X} 1', f'w4 {NVMC_CONFIG:08X} {CONFIG_REN:08X}',
-                        f'loadfile {f["hex"]}', 'h', *[f'verifybin {p} {a:08X}' for a, p in f['runs']], 'r', 'g'],
+                        f'loadfile {f["hex"]}', 'h', *verify_runs(f)[0], 'r', 'g'],
                        timeout=INSTALL_TIMEOUT)
     ready = word_at(out, NVMC_READY)
     if ready is None or ready & 1 != 1:
       raise StepFail(f'NVMC not ready after ERASEALL ({"no read" if ready is None else f"{ready:08X}"})')
-    return {'erased': True, 'verified': [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in f['runs']]}
+    return {'erased': True, 'verified': verify_runs(f)[1]}
 
   def samples(self):
     """Two register samples a commanded APP_SAMPLE_MS apart, the CPU running between them, in one session."""
@@ -824,7 +842,7 @@ class Battery:
     fx = fixture(self.f, nonce)
     dev = self.drive.wait()
     ev = self.drive.copy(dev, make_uf2(fx['image'], fx['start'], self.f['family']), self.dir)
-    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return {**ev, **shown(fx, nonce)}
 
   def app_ran(self, nonce):
     """The app the copy wrote runs after the bootloader's own reset: no probe reset first. The drive stays away, then
@@ -870,7 +888,7 @@ class Battery:
     fx = fixture(self.f, nonce)
     ev, tty = self.enter_cdc()
     self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}', edit), tty, singlebank)
-    return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return {**ev, 'tty': tty, **shown(fx, nonce)}
 
   def package(self, image, name, edit=None):
     """An adafruit-nrfutil genpkg app package of `image`, rewritten by repackage's edit(dat, image) when given."""
@@ -918,8 +936,7 @@ class Battery:
     return ev, self.cdc_only(stale=stale)
 
   def dfu_serial(self, pkg, tty, singlebank=True):
-    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200',
-                        *(['--singlebank'] if singlebank else [])], 'dfu serial')
+    out = self.nrfutil(serial_argv(pkg, tty, singlebank), 'dfu serial')
     if 'Device programmed.' not in out:   # it exits 0 on a failed upgrade too
       raise StepFail('adafruit-nrfutil did not program the device', {'tail': out.strip().splitlines()[-8:]})
     return out
@@ -978,7 +995,7 @@ class Battery:
     ev['copy'] = self.drive.copy(self.drive.wait(), uf2, self.dir)
     self.probe.session(['h', f'verifybin {whole} {fx["start"]:08X}', 'g'])
     ev['appRan'] = self.app_ran(nonce)
-    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return {**ev, **shown(fx, nonce)}
 
   def softdevice(self, nonce):
     """A same-image transfer and validation: the record's release package (genpkg --softdevice --bootloader, the
@@ -991,13 +1008,12 @@ class Battery:
     ev = {'enter': ev, 'tty': tty}
     self.dfu_serial(self.f['zip'], tty)
     dev = self.drive.wait()
-    self.probe.session(['h', *[f'verifybin {p} {a:08X}' for a, p in self.f['runs']], 'g'])
-    ev['verified'] = [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in self.f['runs']]
+    commands, ev['verified'] = verify_runs(self.f)
+    self.probe.session(['h', *commands, 'g'])
     ev['info'] = self.drive.info(dev)
-    fx = fixture(self.f, nonce)
-    ev['copy'] = self.drive.copy(dev, make_uf2(fx['image'], fx['start'], self.f['family']), self.dir)
+    ev['copy'] = self.copy(nonce)
     ev['appRan'] = self.app_ran(nonce)
-    return {**ev, 'package': Path(self.f['zip']).name, 'nonce': nonce.hex()}
+    return {**ev, 'package': Path(self.f['zip']).name}
 
   def banked(self, nonce):
     """An app through dual-bank serial DFU (DUALBANK_FW, dfu_dual_bank.c): received into bank 1, checked against the
@@ -1016,14 +1032,14 @@ class Battery:
     fx = fixture(self.f, nonce)
     ev, tty = self.enter_cdc()
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
-    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200'], 'dfu serial')
+    out = self.nrfutil(serial_argv(pkg, tty, False), 'dfu serial')
     ev['nrfutil'] = out.strip().splitlines()[-2:]   # it reports success either way
     stays_away(self.cdc_absent, QUIET,
                'the bootloader reset as if it activated the refused package')
     ev['bank0'] = self.bank_check(fx['image'], fixture(self.f, running)['image'], ['r', 'g'])
     self.cdc_gone('the bootloader leaving on the reset')
     ev['appRan'] = self.app_ran(running)
-    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return {**ev, **shown(fx, nonce)}
 
   def cut_short(self, nonce, running):
     """A dual-bank serial transfer cut short: app D, CUT_PAGES flash pages, sent by adafruit-nrfutil until its CUT_AFTER
@@ -1034,15 +1050,14 @@ class Battery:
     enter, tty = self.enter_cdc()
     ev = {'enter': enter}
     pkg = self.package(fx['image'], f'cut-{nonce.hex()[:8]}')
-    code, out = self.tools.spawn(['adafruit-nrfutil', '--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b',
-                                  '115200'], CUT_AFTER)
+    code, out = self.tools.spawn(['adafruit-nrfutil', *serial_argv(pkg, tty, False)], CUT_AFTER)
     if code != 124:
       raise StepFail(f'adafruit-nrfutil was not cut short: exit {code}', {'tail': out.strip().splitlines()[-4:]})
     ev['bank0'] = self.bank_check(fx['image'][:PAGE], fixture(self.f, running)['image'], ['r', 'g'],
                                   whole=fx['image'])
     self.cdc_gone('the bootloader leaving on the reset')
     ev['appRan'] = self.app_ran(running)
-    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return {**ev, **shown(fx, nonce)}
 
   def cdc_gone(self, what):
     wait_for(self.cdc_absent, USB_TIMEOUT, what)
@@ -1101,8 +1116,7 @@ class Battery:
     out = self.probe.session([f'w4 {RESETREAS:08X} FFFFFFFF', f'mem32 {RESETREAS:08X} 1'])
     if word_at(out, RESETREAS) != 0:
       raise StepFail('RESETREAS did not clear', {'tail': out.splitlines()[-4:]})
-    code, out = self.tools.spawn(['adafruit-nrfutil', '--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b',
-                                  '115200', '--singlebank'], NRFUTIL_TIMEOUT)
+    code, out = self.tools.spawn(['adafruit-nrfutil', *serial_argv(pkg, tty, True)], NRFUTIL_TIMEOUT)
     ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}
     if received and (code or 'Activating new firmware' not in out):
       raise StepFail('adafruit-nrfutil did not send the whole image and its stop packet', ev)
