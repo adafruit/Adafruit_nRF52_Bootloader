@@ -428,7 +428,7 @@ class BatteryRun(unittest.TestCase):
 
   def serial_run(self, out, drive=None):
     bat = self.battery()
-    bat.f = {**FACTS, 'vid': 0x239A, 'cdcPid': 0xDA}
+    bat.f = {**FACTS, 'vid': 0x239A, 'pid': 0xDA, 'cdcPid': 0xDA}
     calls = []
 
     def spawn(argv, timeout):
@@ -436,6 +436,7 @@ class BatteryRun(unittest.TestCase):
       return 0, out if 'serial' in argv else ''
     with mock.patch.object(bat.probe, 'reenter', return_value={'gpregret': '0000004E'}) as reenter, \
          mock.patch.object(ht, 'usb_device', return_value='1-1'), \
+         mock.patch.object(ht, 'usb_devnum', side_effect=lambda usb, n=iter(range(99)): str(min(next(n), 2))), \
          mock.patch.object(ht, 'cdc_tty', return_value='/dev/ttyACM9'), \
          mock.patch.object(ht.os, 'access', return_value=True), \
          mock.patch.object(ht, 'block_device', return_value=drive), \
@@ -543,7 +544,7 @@ class BatteryRun(unittest.TestCase):
 
   def test_softdevice_sends_the_release_package_then_verifies_every_run(self):
     bat = self.battery()
-    bat.f = {**FACTS, 'zip': '/r/pca10056_bootloader-1_s140_6.1.1.zip',
+    bat.f = {**FACTS, 'vid': 1, 'pid': 2, 'cdcPid': 2, 'zip': '/r/pca10056_bootloader-1_s140_6.1.1.zip',
              'runs': [(0, '/w/run-00000000.bin'), (0x1000, '/w/run-00001000.bin')]}
     calls = []
     with mock.patch.object(bat.probe, 'reenter', side_effect=lambda m: calls.append(('enter', m)) or {}), \
@@ -590,6 +591,19 @@ class BatteryRun(unittest.TestCase):
     bat = self.battery()
     bat.f = {**FACTS, 'vid': 0x239A, 'pid': 0xDA, 'cdcPid': 0xDA, 'bank1': 0x88000}
     return bat
+
+  def test_enter_cdc_skips_the_enumeration_from_before_the_reset(self):
+    bat = self.dual()
+    devnums = iter(['7', '7', '7', '9', '9'])   # before the reset, twice still the old one, then the new one
+    with mock.patch.object(ht, 'usb_device', return_value='1-1'), \
+         mock.patch.object(ht, 'usb_devnum', side_effect=lambda usb: next(devnums)), \
+         mock.patch.object(ht, 'cdc_tty', side_effect=['/dev/ttyACM9', '/dev/ttyACM9']) as tty, \
+         mock.patch.object(ht, 'block_device', return_value=None), \
+         mock.patch.object(ht.os, 'access', return_value=True), \
+         mock.patch.object(ht.time, 'sleep'), \
+         mock.patch.object(bat.probe, 'reenter', return_value={'gpregret': '0000004E'}):
+      self.assertEqual(bat.enter_cdc(), ({'gpregret': '0000004E'}, '/dev/ttyACM9'))
+    self.assertEqual(tty.call_count, 2)   # the old enumeration's tty is never taken
 
   def test_serial_dfu_omits_singlebank_for_a_dual_bank_build(self):
     bat = self.battery()
@@ -709,7 +723,8 @@ class BatteryRun(unittest.TestCase):
     with mock.patch.object(bat, 'serial', side_effect=lambda n, edit: calls.append('fresh') or {}), \
          mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append('ran') or {}), \
          mock.patch.object(bat.probe, 'reenter', return_value={}), \
-         mock.patch.object(bat, 'cdc_only', side_effect=lambda pid=None: calls.append(('cdc', pid)) or '/dev/ttyACM9'), \
+         mock.patch.object(bat, 'cdc_only',
+                           side_effect=lambda pid=None, stale=(): calls.append(('cdc', pid)) or '/dev/ttyACM9'), \
          mock.patch.object(bat, 'package', return_value=Path('/p.zip')), \
          mock.patch.object(ht, 'repackage_image', return_value=fx['image']), \
          mock.patch.object(bat.tools, 'spawn', side_effect=lambda argv, t: calls.append(argv) or nrfutil), \
@@ -754,7 +769,7 @@ class BatteryRun(unittest.TestCase):
     bat.f['pid'] = 0xDB
     with mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9') as cdc:
       self.assertEqual(bat.cdc_dfu(), {'tty': '/dev/ttyACM9'})
-    cdc.assert_called_once_with(0xDB)
+    cdc.assert_called_once_with(0xDB, ())
 
   def test_signed_runs_its_profile_steps_in_order(self):
     bat = self.dual()

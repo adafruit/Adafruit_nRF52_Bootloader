@@ -691,6 +691,14 @@ def cdc_tty(usb_path):
   return f'/dev/{ttys[0]}' if ttys else None
 
 
+def usb_devnum(usb_path):
+  """The kernel's device number of a USB device, None when it is gone; a new enumeration gets another."""
+  try:
+    return (Path('/sys/bus/usb/devices') / usb_path / 'devnum').read_text().strip()
+  except OSError:
+    return None
+
+
 def block_device(usb_path):
   for blk in Path('/sys/block').iterdir():
     if f'/{usb_path}:' in os.path.realpath(blk):
@@ -871,8 +879,7 @@ class Battery:
     """App C through CDC-only serial DFU: GPREGRET 0x4E enumerates the bootloader as one CDC port and no drive
     (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
     fx = fixture(self.f, nonce)
-    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
-    tty = self.cdc_only()
+    ev, tty = self.enter_cdc()
     self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}', edit), tty, singlebank)
     return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
@@ -883,16 +890,18 @@ class Battery:
     self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
     return repackage(pkg, pkg, edit) if edit else pkg
 
-  def cdc_only(self, pid=None):
+  def cdc_only(self, pid=None, stale=()):
     """The tty of the bootloader in CDC-only serial DFU (`pid` default its CDC PID) and the roster serial, one tty, no
-    drive. The UF2 enumeration still up from before the reset can carry the same PID (pca10056), so its drive must
-    drop first."""
+    drive. The enumeration still up from before the reset can carry the same PID (pca10056): one of `stale`
+    (enumerations()) is skipped, and a drive must drop first."""
     pid = pid or self.f['cdcPid']
     want = f'serial DFU {self.f["vid"]:04x}:{pid:04x} {self.b["uid"]}'
     seen = {}
 
     def cdc():
       usb = usb_device(self.f['vid'], pid, self.b['uid'])
+      if usb and (usb, usb_devnum(usb)) in stale:
+        return None
       seen['drive'] = usb and block_device(usb)
       return usb if usb and not seen['drive'] and cdc_tty(usb) else None
     try:
@@ -906,6 +915,17 @@ class Battery:
     if block_device(usb):
       raise StepFail(f'{usb} enumerated a drive in CDC-only serial DFU')
     return tty
+
+  def enumerations(self):
+    """The board's USB enumerations now, on its UF2 and CDC PIDs: (sysfs path, devnum), which a new one changes."""
+    found = (usb_device(self.f['vid'], pid, self.b['uid']) for pid in {self.f['pid'], self.f['cdcPid']})
+    return {(usb, usb_devnum(usb)) for usb in found if usb}
+
+  def enter_cdc(self):
+    """GPREGRET 0x4E and a reset, then the tty of the new CDC-only enumeration."""
+    stale = self.enumerations()
+    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
+    return ev, self.cdc_only(stale=stale)
 
   def dfu_serial(self, pkg, tty, singlebank=True):
     out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200',
@@ -977,9 +997,9 @@ class Battery:
     bootloader_dfu_sd_update_continue finds both equal to the installed ones, so nothing is copied; it marks bank 0
     invalid (bootloader.c, DFU_UPDATE_SD_SWAPPED) and comes back in DFU by itself. Every run of the merged HEX then
     verifies, and app E copied through the drive runs."""
-    ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
-    ev['tty'] = self.cdc_only()
-    self.dfu_serial(self.f['zip'], ev['tty'])
+    ev, tty = self.enter_cdc()
+    ev = {'enter': ev, 'tty': tty}
+    self.dfu_serial(self.f['zip'], tty)
     dev = self.drive.wait()
     self.probe.session(['h', *[f'verifybin {p} {a:08X}' for a, p in self.f['runs']], 'g'])
     ev['verified'] = [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in self.f['runs']]
@@ -1004,8 +1024,7 @@ class Battery:
     dfu_init_postvalidate refuses it, so it is never activated: the bootloader stays in DFU, bank 0 keeps app
     `running` (README, Dual bank firmware support). A J-Link reset then starts `running`."""
     fx = fixture(self.f, nonce)
-    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
-    tty = self.cdc_only()
+    ev, tty = self.enter_cdc()
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
     out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200'], 'dfu serial')
     ev['nrfutil'] = out.strip().splitlines()[-2:]   # it reports success either way
@@ -1022,8 +1041,8 @@ class Battery:
     buffer of src/flash_nrf5x.c) and its last does not; bank 0 still holds app `running`, which runs after a J-Link
     reset (README, Dual bank firmware support)."""
     fx = fixture(self.f, nonce, pattern=CUT_PAGES * PAGE)
-    ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
-    tty = self.cdc_only()
+    enter, tty = self.enter_cdc()
+    ev = {'enter': enter}
     pkg = self.package(fx['image'], f'cut-{nonce.hex()[:8]}')
     code, out = self.tools.spawn(['adafruit-nrfutil', '--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b',
                                   '115200'], CUT_AFTER)
@@ -1063,10 +1082,10 @@ class Battery:
       ev['notWritten'] = f'{end:#010x}'
     return ev
 
-  def cdc_dfu(self):
+  def cdc_dfu(self, stale=()):
     """SIGNED_FW without FORCE_UF2 has no drive (src/usb/tusb_config.h, usb_desc.c): with no app the bootloader stays
-    in DFU as one CDC port on its UF2 PID."""
-    return {'tty': self.cdc_only(self.f['pid'])}
+    in DFU as one CDC port on its UF2 PID; `stale` as for cdc_only."""
+    return {'tty': self.cdc_only(self.f['pid'], stale)}
 
   def refused_signed(self, nonce, edit, received, key):
     """A package SIGNED_FW must refuse, through CDC-only serial DFU, each after a fresh app signed with `key` installs
@@ -1081,8 +1100,7 @@ class Battery:
     fresh = os.urandom(16)
     ev = {'before': {'serial': self.serial(fresh, edit=signed_by(key)), 'appRan': self.app_ran(fresh)}}
     fx = fixture(self.f, nonce)
-    ev['enter'] = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
-    tty = self.cdc_only()
+    ev['enter'], tty = self.enter_cdc()
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', edit)
     image = Path(self.dir) / f'refused-{nonce.hex()[:8]}-image.bin'
     image.write_bytes(repackage_image(pkg))
@@ -1094,6 +1112,7 @@ class Battery:
     ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}
     if received and (code or 'Activating new firmware' not in out):
       raise StepFail('adafruit-nrfutil did not send the whole image and its stop packet', ev)
+    stale = self.enumerations()
     out = self.probe.session([f'mem32 {DHCSR:08X} 1', 'h', f'mem32 {RESETREAS:08X} 1',
                               f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'mem32 {self.f["appStart"]:08X} 4',
                               *([f'verifybin {image} {self.f["appStart"]:08X}'] if received else []), 'r', 'g'])
@@ -1113,7 +1132,7 @@ class Battery:
       ev['verified'] = f'{self.f["appStart"]:#010x}+{image.stat().st_size}'
     elif tuple(app) != (0xFFFFFFFF,) * 4 or not (halted or reset):
       raise StepFail('no init packet refusal: the app is not erased, or the bootloader neither reset nor halted', ev)
-    ev['dfu'] = self.cdc_dfu()
+    ev['dfu'] = self.cdc_dfu(stale)
     return {**ev, 'package': pkg.name, 'nonce': nonce.hex()}
 
   def current_span(self, length):
