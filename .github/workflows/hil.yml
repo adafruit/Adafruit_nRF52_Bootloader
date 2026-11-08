@@ -156,8 +156,8 @@ jobs:
     needs: [select, hil-build]
     if: ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.boards != '' }}
     runs-on: [ self-hosted, Linux, X64, nrf52-bootloader ]
-    # a profile's battery is up to ~6 min; the DK is shared with tinyusb and the Arduino HILs, so each run may wait up
-    # to 30 min for it
+    # a profile's battery takes up to ~6 min (the contract, Execution); the DK is shared with tinyusb and the Arduino
+    # HILs, so each run may wait up to 30 min for it
     timeout-minutes: 120
     # the attempt that uploaded the artifact: a re-run of failed jobs that does not re-run this job keeps its outputs
     outputs:

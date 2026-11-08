@@ -5,7 +5,7 @@
   hil_test.py run -b BOARD --build-record REC --base-dir DIR [--profile P] [--run-root DIR] [--lock-wait S]
                 [--fail-at STEP] ROSTER
   hil_test.py install -b BOARD --build-record REC --under-hold REASON ROSTER
-  hil_test.py restore -b BOARD --build-record REC --under-hold REASON ROSTER
+  hil_test.py restore -b BOARD --build-record REC (--under-hold REASON | --recover-holder PID) ROSTER
   hil_test.py fat-read --dev DEV --file NAME [--offset N] [--length N]   (child: one bounded FAT read)
   hil_test.py flush --dev DEV                                             (child: fsync of the drive)
 
@@ -515,17 +515,15 @@ def tampered_after_signing(d):
 
 
 def signing_key():
-  """The private key of the signed profile's test key (check_build.SIGNED_FW_TEST_KEY), checked against its public
+  """The private key of the signed profile's test key (check_build.signed_fw_test_key), checked against its public
   key, which the build compiles in."""
-  path = build().SIGNED_FW_TEST_KEY
   try:
-    key = json.loads(path.read_text())
-    d = int(key['d'], 16)
-    ok = public_key(d) == bytes.fromhex(key['qx'] + key['qy'])
-  except (OSError, ValueError, KeyError, TypeError) as e:
-    raise Refused(f'{path.name}: not a key ({e})') from None
-  if not ok:
-    raise Refused(f'{path.name}: d does not give qx, qy')
+    key = build().signed_fw_test_key()
+  except build().Refusal as e:
+    raise Refused(str(e)) from None
+  d = int.from_bytes(key['d'], 'big')
+  if public_key(d) != key['qx'] + key['qy']:
+    raise Refused(f'{build().SIGNED_FW_TEST_KEY.name}: d does not give qx, qy')
   return d
 
 
@@ -656,7 +654,6 @@ class Probe:
     if op.attempts[-1].timed_out or issued not in process().cmd_stdout_text(op.stdout):
       raise StepFail('the SYSRESETREQ write was not issued')
     return {'gpregret': f'{value:08X}'}
-
 
   def pin_resets(self, gaps):
     """nRESET pulses `gaps` ms apart, each RESET_PULSE_MS low, from J-Link r0/r1 in a session that never connects to
@@ -861,10 +858,8 @@ class Battery:
     return ev
 
   def double_reset(self, nonce):
-    """src/main.c's double reset on the reset pin: a pin reset while the bootloader still waits DFU_DBL_RESET_DELAY
-    after the previous one enters UF2 DFU, its magic word kept in RAM across the pin reset. Controls first, each
-    leaving app `nonce` running: one pulse, then two DBL_OUT_OF_WINDOW_MS apart; then two DBL_IN_WINDOW_MS apart bring
-    the drive."""
+    """src/main.c's double reset on the reset pin (SKILL.md Execution, double-reset): one pulse and two
+    DBL_OUT_OF_WINDOW_MS apart leave app `nonce` running, two DBL_IN_WINDOW_MS apart bring the drive."""
     ev = {}
     for name, gaps in (('single', []), ('outOfWindow', [DBL_OUT_OF_WINDOW_MS])):
       ev[name] = {**self.probe.pin_resets(gaps), 'appRan': self.app_ran(nonce)}
@@ -883,8 +878,7 @@ class Battery:
     return {**ev, 'method': 'gpregret', 'readBack': len(got)}
 
   def serial(self, nonce, singlebank=True, edit=None):
-    """App C through CDC-only serial DFU: GPREGRET 0x4E enumerates the bootloader as one CDC port and no drive
-    (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
+    """App `nonce` through CDC-only serial DFU (SKILL.md Execution, serial), its package rewritten by `edit`."""
     fx = fixture(self.f, nonce)
     ev, tty = self.enter_cdc()
     self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}', edit), tty, singlebank)
@@ -948,8 +942,7 @@ class Battery:
     return out
 
   def update(self, uf2, version, nonce):
-    """A bootloader update UF2 copied to the drive: the bootloader stages it in the app region's top and has the MBR
-    copy it over itself (src/usb/uf2/ghostfat.c, src/usb/msc_uf2.c). The app `nonce` still runs after it, and
+    """A bootloader update UF2 copied to the drive (SKILL.md Execution, update-base): app `nonce` still runs, and
     re-entered, the drive names `version`."""
     ev = {}
     if not self.drive.present():
@@ -964,12 +957,9 @@ class Battery:
     return ev
 
   def interrupted(self, nonce):
-    """An interrupted UF2 transfer. App D, longer than two flash pages, is copied only up to the first block of its
-    third page: the bootloader writes a page once the transfer moves past it (src/flash_nrf5x.c), so D's first two
-    pages are in flash, read back, and the third is not; then a J-Link reset interrupts it. The outcome: bank 0 stays
-    marked valid with CRC 0, which no transport computes (dfu_single_bank.c m_image_crc, src/usb/msc_uf2.c), so
-    bootloader_app_is_valid checks nothing and the bootloader starts the mixed image; D's vectors and code lie in its
-    first page, so D runs. Then the whole of D copies through the drive, verifies and runs."""
+    """An interrupted UF2 transfer (SKILL.md Execution, interrupted): app D copied up to the first block of its
+    third page (src/flash_nrf5x.c writes a page once the transfer moves past it), J-Link reads two pages written and
+    the third not, resets, and the mixed image runs, bank 0 being valid with CRC 0; then the whole of D runs."""
     fx = fixture(self.f, nonce, pattern=3 * PAGE)
     uf2 = make_uf2(fx['image'], fx['start'], self.f['family'])
     written, whole = Path(self.dir) / 'interrupted-written.bin', Path(self.dir) / 'interrupted-whole.bin'
@@ -998,12 +988,8 @@ class Battery:
     return {**ev, **shown(fx, nonce)}
 
   def softdevice(self, nonce):
-    """A same-image transfer and validation: the record's release package (genpkg --softdevice --bootloader, the
-    installed S140 6.1.1 and the candidate; no other SoftDevice is documented for this build) through CDC-only serial
-    DFU. The bootloader erases the app region to receive them (dfu_single_bank.c) and on the next boot
-    bootloader_dfu_sd_update_continue finds both equal to the installed ones, so nothing is copied; it marks bank 0
-    invalid (bootloader.c, DFU_UPDATE_SD_SWAPPED) and comes back in DFU by itself. Every run of the merged HEX then
-    verifies, and app E copied through the drive runs."""
+    """A same-image SoftDevice and bootloader transfer and validation through the release package (SKILL.md
+    Execution, softdevice): back in DFU by itself, every run of the merged HEX verifies and app `nonce` runs."""
     ev, tty = self.enter_cdc()
     ev = {'enter': ev, 'tty': tty}
     self.dfu_serial(self.f['zip'], tty)
@@ -1016,9 +1002,8 @@ class Battery:
     return {**ev, 'package': Path(self.f['zip']).name}
 
   def banked(self, nonce):
-    """An app through dual-bank serial DFU (DUALBANK_FW, dfu_dual_bank.c): received into bank 1, checked against the
-    init packet's CRC-16, then copied into bank 0 on activation, which ends in a reset. Once the bootloader left, bank 1
-    reads back the app and bank 0 is marked valid."""
+    """App `nonce` through dual-bank serial DFU (SKILL.md Execution, dualbank): once the bootloader left on
+    activation, it reads back in both banks with bank 0 valid."""
     fx = fixture(self.f, nonce)
     ev = self.serial(nonce, singlebank=False)
     self.cdc_gone('the bootloader leaving on activation')
@@ -1026,9 +1011,8 @@ class Battery:
     return ev
 
   def refused(self, nonce, running):
-    """App C in a package whose init packet CRC-16 does not match it: dual-bank serial DFU receives C into bank 1 and
-    dfu_init_postvalidate refuses it, so it is never activated: the bootloader stays in DFU, bank 0 keeps app
-    `running` (README, Dual bank firmware support). A J-Link reset then starts `running`."""
+    """App `nonce` with a flipped init packet CRC-16 (SKILL.md Execution, dualbank refused): the bootloader stays in
+    DFU, bank 1 holds it, bank 0 still `running`, which runs after a J-Link reset."""
     fx = fixture(self.f, nonce)
     ev, tty = self.enter_cdc()
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
@@ -1042,10 +1026,8 @@ class Battery:
     return {**ev, **shown(fx, nonce)}
 
   def cut_short(self, nonce, running):
-    """A dual-bank serial transfer cut short: app D, CUT_PAGES flash pages, sent by adafruit-nrfutil until its CUT_AFTER
-    bound ends it mid-transfer. D's first page reads back in bank 1 (dfu_dual_bank.c writes there through the one-page
-    buffer of src/flash_nrf5x.c) and its last does not; bank 0 still holds app `running`, which runs after a J-Link
-    reset (README, Dual bank firmware support)."""
+    """A dual-bank serial transfer of app `nonce` (CUT_PAGES) ended by adafruit-nrfutil's CUT_AFTER bound (SKILL.md
+    Execution, dualbank interrupted): its first page in bank 1, not its last; `running` runs after a J-Link reset."""
     fx = fixture(self.f, nonce, pattern=CUT_PAGES * PAGE)
     enter, tty = self.enter_cdc()
     ev = {'enter': enter}
@@ -1114,10 +1096,10 @@ class Battery:
     return self.back_in_dfu(ev, rb)
 
   def signed_transfer(self, nonce, edit, key, received):
-    """A fresh app signed with `key` installed and running, then RESETREAS cleared and app `nonce`'s package, rewritten
-    by `edit`, sent through CDC-only serial DFU; then, halted after DHCSR is read, RESETREAS, the settings and the
-    app start read back (with `received`, the whole received image verified there) and a reset. (evidence, the
-    read-back) once bank 0 reads invalid; with `received`, adafruit-nrfutil must have sent the stop packet."""
+    """A fresh app signed with `key` running, RESETREAS cleared, app `nonce`'s package rewritten by `edit` sent
+    through CDC-only serial DFU, then DHCSR read before a halt, RESETREAS, the settings and the app start read back
+    (with `received`, the whole image verified) and a reset (SKILL.md Execution, signed). (evidence, read-back) once
+    bank 0 reads invalid; with `received`, adafruit-nrfutil must have sent the stop packet."""
     fresh = os.urandom(16)
     ev = {'before': {'serial': self.serial(fresh, edit=signed_by(key)), 'appRan': self.app_ran(fresh)}}
     fx = fixture(self.f, nonce)

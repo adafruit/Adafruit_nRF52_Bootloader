@@ -49,6 +49,7 @@ class Render(unittest.TestCase):
     for p, steps in hc.PROFILES.items():
       self.assertIn(f'profile `{p}`', body)
       self.assertIn('| Board | ' + ' | '.join(steps) + ' | cleanup | steps |', body)
+    self.assertEqual(body.count(hc.LEGEND), 1)
     self.assertIn('- `nRF52832: no roster board on this host`', body)
     self.assertIn('- `BLE OTA DFU`', body)
 

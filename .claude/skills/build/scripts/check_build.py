@@ -243,13 +243,19 @@ def prerequisites(make=False, defines=()):
       raise Refusal(f'{path} missing: git submodule update --init')
 
 
-def hil_profiles():
-  """name -> the -D options of each configuration a HIL record builds, the default first."""
+def signed_fw_test_key():
+  """{d, qx, qy} of the SIGNED_FW profile's test-only key, each as bytes."""
   try:
     key = json.loads(SIGNED_FW_TEST_KEY.read_text())
-    qx, qy = (','.join(f'0x{b:02x}' for b in bytes.fromhex(key[k])) for k in ('qx', 'qy'))
-  except (OSError, ValueError, KeyError, TypeError) as e:
+    return {k: bytes.fromhex(key[k]) for k in ('d', 'qx', 'qy')}
+  except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
     raise Refusal(f'{SIGNED_FW_TEST_KEY.relative_to(ROOT)}: not a key ({e})') from None
+
+
+def hil_profiles():
+  """name -> the -D options of each configuration a HIL record builds, the default first."""
+  key = signed_fw_test_key()
+  qx, qy = (','.join(f'0x{b:02x}' for b in key[k]) for k in ('qx', 'qy'))
   return {'default': [], 'dualbank': ['DUALBANK_FW=ON'],
           'signed': ['SIGNED_FW=ON', f'SIGNED_FW_QX={qx}', f'SIGNED_FW_QY={qy}']}
 

@@ -62,9 +62,9 @@ python3 .claude/skills/hil-contract/scripts/hil_test.py run -b pca10056 \
 
 `--base-dir` holds the roster's `selfUpdateBase` file, downloaded from that release; `run` refuses bytes that do not
 hash as pinned and copies them into the run dir. `adafruit-nrfutil` (the farm's hil-venv) and `mcopy` must be on
-`PATH`. `run` takes the lock itself (no pre-hold) and runs one board for up to about five minutes; its last stdout line
-is the JSON report and its exit is final. `--profile` (default `default`) picks the record's profile and its
-battery. The `default` battery, each step judged from its own evidence:
+`PATH`. `run` takes the lock itself (no pre-hold) and runs one board's battery of one profile, `--profile` (default
+`default`), for up to about six minutes (`default` 3-6, `dualbank` and `signed` about 2-3 on the DK); its last stdout
+line is the JSON report and its exit is final. The `default` battery, each step judged from its own evidence:
 
 1. `install`: ERASEALL through NVMC with the CPU halted (nRF52840 errata [184]), `READY` read back, the merged HEX
    (MBR, SoftDevice, bootloader, UICR) loaded and each of its runs verified with `verifybin`, then reset.

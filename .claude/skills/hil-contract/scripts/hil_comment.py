@@ -75,7 +75,7 @@ def board_lines(result, board, profile):
            '| Board | ' + ' | '.join(steps) + ' | cleanup | steps |',
            '| --- | ' + ' | '.join(':-:' for _ in steps) + ' | :-: | --: |',
            '| ' + ' | '.join([literal(board, table=True), *(marks.get(s, '') for s in steps), clean,
-                              f'{seconds:.0f}s']) + ' |', '', LEGEND, '']
+                              f'{seconds:.0f}s']) + ' |', '']
   if verdict != 'pass':   # a failed cleanup's detail says whether the board's cleanup log took it
     lines += [f'- {literal(board)}: {literal(detail)}', '']
   if earlier := run_report.previous_failure(row):
@@ -109,6 +109,8 @@ def render(results, selection, meta):
                   else [f'**HIL report unavailable for {literal(board)}, profile {literal(profile)}: no run of it '
                         '(run incomplete).**', ''])
   report = next((r[2] for r in results.values() if r and r[2]), None)
+  if report:   # once, under every table
+    lines += [LEGEND, '']
   return finish(lines + uncovered(selection, report) + [f'_[Reports and logs]({meta["runUrl"]})_'])
 
 
