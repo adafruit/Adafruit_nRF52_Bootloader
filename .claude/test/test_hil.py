@@ -395,8 +395,19 @@ class BatteryRun(unittest.TestCase):
     self.assertEqual(calls[1][-7:], ['--package', calls[0][-1], '-p', '/dev/ttyACM9', '-b', '115200', '--singlebank'])
     with self.assertRaisesRegex(ht.StepFail, 'did not program'):
       self.serial_run('Failed to upgrade target. Error is: timeout\n')
-    with self.assertRaisesRegex(ht.StepFail, 'enumerated a drive'):
+    with mock.patch.object(ht, 'USB_TIMEOUT', 0.3), self.assertRaisesRegex(ht.StepFail, 'enumerated a drive'):
       self.serial_run('Device programmed.\n', drive='/dev/sdz')
+
+  def test_cdc_only_waits_for_the_previous_drive_to_drop(self):
+    bat = self.battery()
+    bat.f = {**FACTS, 'vid': 0x239A, 'cdcPid': 0xDA}
+    with mock.patch.object(ht, 'usb_device', return_value='1-1'), \
+         mock.patch.object(ht, 'cdc_tty', return_value='/dev/ttyACM9'), \
+         mock.patch.object(ht.os, 'access', return_value=True), \
+         mock.patch.object(ht.time, 'sleep'), \
+         mock.patch.object(ht, 'block_device', side_effect=['/dev/sdz', '/dev/sdz', None, None]) as blk:
+      self.assertEqual(bat.cdc_only(), '/dev/ttyACM9')
+    self.assertEqual(blk.call_count, 4)
 
   def test_update_enters_dfu_when_the_app_runs_and_checks_the_version(self):
     bat = self.battery()

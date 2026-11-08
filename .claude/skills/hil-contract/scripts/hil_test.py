@@ -742,10 +742,22 @@ class Battery:
     return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
   def cdc_only(self):
-    """The tty of the bootloader in CDC-only serial DFU: its CDC PID and the roster serial, one tty, no drive."""
-    usb = wait_for(lambda: usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), USB_TIMEOUT,
-                   f'serial DFU {self.f["vid"]:04x}:{self.f["cdcPid"]:04x} {self.b["uid"]}')
-    tty = wait_for(lambda: cdc_tty(usb), UDEV_TIMEOUT, f'the CDC tty of {usb}')
+    """The tty of the bootloader in CDC-only serial DFU: its CDC PID and the roster serial, one tty, no drive. The UF2
+    enumeration still up from before the reset can carry the same PID (pca10056), so its drive must drop first."""
+    want = f'serial DFU {self.f["vid"]:04x}:{self.f["cdcPid"]:04x} {self.b["uid"]}'
+    seen = {}
+
+    def cdc():
+      usb = usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid'])
+      seen['drive'] = usb and block_device(usb)
+      return usb if usb and not seen['drive'] and cdc_tty(usb) else None
+    try:
+      usb = wait_for(cdc, USB_TIMEOUT, want)
+    except StepFail:
+      if seen.get('drive'):
+        raise StepFail(f'{want} enumerated a drive in CDC-only serial DFU', {'drive': seen['drive']}) from None
+      raise
+    tty = cdc_tty(usb)
     wait_for(lambda: os.access(tty, os.R_OK | os.W_OK), UDEV_TIMEOUT, f'read-write access to {tty}')
     if block_device(usb):
       raise StepFail(f'{usb} enumerated a drive in CDC-only serial DFU')
