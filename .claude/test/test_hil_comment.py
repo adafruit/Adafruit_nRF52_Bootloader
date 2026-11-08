@@ -35,7 +35,7 @@ class Render(unittest.TestCase):
   def test_a_pass(self):
     body = hc.render({'pca10056': ('pass', '', report())}, SELECTION, META)
     self.assertIn('**✅ passed** · bootloader `0.11.0`', body)
-    self.assertIn('| `pca10056` |' + ' ✅ |' * 12 + ' 22s |', body)
+    self.assertIn('| `pca10056` |' + ' ✅ |' * (len(hc.STEPS) + 1) + f' {2 * len(hc.STEPS)}s |', body)
     self.assertIn('- `nRF52832: no roster board on this host`', body)
     self.assertIn('- `BLE OTA DFU`', body)
 

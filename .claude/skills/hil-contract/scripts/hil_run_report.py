@@ -5,8 +5,8 @@ the core's shared run rules. The core module is passed in, loaded through the ag
 (agentrc.py); verdict() needs no core. Stdlib only."""
 
 NAME, VERSION, STEM = 'nrf52-bootloader-hil-run', 1, 'hil_report'
-STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'serial', 'app-ran-c', 'update-base',
-         'update')   # hil_test.py's default battery, in order
+STEPS = ('install', 'dfu', 'copy', 'app-ran', 'reenter', 'copy-b', 'app-ran-b', 'double-reset', 'serial', 'app-ran-c',
+         'update-base', 'update')   # hil_test.py's default battery, in order
 PROFILE_STEPS = {'default': STEPS}   # each profile's battery (check_build.hil_profiles), in order
 STEP_MARK = {True: '✅', False: '❌'}
 TYPES = {'pass': bool, 'caveat': str, 'reportPath': str, 'error': str, 'exitCode': int, 'uncovered': list}

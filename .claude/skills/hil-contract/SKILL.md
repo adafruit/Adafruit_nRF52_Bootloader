@@ -76,10 +76,15 @@ is the JSON report and its exit is final. The battery, each step judged from its
 5. `reenter`: GPREGRET = 0x57 written and read back, then SYSRESETREQ (a soft reset keeps GPREGRET); the drive returns
    and `CURRENT.UF2` reads back A's bytes at the app start. Forced entry, not a double reset.
 6. `copy-b`, `app-ran-b`: app B, with another nonce and marker, runs, so a stale image cannot pass.
-7. `serial`, `app-ran-c`: GPREGRET = 0x4E and SYSRESETREQ enumerate the bootloader as the CDC-only device (its PID and
+7. `double-reset`: nRESET pulses from J-Link `r0`/`r1` in a session that never connects to the target (the DK's
+   interface MCU drives nRESET: DK guide, book 1602 pp14, 25). `src/main.c` enters DFU on a pin reset while it still
+   waits 500 ms after the previous one, its magic word kept in RAM (nRF52840 PS v1.7 5.3.6.8: a pin reset never resets
+   RAM, though its content may be corrupted; RESETREAS is cumulative, 5.3.7.11). Controls first, each leaving app B
+   running: one pulse, then two 1500 ms apart; then two 150 ms apart bring the drive back, `INFO_UF2.TXT` as in `dfu`.
+8. `serial`, `app-ran-c`: GPREGRET = 0x4E and SYSRESETREQ enumerate the bootloader as the CDC-only device (its PID and
    the roster serial, one tty, no drive); `adafruit-nrfutil dfu genpkg --dev-type 0x0052` packages app C and `dfu
    serial --singlebank` sends it ("Device programmed." required: it exits 0 on a failed upgrade); app C runs.
-8. `update-base`: from the drive (re-entered through GPREGRET), the pinned release's update UF2 copied: the bootloader
+9. `update-base`: from the drive (re-entered through GPREGRET), the pinned release's update UF2 copied: the bootloader
    stages it at the top of the app region and the MBR copies it over itself; app C still runs, and re-entered, the
    drive names the release's version. `update`: the record's `update-*_nosd.uf2` the same way, back to the candidate's
    version, so the candidate both updates and is updated.
@@ -186,8 +191,8 @@ retries a fail once per `hil` Caller rules.
 ## Limits
 
 - Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
-  readback, CDC serial DFU of an app, and bootloader self-update from the pinned release and back. Uncovered, named
-  pending in every report that needs them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA, SIGNED_FW, dual
-  bank, a physical double reset, an interrupted update and a SoftDevice update.
+  readback, a double reset on the reset pin, CDC serial DFU of an app, and bootloader self-update from the pinned
+  release and back. Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only, no USB),
+  nRF52833, BLE OTA, SIGNED_FW, dual bank, an interrupted update and a SoftDevice update.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.

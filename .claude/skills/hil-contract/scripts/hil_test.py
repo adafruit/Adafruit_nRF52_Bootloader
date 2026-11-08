@@ -56,6 +56,9 @@ ERASEALL_WAIT_MS = 1000      # tERASEALL is at most 169 ms (PS v1.7 4.3.10); REA
 PROBE_TIMEOUT, INSTALL_TIMEOUT, NRFUTIL_TIMEOUT = 60, 180, 120
 USB_TIMEOUT, UDEV_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 10, 30, 15, 3
 APP_SAMPLE_MS = 200
+# nRESET pulses through the DK's interface MCU (J-Link r0/r1); src/main.c enters DFU on a pin reset within
+# DFU_DBL_RESET_DELAY (500 ms) of the previous one
+RESET_PULSE_MS, DBL_IN_WINDOW_MS, DBL_OUT_OF_WINDOW_MS = 20, 150, 1500
 LOCK_RETRY = 15
 FLUSH_GONE = 3
 SETTLE = 1.0                 # s after a tool exits for its descendants to be proven gone (hil_process.run_tracked)
@@ -64,7 +67,7 @@ ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
 UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW and dual-bank builds',
-             'a physical double reset', 'an interrupted update', 'a SoftDevice update')
+             'an interrupted update', 'a SoftDevice update')
 
 
 class Refused(Exception):
@@ -437,12 +440,12 @@ class Probe:
     self.profile = {'interface': 'swd', 'speed': JLINK_SPEED, 'autoconnect': True, 'device': board['device'],
                     'workdir': str(workdir)}
 
-  def session(self, commands, timeout=PROBE_TIMEOUT, judge=True):
+  def session(self, commands, timeout=PROBE_TIMEOUT, judge=True, connect=True):
     def crashed(a):   # the OB's libjlinkarm crash before any target access
       out = process().cmd_stdout_text(a.result.stdout)
       return a.result.returncode in provider().JLINK_CRASH_RCS and 'Found Cortex' not in out
-    op = provider().run_jlink_commands(self.b['flasher'], list(commands), **self.profile, timeout=timeout,
-                                       run=self.tools.run, retry_if=crashed, retry_delay=2)
+    op = provider().run_jlink_commands(self.b['flasher'], list(commands), **{**self.profile, 'autoconnect': connect},
+                                       timeout=timeout, run=self.tools.run, retry_if=crashed, retry_delay=2)
     self.tools.check('JLinkExe')
     out, last = process().cmd_stdout_text(op.stdout), op.attempts[-1]
     tail = {'tail': out.strip().splitlines()[-6:]}
@@ -494,6 +497,22 @@ class Probe:
     if op.attempts[-1].timed_out or issued not in process().cmd_stdout_text(op.stdout):
       raise StepFail('the SYSRESETREQ write was not issued')
     return {'gpregret': f'{value:08X}'}
+
+
+  def pin_resets(self, gaps):
+    """nRESET pulses `gaps` ms apart, each RESET_PULSE_MS low, from J-Link r0/r1 in a session that never connects to
+    the target: on the DK the interface MCU drives the nRF52840's nRESET (nRF52840 DK guide, book 1602 pp14, 25;
+    qualified on the rig: RESETREAS.RESETPIN set). The pulses are judged by their echoes, which no completion rule
+    covers."""
+    pulse = ['r0', f'sleep {RESET_PULSE_MS}', 'r1']
+    commands = [*pulse, *(c for g in gaps for c in (f'sleep {g}', *pulse))]
+    out = self.session(commands, judge=False, connect=False)
+    echoed = provider().jlink_echoed(out)
+    failed = [c for c, chunk in echoed if re.search(provider().JLINK_ERRORS, chunk)]
+    if [c for c, _ in echoed] != [*commands, 'exit'] or failed:
+      raise StepFail(f'the nRESET pulses were not all issued (failed: {failed})',
+                     {'tail': out.strip().splitlines()[-8:]})
+    return {'pulses': len(gaps) + 1, 'gapsMs': list(gaps)}
 
 
 def word_at(out, addr):
@@ -674,6 +693,18 @@ class Battery:
       raise StepFail('r0 did not advance', ev)
     return ev
 
+  def double_reset(self, nonce):
+    """src/main.c's double reset on the reset pin: a pin reset while the bootloader still waits DFU_DBL_RESET_DELAY
+    after the previous one enters UF2 DFU, its magic word kept in RAM across the pin reset. Controls first, each
+    leaving app `nonce` running: one pulse, then two DBL_OUT_OF_WINDOW_MS apart; then two DBL_IN_WINDOW_MS apart bring
+    the drive."""
+    ev = {}
+    for name, gaps in (('single', []), ('outOfWindow', [DBL_OUT_OF_WINDOW_MS])):
+      ev[name] = {**self.probe.pin_resets(gaps), 'appRan': self.app_ran(nonce)}
+    ev['inWindow'] = self.probe.pin_resets([DBL_IN_WINDOW_MS])
+    ev['inWindow']['info'] = self.drive.info(self.drive.wait())
+    return ev
+
   def reenter(self, nonce):
     fx = fixture(self.f, nonce)
     ev = self.probe.reenter()
@@ -743,6 +774,7 @@ class Battery:
     self.step('reenter', lambda: self.reenter(a))
     self.step('copy-b', lambda: self.copy(b))
     self.step('app-ran-b', lambda: self.app_ran(b))
+    self.step('double-reset', lambda: self.double_reset(b))
     self.step('serial', lambda: self.serial(c))
     self.step('app-ran-c', lambda: self.app_ran(c))
     self.step('update-base', lambda: self.update(base['path'], base['version'], c))

@@ -286,14 +286,30 @@ class Probe(unittest.TestCase):
   BOARD = {'flasher': {'name': 'jlink', 'args': '-device nrf52840_xxaa', 'uid': '683944004'}, 'device': 'nrf52840_xxaa'}
 
   def probe(self, out, cleanup='done'):
-    """A Probe whose JLinkExe prints `out`, judged by the installed agentrc's hil_flash."""
+    """A Probe whose JLinkExe prints `out`, judged by the installed agentrc's hil_flash; `self.argv` its command."""
     tmp = tempfile.mkdtemp()
     self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
     p = ht.Probe(self.BOARD, tmp, ht.Tools(tmp, Path(tmp) / 'hil.log'))
 
     def fake(cmd, cwd=None, *, timeout, settle, state_dir, quiet):
+      self.argv = cmd
       return mock.Mock(returncode=0, stdout=out, stderr='', cleanup=cleanup, receipt=None)
     return p, mock.patch.object(ht.process(), 'run_tracked', side_effect=fake)
+
+  def test_pin_resets_never_connect_and_need_every_echo(self):
+    probe_line = 'J-Link connection not established yet but required for command.\nConnecting to J-Link ...O.K.\n'
+    pulses = [('r0', probe_line), ('sleep 20', 'Sleep(20)\n'), ('r1', ''), ('sleep 150', 'Sleep(150)\n'),
+              ('r0', ''), ('sleep 20', 'Sleep(20)\n'), ('r1', '')]
+    p, patch = self.probe(transcript(*pulses, ('exit', 'Script processing completed.\n')))
+    with patch:
+      self.assertEqual(p.pin_resets([150]), {'pulses': 2, 'gapsMs': [150]})
+    self.assertNotIn('-autoconnect', self.argv)
+    p, patch = self.probe(transcript(*pulses[:3], ('exit', 'Script processing completed.\n')))
+    with patch, self.assertRaisesRegex(ht.StepFail, 'nRESET pulses were not all issued'):
+      p.pin_resets([150])
+    p, patch = self.probe(transcript(('r0', '****** Error: no probe\n'), *pulses[1:3], ('exit', '')))
+    with patch, self.assertRaisesRegex(ht.StepFail, r"failed: \['r0'\]"):
+      p.pin_resets([])
 
   def test_a_tool_not_proven_ended_stops_with_its_receipt(self):
     p, patch = self.probe('', cleanup='unknown')
@@ -397,6 +413,17 @@ class BatteryRun(unittest.TestCase):
     copy.assert_called_once()
     app_ran.assert_called_once_with(b'c' * 16)
     info.assert_called_once_with('/dev/sdz', '0.11.0')
+
+  def test_double_reset_runs_both_controls_before_the_window(self):
+    bat, calls = self.battery(), []
+    with mock.patch.object(bat.probe, 'pin_resets', side_effect=lambda g: calls.append(('pulse', g)) or {}), \
+         mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}), \
+         mock.patch.object(bat.drive, 'wait', side_effect=lambda: calls.append(('drive',)) or '/dev/sdz'), \
+         mock.patch.object(bat.drive, 'info', return_value=['UF2 Bootloader x']):
+      ev = bat.double_reset(b'b' * 16)
+    self.assertEqual(calls, [('pulse', []), ('app', b'b' * 16), ('pulse', [1500]), ('app', b'b' * 16),
+                             ('pulse', [150]), ('drive',)])
+    self.assertEqual(ev['inWindow']['info'], ['UF2 Bootloader x'])
 
   def test_app_ran_rejects_another_copys_marker(self):
     bat = self.battery()
