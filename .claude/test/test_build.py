@@ -5,7 +5,6 @@ import contextlib
 import importlib.util
 import io
 import json
-import re
 import sys
 import tempfile
 import unittest
@@ -50,10 +49,6 @@ class Classify(unittest.TestCase):
       rule, _, sel = self.rule(p)
       self.assertEqual((rule, sel['boards']), ('board', {'pca10100'}), p)
 
-  def test_board_mk_adds_make_builds_of_that_board_and_the_mandated_boards(self):
-    rule, _, sel = self.rule('src/boards/nrfmicro/board.mk')
-    self.assertEqual((rule, sel['boards'], sel['make']), ('board-make', {'nrfmicro'}, {'nrfmicro', *cb.MANDATED}))
-
   def test_contract_changes_build_the_representatives(self):
     for p in ('.claude/skills/build/scripts/check_build.py', 'test/hil/fixture/main.c', '.github/workflows/hil.yml'):
       self.assertEqual(self.rule(p)[2]['boards'], set(cb.REPRESENTATIVES), p)
@@ -89,17 +84,6 @@ class BoardConfig(unittest.TestCase):
     for b in BOARDS:
       sd = cb.board_config(b)[1]
       self.assertTrue((ROOT / 'lib/softdevice' / sd / f'{sd}_softdevice.hex').is_file(), (b, sd))
-
-  def test_every_board_mk_override_is_mirrored_in_board_cmake(self):
-    for mk in (ROOT / 'src/boards').glob('*/board.mk'):
-      make_vars = dict(re.findall(r'^(\w+)\s*=\s*(\S+)', mk.read_text(), re.M))
-      cmake = (mk.parent / 'board.cmake').read_text()
-      for var in ('SD_VERSION', 'USE_NFCT'):
-        if var in make_vars:
-          m = re.search(rf'if \(NOT DEFINED {var}\)\s*set\({var}\s+([^)\s]+)\)', cmake)
-          self.assertTrue(m, (mk.parent.name, var))
-          want = {'yes': 'ON', 'no': 'OFF'}.get(make_vars[var], make_vars[var])
-          self.assertEqual(m[1], want, (mk.parent.name, var))
 
 
 class Select(unittest.TestCase):

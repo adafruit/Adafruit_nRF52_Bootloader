@@ -54,7 +54,6 @@ DOCS = re.compile(r'^(README\.md|changelog\.md|CODE_OF_CONDUCT\.md|LICENSE|suppo
                   r'|\.claude/skills/[^/]+/[^/]+\.md)$')
 # (pattern, rule, what it selects); first match wins
 RULES = (
-  (r'^src/boards/([^/]+)/board\.mk$', 'board-make', 'the board, plus legacy make builds of it and the mandated boards'),
   (r'^src/boards/([^/]+)(/|$)', 'board', 'the board'),
   (r'^\.claude/skills/build/scripts/', 'contract-build', 'contract tests, the representatives and every roster board'),
   (r'^(\.claude/skills/hil-contract/scripts/|test/hil/)', 'contract-hil',
@@ -134,16 +133,13 @@ def classify(path, boards):
     m = re.match(pattern, path)
     if not m:
       continue
-    if rule in ('board', 'board-make'):
+    if rule == 'board':
       board = m.group(1)
       if path == f'src/boards/{board}' and board not in boards:
         continue   # a file beside the boards (boards.c, boards.h) is shared code
       if board not in boards:
         return rule, f'{board} is no board in this tree (removed): nothing to build', {}
-      sel = {'boards': {board}, 'direct': {board}}
-      if rule == 'board-make':
-        sel['make'] = {board, *MANDATED}
-      return rule, f'{what}', sel
+      return rule, f'{what}', {'boards': {board}, 'direct': {board}}
     if rule == 'softdevice':
       users = {b for b in boards if board_config(b)[1] == m.group(1)}
       return rule, f'{what}: {", ".join(sorted(users)) or "none"}', {'boards': users, 'direct': users}
