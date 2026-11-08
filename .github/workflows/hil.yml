@@ -18,7 +18,7 @@ on:
         required: false
         default: ''
 
-# never cancelled: a battery killed mid-run leaves the board for recovery, so a newer push waits its turn
+# never cancelled: a battery killed mid-run leaves the board unrestored and its cleanup failed, so a newer push waits
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: false

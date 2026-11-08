@@ -9,9 +9,11 @@
   hil_test.py flush --dev DEV                                             (child: fsync of the drive)
 
 Exit: 0 pass (and cleaned up), 1 a step failed or the board did not run, 2 refused before any hardware access,
-4 cleanup failed: the board stays held by a cleanup holder (SKILL.md Recovery).
+4 cleanup failed (run) or a command failed after touching the board (install, restore): a run's failure is logged in
+the board's cleanup log and its lock released (SKILL.md Recovery).
 """
 import argparse
+import contextlib
 import errno
 import hashlib
 import json
@@ -32,7 +34,10 @@ import agentrc  # noqa: E402
 import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
-PENDING_KIND = 'nrf52-bootloader'   # hil_lock.PendingSessions: <lock>.nrf52-bootloader-pending.json
+# hil_lock.PendingSessions claims: <lock>.nrf52-bootloader-pending.json, the record older harnesses' marks used, whose
+# entries were claims already
+CLAIM_KIND = 'nrf52-bootloader'
+CLAIM_SETTLE = 30            # s an earlier invocation's unproven tools get to end before an attempt gives the board up
 STEPS = run_report.STEPS
 REENTRY = ('gpregret',)
 # nRF52 NVMC (PS v1.7 4.3.9) and POWER.GPREGRET (5.3.7.16); the same offsets on nRF52832/833
@@ -358,8 +363,8 @@ def uf2_payload(blob, base, length):
 
 class Tools:
   """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
-  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder.
-  run_tracked keeps a child's files in `dir` until it is proven ended: the board's pending mark names `dir` (claim)."""
+  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the board's cleanup log.
+  run_tracked keeps a child's files in `dir` until it is proven ended: the board's claim names `dir` (claim)."""
   def __init__(self, workdir, log):
     self.dir, self.log, self.receipts = process().state_dir(str(workdir), 'ops'), log, []
 
@@ -386,6 +391,12 @@ class Tools:
   def check(self, what):
     if self.receipts:
       raise NotEnded(f'{what}: a tool is not proven ended', {'receipts': self.receipts})
+
+  def logged(self):
+    """What the board's cleanup log keeps of each tool not proven ended: its receipt, or for one run_tracked named
+    none, an entry nothing rechecks done, so its failure stays open."""
+    return [r['receipt'] if r['receipt'] is not None else {'unrecheckable': f'{r["cmd"]}: cleanup {r["cleanup"]}'}
+            for r in self.receipts]
 
   def spawn(self, argv, timeout):
     """(exit, output) of a bounded child; exit 124 on the bound."""
@@ -739,7 +750,18 @@ class Battery:
 
 # ------------------------------------------------------------------ locks
 
+class InUse(Refused):
+  """The board is not free for this invocation: another one on it is alive (`occupied` None), or what an earlier one
+  left, or another JLinkExe on the probe, still occupies it after the settle (`occupied` names it). `found` is the
+  board's open failed cleanups, those the claim logged included."""
+  def __init__(self, msg, found, occupied=None):
+    super().__init__(msg)
+    self.found, self.occupied = found, occupied
+
+
 def take_lock(board, run_dir, wait):
+  """(handle, None) once the board's flock is taken, the handle's `cleanup_failures` the board's open failed cleanups;
+  (None, the row's fields) when it is not."""
   helper = lock_helper()
   end = time.monotonic() + wait
   while True:
@@ -751,64 +773,108 @@ def take_lock(board, run_dir, wait):
       if time.monotonic() >= end:
         return None, {'locked': True, 'recoveryBlocker': False, 'detail': str(e)}
       time.sleep(min(LOCK_RETRY, max(0, end - time.monotonic())))
+    except helper.LockUnavailable as e:
+      return None, {'detail': str(e)}
 
 
-def claim(board, ops):
-  """The board's pending mark names this invocation and its ops dir before its first tool starts; refused while it
-  names another invocation not ended (invocation_ended), so a later one, a recovery's included, refuses while this one
-  lives or a tool it started is not proven ended. add() runs under the mark's mutex: of two invocations claiming at
-  once, the later one lists the earlier."""
-  helper = lock_helper()
-  me = {'ops': os.path.realpath(ops), 'pid': os.getpid(), 'start': helper.proc_start(os.getpid())}
+def log_failure(board, detail, receipts, task=None):
+  """A cleanup this invocation, or an earlier one (`task`, its claim), could not prove, appended to the board's cleanup
+  log without touching its lock; '' or why it was not logged."""
   try:
-    if me['start'] is None:
-      raise OSError('own start time unreadable')
-    listed = helper.PendingSessions(board['lock'], PENDING_KIND).add([{'receipt': me, 'cmd': 'hil_test.py'}])
+    lock_helper().log_cleanup_failure(board['lock'], REASON, detail=detail, task=task, receipts=receipts)
+  except Exception as e:
+    return f'cleanup log not written: {type(e).__name__}: {e}'
+  return ''
+
+
+def claim(board, ops, found):
+  """Name this invocation and its ops dir in the board's claim record before its first tool, under the run's flock or
+  the caller's hold (agentrc `hil` Board locks). An earlier invocation's claim leaves the record once it ended, or once
+  the tools it left not proven ended are logged in the board's cleanup log; those, and any JLinkExe on the probe, then
+  get CLAIM_SETTLE to end. Returns (claim, `found` refreshed, '' or what was not logged or removed); Refused when the
+  record cannot name this invocation, InUse while the board is not free, this claim removed again."""
+  helper = lock_helper()
+  record = helper.PendingSessions(board['lock'], CLAIM_KIND)
+  try:
+    entry = helper.claim_entry(ops, REASON)
+    others = record.claim(entry)
   except (OSError, ValueError, helper.PendingRefused) as e:
-    raise Refused(f'the board\'s pending mark could not name this invocation: {type(e).__name__}: {e}')
-  left = [e['receipt'] for e in listed if e['receipt'] != me and not ended_quietly(board, e)]
-  if left:
-    raise Refused(f'an earlier invocation, or a tool it started, is not proven ended: {left}')
-
-
-def invocation_ended(board, session):
-  """A claim's invocation is gone (or is this one) and every tool it started rechecks done: run_tracked removes a
-  child's files once it is, so each hil_op_*.log left in its ops dir is one to recheck. An ops dir this user cannot
-  list, another user's or gone, is not ended (the listing raises). A receipt the board's holder names keeps its files:
-  a cleanup holder's release rechecks them."""
-  rec = lock_helper().read_record(board['lock'])
-  held = {h.get('token') for h in rec.get('receipts') or [] if isinstance(h, dict)} if isinstance(rec, dict) else set()
-  r = session['receipt']
-  if r['pid'] != os.getpid() and lock_helper().proc_start(r['pid']) == r['start']:
-    return False
-  for name in os.listdir(r['ops']):
-    if not (name.startswith('hil_op_') and name.endswith('.log')):
-      continue
-    base = os.path.join(r['ops'], name[:-len('.log')])
-    receipt = {'token': name[len('hil_op_'):-len('.log')], 'supervisor': None, 'lock': f'{base}.lock',
-               'record': f'{base}.json', 'log': f'{base}.log'}
-    if process().recheck(receipt) != 'done':
-      return False
-    if receipt['token'] not in held:
-      process().tidy(receipt)
-  return True
-
-
-def ended_quietly(board, session):
+    raise Refused(f'the board\'s claim record could not name this invocation: {type(e).__name__}: {e}')
+  notes, unsettled = [], []
   try:
-    return invocation_ended(board, session) is True
-  except Exception:
-    return False
+    if alive := [s['receipt'] for s in others if helper.claim_alive(s)]:
+      raise InUse(f'another invocation on the board is running: {alive}', found)
+    # read after the gate: a claimant alive at the take may have logged, and so keeps, a receipt since
+    keep = helper.logged_tokens(found + helper.open_cleanup_failures(board['lock']))
+    for s in others:
+      state, receipts = helper.invocation_state(s, keep)
+      if state == 'alive':   # not after the gate, but a live claim is never removed
+        continue
+      unsettled += receipts
+      if new := [r for r in receipts if not (isinstance(r, dict) and r.get('token') in keep)]:
+        if why := log_failure(board, 'an earlier invocation ended with tools not proven ended', new, s['receipt']):
+          notes.append(why)   # its claim stays, for the next attempt to log
+          continue
+        found = helper.open_cleanup_failures(board['lock'])
+      try:
+        record.remove(s)
+      except (OSError, helper.PendingRefused) as e:
+        notes.append(f'earlier claim not removed: {e}')
+    wait = CLAIM_SETTLE if unsettled else 0
+    if left := helper.settle(unsettled, wait, busy=lambda: probe_users(board)):
+      raise InUse(f'still on the board after {wait}s: {left}', found, left)
+  except InUse:
+    with contextlib.suppress(OSError, helper.PendingRefused):
+      record.remove(entry)
+    raise
+  return entry, found, '; '.join(notes)
 
 
-def unmark(board):
-  """The mark removed once every invocation it names, this one included, ended; kept otherwise, for the next claim
-  to judge."""
+def unclaim(board, entry, tools):
+  """Remove this invocation's claim once recheck_dir of its ops dir answers done, the files of the receipts it logged
+  kept for resolve_restored; before its lock goes. An unclean end keeps it, for the next claim to judge. '' or why it
+  stays."""
+  if entry is None:
+    return ''
+  try:
+    verdict, _ = process().recheck_dir(tools.dir, {r.get('token') for r in tools.logged()})
+    if verdict != 'done':
+      return f'claim kept: its tools recheck {verdict}'
+    lock_helper().PendingSessions(board['lock'], CLAIM_KIND).remove(entry)
+  except Exception as e:   # the lock ends after this whatever it found
+    return f'claim not removed: {type(e).__name__}: {e}'
+  return ''
+
+
+def note(fields, key, why):
+  if why:
+    fields[key] = '; '.join(filter(None, (fields.get(key), why)))
+
+
+def resolve(board, found, state):
+  """The board was restored: each of `found` (open failed cleanups) whose own receipts recheck done is marked restored,
+  every other kept open. '' or why some stay."""
+  try:
+    return '; '.join(lock_helper().resolve_restored(board['lock'], found, evidence=f'{board["name"]}: {state}'))
+  except Exception as e:
+    return f'restorations not logged: {type(e).__name__}: {e}'
+
+
+def end_lock(board, fh, cleanup, detail, tools, found):
+  """The run's lock ends with it: after a proven cleanup the open failures it found are resolved and the lock released;
+  otherwise end_failed logs the cleanup it could not prove, with the receipts of tools not proven ended, and releases.
+  `cleanup` (the row's) records which."""
   helper = lock_helper()
-  try:
-    helper.PendingSessions(board['lock'], PENDING_KIND).clear(lambda s: invocation_ended(board, s))
-  except (OSError, helper.PendingRefused):
-    pass
+  if cleanup['pass']:
+    if cleanup['state'] != 'untouched':
+      note(cleanup, 'restoredNote', resolve(board, found, cleanup['state']))
+    helper.release_board_lock(fh)
+  else:
+    errors = helper.end_failed({board['lock']: fh}, REASON, detail=detail, receipts=tools.logged()).get(board['lock'])
+    cleanup['failureLogged'] = not any(e.startswith('cleanup log not written') for e in errors or [])
+    if errors:
+      cleanup['endErrors'] = errors
+  cleanup['released'] = True
 
 
 def prove_hold(board, reason):
@@ -819,8 +885,8 @@ def prove_hold(board, reason):
 
 
 def prove_cleanup_holder(board, pid):
-  """The board's lock record: a live cleanup holder `pid` (a failed run's, or a takeover's) of this board alone, every
-  receipt it was handed rechecking `done`, and no tool of a run left on the host."""
+  """The board's lock record: an older helper's live cleanup holder `pid` of this board alone, every receipt it was
+  handed rechecking `done`, and no tool of a run left on the host."""
   helper = lock_helper()
   rec = helper.read_record(board['lock'])
   if not helper.is_cleanup_holder(rec) or rec.get('pid') != pid or not helper.holder_alive(rec) \
@@ -869,7 +935,7 @@ def cmd_run(args, argv):
   row = {'board': args.board, 'ran': False, 'pass': False, 'locked': False, 'steps': [],
          'cleanup': {'pass': True, 'state': 'untouched'}}
   result = {'pass': False, 'caveat': '', 'results': [row], 'reportPath': str(run_dir / 'hil_report.json'),
-            'heldInProcess': False, 'uncovered': list(UNCOVERED)}
+            'uncovered': list(UNCOVERED)}
 
   def finish(code):
     result['exitCode'] = code
@@ -890,6 +956,10 @@ def cmd_run(args, argv):
     for tool, what in (('mcopy', 'mtools'), ('adafruit-nrfutil', 'the farm\'s hil-venv')):
       if not shutil.which(tool):
         raise Refused(f'{tool} ({what}) must be on PATH')
+    try:
+      bat = Battery(board, f, run_dir, log, args.fail_at)
+    except OSError as e:
+      raise Refused(f'ops dir in {run_dir}: {type(e).__name__}: {e}')
   except Refused as e:
     row['detail'] = result['error'] = str(e)
     return finish(2)
@@ -898,19 +968,20 @@ def cmd_run(args, argv):
   if fh is None:
     row.update(held)
     return finish(1)
-  bat = Battery(board, f, run_dir, log, args.fail_at)
+  helper, found, entry = lock_helper(), fh.cleanup_failures, None
+  row.update(helper.failure_report(found))
   code, row['cleanup'] = 1, None
   try:
     try:
-      claim(board, bat.tools.dir)
-      blocked, users = None, probe_users(board)
+      entry, found, why = claim(board, bat.tools.dir, found)
+    except InUse as e:
+      row.update(detail=f'board in use: {e}', **helper.failure_report(e.found),
+                 **({'occupiedBy': e.occupied} if e.occupied else {'locked': True}))
     except Refused as e:
-      blocked, users = str(e), []
-    if blocked:
-      row.update(recoveryBlocker=True, detail=blocked)
-    elif users:
-      row.update(probeUsers=users, detail='another JLinkExe uses the probe')
+      row.update(recoveryBlocker=True, detail=str(e))
     else:
+      row.update(helper.failure_report(found))
+      note(row, 'claimNote', why)
       row['ran'] = True
       try:
         bat.battery(base)
@@ -919,35 +990,28 @@ def cmd_run(args, argv):
         row['detail'] = f'{bat.steps[-1]["step"]}: {e}'
       row['cleanup'] = bat.restore()
       code = 0 if row['pass'] and row['cleanup']['pass'] else 1
-  except BaseException as e:   # an interrupt or an error outside a step: reported, the board handed over below
+  except BaseException as e:   # an interrupt or an error outside a step: reported, the board's failure logged below
     row['detail'] = f'{type(e).__name__}: {e}'
   finally:
     row['steps'] = bat.steps
     if row['cleanup'] is None:   # never restored: an interrupt, or nothing written
       row['cleanup'] = ({'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
                          'receipts': bat.tools.receipts} if bat.touched else {'pass': True, 'state': 'untouched'})
+    note(row, 'claimNote', unclaim(board, entry, bat.tools))
+    end_lock(board, fh, row['cleanup'], row['cleanup'].get('detail') or row.get('detail'), bat.tools, found)
     if not row['cleanup']['pass']:
-      try:
-        token = lock_helper().hand_to_cleanup_holder(
-          {board['lock']: fh}, REASON, detail=row['cleanup'].get('detail'),
-          receipts=[r['receipt'] for r in bat.tools.receipts if r['receipt'] is not None])
-        row['cleanup'].update(heldAfter=True, holder={'token': token})
-      except Exception as e:
-        row['cleanup'].update(heldAfter=True, holder={'error': str(e)})
-      fh.close()
       code = 4
-    else:
-      unmark(board)
-      lock_helper().release_board_lock(fh)
   result['pass'] = code == 0
   return finish(code)
 
 
 def cmd_manual(args, argv):
-  """install or restore under the caller's own hold, or restore under a cleanup holder, ended once it passed."""
+  """install or restore under the caller's own hold, or restore under an older helper's cleanup holder, ended once
+  it passed. Nothing here ends a hold: a restore that failed, or a tool not proven ended, is only logged."""
   workdir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / \
     f'{args.cmd}-{time.strftime("%Y%m%d-%H%M%S")}-{os.getpid()}'
   workdir.mkdir(parents=True)
+  helper = lock_helper()
   try:
     board = load_board(args.roster, args.board)
     holder = None
@@ -955,34 +1019,47 @@ def cmd_manual(args, argv):
       prove_hold(board, args.under_hold)
     else:
       holder = prove_cleanup_holder(board, args.recover_holder)
+    found = helper.open_cleanup_failures(board['lock'])
     _, rrow, copies = admit(args.build_record, args.board, args.roster, workdir)
     f = facts(args.board, rrow, copies, workdir)
-    bat = Battery(board, f, workdir, workdir / 'hil.log')
-    claim(board, bat.tools.dir)
-    if probe_users(board):
-      raise Refused('another JLinkExe uses the probe')
+    try:
+      bat = Battery(board, f, workdir, workdir / 'hil.log')
+    except OSError as e:
+      raise Refused(f'ops dir in {workdir}: {type(e).__name__}: {e}')
+    entry, found, why = claim(board, bat.tools.dir, found)
   except Refused as e:
-    print(json.dumps({'pass': False, 'error': str(e)}))
+    print(json.dumps({'pass': False, 'error': str(e),
+                      **(helper.failure_report(e.found) if isinstance(e, InUse) else {})}))
     return 2
+  out, interrupt = {**helper.failure_report(found)}, None
+  note(out, 'claimNote', why)
   bat.touched = True
   try:
     if args.cmd == 'install':
-      ev = {'install': bat.install(), 'dfu': bat.dfu()}
-      out = {'pass': True, 'evidence': ev}
+      out.update({'pass': True, 'evidence': {'install': bat.install(), 'dfu': bat.dfu()}})
     else:
-      out = bat.restore()
-  except StepFail as e:
-    print(json.dumps({'pass': False, 'error': str(e), 'evidence': e.evidence}))
-    return 4
-  if out['pass'] and holder:
-    try:
-      lock_helper().release_token(holder['token'])
-      out['recovered'] = {'holder': holder['pid'], 'released': True}
-    except lock_helper().ReleaseRefused as e:
-      out.update({'pass': False, 'recovered': {'holder': holder['pid'], 'released': False, 'error': str(e)}})
-  if out['pass']:
-    unmark(board)
-  print(json.dumps(out))
+      out.update(bat.restore())
+  except BaseException as e:
+    out.update({'pass': False, 'error': f'{type(e).__name__}: {e}', 'evidence': getattr(e, 'evidence', {})})
+    interrupt = None if isinstance(e, Exception) else e
+  try:
+    if not out['pass'] and (args.cmd == 'restore' or bat.tools.receipts):
+      why = log_failure(board, f'{args.cmd} failed: {out.get("detail") or out.get("error")}', bat.tools.logged())
+      out['failureLogged'] = not why
+      note(out, 'logError', why)
+    elif out['pass'] and args.cmd == 'restore':
+      note(out, 'restoredNote', resolve(board, found, out['state']))
+      if holder:
+        try:
+          helper.release_token(holder['token'])
+          out['recovered'] = {'holder': holder['pid'], 'released': True}
+        except helper.ReleaseRefused as e:
+          out.update({'pass': False, 'recovered': {'holder': holder['pid'], 'released': False, 'error': str(e)}})
+  finally:
+    note(out, 'claimNote', unclaim(board, entry, bat.tools))
+    print(json.dumps(out))
+  if interrupt:
+    raise interrupt
   return 0 if out['pass'] else 4
 
 

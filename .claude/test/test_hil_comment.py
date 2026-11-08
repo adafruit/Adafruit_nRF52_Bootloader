@@ -19,14 +19,15 @@ META = {'head': 'a' * 40, 'tested': 'b' * 40, 'runUrl': 'https://x/runs/1/attemp
 SELECTION = {'boards': ['pca10056'], 'full': False, 'uncovered': ['nRF52832: no roster board on this host']}
 
 
-def report(passed=True, failed_step=None, exit_code=0, cleanup=True):
+def report(passed=True, failed_step=None, exit_code=0, cleanup=True, **extra):
   steps = [{'step': s, 'pass': s != failed_step, 'seconds': 2} for s in hc.STEPS]
   if failed_step:
     steps = steps[:hc.STEPS.index(failed_step) + 1]
     steps[-1]['detail'] = 'no drive'
   row = {'board': 'pca10056', 'ran': True, 'pass': passed, 'steps': steps, 'detail': None if passed else
          f'{failed_step}: no drive', 'firmware': {'version': '0.11.0'},
-         'cleanup': {'pass': cleanup, 'state': 'fixture running' if cleanup else 'unknown', 'heldAfter': not cleanup}}
+         'cleanup': {'pass': cleanup, 'state': 'fixture running' if cleanup else 'unknown', 'released': True,
+                     **({} if cleanup else {'failureLogged': True})}, **extra}
   return {'pass': passed, 'exitCode': exit_code, 'results': [row], 'uncovered': ['BLE OTA DFU']}
 
 
@@ -45,6 +46,18 @@ class Render(unittest.TestCase):
     body = hc.render({'pca10056': ('blocker', 'report corrupt: x', None)}, SELECTION, META)
     self.assertIn('**⛔ blocked**', body)
     self.assertIn('`report corrupt: x`', body)
+
+  def test_a_failed_cleanup_and_an_earlier_one_are_named(self):
+    earlier = {'event': 'failed', 'id': 'f1', 'at': '2026-11-08T10:00:00+0700', 'reason': 'hil_test.py',
+               'detail': 'interrupted before cleanup'}
+    body = report(False, 'dfu', 4, cleanup=False, previousCleanupFailure=earlier)
+    verdict, detail = hc.run_report.verdict(4, body, 'pca10056')
+    self.assertEqual(verdict, 'blocker')
+    text = hc.render({'pca10056': (verdict, detail, body)}, SELECTION, META)
+    self.assertIn("Cleanup failed (unknown): logged in the board's cleanup log; lock released", text)
+    self.assertIn('- `Found an earlier failed cleanup on the board: 2026-11-08T10:00:00+0700 hil_test.py: '
+                  'interrupted before cleanup`', text)
+    self.assertNotIn('earlier failed cleanup', hc.render({'pca10056': ('pass', '', report())}, SELECTION, META))
 
   def test_missing_run_selection_and_no_boards(self):
     self.assertIn('HIL report unavailable for `pca10056`', hc.render({'pca10056': None}, SELECTION, META))

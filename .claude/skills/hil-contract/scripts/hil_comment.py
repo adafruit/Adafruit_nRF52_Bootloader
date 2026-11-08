@@ -73,8 +73,10 @@ def board_lines(result, board):
            '| --- | ' + ' | '.join(':-:' for _ in STEPS) + ' | :-: | --: |',
            '| ' + ' | '.join([literal(board, table=True), *(marks.get(s, '') for s in STEPS), clean,
                               f'{seconds:.0f}s']) + ' |', '', LEGEND, '']
-  if verdict != 'pass':
+  if verdict != 'pass':   # a failed cleanup's detail says whether the board's cleanup log took it
     lines += [f'- {literal(board)}: {literal(detail)}', '']
+  if earlier := run_report.previous_failure(row):
+    lines += [f'- {literal(earlier)}', '']
   return lines
 
 
