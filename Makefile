@@ -96,6 +96,9 @@ GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan
 # without configuring it.
 SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f
 
+# one configure and one build at a time in $(BUILD), whatever -j and the goals given
+.NOTPARALLEL:
+
 .PHONY: all configure clean flash flash-dfu dfu-flash flash-sd sd flash-mbr mbr flash-uf2 erase copy-artifact \
   linkermap gdbflash gdb
 

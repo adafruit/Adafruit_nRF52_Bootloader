@@ -175,7 +175,12 @@ class FlashWithoutBuild(unittest.TestCase):
     self.assertIn(f'NRFJPROG --program {rel} -f nrf52 --sectorerase --reset', p.stdout.splitlines())
 
   def test_flash_tool_failure_fails_make(self):
-    p = make('BOARD=pca10056', 'CROSS_COMPILE=/nonexistent/', 'NRFJPROG=false', 'BUILD=/nonexistent/b', 'erase')
+    with tempfile.TemporaryDirectory() as d:
+      failing = Path(d, 'nrfjprog')
+      failing.write_text(f'#!/bin/sh\necho "$@" > {d}/called\nexit 1\n')
+      failing.chmod(0o755)
+      p = make('BOARD=pca10056', 'CROSS_COMPILE=/nonexistent/', f'NRFJPROG={failing}', f'BUILD={d}/b', 'erase')
+      self.assertEqual(Path(d, 'called').read_text(), '-f nrf52 --eraseall\n')
     self.assertNotEqual(p.returncode, 0)
 
 
@@ -257,6 +262,16 @@ class Build(unittest.TestCase):
       self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
       self.assertIn(f'NRFUTIL --verbose dfu serial --package {build}/{zips[0]} -p /dev/ttyX -b 115200 --singlebank '
                     '--touch 1200', p.stdout.splitlines())
+
+      # concurrent goals share one configure and never run two builds in one directory
+      self.assertEqual(make(*base, 'clean').returncode, 0)
+      p = make('-j2', *base, 'all', 'flash')
+      self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+      self.assertEqual(p.stdout.count('cmake -S . -B'), 1)
+      self.assertEqual(len(re.findall(r'Building C object \S*/src/main\.c', p.stdout)), 1)
+      self.assertEqual(p.stdout.count('Linking C executable bootloader.elf'), 1)
+      self.assertIn(f'NRFJPROG --program {build}/{nosd[0]} --sectoranduicrerase -f nrf52 --reset',
+                    p.stdout.splitlines())
 
       p = make(*base, 'clean')
       self.assertEqual(p.returncode, 0, p.stderr)
