@@ -56,13 +56,15 @@ On the rig, from a clean checkout at the record's HEAD (exit 2 otherwise):
 
 ```bash
 python3 .claude/skills/hil-contract/scripts/hil_test.py run -b pca10056 \
-  --build-record cmake-build/pca10056.hil.json --base-dir <dir> [--lock-wait S] [--run-root DIR] test/hil/ci.json
+  --build-record cmake-build/pca10056.hil.json --base-dir <dir> [--profile P] [--lock-wait S] [--run-root DIR] \
+  test/hil/ci.json
 ```
 
 `--base-dir` holds the roster's `selfUpdateBase` file, downloaded from that release; `run` refuses bytes that do not
 hash as pinned and copies them into the run dir. `adafruit-nrfutil` (the farm's hil-venv) and `mcopy` must be on
 `PATH`. `run` takes the lock itself (no pre-hold) and runs one board for up to about five minutes; its last stdout line
-is the JSON report and its exit is final. The battery, each step judged from its own evidence:
+is the JSON report and its exit is final. `--profile` (default `default`) picks the record's profile and its
+battery. The `default` battery, each step judged from its own evidence:
 
 1. `install`: ERASEALL through NVMC with the CPU halted (nRF52840 errata [184]), `READY` read back, the merged HEX
    (MBR, SoftDevice, bootloader, UICR) loaded and each of its runs verified with `verifybin`, then reset.
@@ -101,6 +103,22 @@ is the JSON report and its exit is final. The battery, each step judged from its
    invalid (`DFU_UPDATE_SD_SWAPPED`), so it comes back in DFU by itself; every run of the merged HEX, SoftDevice and
    bootloader included, verifies, `INFO_UF2.TXT` names the candidate and SoftDevice, and app E copied through the
    drive runs.
+
+The `dualbank` battery (`DUALBANK_FW=ON`, `dfu_dual_bank.c`), its cleanup reinstalling the `default` image:
+
+1. `install`, `dfu` as above.
+2. `serial`, `app-ran`, `serial-b`, `app-ran-b`: apps A, then B, through CDC-only serial DFU without `--singlebank`.
+   The bootloader receives each into bank 1 (`DFU_BANK_1_REGION_START`: half the app region less
+   `DFU_APP_DATA_RESERVED`, rounded down to two 4 kB pages; `0x88000` here), checks the init packet's CRC-16 and on
+   activation copies bank 1 into bank 0, then resets. Once the CDC device left, J-Link verifies the app in both banks
+   and bank 0 marked valid in the settings; the app runs.
+3. `refused`: app C in a package whose init packet CRC-16 is flipped. The bootloader receives C into bank 1 and
+   `dfu_init_postvalidate` refuses it, so it never activates: the CDC device stays (no activation reset;
+   adafruit-nrfutil reports success either way), J-Link verifies C in bank 1 and B in bank 0, still marked valid,
+   then resets, and B runs (README, Dual bank firmware support).
+4. `interrupted`: an interrupted serial transfer. App D, about 240 KiB, is sent until adafruit-nrfutil's 12 s bound
+   ends it (`CUT_AFTER`: about 6 s of erase wait and 16 s of sending at the DK's ~15 KB/s); J-Link verifies D's first
+   page in bank 1 and not the start of its last, B in bank 0 still marked valid, then resets, and B runs.
 
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, adafruit-nrfutil, the FAT
 reader and flush) runs under agentrc's `hil_process.run_tracked` with its files in the run dir's `ops`
@@ -205,9 +223,10 @@ retries a fail once per `hil` Caller rules.
 
 - Covered: the nRF52840 with S140 6.1.1 on the DK, UF2 DFU end to end, GPREGRET entry (UF2 and CDC-only) and
   readback, a double reset on the reset pin, CDC serial DFU of an app, bootloader self-update from the pinned release
-  and back, an interrupted UF2 transfer (the bootloader starts the partly written image), and a same-version
-  SoftDevice and bootloader rewrite through the release package. Uncovered, named pending in every report that needs
-  them: nRF52832 (serial DFU only, no USB), nRF52833, BLE OTA, SIGNED_FW, dual bank, and another SoftDevice version
-  than the build's.
+  and back, an interrupted UF2 transfer (the bootloader starts the partly written image), a same-version SoftDevice
+  and bootloader rewrite through the release package, and on a dual-bank build an app's serial DFU, a refused and an
+  interrupted one. Uncovered, named pending in every report that needs them: nRF52832 (serial DFU only, no USB),
+  nRF52833, BLE OTA, SIGNED_FW, another SoftDevice version than the build's, and a SoftDevice or bootloader update on
+  a dual-bank build.
 - `INFO_UF2.TXT` is checked by its lines, not the drive's other files; `CURRENT.UF2` only over the app's span.
 - Commissioning: `commissioning.md`.

@@ -99,6 +99,26 @@ class Images(unittest.TestCase):
     self.assertEqual(ht.uf2_payload(uf2, 0x26000, len(img)), img)
     self.assertEqual(ht.uf2_payload(uf2, 0x26100, 256), img[256:512])
 
+  def test_bank_1_starts_half_the_app_region_up(self):
+    # nRF52840, S140 6.1.1: (0xF4000 - 0x26000 - 10 * 4096) rounded to two pages, halved
+    self.assertEqual(ht.bank_1_start('nrf52840', 0x26000, 0xF4000), 0x88000)
+    with self.assertRaises(ht.Refused):
+      ht.bank_1_start('nrf52999', 0x26000, 0xF4000)
+
+  def test_repackage_replaces_each_init_packet(self):
+    import zipfile
+    with tempfile.TemporaryDirectory() as tmp:
+      src, dst = Path(tmp) / 'a.zip', Path(tmp) / 'b.zip'
+      manifest = {'manifest': {'application': {'bin_file': 'app.bin', 'dat_file': 'app.dat'}, 'dfu_version': 0.5}}
+      with zipfile.ZipFile(src, 'w') as z:
+        z.writestr('manifest.json', json.dumps(manifest))
+        z.writestr('app.dat', bytes.fromhex('5200ffffffffffff0100feff65d6'))
+        z.writestr('app.bin', b'img')
+      ht.repackage(src, dst, ht.flip_crc)
+      with zipfile.ZipFile(dst) as z:
+        self.assertEqual(z.read('app.dat'), bytes.fromhex('5200ffffffffffff0100feff9a29'))
+        self.assertEqual(z.read('app.bin'), b'img')
+
   def test_current_span_is_the_app_blocks_of_current_uf2(self):
     bat = ht.Battery.__new__(ht.Battery)
     bat.f = FACTS
@@ -529,6 +549,106 @@ class BatteryRun(unittest.TestCase):
       with self.assertRaisesRegex(ht.StepFail, "copy's app"):
         bat.app_ran(b'b' * 16)
     self.assertNotEqual(a['marker'], b['marker'])
+
+  def dual(self):
+    bat = self.battery()
+    bat.f = {**FACTS, 'vid': 0x239A, 'cdcPid': 0xDA, 'bank1': 0x88000}
+    return bat
+
+  def test_serial_dfu_omits_singlebank_for_a_dual_bank_build(self):
+    bat = self.battery()
+    with mock.patch.object(bat, 'nrfutil', return_value='Device programmed.\n') as nrfutil:
+      bat.dfu_serial('/p.zip', '/dev/ttyACM9', singlebank=False)
+    self.assertNotIn('--singlebank', nrfutil.call_args.args[0])
+
+  def bank_session(self, settings=0x0000_0001, tail=None):
+    sessions = []
+
+    def session(cmds):
+      sessions.append(cmds)
+      out = f'{ht.BOOTLOADER_SETTINGS:08X} = {settings:08X} \n'
+      mem = [c for c in cmds if c.startswith('mem32') and not c.startswith(f'mem32 {ht.BOOTLOADER_SETTINGS:08X}')]
+      if mem and tail is not None:
+        out += f'{mem[0].split()[1]} = ' + ' '.join(f'{int.from_bytes(tail[i:i + 4], "little"):08X}'
+                                                   for i in range(0, 16, 4)) + ' \n'
+      return out
+    return sessions, session
+
+  def test_banked_reads_the_app_back_from_both_banks_once_the_bootloader_left(self):
+    bat, calls = self.dual(), []
+    sessions, session = self.bank_session()
+    fx = ht.fixture(bat.f, b'a' * 16)
+    with mock.patch.object(bat, 'serial', side_effect=lambda n, singlebank: calls.append(('serial', singlebank)) or {}), \
+         mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(bat.probe, 'session', side_effect=session):
+      ev = bat.banked(b'a' * 16)
+    self.assertEqual(calls, [('serial', False)])
+    cmds = sessions[0]
+    self.assertEqual((cmds[0], cmds[-1]), ('h', 'g'))
+    self.assertTrue(cmds[2].endswith('00088000') and cmds[3].endswith('00026000'))
+    self.assertEqual(Path(cmds[2].split()[1]).read_bytes(), fx['image'])
+    self.assertEqual(ev['bank0']['state'], 1)
+    sessions, session = self.bank_session(settings=0xFF)
+    with mock.patch.object(bat, 'serial', return_value={}), mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(bat.probe, 'session', side_effect=session), self.assertRaisesRegex(ht.StepFail, 'valid'):
+      bat.banked(b'a' * 16)
+
+  def test_refused_keeps_the_bootloader_in_dfu_then_runs_the_old_app(self):
+    bat, calls = self.dual(), []
+    sessions, session = self.bank_session()
+    c, b = ht.fixture(bat.f, b'c' * 16), ht.fixture(bat.f, b'b' * 16)
+    with mock.patch.object(bat.probe, 'reenter', return_value={}), \
+         mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9'), \
+         mock.patch.object(bat, 'package', side_effect=lambda img, name, edit=None: calls.append(edit) or '/p.zip'), \
+         mock.patch.object(bat, 'nrfutil', side_effect=lambda argv, what: calls.append(argv) or 'Device programmed.'), \
+         mock.patch.object(ht, 'stays_away', side_effect=lambda *a: calls.append('stays')), \
+         mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(bat.probe, 'session', side_effect=session), \
+         mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}):
+      bat.refused(b'c' * 16, b'b' * 16)
+    self.assertIs(calls[0], ht.flip_crc)
+    self.assertNotIn('--singlebank', calls[1])
+    self.assertEqual(calls[2:], ['stays', ('app', b'b' * 16)])
+    cmds = sessions[0]
+    self.assertEqual(cmds[-2:], ['r', 'g'])
+    self.assertEqual(Path(cmds[2].split()[1]).read_bytes(), c['image'])
+    self.assertEqual(Path(cmds[3].split()[1]).read_bytes(), b['image'])
+
+  def cut(self, code=124, tail=None):
+    bat = self.dual()
+    fx = ht.fixture(bat.f, b'd' * 16, pattern=ht.CUT_PAGES * ht.PAGE)
+    sessions, session = self.bank_session(tail=tail if tail is not None else b'\xff' * 16)
+    with mock.patch.object(bat.probe, 'reenter', return_value={}), \
+         mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9'), \
+         mock.patch.object(bat, 'package', return_value='/p.zip'), \
+         mock.patch.object(bat.tools, 'spawn', return_value=(code, 'Sending DFU start packet\n')) as spawn, \
+         mock.patch.object(ht, 'usb_device', return_value=None), \
+         mock.patch.object(bat.probe, 'session', side_effect=session), \
+         mock.patch.object(bat, 'app_ran', return_value={}) as app_ran:
+      ev = bat.cut_short(b'd' * 16, b'b' * 16)
+    self.assertEqual(spawn.call_args.args[1], ht.CUT_AFTER)
+    app_ran.assert_called_once_with(b'b' * 16)
+    return ev, sessions, fx
+
+  def test_cut_short_reads_the_first_page_but_not_the_last_from_bank_1(self):
+    ev, sessions, fx = self.cut()
+    cmds = sessions[0]
+    self.assertEqual(Path(cmds[2].split()[1]).read_bytes(), fx['image'][:ht.PAGE])
+    self.assertIn(f'mem32 {0x88000 + ht.CUT_PAGES * ht.PAGE:08X} 4', cmds)
+    self.assertEqual(cmds[-2:], ['r', 'g'])
+    self.assertIn('notWritten', ev['bank0'])
+    with self.assertRaisesRegex(ht.StepFail, 'not cut short: exit 0'):
+      self.cut(code=0)
+    with self.assertRaisesRegex(ht.StepFail, 'holds the whole image'):
+      self.cut(tail=fx['image'][ht.CUT_PAGES * ht.PAGE:][:16])
+
+  def test_dualbank_runs_its_profile_steps_in_order(self):
+    bat = self.dual()
+    bat.profile = 'dualbank'
+    with mock.patch.object(bat, 'install'), mock.patch.object(bat, 'dfu'), mock.patch.object(bat, 'banked'), \
+         mock.patch.object(bat, 'app_ran'), mock.patch.object(bat, 'refused'), mock.patch.object(bat, 'cut_short'):
+      bat.battery({})
+    self.assertEqual(tuple(s['step'] for s in bat.steps), rr.PROFILE_STEPS['dualbank'])
 
   def test_a_profiles_cleanup_reinstalls_the_default_image(self):
     tmp = tempfile.mkdtemp()

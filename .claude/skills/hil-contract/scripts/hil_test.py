@@ -26,6 +26,7 @@ import struct
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -57,6 +58,9 @@ UF2_FLAG_FAMILY = 0x2000
 JLINK_SPEED = 4000
 ERASEALL_WAIT_MS = 1000      # tERASEALL is at most 169 ms (PS v1.7 4.3.10); READY is read after it
 PROBE_TIMEOUT, INSTALL_TIMEOUT, NRFUTIL_TIMEOUT = 60, 180, 120
+# a dual-bank serial transfer cut short: about 240 KiB, which adafruit-nrfutil needs ~6 s of erase wait (dfu
+# serial get_erase_wait_time) and ~16 s at the DK's ~15 KB/s to send; its bound ends it about a third in
+CUT_PAGES, CUT_AFTER = 60, 12
 USB_TIMEOUT, UDEV_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 10, 30, 15, 3
 APP_SAMPLE_MS = 200
 # nRESET pulses through the DK's interface MCU (J-Link r0/r1); src/main.c enters DFU on a pin reset within
@@ -69,8 +73,8 @@ UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] 
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
-UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW and dual-bank builds',
-             'another SoftDevice version than the build\'s')
+UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW builds',
+             'another SoftDevice version than the build\'s', 'a SoftDevice or bootloader update on a dual-bank build')
 
 
 class Refused(Exception):
@@ -326,6 +330,7 @@ def facts(board, row, copies, workdir):
   if not flash or not boot:
     raise Refused(f'{mcu}: cannot establish the flash size or the bootloader start')
   check_spans(merged, int(flash[2], 16), MBR_SIZE + int(sd_size, 0), int(boot[1], 16), copies['merged'].name)
+  bank1 = bank_1_start(mcu, MBR_SIZE + int(sd_size, 0), int(boot[1], 16))
   hex_runs = runs(merged)
   versions = {v for _, data in hex_runs for v in re.findall(rb'UF2 Bootloader ([^\r\n\x00]+)\r\n', data)}
   if len(versions) != 1:
@@ -333,11 +338,40 @@ def facts(board, row, copies, workdir):
   for a, b in hex_runs:
     (Path(workdir) / f'run-{a:08x}.bin').write_bytes(b)
   return {'mcu': mcu, 'family': APP_FAMILY[mcu], 'appStart': MBR_SIZE + int(sd_size, 0),
-          'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0), 'cdcPid': int(cdc_pid, 0),
+          'bank1': bank1, 'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0), 'cdcPid': int(cdc_pid, 0),
           'boardId': board_id.strip('"'), 'version': versions.pop().decode(),
           'softdevice': f'S{row["softdevice"]["name"][1:]} {row["softdevice"]["version"]}',
           'hex': str(copies['merged']), 'update': str(copies['update']), 'zip': str(copies['zip']),
           'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
+
+
+def bank_1_start(mcu, app_start, boot_start):
+  """DFU_BANK_1_REGION_START (dfu_types.h): each bank half the app region less the MCU's DFU_APP_DATA_RESERVED
+  (CMakeLists.txt), rounded down to two pages, bank 0 at the app start."""
+  m = re.search(rf'MCU_VARIANT STREQUAL "{mcu}"\)(?:(?!elseif|endif).)*?set\(DFU_APP_DATA_RESERVED (\d+)\*4096\)',
+                (ROOT / 'CMakeLists.txt').read_text(), re.S)
+  if not m:
+    raise Refused(f'{mcu}: cannot establish DFU_APP_DATA_RESERVED')
+  full = boot_start - app_start - int(m[1]) * 4096
+  return app_start + (full - full % (2 * PAGE)) // 2
+
+
+def repackage(src, dst, edit):
+  """genpkg package `src` written again to `dst`, each init packet (.dat) replaced by edit(dat, image)."""
+  with zipfile.ZipFile(src) as z:
+    files = {n: z.read(n) for n in z.namelist()}
+  for part in json.loads(files['manifest.json'])['manifest'].values():
+    if isinstance(part, dict) and 'dat_file' in part:
+      files[part['dat_file']] = edit(files[part['dat_file']], files[part['bin_file']])
+  with zipfile.ZipFile(dst, 'w') as z:
+    for n, data in files.items():
+      z.writestr(n, data)
+  return dst
+
+
+def flip_crc(dat, image):
+  """An unsigned init packet whose trailing CRC-16 (dfu_init.c postvalidate) no longer matches `image`."""
+  return dat[:-2] + bytes(b ^ 0xFF for b in dat[-2:])
 
 
 # ------------------------------------------------------------------ the fixture app
@@ -729,17 +763,21 @@ class Battery:
       raise StepFail('CURRENT.UF2 does not read back the copied app', {'read': len(got)})
     return {**ev, 'method': 'gpregret', 'readBack': len(got)}
 
-  def serial(self, nonce):
+  def serial(self, nonce, singlebank=True):
     """App C through CDC-only serial DFU: GPREGRET 0x4E enumerates the bootloader as one CDC port and no drive
     (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
     fx = fixture(self.f, nonce)
     ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
     tty = self.cdc_only()
-    app, pkg = self.dir / 'app-serial.bin', self.dir / 'app-serial.zip'
-    app.write_bytes(fx['image'])
-    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
-    self.dfu_serial(pkg, tty)
+    self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}'), tty, singlebank)
     return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+
+  def package(self, image, name, edit=None):
+    """An adafruit-nrfutil genpkg app package of `image`, each init packet replaced by edit(dat, image) when given."""
+    app, pkg = self.dir / f'{name}.bin', self.dir / f'{name}.zip'
+    app.write_bytes(image)
+    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
+    return repackage(pkg, pkg, edit) if edit else pkg
 
   def cdc_only(self):
     """The tty of the bootloader in CDC-only serial DFU: its CDC PID and the roster serial, one tty, no drive. The UF2
@@ -763,9 +801,9 @@ class Battery:
       raise StepFail(f'{usb} enumerated a drive in CDC-only serial DFU')
     return tty
 
-  def dfu_serial(self, pkg, tty):
-    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200', '--singlebank'],
-                       'dfu serial')
+  def dfu_serial(self, pkg, tty, singlebank=True):
+    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200',
+                        *(['--singlebank'] if singlebank else [])], 'dfu serial')
     if 'Device programmed.' not in out:   # it exits 0 on a failed upgrade too
       raise StepFail('adafruit-nrfutil did not program the device', {'tail': out.strip().splitlines()[-8:]})
     return out
@@ -844,13 +882,87 @@ class Battery:
     ev['appRan'] = self.app_ran(nonce)
     return {**ev, 'package': Path(self.f['zip']).name, 'nonce': nonce.hex()}
 
+  def banked(self, nonce):
+    """An app through dual-bank serial DFU (DUALBANK_FW, dfu_dual_bank.c): received into bank 1, checked against the
+    init packet's CRC-16, then copied into bank 0 on activation, which ends in a reset. Once the bootloader left, bank 1
+    reads back the app and bank 0 is marked valid."""
+    fx = fixture(self.f, nonce)
+    ev = self.serial(nonce, singlebank=False)
+    self.cdc_gone('the bootloader leaving on activation')
+    ev['bank0'] = self.bank_check(fx['image'], fx['image'], ['g'])
+    return ev
+
+  def refused(self, nonce, running):
+    """App C in a package whose init packet CRC-16 does not match it: dual-bank serial DFU receives C into bank 1 and
+    dfu_init_postvalidate refuses it, so it is never activated: the bootloader stays in DFU, bank 0 keeps app
+    `running` (README, Dual bank firmware support). A J-Link reset then starts `running`."""
+    fx = fixture(self.f, nonce)
+    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
+    tty = self.cdc_only()
+    pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
+    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200'], 'dfu serial')
+    ev['nrfutil'] = out.strip().splitlines()[-2:]   # it reports success either way
+    stays_away(lambda: not usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), QUIET,
+               'the bootloader reset as if it activated the refused package')
+    ev['bank0'] = self.bank_check(fx['image'], fixture(self.f, running)['image'], ['r', 'g'])
+    self.cdc_gone('the bootloader leaving on the reset')
+    ev['appRan'] = self.app_ran(running)
+    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+
+  def cut_short(self, nonce, running):
+    """A dual-bank serial transfer cut short: app D, CUT_PAGES flash pages, sent by adafruit-nrfutil until its CUT_AFTER
+    bound ends it mid-transfer. D's first page reads back in bank 1 (dfu_dual_bank.c writes there through the one-page
+    buffer of src/flash_nrf5x.c) and its last does not; bank 0 still holds app `running`, which runs after a J-Link
+    reset (README, Dual bank firmware support)."""
+    fx = fixture(self.f, nonce, pattern=CUT_PAGES * PAGE)
+    ev = {'enter': self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)}
+    tty = self.cdc_only()
+    pkg = self.package(fx['image'], f'cut-{nonce.hex()[:8]}')
+    code, out = self.tools.spawn(['adafruit-nrfutil', '--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b',
+                                  '115200'], CUT_AFTER)
+    if code != 124:
+      raise StepFail(f'adafruit-nrfutil was not cut short: exit {code}', {'tail': out.strip().splitlines()[-4:]})
+    ev['bank0'] = self.bank_check(fx['image'][:PAGE], fixture(self.f, running)['image'], ['r', 'g'],
+                                  whole=fx['image'])
+    self.cdc_gone('the bootloader leaving on the reset')
+    ev['appRan'] = self.app_ran(running)
+    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+
+  def cdc_gone(self, what):
+    wait_for(lambda: not usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), USB_TIMEOUT, what)
+
+  def bank_check(self, bank1, bank0, then, whole=None):
+    """Halted, bank 1 verifies `bank1`, bank 0 `bank0` and the settings mark bank 0 valid; with `whole`, the first 16
+    bytes of its last page in bank 1 are not its own (its tail is 0xFF padding). Then the J-Link commands `then`."""
+    files = []
+    for name, data in (('bank1', bank1), ('bank0', bank0)):
+      files.append(Path(self.dir) / f'{name}-check.bin')
+      files[-1].write_bytes(data)
+    last = (len(whole or b'') - 1) // PAGE * PAGE
+    end = self.f['bank1'] + last
+    out = self.probe.session(['h', f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'verifybin {files[0]} {self.f["bank1"]:08X}',
+                              f'verifybin {files[1]} {self.f["appStart"]:08X}',
+                              *([f'mem32 {end:08X} 4'] if whole else []), *then])
+    settings = word_at(out, BOOTLOADER_SETTINGS)
+    if settings is None or settings & 0xFFFF != BANK_VALID_APP:
+      raise StepFail('the bootloader settings do not mark bank 0 valid', {'tail': out.splitlines()[-8:]})
+    ev = {'state': settings & 0xFFFF, 'crc': settings >> 16, 'bank1': f'{self.f["bank1"]:#010x}+{len(bank1)}',
+          'verified': len(bank0)}
+    if whole:
+      got = words_at(out, end, 4)
+      if got is None or b''.join(w.to_bytes(4, 'little') for w in got) == whole[last:last + 16]:
+        raise StepFail("bank 1's last page did not read back or holds the whole image: not cut short",
+                       {**ev, 'tail': out.splitlines()[-8:]})
+      ev['notWritten'] = f'{end:#010x}'
+    return ev
+
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
     from USER_FLASH_START = MBR_SIZE (src/usb/uf2/ghostfat.c, uf2cfg.h)."""
     return (self.f['appStart'] - MBR_SIZE) // 256 * 512, length // 256 * 512
 
   def battery(self, base):
-    {'default': self.default}[self.profile](base)
+    {'default': self.default, 'dualbank': self.dualbank}[self.profile](base)
 
   def default(self, base):
     a, b, c, d, e = (os.urandom(16) for _ in range(5))
@@ -868,6 +980,17 @@ class Battery:
     self.step('update', lambda: self.update(self.f['update'], self.f['version'], c))
     self.step('interrupted', lambda: self.interrupted(d))
     self.step('softdevice', lambda: self.softdevice(e))
+
+  def dualbank(self, base):
+    a, b, c, d = (os.urandom(16) for _ in range(4))
+    self.step('install', self.install)
+    self.step('dfu', self.dfu)
+    self.step('serial', lambda: self.banked(a))
+    self.step('app-ran', lambda: self.app_ran(a))
+    self.step('serial-b', lambda: self.banked(b))
+    self.step('app-ran-b', lambda: self.app_ran(b))
+    self.step('refused', lambda: self.refused(c, b))
+    self.step('interrupted', lambda: self.cut_short(d, b))
 
   def restore(self):
     """The candidate installed again and the benign fixture copied through it and running; never while a tool of the
