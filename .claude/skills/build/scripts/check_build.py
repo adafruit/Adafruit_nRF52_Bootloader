@@ -61,7 +61,8 @@ RULES = (
   (r'^\.github/workflows/hil\.yml$', 'contract-hil', 'contract tests, the representatives and every roster board'),
   (r'^(\.claude/test/|\.pre-commit-config\.yaml$)', 'tests', 'contract tests'),
   (r'^\.github/workflows/githubci\.yml$', 'ci', 'contract tests and the mandated boards'),
-  (r'^(Makefile|tools/build_all\.py)$', 'make', 'a legacy make build of the mandated boards'),
+  (r'^Makefile$', 'make', 'a build of the mandated boards through the Makefile wrapper'),
+  (r'^tools/build_all\.py$', 'tools', 'the mandated boards'),
   (r'^lib/softdevice/(s\d+_nrf52_[0-9.]+)/', 'softdevice', 'the boards that use this SoftDevice'),
   (r'^(CMakeLists\.txt|cmake/|src/|lib/|linker/|tools/hexmerge\.py$)', 'shared', 'the representatives'),
 )
@@ -148,6 +149,7 @@ def classify(path, boards):
            'tests': {'tests': True},
            'ci': {'tests': True, 'boards': set(MANDATED)},
            'make': {'make': set(MANDATED)},
+           'tools': {'boards': set(MANDATED)},
            'shared': {'boards': set(REPRESENTATIVES), 'shared': True}}[rule]
     return rule, what, sel
   return 'unclassified', 'not classified: built like shared code (the representatives)', \
@@ -259,8 +261,9 @@ def expected_artifacts(bdir, board):
 
 
 def make_artifacts(bdir, board):
-  """name -> path of every file the Makefile's `all` target produces, or a list of what is missing or ambiguous."""
-  return unique_matches(bdir, {'out': f'{board}_bootloader-*.out', 'hexNosd': f'{board}_bootloader-*_nosd.hex',
+  """name -> path of every file the Makefile wrapper's `all` target must produce under make's names, or a list of
+  what is missing or ambiguous."""
+  return unique_matches(bdir, {'elf': 'bootloader.elf', 'hexNosd': f'{board}_bootloader-*_nosd.hex',
                                'update': f'update-{board}_bootloader-*_nosd.uf2',
                                'merged': f'{board}_bootloader-*_s*.hex', 'zip': f'{board}_bootloader-*_s*.zip'})
 

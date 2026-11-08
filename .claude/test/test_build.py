@@ -69,8 +69,9 @@ class Classify(unittest.TestCase):
     self.assertEqual(sel['boards'], {'bluemicro_nrf52833'})
     self.assertEqual(self.rule('lib/softdevice/s340_nrf52_7.0.1/readme.md')[2]['boards'], set())
 
-  def test_make_files_select_a_make_build(self):
+  def test_makefile_selects_a_wrapper_build_and_build_all_the_mandated_boards(self):
     self.assertEqual(self.rule('Makefile')[2], {'make': set(cb.MANDATED)})
+    self.assertEqual(self.rule('tools/build_all.py')[2], {'boards': set(cb.MANDATED)})
 
 
 class BoardConfig(unittest.TestCase):
@@ -247,12 +248,12 @@ class Make(unittest.TestCase):
          mock.patch.object(cb, 'run_logged', return_value=0):
       row = cb.make_board('b', False)
       self.assertEqual(row['status'], 'failed')
-      self.assertIn('b_bootloader-*.out: 0 match(es)', row['firstError'])
+      self.assertIn('bootloader.elf: 0 match(es)', row['firstError'])
       self.assertTrue((Path(d) / row['buildDir']).is_dir())
       self.assertIn('log', row)
 
   def test_make_with_every_output_passes(self):
-    names = ('b_bootloader-1.0.out', 'b_bootloader-1.0_nosd.hex', 'update-b_bootloader-1.0_nosd.uf2',
+    names = ('bootloader.elf', 'b_bootloader-1.0_nosd.hex', 'update-b_bootloader-1.0_nosd.uf2',
              'b_bootloader-1.0_s140_6.1.1.hex', 'b_bootloader-1.0_s140_6.1.1.zip')
 
     def fake_make(cmd, log, verbose):

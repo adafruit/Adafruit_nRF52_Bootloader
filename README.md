@@ -116,6 +116,7 @@ You must have have a J-Link available to "unbrick" your device.
 ### Prerequisites
 
 - ARM GCC
+- [CMake](https://cmake.org/) and [Ninja](https://ninja-build.org/)
 - Nordic's [nRF5x Command Line Tools](https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF-Command-Line-Tools)
 - [Python IntelHex](https://pypi.org/project/IntelHex/)
 
@@ -134,9 +135,10 @@ cd Adafruit_nRF52_Bootloader
 git submodule update --init
 ```
 
-#### Build using `make` (legacy)
-The Makefile is kept for existing workflows; CI and releases build with CMake (below), which produces the same images.
-Build with `make BOARD={board} all`, for example:
+#### Build using `make`
+
+The Makefile is a thin wrapper over the CMake build below: it configures `_build/build-{board}` with CMake and Ninja,
+then builds through it. Build with `make BOARD={board} all`, for example:
 
 ```
 make BOARD=feather_nrf52840_express all
@@ -147,9 +149,17 @@ For the list of supported boards, run `make` without `BOARD=` :
 ```
 make
 You must provide a BOARD parameter with 'BOARD='
-Supported boards are: feather_nrf52840_express feather_nrf52840_express pca10056
-Makefile:90: *** BOARD not defined.  Stop
+Supported boards are:
+- adm_b_nrf52840_1
+- ae_bl652_bo
+...
+Makefile:37: *** BOARD not defined.  Stop.
 ```
+
+Each `make` configures from an empty CMake cache, so only the variables of that invocation apply: `DEBUG=1`,
+`DUALBANK_FW=1`, `DEFAULT_TO_OTA_DFU=1`, `SIGNED_FW=1` with `SIGNED_FW_QX`/`SIGNED_FW_QY`, `FORCE_UF2=1`,
+`SD_VERSION`, `SD_NAME`, `SD_HEX`, `USE_NFCT=yes|no`, `CROSS_COMPILE`; `BUILD=` and `BIN=` move the build and
+`copy-artifact` directories. Local defaults can go in an untracked `Makefile.user`.
 
 #### Build using `cmake`
 
@@ -157,40 +167,36 @@ CI and releases build with CMake. Initialize your build environment by passing y
 `-DBOARD={board}`:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DBOARD=feather_nrf52840_express 
+cmake -S . -B build -G Ninja -DBOARD=feather_nrf52840_express
 ```
 
 And then build it with:
 
 ```bash
-make
+cmake --build build
 ```
-
-You can also use the generator of your choice. For example adding the `-GNinja` and then you can invoke `ninja build` instead of `make`.
 
 To list all supported targets, run:
 
 ```bash
-cmake --build . --target help
-``` 
+cmake --build build --target help
+```
 
 The build directory then holds the release artifacts: `{board}_bootloader-{version}_{sd}_{sdversion}.hex` (bootloader,
-MBR and SoftDevice), the matching `.zip` DFU package (needs `adafruit-nrfutil`) and
-`update-{board}_bootloader-{version}_nosd.uf2` (bootloader self-update). Options: `-DDUALBANK_FW=ON`,
-`-DDEFAULT_TO_OTA_DFU=ON`, `-DSIGNED_FW=ON -DSIGNED_FW_QX=... -DSIGNED_FW_QY=...`, `-DFORCE_UF2=ON`.
+MBR and SoftDevice), the matching `.zip` DFU package (needs `adafruit-nrfutil`),
+`update-{board}_bootloader-{version}_nosd.uf2` (bootloader self-update) and `{board}_bootloader-{version}_nosd.hex`
+(bootloader and MBR). Options: `-DDUALBANK_FW=ON`, `-DDEFAULT_TO_OTA_DFU=ON`,
+`-DSIGNED_FW=ON -DSIGNED_FW_QX=... -DSIGNED_FW_QY=...`, `-DFORCE_UF2=ON`.
 
-To build individual targets, you can specify it directly with `make` or using `cmake --build`:
+To build individual targets, specify it with `cmake --build`:
 
 ```bash
-make bootloader
-cmake --build . --target bootloader
+cmake --build build --target bootloader
 ```
 
 ### Flash
 
-To flash the bootloader (without softdevice/mbr) using JLink:
+To flash the bootloader and MBR (without SoftDevice) using JLink:
 
 ```
 make BOARD=feather_nrf52840_express flash
@@ -208,7 +214,7 @@ To upgrade the bootloader using DFU Serial via port /dev/ttyACM0
 make BOARD=feather_nrf52840_express SERIAL=/dev/ttyACM0 flash-dfu
 ```
 
-To flash SoftDevice (will also erase chip):
+To flash SoftDevice (erases only the sectors it writes):
 
 ```
 make BOARD=feather_nrf52840_express flash-sd
@@ -219,6 +225,8 @@ To flash MBR only
 ```
 make BOARD=feather_nrf52840_express flash-mbr
 ```
+
+To erase the whole chip: `make BOARD=feather_nrf52840_express erase`.
 
 ### Dual bank firmware support:
 

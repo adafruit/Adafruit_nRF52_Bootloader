@@ -21,7 +21,7 @@ reviews:
         brick a device: erasing or writing the MBR, bootloader, SoftDevice or
         UICR outside a validated update, a wrong application start address,
         or jumping to the application without validating it. Code must build
-        for every MCU_SUB_VARIANT (nrf52, nrf52833, nrf52840); src/usb is not
+        for every MCU_VARIANT (nrf52, nrf52833, nrf52840); src/usb is not
         built for nrf52.
     - path: "src/usb/**"
       instructions: |

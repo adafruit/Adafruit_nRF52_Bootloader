@@ -1,5 +1,4 @@
 import os
-import glob
 import sys
 import subprocess
 import time
@@ -14,19 +13,19 @@ build_separator = '-' * 74
 
 def build_board(board):
     start_time = time.monotonic()
-    make_result = subprocess.run("make -j BOARD={} all".format(board), shell=True, stdout=subprocess.PIPE,
-                                 stderr=subprocess.STDOUT)
+    build_dir = '_build/build-{}'.format(board)
+    cmd = "cmake -S . -B {0} -G Ninja -DBOARD={1} && cmake --build {0}".format(build_dir, board)
+    build_result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     build_duration = time.monotonic() - start_time
 
     flash_size = "-"
     sram_size = "-"
     succeeded = 0
 
-    if make_result.returncode == 0:
+    if build_result.returncode == 0:
         succeeded = 1
-        out_file = glob.glob('_build/build-{}/*.out'.format(board))[0]
-        size_output = subprocess.run('size {}'.format(out_file), shell=True, stdout=subprocess.PIPE).stdout.decode(
-            "utf-8")
+        size_output = subprocess.run('size {}/bootloader.elf'.format(build_dir), shell=True,
+                                     stdout=subprocess.PIPE).stdout.decode("utf-8")
         size_list = size_output.split('\n')[1].split('\t')
         flash_size = int(size_list[0])
         sram_size = int(size_list[1]) + int(size_list[2])
@@ -34,8 +33,8 @@ def build_board(board):
     print(build_format.format(board, SUCCEEDED if succeeded else FAILED, "{:.2f}s".format(build_duration), flash_size,
                               sram_size))
 
-    if make_result.returncode != 0:
-        print(make_result.stdout.decode("utf-8"))
+    if build_result.returncode != 0:
+        print(build_result.stdout.decode("utf-8"))
 
     return succeeded
 
