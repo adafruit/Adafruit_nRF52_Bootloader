@@ -97,6 +97,10 @@ def process():
   return agentrc.load_file('skills/hil/scripts/hil_process.py')
 
 
+def usb():
+  return agentrc.load_file('skills/hil/scripts/usb_observe.py')
+
+
 # ------------------------------------------------------------------ roster, record, facts
 
 def load_board(roster_path, name):
@@ -545,6 +549,10 @@ class Drive:
     usb = usb_device(self.f['vid'], self.f['pid'], self.b['uid'])
     return block_device(usb) if usb else None
 
+  def absent(self):
+    """No bootloader device with the board's serial enumerated: one whose serial cannot be read may be it."""
+    return usb().usb_absent(vid_pid=(f'{self.f["vid"]:04x}', f'{self.f["pid"]:04x}'), serial=self.b['uid'])
+
   def wait(self):
     dev = wait_for(self.present, USB_TIMEOUT, f'UF2 drive {self.f["vid"]:04x}:{self.f["pid"]:04x} {self.b["uid"]}')
     # the node appears before udev's rule gives it the rig's group
@@ -578,7 +586,7 @@ class Drive:
     code, res = self.tools.child_json(['flush', '--dev', dev], CHILD_TIMEOUT, 'flush')
     if code not in (0, FLUSH_GONE):
       raise StepFail('flush failed', {'result': res})
-    wait_for(lambda: not self.present(), LEAVE_TIMEOUT, 'the drive leaving after the copy')
+    wait_for(self.absent, LEAVE_TIMEOUT, 'the drive leaving after the copy')
     return {'flush': 'flushed' if code == 0 else 'device gone before flush'}
 
 
@@ -626,7 +634,7 @@ class Battery:
     """The app the copy wrote runs after the bootloader's own reset: no probe reset first. The drive stays away, then
     two samples: thread mode, PC in the counting loop, r1 this copy's marker, r0 advancing."""
     fx = fixture(self.f, nonce)
-    stays_away(self.drive.present, QUIET, 'the UF2 drive came back instead of the app')
+    stays_away(lambda: not self.drive.absent(), QUIET, 'the UF2 drive came back instead of the app')
     first, second = self.probe.samples()
     ev = {'samples': [{k: hex(v) for k, v in s.items()} for s in (first, second)]}
     loop = range(fx['loop'], fx['fault'])

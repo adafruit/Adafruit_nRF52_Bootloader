@@ -600,5 +600,35 @@ class Tools(unittest.TestCase):
     self.assertEqual((ht.os.listdir(tools.dir), tools.receipts), ([], []))
 
 
+class DriveAbsence(unittest.TestCase):
+  """Drive.absent through the agentrc's usb_observe over a planted sysfs tree."""
+  def drive(self, serial):
+    tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(tmp))
+    if serial is not False:
+      d = Path(tmp, '1-1')
+      d.mkdir()
+      (d / 'idVendor').write_text('239a\n')
+      (d / 'idProduct').write_text('00da\n')
+      if serial is not None:
+        (d / 'serial').write_text(serial + '\n')
+    patch = mock.patch.object(ht.usb(), 'SYS_USB_DEVICES', tmp)
+    patch.start()
+    self.addCleanup(patch.stop)
+    return ht.Drive({'uid': '2467EB236E0E4F2D'}, {'vid': 0x239A, 'pid': 0x00DA}, None)
+
+  def test_absent_only_when_no_match_could_be_the_board(self):
+    for serial, absent in ((False, True), ('2467eb236e0e4f2d', False), ('0000000000000001', True), (None, False)):
+      with self.subTest(serial=serial):
+        self.assertEqual(self.drive(serial).absent(), absent)
+
+  def test_a_copy_waits_for_the_device_to_leave_not_only_the_drive(self):
+    drive = self.drive(None)   # the drive node gone, the device's serial unreadable
+    drive.tools = mock.Mock(spawn=mock.Mock(return_value=(0, '')), child_json=mock.Mock(return_value=(0, {})))
+    with tempfile.TemporaryDirectory() as d, mock.patch.object(drive, 'present', return_value=None), \
+         mock.patch.object(ht, 'LEAVE_TIMEOUT', 0.3), self.assertRaisesRegex(ht.StepFail, 'leaving after the copy'):
+      drive.copy('/dev/sdz', b'uf2', d)
+
+
 if __name__ == '__main__':
   unittest.main()
