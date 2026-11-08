@@ -1,5 +1,5 @@
 # A board's SoftDevice and the MBR: board.cmake's settings over the MCU variant's defaults. Included after board.cmake
-# by CMakeLists.txt.
+# by CMakeLists.txt and by board_vars.cmake.
 get_filename_component(SOFTDEVICE_DIR ${CMAKE_CURRENT_LIST_DIR}/../lib/softdevice ABSOLUTE)
 set(MBR_HEX ${SOFTDEVICE_DIR}/mbr/hex/mbr_nrf52_2.4.1_mbr.hex)
 

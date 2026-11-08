@@ -91,9 +91,10 @@ GDB = $(CROSS_COMPILE)gdb
 BMP_PORT ?= $(shell ls -1 /dev/cu.usbmodem????????1 | head -1)
 GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan' -ex 'attach 1'
 
-# CMake resolves the artifact names and the SoftDevice hex and writes them to $(BUILD)/make_vars.mk while
-# configuring; the recipes that need them run in a sub-make that reads it.
-SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f "$(BUILD)/make_vars.mk"
+# Recipes that need the artifact names, the SoftDevice hex or the MCU run in a sub-make that reads them from a file
+# CMake writes: $(BUILD)/make_vars.mk when configuring the build, $(BUILD)/board_vars.mk from cmake/board_vars.cmake
+# without configuring it.
+SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f
 
 .PHONY: all configure clean flash flash-dfu dfu-flash flash-sd sd flash-mbr mbr flash-uf2 erase copy-artifact \
   linkermap gdbflash gdb
@@ -108,11 +109,25 @@ configure:
 clean:
 	@cmake -E rm -rf "$(BUILD)" "$(BIN)"
 
-flash flash-dfu gdbflash gdb linkermap: all
-	@$(SUBMAKE) _$@
+# each builds only the artifact it uses
+flash: CMAKE_TARGET = nosd-hex
+flash-dfu: CMAKE_TARGET = dfu-zip
+gdbflash: CMAKE_TARGET = merged-hex
+gdb linkermap: CMAKE_TARGET = bootloader
+flash flash-dfu gdbflash gdb linkermap: configure
+	cmake --build "$(BUILD)" --target $(CMAKE_TARGET)
+	@$(SUBMAKE) "$(BUILD)/make_vars.mk" _$@
 
-flash-sd flash-mbr erase copy-artifact: configure
-	@$(SUBMAKE) _$@
+# need no compiler or submodule, as before the wrapper
+flash-sd flash-mbr erase:
+	@cmake -DBOARD=$(BOARD) $(foreach v,SD_NAME SD_VERSION SD_HEX,$(call optional,$(v))) \
+	  "-DOUT=$(BUILD)/board_vars.mk" -P cmake/board_vars.cmake
+	@$(SUBMAKE) "$(BUILD)/board_vars.mk" _$@
+
+# copies what the last build produced
+copy-artifact:
+	@test -f "$(BUILD)/make_vars.mk" || { echo "$(BUILD) holds no build: run make all first" >&2; exit 1; }
+	@$(SUBMAKE) "$(BUILD)/make_vars.mk" _$@
 
 sd: flash-sd
 mbr: flash-mbr

@@ -398,6 +398,13 @@ endif ()
 
 add_custom_target(release ALL DEPENDS ${RELEASE_FILES})
 
+# one artifact each, what the Makefile wrapper's flash and debug targets build
+add_custom_target(nosd-hex DEPENDS ${NOSD_HEX})
+add_custom_target(merged-hex DEPENDS ${MERGED_HEX})
+if (NRFUTIL)
+  add_custom_target(dfu-zip DEPENDS ${MERGED_ZIP})
+endif ()
+
 # what the Makefile wrapper's flash, debug and copy recipes need, read by its sub-make
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/make_vars.mk
   "MCU_VARIANT = ${MCU_VARIANT}\n"
