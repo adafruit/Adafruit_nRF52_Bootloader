@@ -741,6 +741,47 @@ class Claim(unittest.TestCase):
     self.assertEqual(self.helper.resolve_restored('nrf52840dk', found), [])
     self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
 
+  def test_a_failure_logged_since_the_take_is_returned_with_what_the_log_cannot_hold(self):
+    self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='a previous command under the hold')
+    left = {'how': 'found-left', 'detail': 'x', 'noteError': 'cleanup log not written: x'}   # the take's, unlogged
+    restored_since = dict(PREVIOUS, id='restored-since')
+    _, found, _ = ht.claim(self.board, self.tools.dir, [left, restored_since])
+    (logged,) = self.helper.open_cleanup_failures('nrf52840dk')
+    self.assertEqual(found, [logged, left])
+    self.assertEqual(self.helper.resolve_restored('nrf52840dk', found), [])
+    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
+    unreadable = [{'unavailable': 'cleanup log unreadable: x'}]
+    with mock.patch.object(self.helper, 'open_cleanup_failures', return_value=unreadable):
+      _, found, _ = ht.claim(self.board, self.tools.dir, [left, restored_since])
+    self.assertEqual(found, [left, restored_since, *unreadable])
+
+  def test_a_recovery_keeps_the_receipts_its_legacy_holder_releases_on(self):
+    self.other(999999999, '1')
+    self.plant(self.earlier, 'legacy', live=False)
+    base = str(Path(self.earlier, 'hil_op_legacy'))
+    holder = {'role': 'cleanup-holder', 'pid': 7, 'start': '1', 'token': 'tok', 'locks': ['nrf52840dk'],
+              'receipts': [{'token': 'legacy', 'supervisor': None, 'lock': f'{base}.lock', 'record': f'{base}.json',
+                            'log': f'{base}.log'}]}
+    predicate = []
+
+    def release_token(token):   # what the real one rechecks before it signals the holder
+      predicate.append(self.helper._release_blocker(holder['receipts']))
+      return 7, ['nrf52840dk']
+    with contextlib.redirect_stdout(io.StringIO()) as out, \
+         mock.patch.object(self.helper, 'read_record', return_value=holder), \
+         mock.patch.object(self.helper, 'holder_alive', return_value=True), \
+         mock.patch.object(self.helper, 'release_token', side_effect=release_token), \
+         mock.patch.object(ht, 'tools_left', return_value=[]), \
+         mock.patch.object(ht, 'load_board', return_value=BOARD), \
+         mock.patch.object(ht, 'admit', return_value=({}, {}, {})), \
+         mock.patch.object(ht, 'facts', return_value=FACTS), \
+         mock.patch.object(ht.Battery, 'restore', lambda bat: {'pass': True, 'state': 'fixture running'}):
+      code = ht.main(['restore', '-b', 'pca10056', '--build-record', 'r', '--run-root', self.tmp,
+                      '--recover-holder', '7', 'roster'])
+    self.assertEqual((code, predicate), (0, ['']))
+    self.assertEqual(json.loads(out.getvalue().splitlines()[-1])['recovered'], {'holder': 7, 'released': True})
+    self.assertEqual(self.listed(), [])
+
   def test_a_probe_user_refuses_without_a_wait(self):
     with mock.patch.object(ht, 'probe_users', return_value=['123 JLinkExe -USB 683944004']), \
          self.assertRaisesRegex(ht.InUse, 'after 0s') as e:

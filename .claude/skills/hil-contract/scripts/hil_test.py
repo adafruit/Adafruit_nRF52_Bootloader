@@ -787,6 +787,23 @@ def log_failure(board, detail, receipts, task=None):
   return ''
 
 
+def refreshed(board, found):
+  """The board's open failed cleanups read now, plus what of `found` (the take's) the log cannot hold: a leftover whose
+  append failed, or all of it while the log is unreadable now."""
+  fresh = lock_helper().open_cleanup_failures(board['lock'])
+  if any('unavailable' in f for f in fresh):
+    return found + [f for f in fresh if f not in found]
+  return fresh + [f for f in found if not isinstance(f.get('id'), str) and f not in fresh]
+
+
+def holder_tokens(board):
+  """The receipt tokens the board's holder record names, an older helper's cleanup holder's: its release by token
+  rechecks their files."""
+  rec = lock_helper().read_record(board['lock'])
+  receipts = rec.get('receipts') if isinstance(rec, dict) else None
+  return {r.get('token') for r in receipts if isinstance(r, dict)} if isinstance(receipts, list) else set()
+
+
 def claim(board, ops, found):
   """Name this invocation and its ops dir in the board's claim record before its first tool, under the run's flock or
   the caller's hold (agentrc `hil` Board locks). An earlier invocation's claim leaves the record once it ended, or once
@@ -805,7 +822,8 @@ def claim(board, ops, found):
     if alive := [s['receipt'] for s in others if helper.claim_alive(s)]:
       raise InUse(f'another invocation on the board is running: {alive}', found)
     # read after the gate: a claimant alive at the take may have logged, and so keeps, a receipt since
-    keep = helper.logged_tokens(found + helper.open_cleanup_failures(board['lock']))
+    found = refreshed(board, found)
+    keep = helper.logged_tokens(found) | holder_tokens(board)
     for s in others:
       state, receipts = helper.invocation_state(s, keep)
       if state == 'alive':   # not after the gate, but a live claim is never removed
@@ -815,7 +833,7 @@ def claim(board, ops, found):
         if why := log_failure(board, 'an earlier invocation ended with tools not proven ended', new, s['receipt']):
           notes.append(why)   # its claim stays, for the next attempt to log
           continue
-        found = helper.open_cleanup_failures(board['lock'])
+        found = refreshed(board, found)
       try:
         record.remove(s)
       except (OSError, helper.PendingRefused) as e:
