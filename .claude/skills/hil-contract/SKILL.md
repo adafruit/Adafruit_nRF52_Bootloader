@@ -146,15 +146,14 @@ against:
 reader and flush) runs under agentrc's `hil_process.run_tracked` with its files in the run dir's `ops`
 (`hil_process.state_dir`); one whose process tree is not proven ended stops the battery, skips the restore and its
 receipt goes to the board's cleanup log. Before its first tool, every `run`, `install` and `restore` claims the board
-(agentrc `hil` Board locks): its pid, start time and ops dir in its own claim file,
-`<lock>.nrf52-bootloader-claim.<seq>.<token>.json` (`hil_lock.PendingSessions`, which also reads the entries of
-`<lock>.nrf52-bootloader-pending.json`, the record older harnesses' pending marks used), refused when that cannot be
-written. Another invocation still alive refuses it (two commands under one hold). An earlier one that ended with a tool
-not proven ended has that tool's receipt logged in the board's cleanup log, and the tool, and any `JLinkExe` on the
-board's probe, get up to 30 s to end (`hil_test.py` `CLAIM_SETTLE`); a receipt whose state cannot be read (`unknown`)
-is not waited on. Anything not ended refuses the attempt. The earlier claim is removed unless one of its tools still
-rechecks `pending` (proven running), so a later attempt waits only on a tool that runs. An invocation removes its own
-claim once its own tools recheck `done`, and keeps it otherwise for the next claim to judge.
+(agentrc `hil` Board locks): its pid, start time and ops dir in its own claim file (`hil_lock.PendingSessions`, kind
+`nrf52-bootloader`, which also reads the pending record older harnesses left), refused when that cannot be written.
+Another invocation still alive refuses it (two commands under one hold). An earlier one that ended with a tool not
+proven ended has that tool's receipt logged in the board's cleanup log, and the tool, and any `JLinkExe` on the board's
+probe, get up to 30 s to end (`hil_test.py` `CLAIM_SETTLE`); a receipt whose state cannot be read (`unknown`) is not
+waited on. Anything not ended refuses the attempt. The earlier claim is removed unless one of its tools still rechecks
+`pending` (proven running) or its log could not be written, so a later attempt waits only on a tool that runs. An
+invocation removes its own claim once its own tools recheck `done`, and keeps it otherwise for the next claim to judge.
 
 ### CI
 
@@ -239,8 +238,7 @@ retries a fail once per `hil` Caller rules.
   holder by its token (`recovered.released`). A failed restore (exit 4) is logged and leaves the holder: the board goes
   to the human. A dead holder's record on a free lock needs nothing: the next taker logs it as a failed cleanup.
 - `occupiedBy`: an earlier invocation's tool, or another `JLinkExe` on the probe, outlived the settle, or its state
-  could not be read; the earlier invocation's failure is logged. A tool still proven running keeps its claim, so each
-  attempt refuses until it ends; otherwise the claim is removed and a later attempt does not wait on it again (the
+  could not be read; the earlier invocation's failure is logged and its claim kept or removed as Execution says (the
   failure stays open until a restore resolves it). A `JLinkExe` still on the probe refuses every attempt.
 - A J-Link that no longer connects: agentrc's `usb-kernel-recover` rungs, then the registry's `flasher_recover`
   (openocd `nrf52.cfg`). An APPROTECT recover is never automatic.

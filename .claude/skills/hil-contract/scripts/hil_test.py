@@ -37,8 +37,7 @@ import agentrc  # noqa: E402
 import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
-# hil_lock.PendingSessions claims: <lock>.nrf52-bootloader-claim.<seq>.<token>.json, one per invocation, beside
-# <lock>.nrf52-bootloader-pending.json, the record older harnesses' marks used, whose entries are read as claims
+# the hil_lock.PendingSessions kind of this harness's claims, and of the pending marks older harnesses left
 CLAIM_KIND = 'nrf52-bootloader'
 CLAIM_SETTLE = 30            # s an earlier invocation's unproven tools get to end before an attempt gives the board up
 PROFILE_STEPS = run_report.PROFILE_STEPS
@@ -1257,7 +1256,8 @@ def holder_tokens(board):
   rechecks their files."""
   rec = lock_helper().read_record(board['lock'])
   receipts = rec.get('receipts') if isinstance(rec, dict) else None
-  return {r.get('token') for r in receipts if isinstance(r, dict)} if isinstance(receipts, list) else set()
+  token = lock_helper().receipt_token
+  return {t for r in receipts if (t := token(r))} if isinstance(receipts, list) else set()
 
 
 def claim(board, ops, found):
@@ -1286,7 +1286,7 @@ def claim(board, ops, found):
       if state == 'alive':   # not after the gate, but a live claim is never removed
         continue
       why = ''
-      if new := [r for r in receipts if not (isinstance(r, dict) and r.get('token') in keep)]:
+      if new := [r for r in receipts if helper.receipt_token(r) not in keep]:
         if why := log_failure(board, 'an earlier invocation ended with tools not proven ended', new, s['receipt']):
           notes.append(why)
         else:
@@ -1295,10 +1295,9 @@ def claim(board, ops, found):
     unsettled = [r for _, receipts, _ in earlier for r in receipts]
     wait = CLAIM_SETTLE if unsettled else 0
     states, named = helper.settle(unsettled, wait, busy=lambda: probe_users(board))
-    pending = iter(st == 'pending' for st in states)
+    each = iter(states)
     for s, receipts, unlogged in earlier:
-      # a tool proven still running keeps its claim, and one whose log failed stays, for the next attempt to judge
-      if not any([next(pending) for _ in receipts]) and not unlogged:
+      if 'pending' not in [next(each) for _ in receipts] and not unlogged:
         try:
           record.remove(s)
         except (OSError, helper.PendingRefused) as e:
@@ -1319,7 +1318,7 @@ def unclaim(board, entry, tools):
   if entry is None:
     return ''
   try:
-    verdict, _ = process().recheck_dir(tools.dir, {r.get('token') for r in tools.logged()})
+    verdict, _ = process().recheck_dir(tools.dir, {lock_helper().receipt_token(r) for r in tools.logged()})
     if verdict != 'done':
       return f'claim kept: its tools recheck {verdict}'
     lock_helper().PendingSessions(board['lock'], CLAIM_KIND).remove(entry)
