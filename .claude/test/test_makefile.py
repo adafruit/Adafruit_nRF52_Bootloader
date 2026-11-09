@@ -102,20 +102,31 @@ class Configure(unittest.TestCase):
       self.assertIn(arg, cfg)
 
   def test_makefile_user_flags_reach_the_configure_environment(self):
-    """CMake adds env CFLAGS, ASMFLAGS and LDFLAGS to the toolchain's on a fresh cache; ASFLAGS also take CFLAGS."""
+    """CMake adds env CFLAGS, ASMFLAGS and LDFLAGS to the toolchain's on a fresh cache; ASFLAGS also take CFLAGS.
+    Existing relative paths, alone or after -I or -L, become absolute: CMake compiles in the build directory."""
     with tempfile.TemporaryDirectory() as d:
       for name in ('Makefile', 'src', 'cmake'):
         os.symlink(ROOT / name, Path(d) / name)
-      (Path(d) / 'Makefile.user').write_text('CFLAGS += -DX\nASFLAGS += -DY\nLDFLAGS += -Wl,-z\n')
+      (Path(d) / 'Makefile.user').write_text('CFLAGS += -DX -include src/main.c -Isrc -Inope\nASFLAGS += -DY\n'
+                                             'LDFLAGS += -Wl,-z -Lcmake\n')
       tools = Path(d, 'tools')
       tools.mkdir()
       cmake = tools / 'cmake'
       cmake.write_text('#!/bin/sh\necho "CMAKE $1 CFLAGS=[$CFLAGS] ASMFLAGS=[$ASMFLAGS] LDFLAGS=[$LDFLAGS]"\n')
       cmake.chmod(0o755)
       p = make('BOARD=pca10056', 'configure', cwd=d, path_prefix=tools)
+      r = Path(d).resolve()
     self.assertEqual(p.returncode, 0, p.stderr)
-    self.assertIn('CMAKE -S CFLAGS=[-DX] ASMFLAGS=[-DY -DX] LDFLAGS=[-Wl,-z]', p.stdout.splitlines())
+    cflags = f'-DX -include {r}/src/main.c -I{r}/src -Inope'
+    self.assertIn(f'CMAKE -S CFLAGS=[{cflags}] ASMFLAGS=[-DY {cflags}] LDFLAGS=[-Wl,-z -L{r}/cmake]',
+                  p.stdout.splitlines())
     self.assertNotIn('CMAKE_C_FLAGS=', configure_line(p.stdout))
+
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  def test_checkout_relative_flags_resolve_in_cmakes_compiler_check(self):
+    with tempfile.TemporaryDirectory() as d:
+      p = make('BOARD=pca10056', f'BUILD={d}/b', 'CFLAGS=-Isrc/usb/uf2 -include compile_date.h', 'configure')
+    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
   @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
   def test_each_configure_starts_from_an_empty_cache(self):

@@ -69,9 +69,16 @@ CMAKE_ARGS += -DCMAKE_C_FLAGS_DEBUG=-Os -DCMAKE_ASM_FLAGS_DEBUG=-Os
 
 # Extra flags (command line, environment or Makefile.user) reach a fresh configure through the environment, where CMake
 # adds them to the toolchain's; a -DCMAKE_C_FLAGS would replace those. As in the make build, CFLAGS also reach the
-# assembler and the link.
+# assembler and the link. CMake compiles in the build directory, the make build here: a flag word naming an existing
+# path, alone or after -I or -L, is made absolute so a checkout-relative one still resolves.
+abs_path = $(if $(wildcard $(2)),$(1)$(abspath $(2)),$(1)$(2))
+abs_flag = $(or $(strip $(foreach p,-I -L,$(if $(filter $(p)%,$(1)),$(call abs_path,$(p),$(1:$(p)%=%))))),\
+  $(call abs_path,,$(1)))
+abs_flags = $(foreach w,$(1),$(call abs_flag,$(w)))
+override CFLAGS := $(call abs_flags,$(CFLAGS))
+override LDFLAGS := $(call abs_flags,$(LDFLAGS))
 export CFLAGS LDFLAGS
-export ASMFLAGS = $(strip $(ASFLAGS) $(CFLAGS))
+export ASMFLAGS = $(call abs_flags,$(ASFLAGS) $(CFLAGS))
 
 # Flasher utility options
 NRFJPROG = nrfjprog
