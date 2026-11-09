@@ -9,9 +9,11 @@ import os
 import re
 import runpy
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -103,6 +105,35 @@ class ResolveFlags(unittest.TestCase):
     self.in_dir('co', 'linker', 'src')
     for flags in ('-DMSG=\'"see -L linker"\' ', '-DA="x -Isrc"', '"-DA -Isrc"', '-DA=\\"-I src\\"x'):
       self.assertEqual(resolve(flags), flags)
+
+  def test_dash_operand_passes_as_written(self):
+    c = self.in_dir('co', '-', 'src')
+    self.assertEqual(resolve('-I- -I - -Isrc'), f'-I- -I - -I{c}/src')
+
+  def test_line_continuations_go_as_the_shell_removes_them(self):
+    c = self.in_dir('co', 'src/usb')
+    self.assertEqual(resolve('-DA=1 \\\n-DB="x\\\ny" -DC=\'x\\\ny\' -Isrc\\\n/usb'),
+                     f'-DA=1 -DB="xy" -DC=\'x\\\ny\' -I{c}/src/usb')
+
+
+@unittest.skipUnless(os.name == 'posix', 'POSIX signals')
+class RunCommand(unittest.TestCase):
+  """tools/abs_flags.py runs the command and exits with its status, 128+N for a signal as a shell reports it."""
+
+  def test_interrupt_is_left_to_the_command_without_a_traceback(self):
+    with tempfile.TemporaryDirectory() as d:
+      ready = Path(d, 'ready')
+      p = subprocess.Popen([sys.executable, str(ROOT / 'tools/abs_flags.py'), 'sh', '-c',
+                            f'touch "{ready}"; exec sleep 30'], start_new_session=True, stderr=subprocess.PIPE, text=True)
+      while not ready.exists() and p.poll() is None:
+        time.sleep(0.05)
+      os.killpg(p.pid, signal.SIGINT)
+      _, err = p.communicate(timeout=30)
+    self.assertEqual((p.returncode, err), (128 + signal.SIGINT, ''))
+
+  def test_signal_death_exits_as_a_shell_reports_it(self):
+    p = subprocess.run([sys.executable, str(ROOT / 'tools/abs_flags.py'), 'sh', '-c', 'kill -TERM $$'])
+    self.assertEqual(p.returncode, 128 + signal.SIGTERM)
 
 
 @unittest.skipUnless(HAVE_TOOLS, 'make and cmake needed')
@@ -244,6 +275,18 @@ class Configure(unittest.TestCase):
 
     self.assertEqual(runs(), 'python3')
     self.assertEqual(runs('PYTHON=python'), 'python')
+
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  def test_python_is_the_interpreter_cmake_runs_the_artifact_scripts_with(self):
+    """PYTHON may be a command name: CMake gets the path it runs as, not its own FindPython pick."""
+    with tempfile.TemporaryDirectory() as d:
+      bin_ = Path(d, 'bin')
+      bin_.mkdir()
+      os.symlink(sys.executable, bin_ / 'mypython')
+      p = make('BOARD=pca10056', f'BUILD={d}/b', 'PYTHON=mypython', 'configure', path_prefix=bin_)
+      self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+      cache = Path(d, 'b', 'CMakeCache.txt').read_text()
+    self.assertEqual(re.search(r'^_Python_EXECUTABLE:INTERNAL=(.*)$', cache, re.M)[1], f'{bin_}/mypython')
 
   @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
   def test_each_configure_starts_from_an_empty_cache(self):
