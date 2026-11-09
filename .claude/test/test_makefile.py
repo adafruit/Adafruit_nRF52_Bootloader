@@ -17,17 +17,39 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SD = ROOT / 'lib/softdevice'
 SCRUBBED = ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'MAKELEVEL', 'BOARD', 'BUILD', 'BIN', 'DEBUG',
-            'CFLAGS', 'LDFLAGS', 'CMAKE_GENERATOR', 'CMAKE_BUILD_TYPE')
+            'CFLAGS', 'ASFLAGS', 'LDFLAGS', 'CMAKE_GENERATOR', 'CMAKE_BUILD_TYPE')
 HAVE_TOOLS = bool(shutil.which('make') and shutil.which('cmake'))
 HAVE_GCC = bool(shutil.which('arm-none-eabi-gcc') and shutil.which('ninja'))
 SLOW = 'pytest' in sys.modules or os.environ.get('WRAPPER_SLOW_TESTS') == '1'
 
 
-def make(*args, cwd=ROOT, path_prefix=None):
+def make(*args, cwd=ROOT, path_prefix=None, home=None):
   env = {k: v for k, v in os.environ.items() if k not in SCRUBBED}
   if path_prefix:
     env['PATH'] = f'{path_prefix}{os.pathsep}{env["PATH"]}'
+  if home:
+    env['HOME'] = str(home)
   return subprocess.run(['make', '--no-print-directory', *args], cwd=cwd, env=env, capture_output=True, text=True)
+
+
+def user_checkout(d, makefile_user):
+  """A checkout of symlinks to this one's entries, with its own Makefile.user."""
+  for entry in ROOT.iterdir():
+    if entry.name not in ('Makefile.user', '_build', '_bin'):
+      os.symlink(entry, Path(d) / entry.name)
+  (Path(d) / 'Makefile.user').write_text(makefile_user)
+  return Path(d)
+
+
+def env_cmake(d):
+  """A cmake stub printing the flag variables of its environment, for PATH."""
+  stubs = Path(d, 'stubs')
+  stubs.mkdir()
+  cmake = stubs / 'cmake'
+  cmake.write_text('#!/bin/sh\nprintf "CMAKE %s CFLAGS=[%s] ASMFLAGS=[%s] LDFLAGS=[%s]\\n" '
+                   '"$1" "$CFLAGS" "$ASMFLAGS" "$LDFLAGS"\n')
+  cmake.chmod(0o755)
+  return stubs
 
 
 def stub(d, name):
@@ -39,7 +61,7 @@ def stub(d, name):
 
 
 def configure_line(out):
-  return next(l for l in out.splitlines() if l.startswith('cmake -S . -B'))
+  return next(l[l.index('cmake -S . -B'):] for l in out.splitlines() if 'cmake -S . -B' in l)
 
 
 @unittest.skipUnless(HAVE_TOOLS, 'make and cmake needed')
@@ -103,24 +125,51 @@ class Configure(unittest.TestCase):
 
   def test_makefile_user_flags_reach_the_configure_environment(self):
     """CMake adds env CFLAGS, ASMFLAGS and LDFLAGS to the toolchain's on a fresh cache; ASFLAGS also take CFLAGS.
-    Existing relative paths, alone or after -I or -L, become absolute: CMake compiles in the build directory."""
+    Existing relative paths after -I, -L or -include become absolute: CMake compiles in the build directory."""
     with tempfile.TemporaryDirectory() as d:
-      for name in ('Makefile', 'src', 'cmake'):
+      for name in ('Makefile', 'src', 'cmake', 'tools'):
         os.symlink(ROOT / name, Path(d) / name)
       (Path(d) / 'Makefile.user').write_text('CFLAGS += -DX -include src/main.c -Isrc -Inope\nASFLAGS += -DY\n'
                                              'LDFLAGS += -Wl,-z -Lcmake\n')
-      tools = Path(d, 'tools')
-      tools.mkdir()
-      cmake = tools / 'cmake'
-      cmake.write_text('#!/bin/sh\necho "CMAKE $1 CFLAGS=[$CFLAGS] ASMFLAGS=[$ASMFLAGS] LDFLAGS=[$LDFLAGS]"\n')
-      cmake.chmod(0o755)
-      p = make('BOARD=pca10056', 'configure', cwd=d, path_prefix=tools)
+      p = make('BOARD=pca10056', 'configure', cwd=d, path_prefix=env_cmake(d))
       r = Path(d).resolve()
     self.assertEqual(p.returncode, 0, p.stderr)
     cflags = f'-DX -include {r}/src/main.c -I{r}/src -Inope'
     self.assertIn(f'CMAKE -S CFLAGS=[{cflags}] ASMFLAGS=[-DY {cflags}] LDFLAGS=[-Wl,-z -L{r}/cmake]',
                   p.stdout.splitlines())
     self.assertNotIn('CMAKE_C_FLAGS=', configure_line(p.stdout))
+
+  def test_only_path_operands_change_and_the_rest_passes_as_written(self):
+    """Quoted or separate operands resolve too. Operands naming no checkout path (~, $VAR, =sysroot, a header for the
+    search path), absolute ones, other words and quoted whitespace pass as written; references to later variables
+    and target-specific flags take effect as in the make build."""
+    with tempfile.TemporaryDirectory() as d:
+      user_checkout(d, 'CFLAGS += -include ~/x.h -D tools -DS=\'"a  b"\' -DPROG=\\"$(NRFJPROG)\\" '
+                    '-include "src/main.c" -I \'src\' -I/abs -I=sys -isystem  src -iquote$$HOME -include compile_date.h\n'
+                    'all: CFLAGS += -include src/usb/uf2/compile_date.h\nLDFLAGS += -Wl,-z -L linker\n')
+      p = make('BOARD=pca10056', 'all', cwd=d, path_prefix=env_cmake(d))
+      r = Path(d).resolve()
+    self.assertEqual(p.returncode, 0, p.stderr)
+    cflags = (f'-include ~/x.h -D tools -DS=\'"a  b"\' -DPROG=\\"nrfjprog\\" -include "{r}/src/main.c" -I \'{r}/src\' '
+              f'-I/abs -I=sys -isystem  {r}/src -iquote$HOME -include compile_date.h '
+              f'-include {r}/src/usb/uf2/compile_date.h')
+    self.assertIn(f'CMAKE -S CFLAGS=[{cflags}] ASMFLAGS=[ {cflags}] LDFLAGS=[-Wl,-z -L {r}/linker]',
+                  p.stdout.splitlines())
+
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  def test_makefile_user_flags_compile_as_written_in_cmakes_compiler_check(self):
+    """Each flag below fails the compiler check, or its #error, unless it reaches the compiler as written."""
+    with tempfile.TemporaryDirectory() as d:
+      user_checkout(d, 'CFLAGS += -D tools -DS=\'"a  b"\' -DPROG=\\"$(NRFJPROG)\\" '
+                    '-include "src/usb/uf2/compile_date.h"\nconfigure: CFLAGS += -isystem src/usb -include ~/check.h\n')
+      home = Path(d, 'home')
+      home.mkdir()
+      (home / 'check.h').write_text(
+        '#ifndef COMPILE_DATE_H\n#error quoted -include\n#endif\n#include <uf2/compile_date.h>\n'
+        '#if tools != 1\n#error -D tools\n#endif\n'
+        '_Static_assert(sizeof S == sizeof "a  b", "S");\n_Static_assert(sizeof PROG == sizeof "nrfjprog", "PROG");\n')
+      p = make('BOARD=pca10056', f'BUILD={d}/b', 'configure', cwd=d, home=home)
+    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
   @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
   def test_checkout_relative_flags_resolve_in_cmakes_compiler_check(self):
