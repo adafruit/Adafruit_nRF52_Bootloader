@@ -37,8 +37,8 @@ import agentrc  # noqa: E402
 import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
-# hil_lock.PendingSessions claims: <lock>.nrf52-bootloader-pending.json, the record older harnesses' marks used, whose
-# entries were claims already
+# hil_lock.PendingSessions claims: <lock>.nrf52-bootloader-claim.<seq>.<token>.json, one per invocation, beside
+# <lock>.nrf52-bootloader-pending.json, the record older harnesses' marks used, whose entries are read as claims
 CLAIM_KIND = 'nrf52-bootloader'
 CLAIM_SETTLE = 30            # s an earlier invocation's unproven tools get to end before an attempt gives the board up
 PROFILE_STEPS = run_report.PROFILE_STEPS
@@ -1262,10 +1262,11 @@ def holder_tokens(board):
 
 def claim(board, ops, found):
   """Name this invocation and its ops dir in the board's claim record before its first tool, under the run's flock or
-  the caller's hold (agentrc `hil` Board locks). An earlier invocation's claim leaves the record once it ended, or once
-  the tools it left not proven ended are logged in the board's cleanup log; those, and any JLinkExe on the probe, then
-  get CLAIM_SETTLE to end. Returns (claim, `found` refreshed, '' or what was not logged or removed); Refused when the
-  record cannot name this invocation, InUse while the board is not free, this claim removed again."""
+  the caller's hold (agentrc `hil` Board locks). The tools an earlier invocation left not proven ended are logged in
+  the board's cleanup log; they, and any JLinkExe on the probe, then get CLAIM_SETTLE to end. Its claim leaves the
+  record unless one of them still rechecks pending or its log failed. Returns (claim, `found` refreshed, '' or what was
+  not logged or removed); Refused when the record cannot name this invocation, InUse while the board is not free, this
+  claim removed again."""
   helper = lock_helper()
   record = helper.PendingSessions(board['lock'], CLAIM_KIND)
   try:
@@ -1273,7 +1274,7 @@ def claim(board, ops, found):
     others = record.claim(entry)
   except (OSError, ValueError, helper.PendingRefused) as e:
     raise Refused(f'the board\'s claim record could not name this invocation: {type(e).__name__}: {e}')
-  notes, unsettled = [], []
+  notes, earlier = [], []
   try:
     if alive := [s['receipt'] for s in others if helper.claim_alive(s)]:
       raise InUse(f'another invocation on the board is running: {alive}', found)
@@ -1284,18 +1285,24 @@ def claim(board, ops, found):
       state, receipts = helper.invocation_state(s, keep)
       if state == 'alive':   # not after the gate, but a live claim is never removed
         continue
-      unsettled += receipts
+      why = ''
       if new := [r for r in receipts if not (isinstance(r, dict) and r.get('token') in keep)]:
         if why := log_failure(board, 'an earlier invocation ended with tools not proven ended', new, s['receipt']):
-          notes.append(why)   # its claim stays, for the next attempt to log
-          continue
-        found = refreshed(board, found)
-      try:
-        record.remove(s)
-      except (OSError, helper.PendingRefused) as e:
-        notes.append(f'earlier claim not removed: {e}')
+          notes.append(why)
+        else:
+          found = refreshed(board, found)
+      earlier.append((s, receipts, bool(why)))
+    unsettled = [r for _, receipts, _ in earlier for r in receipts]
     wait = CLAIM_SETTLE if unsettled else 0
     states, named = helper.settle(unsettled, wait, busy=lambda: probe_users(board))
+    pending = iter(st == 'pending' for st in states)
+    for s, receipts, unlogged in earlier:
+      # a tool proven still running keeps its claim, and one whose log failed stays, for the next attempt to judge
+      if not any([next(pending) for _ in receipts]) and not unlogged:
+        try:
+          record.remove(s)
+        except (OSError, helper.PendingRefused) as e:
+          notes.append(f'earlier claim not removed: {e}')
     if left := helper.open_runs(unsettled, states) + named:
       raise InUse(f'still on the board after {wait}s: {left}', found, left)
   except InUse:

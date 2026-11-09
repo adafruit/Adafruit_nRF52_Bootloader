@@ -1202,16 +1202,20 @@ class Claim(unittest.TestCase):
       ht.claim(self.board, self.tools.dir, [])
     (failure,) = self.helper.open_cleanup_failures('nrf52840dk')
     self.assertEqual((failure['task'], [r['token'] for r in failure['receipts']]), (dead, ['abc']))
-    self.assertEqual((e.exception.found, self.listed()), ([failure], []))
-    # the next attempt, its take reporting the failure, does not find that claim: it refuses nothing, its files kept
+    self.assertEqual((e.exception.found, self.listed()), ([failure], [dead]))
+    # while the tool still runs, the next attempt refuses again without logging it twice
     found = self.helper.open_cleanup_failures('nrf52840dk')
+    with self.assertRaisesRegex(ht.InUse, r'still on the board after 0.3s: \[.receipt abc'):
+      ht.claim(self.board, self.tools.dir, found)
+    self.assertEqual((self.helper.open_cleanup_failures('nrf52840dk'), self.listed()), ([failure], [dead]))
+    (why,) = self.helper.resolve_restored('nrf52840dk', found)
+    self.assertIn(f'{failure["id"]} stays open', why)
+    # once it ended, the next attempt removes that claim, the tool's files kept for resolve_restored
+    self.end(self.earlier, 'abc', fd)
     entry, found, _ = ht.claim(self.board, self.tools.dir, found)
     self.assertEqual((found, self.listed()), ([failure], [entry['receipt']]))
     self.assertEqual(ht.unclaim(self.board, entry, self.tools), '')
     self.assertTrue(Path(self.earlier, 'hil_op_abc.lock').exists())
-    (why,) = self.helper.resolve_restored('nrf52840dk', found)
-    self.assertIn(f'{failure["id"]} stays open', why)
-    self.end(self.earlier, 'abc', fd)
     self.assertEqual(self.helper.resolve_restored('nrf52840dk', found), [])
     self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
 

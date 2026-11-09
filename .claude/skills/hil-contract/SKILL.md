@@ -146,13 +146,15 @@ against:
 reader and flush) runs under agentrc's `hil_process.run_tracked` with its files in the run dir's `ops`
 (`hil_process.state_dir`); one whose process tree is not proven ended stops the battery, skips the restore and its
 receipt goes to the board's cleanup log. Before its first tool, every `run`, `install` and `restore` claims the board
-(agentrc `hil` Board locks): its pid, start time and ops dir in `<lock>.nrf52-bootloader-pending.json`
-(`hil_lock.PendingSessions`, the record older harnesses' pending marks used), refused when that cannot be written.
-Another invocation still alive refuses it (two commands under one hold). An earlier one that ended with a tool not
-proven ended has that tool's receipt logged in the board's cleanup log, its claim removed, and the tool, and any
-`JLinkExe` on the board's probe, get 30 s to end (`hil_test.py` `CLAIM_SETTLE`); still there, the attempt is not run,
-and the next attempt no longer waits on it. An invocation removes its own claim once its own tools recheck `done`, and
-keeps it otherwise for the next claim to judge.
+(agentrc `hil` Board locks): its pid, start time and ops dir in its own claim file,
+`<lock>.nrf52-bootloader-claim.<seq>.<token>.json` (`hil_lock.PendingSessions`, which also reads the entries of
+`<lock>.nrf52-bootloader-pending.json`, the record older harnesses' pending marks used), refused when that cannot be
+written. Another invocation still alive refuses it (two commands under one hold). An earlier one that ended with a tool
+not proven ended has that tool's receipt logged in the board's cleanup log, and the tool, and any `JLinkExe` on the
+board's probe, get up to 30 s to end (`hil_test.py` `CLAIM_SETTLE`); a receipt whose state cannot be read (`unknown`)
+is not waited on. Anything not ended refuses the attempt. The earlier claim is removed unless one of its tools still
+rechecks `pending` (proven running), so a later attempt waits only on a tool that runs. An invocation removes its own
+claim once its own tools recheck `done`, and keeps it otherwise for the next claim to judge.
 
 ### CI
 
@@ -222,7 +224,8 @@ retries a fail once per `hil` Caller rules.
   recheck `done`; to restore without a run, hold, `restore --under-hold`, release (Reservation). A failure that stays
   open (`restoredNote`) names a tool not proven ended: once no `JLinkExe`, `mcopy`, `adafruit-nrfutil` or
   `hil_test.py` child of it is left on the host, a passing `restore` resolves it; a tool that never ends (D state) is
-  `usb-kernel-recover`'s, then the human's.
+  `usb-kernel-recover`'s, then the human's. A receipt in another user's run dir rechecks `done` only for that user, so
+  only that user's restore resolves it.
 - `recoveryBlocker`: an older helper's cleanup holder still holds the lock (`hil_lock.py status` shows `role:
   cleanup-holder` and its pid) and never frees on its own. Once no tool of its run is left on the host, a
   `hw-validator` or the human runs, with that run's record or one rebuilt on a known-good clean HEAD:
@@ -235,9 +238,10 @@ retries a fail once per `hil` Caller rules.
   It proves `<pid>` is the board's live cleanup holder, restores under it, and only after the restore passed ends the
   holder by its token (`recovered.released`). A failed restore (exit 4) is logged and leaves the holder: the board goes
   to the human. A dead holder's record on a free lock needs nothing: the next taker logs it as a failed cleanup.
-- `occupiedBy`: an earlier invocation's tool, or another `JLinkExe` on the probe, outlived the 30 s settle; the earlier
-  invocation's failure is logged and its claim removed, so a later attempt does not wait on it again (the failure stays
-  open until a restore resolves it); a `JLinkExe` still on the probe refuses every attempt.
+- `occupiedBy`: an earlier invocation's tool, or another `JLinkExe` on the probe, outlived the settle, or its state
+  could not be read; the earlier invocation's failure is logged. A tool still proven running keeps its claim, so each
+  attempt refuses until it ends; otherwise the claim is removed and a later attempt does not wait on it again (the
+  failure stays open until a restore resolves it). A `JLinkExe` still on the probe refuses every attempt.
 - A J-Link that no longer connects: agentrc's `usb-kernel-recover` rungs, then the registry's `flasher_recover`
   (openocd `nrf52.cfg`). An APPROTECT recover is never automatic.
 - A UF2 drive that never enumerates after a passing `install`: check the DK's nRF USB cable (J3) and the hub port;
