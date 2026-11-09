@@ -668,19 +668,23 @@ class BatteryRun(unittest.TestCase):
          mock.patch.object(bat.probe, 'session', side_effect=session), self.assertRaisesRegex(ht.StepFail, 'valid'):
       bat.banked(b'a' * 16)
 
-  def test_refused_keeps_the_bootloader_in_dfu_then_runs_the_old_app(self):
+  def refuse(self, nrfutil=(0, 'Sending firmware file\nActivating new firmware\nDevice programmed.\n')):
     bat, calls = self.dual(), []
     sessions, session = self.bank_session()
-    c, b = ht.fixture(bat.f, b'c' * 16), ht.fixture(bat.f, b'b' * 16)
     with mock.patch.object(bat.probe, 'reenter', return_value={}), \
          mock.patch.object(bat, 'cdc_only', return_value='/dev/ttyACM9'), \
          mock.patch.object(bat, 'package', side_effect=lambda img, name, edit=None: calls.append(edit) or '/p.zip'), \
-         mock.patch.object(bat, 'nrfutil', side_effect=lambda argv, what: calls.append(argv) or 'Device programmed.'), \
+         mock.patch.object(bat.tools, 'spawn', side_effect=lambda argv, t: calls.append(argv) or nrfutil), \
          mock.patch.object(ht, 'stays_away', side_effect=lambda *a: calls.append('stays')), \
          mock.patch.object(ht.Battery, 'cdc_absent', return_value=True), \
          mock.patch.object(bat.probe, 'session', side_effect=session), \
          mock.patch.object(bat, 'app_ran', side_effect=lambda n: calls.append(('app', n)) or {}):
       bat.refused(b'c' * 16, b'b' * 16)
+    return bat, calls, sessions
+
+  def test_refused_keeps_the_bootloader_in_dfu_then_runs_the_old_app(self):
+    bat, calls, sessions = self.refuse()
+    c, b = ht.fixture(bat.f, b'c' * 16), ht.fixture(bat.f, b'b' * 16)
     self.assertIs(calls[0], ht.flip_crc)
     self.assertNotIn('--singlebank', calls[1])
     self.assertEqual(calls[2:], ['stays', ('app', b'b' * 16)])
@@ -688,6 +692,13 @@ class BatteryRun(unittest.TestCase):
     self.assertEqual(cmds[-2:], ['r', 'g'])
     self.assertEqual(Path(cmds[2].split()[1]).read_bytes(), c['image'])
     self.assertEqual(Path(cmds[3].split()[1]).read_bytes(), b['image'])
+
+  def test_no_crc_refusal_without_the_stop_packet(self):
+    # it exits 0 on a failed upgrade too; the bootloader checks the CRC only on the stop packet
+    for nrfutil in ((0, 'Sending firmware file\nFailed to upgrade target. Error is: Three failed tx attempts\n'),
+                    (1, 'Activating new firmware\n')):
+      with self.subTest(nrfutil), self.assertRaisesRegex(ht.StepFail, 'stop packet'):
+        self.refuse(nrfutil)
 
   def cut(self, code=124, tail=None):
     bat = self.dual()

@@ -101,6 +101,22 @@ class Configure(unittest.TestCase):
     for arg in ('-B "_build/build-feather_nrf52832"', '-DBOARD=feather_nrf52832', '-DDUALBANK_FW=ON'):
       self.assertIn(arg, cfg)
 
+  def test_makefile_user_flags_reach_the_configure_environment(self):
+    """CMake adds env CFLAGS, ASMFLAGS and LDFLAGS to the toolchain's on a fresh cache; ASFLAGS also take CFLAGS."""
+    with tempfile.TemporaryDirectory() as d:
+      for name in ('Makefile', 'src', 'cmake'):
+        os.symlink(ROOT / name, Path(d) / name)
+      (Path(d) / 'Makefile.user').write_text('CFLAGS += -DX\nASFLAGS += -DY\nLDFLAGS += -Wl,-z\n')
+      tools = Path(d, 'tools')
+      tools.mkdir()
+      cmake = tools / 'cmake'
+      cmake.write_text('#!/bin/sh\necho "CMAKE $1 CFLAGS=[$CFLAGS] ASMFLAGS=[$ASMFLAGS] LDFLAGS=[$LDFLAGS]"\n')
+      cmake.chmod(0o755)
+      p = make('BOARD=pca10056', 'configure', cwd=d, path_prefix=tools)
+    self.assertEqual(p.returncode, 0, p.stderr)
+    self.assertIn('CMAKE -S CFLAGS=[-DX] ASMFLAGS=[-DY -DX] LDFLAGS=[-Wl,-z]', p.stdout.splitlines())
+    self.assertNotIn('CMAKE_C_FLAGS=', configure_line(p.stdout))
+
   @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
   def test_each_configure_starts_from_an_empty_cache(self):
     with tempfile.TemporaryDirectory() as d:

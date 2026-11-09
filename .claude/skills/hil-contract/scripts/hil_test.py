@@ -1015,8 +1015,10 @@ class Battery:
     fx = fixture(self.f, nonce)
     ev, tty = self.enter_cdc()
     pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
-    out = self.nrfutil(serial_argv(pkg, tty, False), 'dfu serial')
-    ev['nrfutil'] = out.strip().splitlines()[-2:]   # it reports success either way
+    code, out = self.tools.spawn(['adafruit-nrfutil', *serial_argv(pkg, tty, False)], NRFUTIL_TIMEOUT)
+    ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}   # it reports success either way
+    if code or 'Activating new firmware' not in out:   # the bootloader checks the CRC on the stop packet
+      raise StepFail('adafruit-nrfutil did not send the whole image and its stop packet', ev)
     stays_away(self.cdc_absent, QUIET,
                'the bootloader reset as if it activated the refused package')
     ev['bank0'] = self.bank_check(fx['image'], fixture(self.f, running)['image'], ['r', 'g'])

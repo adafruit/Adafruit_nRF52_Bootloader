@@ -67,6 +67,12 @@ CMAKE_ARGS = -G Ninja -DBOARD=$(BOARD) "-DCROSS_COMPILE=$(CROSS_COMPILE)" "-DNRF
 # make's DEBUG=1 build kept -Os; CMake's Debug type alone compiles with -O0
 CMAKE_ARGS += -DCMAKE_C_FLAGS_DEBUG=-Os -DCMAKE_ASM_FLAGS_DEBUG=-Os
 
+# Extra flags (command line, environment or Makefile.user) reach a fresh configure through the environment, where CMake
+# adds them to the toolchain's; a -DCMAKE_C_FLAGS would replace those. As in the make build, CFLAGS also reach the
+# assembler and the link.
+export CFLAGS LDFLAGS
+export ASMFLAGS = $(strip $(ASFLAGS) $(CFLAGS))
+
 # Flasher utility options
 NRFJPROG = nrfjprog
 FLASHER ?= nrfjprog
