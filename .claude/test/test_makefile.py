@@ -7,6 +7,7 @@ The `Build` class compiles a board and runs only under pytest (`python3 -m pytes
 WRAPPER_SLOW_TESTS=1; pre-commit and CI's `unittest discover` skip it."""
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,7 @@ SCRUBBED = ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'MAKELEVEL',
 HAVE_TOOLS = bool(shutil.which('make') and shutil.which('cmake'))
 HAVE_GCC = bool(shutil.which('arm-none-eabi-gcc') and shutil.which('ninja'))
 SLOW = 'pytest' in sys.modules or os.environ.get('WRAPPER_SLOW_TESTS') == '1'
+resolve = runpy.run_path(str(ROOT / 'tools/abs_flags.py'))['resolve']
 
 
 def make(*args, cwd=ROOT, path_prefix=None, home=None):
@@ -62,6 +64,45 @@ def stub(d, name):
 
 def configure_line(out):
   return next(l[l.index('cmake -S . -B'):] for l in out.splitlines() if 'cmake -S . -B' in l)
+
+
+class ResolveFlags(unittest.TestCase):
+  """tools/abs_flags.py: existing relative path operands get the current directory, quoted for the shell; the rest
+  passes byte for byte."""
+
+  def in_dir(self, name, *paths):
+    d = tempfile.TemporaryDirectory()
+    self.addCleanup(d.cleanup)
+    cwd = Path(d.name, name)
+    for p in paths:
+      (cwd / p).mkdir(parents=True)
+    old = os.getcwd()
+    os.chdir(cwd)
+    self.addCleanup(os.chdir, old)
+    return os.getcwd()
+
+  def test_quoted_operand_resolves_whole(self):
+    c = self.in_dir('co', 'custom includes')
+    self.assertEqual(resolve('-I"custom includes" -include check.h'), f'-I"{c}/custom includes" -include check.h')
+    self.assertEqual(resolve("-I 'custom includes'  -Icustom\\ includes"),
+                     f"-I '{c}/custom includes'  -I{c}/custom\\ includes")
+
+  def test_directory_with_spaces_is_quoted(self):
+    c = self.in_dir('sp ace', 'src')
+    self.assertEqual(resolve('-Isrc -I src -I"src" "-Isrc" -Isrc/../src'),
+                     f"-I'{c}/'src -I '{c}/'src -I\"{c}/src\" \"-I{c}/src\" -I'{c}/'src/../src")
+
+  def test_shell_characters_in_the_directory_stay_literal(self):
+    c = self.in_dir('it\'s "$x" `y`', 'src')
+    flags = resolve('-Isrc -I"src" -I\'src\'')
+    words = subprocess.run(['sh', '-c', 'printf "%s\\n" ' + flags], capture_output=True, text=True,
+                           check=True).stdout.splitlines()
+    self.assertEqual(words, [f'-I{c}/src'] * 3)
+
+  def test_options_inside_quoted_values_are_not_options(self):
+    self.in_dir('co', 'linker', 'src')
+    for flags in ('-DMSG=\'"see -L linker"\' ', '-DA="x -Isrc"', '"-DA -Isrc"', '-DA=\\"-I src\\"x'):
+      self.assertEqual(resolve(flags), flags)
 
 
 @unittest.skipUnless(HAVE_TOOLS, 'make and cmake needed')
@@ -176,6 +217,33 @@ class Configure(unittest.TestCase):
     with tempfile.TemporaryDirectory() as d:
       p = make('BOARD=pca10056', f'BUILD={d}/b', 'CFLAGS=-Isrc/usb/uf2 -include compile_date.h', 'configure')
     self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  def test_quoted_operand_with_whitespace_and_quoted_option_text_compile(self):
+    with tempfile.TemporaryDirectory() as d:
+      user_checkout(d, 'CFLAGS += -I"custom includes" -include check.h -DMSG=\'"see -L linker"\'\n')
+      Path(d, 'custom includes').mkdir()
+      Path(d, 'custom includes', 'check.h').write_text('_Static_assert(sizeof MSG == sizeof "see -L linker", "MSG");\n')
+      p = make('BOARD=pca10056', f'BUILD={d}/b', 'configure', cwd=d)
+    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  def test_checkout_relative_flags_resolve_in_a_checkout_path_with_spaces(self):
+    with tempfile.TemporaryDirectory() as d:
+      checkout = Path(d, 'sp ace')
+      checkout.mkdir()
+      user_checkout(checkout, '')
+      p = make('BOARD=pca10056', f'BUILD={d}/b', 'CFLAGS=-Isrc/usb/uf2 -include compile_date.h', 'configure',
+               cwd=checkout)
+    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+
+  def test_python_runs_the_configure_and_can_be_overridden(self):
+    def runs(*args):
+      return next(l.split()[0] for l in make('-n', 'BOARD=pca10056', *args, 'configure').stdout.splitlines()
+                  if 'tools/abs_flags.py cmake' in l)
+
+    self.assertEqual(runs(), 'python3')
+    self.assertEqual(runs('PYTHON=python'), 'python')
 
   @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
   def test_each_configure_starts_from_an_empty_cache(self):

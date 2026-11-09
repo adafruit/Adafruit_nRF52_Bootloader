@@ -18,12 +18,15 @@
 # - ANT_LICENSE_KEY    : ANT license key, with SD_NAME=s340
 # - TRACE_ETM          : 1 to set up ETM trace
 # - CROSS_COMPILE      : toolchain prefix, default arm-none-eabi-
+# - PYTHON             : Python 3 interpreter, default python3
 # - NRFUTIL            : adafruit-nrfutil command
 # - FLASHER            : nrfjprog (default) or pyocd
 # - SERIAL             : serial port for flash-dfu e.g /dev/ttyACM0
 #------------------------------------------------------------------------------
 
 THIS_MAKEFILE := $(lastword $(MAKEFILE_LIST))
+
+PYTHON = python3
 
 # local customization
 -include Makefile.user
@@ -115,7 +118,7 @@ all: configure
 
 configure:
 	@cmake -E rm -f "$(BUILD)/CMakeCache.txt"
-	python3 tools/abs_flags.py cmake -S . -B "$(BUILD)" $(CMAKE_ARGS)
+	$(PYTHON) tools/abs_flags.py cmake -S . -B "$(BUILD)" $(CMAKE_ARGS)
 
 clean:
 	@cmake -E rm -rf "$(BUILD)" "$(BIN)"
