@@ -47,7 +47,7 @@ def words(flags):
 
 
 def resolve(flags):
-  inserts, separate = [], False
+  out, last, separate = [], 0, False
   for word in words(flags):
     if separate:
       operand, separate = word, False
@@ -63,11 +63,8 @@ def resolve(flags):
     path = ''.join(c for c, _, _ in operand)
     if not os.path.isabs(path) and os.path.exists(path):
       _, at, quote = operand[0]
-      inserts.append((at, ESCAPE[quote](f'{os.getcwd()}/')))
-  out, last = [], 0
-  for at, text in inserts:
-    out += [flags[last:at], text]
-    last = at
+      out += [flags[last:at], ESCAPE[quote](f'{os.getcwd()}/')]
+      last = at
   return ''.join(out) + flags[last:]
 
 
