@@ -1295,7 +1295,8 @@ def claim(board, ops, found):
       except (OSError, helper.PendingRefused) as e:
         notes.append(f'earlier claim not removed: {e}')
     wait = CLAIM_SETTLE if unsettled else 0
-    if left := helper.settle(unsettled, wait, busy=lambda: probe_users(board)):
+    states, named = helper.settle(unsettled, wait, busy=lambda: probe_users(board))
+    if left := helper.open_runs(unsettled, states) + named:
       raise InUse(f'still on the board after {wait}s: {left}', found, left)
   except InUse:
     with contextlib.suppress(OSError, helper.PendingRefused):
