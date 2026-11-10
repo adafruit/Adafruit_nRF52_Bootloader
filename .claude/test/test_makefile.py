@@ -191,7 +191,7 @@ class Configure(unittest.TestCase):
       self.assertNotIn(f'-D{name}', cfg)
     self.assertIn('-DUSE_NFCT=OFF', configure_line(make('-n', 'BOARD=m60_keyboard', 'USE_NFCT=no', 'all').stdout))
 
-  def test_cmake_generator_overrides_the_make_generator(self):
+  def test_cmake_generator_overrides_the_default(self):
     self.assertIn('-G "Ninja"', configure_line(make('-n', 'BOARD=pca10056', 'CMAKE_GENERATOR=Ninja', 'all').stdout))
 
   def test_makefile_user_sets_variables(self):

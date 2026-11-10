@@ -116,7 +116,8 @@ You must have have a J-Link available to "unbrick" your device.
 ### Prerequisites
 
 - ARM GCC
-- [CMake](https://cmake.org/), and [Ninja](https://ninja-build.org/) for a direct CMake build
+- [CMake](https://cmake.org/)
+- [Ninja](https://ninja-build.org/), for the CMake build below (as CI does)
 - Nordic's [nRF5x Command Line Tools](https://www.nordicsemi.com/Software-and-Tools/Development-Tools/nRF-Command-Line-Tools)
 - [Python IntelHex](https://pypi.org/project/IntelHex/)
 
@@ -138,8 +139,8 @@ git submodule update --init
 #### Build using `make`
 
 The Makefile is a thin wrapper over the CMake build below: it configures `_build/build-{board}` with CMake's Unix
-Makefiles generator (`CMAKE_GENERATOR=Ninja` picks another), then builds through it. Build with
-`make BOARD={board} all`, for example:
+Makefiles generator (`make CMAKE_GENERATOR=Ninja ...` selects another), then builds through it. Build with
+`make BOARD={board} all`, adding `-j` for a parallel build, for example:
 
 ```
 make BOARD=feather_nrf52840_express all
