@@ -276,6 +276,14 @@ class Make(unittest.TestCase):
       self.assertEqual(row['status'], 'ok')
       self.assertFalse((Path(d) / row['buildDir']).exists())
 
+  def test_make_jobs_are_capped_at_the_cpu_count(self):
+    for cpus, jobs in ((8, '-j8'), (None, '-j1')):
+      with self.subTest(cpus=cpus), tempfile.TemporaryDirectory() as d, mock.patch.object(cb, 'ROOT', Path(d)), \
+           mock.patch.object(cb.os, 'cpu_count', return_value=cpus), \
+           mock.patch.object(cb, 'run_logged', return_value=0) as run:
+        cb.make_board('b', False)
+        self.assertEqual(run.call_args[0][0][:2], ['make', jobs])
+
 
 if __name__ == '__main__':
   unittest.main()

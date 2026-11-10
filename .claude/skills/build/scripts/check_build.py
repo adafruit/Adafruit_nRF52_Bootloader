@@ -367,7 +367,7 @@ def make_board(board, verbose):
   shutil.rmtree(bdir, ignore_errors=True)
   bdir.mkdir(parents=True)
   log = bdir / 'check_build.log'
-  rc = run_logged(['make', f'-j{os.cpu_count()}', f'BOARD={board}', f'BUILD={bdir}', 'all'], log, verbose)
+  rc = run_logged(['make', f'-j{os.cpu_count() or 1}', f'BOARD={board}', f'BUILD={bdir}', 'all'], log, verbose)
   row = {'board': board, 'backend': 'make', 'buildDir': str(bdir.relative_to(ROOT))}
   problems = [] if rc else make_artifacts(bdir, board)[1]
   if rc or problems:
