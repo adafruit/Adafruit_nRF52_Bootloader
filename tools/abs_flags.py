@@ -8,6 +8,10 @@ prepended, quoted for the shell. Words split as the shell splits them, so an opt
 Line continuations go, as the shell removes them; everything else passes as written, quoting and whitespace included,
 for the shell running each compile to expand (~, $VAR) as the make build's did.
 
+The command gets a last argument, -DPython_EXECUTABLE= naming the interpreter running this, which no shell expands:
+CMake runs the artifact scripts with it (hexmerge.py needs intelhex), as the make build did; FindPython would pick its
+own.
+
 usage: abs_flags.py COMMAND [ARG...]"""
 import os
 import re
@@ -52,10 +56,10 @@ def words(flags, edits):
 
 
 def resolve(flags):
-  edits, separate = [], False
+  edits, separate = [], None
   for word in words(flags, edits):
     if separate:
-      operand, separate = word, False
+      option, operand, separate = separate, word, None
     else:
       value = ''.join(c for c, _, _ in word)
       option = next((o for o in PATH_OPTIONS if value.startswith(o)), None)
@@ -63,11 +67,11 @@ def resolve(flags):
         continue
       operand = word[len(option):]
       if not operand:
-        separate = True
+        separate = option
         continue
     path = ''.join(c for c, _, _ in operand)
-    # GCC's -I- splits the search path: a directory named - is not what it means
-    if path != '-' and not os.path.isabs(path) and os.path.exists(path):
+    # GCC's -I- (or -I -) splits the search path; the other options take - as a path
+    if (option, path) != ('-I', '-') and not os.path.isabs(path) and os.path.exists(path):
       _, at, quote = operand[0]
       edits.append((at, 0, ESCAPE[quote](f'{os.getcwd()}/')))
   out, last = [], 0
@@ -85,7 +89,7 @@ def main():
   # SIG_IGN, is not inherited.
   signal.signal(signal.SIGINT, lambda *_: None)
   # os.execvp on Windows ends this process without waiting for the command: make would miss its status
-  status = subprocess.call(sys.argv[1:])
+  status = subprocess.call([*sys.argv[1:], f'-DPython_EXECUTABLE={sys.executable}'])
   sys.exit(128 - status if status < 0 else status)
 
 

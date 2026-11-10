@@ -106,9 +106,15 @@ class ResolveFlags(unittest.TestCase):
     for flags in ('-DMSG=\'"see -L linker"\' ', '-DA="x -Isrc"', '"-DA -Isrc"', '-DA=\\"-I src\\"x'):
       self.assertEqual(resolve(flags), flags)
 
-  def test_dash_operand_passes_as_written(self):
+  def test_dash_operand_of_I_passes_as_written(self):
     c = self.in_dir('co', '-', 'src')
     self.assertEqual(resolve('-I- -I - -Isrc'), f'-I- -I - -I{c}/src')
+
+  def test_dash_operand_of_other_options_is_a_path(self):
+    """Only GCC's -I gives - a meaning of its own; the rest take it as a directory or a file."""
+    c = self.in_dir('co', '-')
+    self.assertEqual(resolve('-isystem - -iquote- -idirafter - -L- -include - -imacros -'),
+                     f'-isystem {c}/- -iquote{c}/- -idirafter {c}/- -L{c}/- -include {c}/- -imacros {c}/-')
 
   def test_line_continuations_go_as_the_shell_removes_them(self):
     c = self.in_dir('co', 'src/usb')
@@ -275,6 +281,20 @@ class Configure(unittest.TestCase):
 
     self.assertEqual(runs(), 'python3')
     self.assertEqual(runs('PYTHON=python'), 'python')
+
+  def test_python_reaches_cmake_without_shell_expansion(self):
+    """The interpreter path reaches CMake as PYTHON ran, whatever shell characters it holds."""
+    with tempfile.TemporaryDirectory() as d:
+      bin_ = Path(d, 'py $x `y` "q" \'s\' \\b')
+      bin_.mkdir()
+      os.symlink(sys.executable, bin_ / 'python')
+      cmake = Path(d, 'cmake')
+      cmake.write_text('#!/bin/sh\nfor a; do printf "ARG[%s]\\n" "$a"; done\n')
+      cmake.chmod(0o755)
+      quoted = "'" + str(bin_ / 'python').replace("'", "'\\''") + "'"
+      p = make('BOARD=pca10056', f'BUILD={d}/b', 'PYTHON=' + quoted.replace('$', '$$'), 'configure', path_prefix=d)
+    self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+    self.assertEqual(p.stdout.splitlines()[-1], f'ARG[-DPython_EXECUTABLE={bin_}/python]')
 
   @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
   def test_python_is_the_interpreter_cmake_runs_the_artifact_scripts_with(self):
