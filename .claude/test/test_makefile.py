@@ -407,6 +407,21 @@ class Configure(unittest.TestCase):
         self.assertNotIn(gone, text)
       self.assertIn('s140_nrf52_6.1.1_softdevice.hex', (build / 'make_vars.mk').read_text())
 
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
+  def test_dashless_cross_compile_prefix_selects_its_objcopy(self):
+    """CMake derives no binutils prefix from a compiler named without a dash; objcopy still takes CROSS_COMPILE."""
+    with tempfile.TemporaryDirectory() as d:
+      tc = Path(d) / 'tc'
+      tc.mkdir()
+      gcc = Path(shutil.which('arm-none-eabi-gcc')).resolve()
+      for tool in gcc.parent.glob('arm-none-eabi-*'):
+        os.symlink(tool, tc / tool.name.replace('arm-none-eabi-', 'xx'))
+      build = Path(d) / 'b'
+      p = make('BOARD=pca10056', f'BUILD={build}', f'CROSS_COMPILE={tc}/xx', 'configure')
+      self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+      cache = (build / 'CMakeCache.txt').read_text()
+    self.assertEqual(re.search(r'^CMAKE_OBJCOPY:FILEPATH=(.*)$', cache, re.M)[1], f'{tc}/xxobjcopy')
+
   def test_configure_failure_fails_make(self):
     with tempfile.TemporaryDirectory() as d:
       p = make('BOARD=pca10056', f'BUILD={d}/b', 'CROSS_COMPILE=/nonexistent/', 'all')

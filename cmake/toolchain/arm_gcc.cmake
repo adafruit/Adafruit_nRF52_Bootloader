@@ -6,6 +6,13 @@ endif ()
 set(CMAKE_C_COMPILER "${CROSS_COMPILE}gcc")
 set(CMAKE_CXX_COMPILER "${CROSS_COMPILE}g++")
 set(CMAKE_ASM_COMPILER "${CROSS_COMPILE}gcc")
+# CMake derives a binutils prefix only from a dashed compiler name; a cache entry, as CMP0125 is OLD at 3.17.
+if (NOT DEFINED CMAKE_OBJCOPY)
+  find_program(CMAKE_OBJCOPY "${CROSS_COMPILE}objcopy")
+  if (NOT CMAKE_OBJCOPY)
+    set(CMAKE_OBJCOPY "${CROSS_COMPILE}objcopy" CACHE FILEPATH "" FORCE)
+  endif ()
+endif ()
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS FALSE)
