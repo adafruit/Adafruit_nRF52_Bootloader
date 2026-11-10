@@ -110,14 +110,12 @@ GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan
 SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f
 
 # one configure and one build at a time in $(BUILD), whatever -j and the goals given
-# + hands the jobserver to cmake --build, so -j reaches a Makefile generator's make; -n runs those lines too
 .NOTPARALLEL:
 
 .PHONY: all configure clean flash flash-dfu dfu-flash flash-sd sd flash-mbr mbr flash-uf2 erase copy-artifact \
   linkermap gdbflash gdb
 
-all: configure
-	+cmake --build "$(BUILD)"
+.DEFAULT_GOAL := all
 
 configure:
 	@cmake -E rm -f "$(BUILD)/CMakeCache.txt"
@@ -126,14 +124,30 @@ configure:
 clean:
 	@cmake -E rm -rf "$(BUILD)" "$(BIN)"
 
-# each builds only the artifact it uses
+# each builds only the artifact it uses; flash-uf2 deploys bootloader_mbr.uf2, the same bytes as update-*_nosd.uf2
 flash: CMAKE_TARGET = nosd-hex
 flash-dfu: CMAKE_TARGET = dfu-zip
 gdbflash: CMAKE_TARGET = merged-hex
 gdb linkermap: CMAKE_TARGET = bootloader
+flash-uf2: CMAKE_TARGET = flash-uf2
+
+# The make generator's build runs as a sub-make, so make's -j (its pipe jobserver too), -n, -t and -q reach it.
+# cmake --build runs unmarked: -n, -t and -q do not execute it, and Ninja joins -j only through make 4.4's fifo.
+ifeq ($(CMAKE_GENERATOR),Unix Makefiles)
+all flash-uf2: configure
+	$(MAKE) --no-print-directory -C "$(BUILD)" $(CMAKE_TARGET)
+
 flash flash-dfu gdbflash gdb linkermap: configure
-	+cmake --build "$(BUILD)" --target $(CMAKE_TARGET)
+	$(MAKE) --no-print-directory -C "$(BUILD)" $(CMAKE_TARGET)
 	@$(SUBMAKE) "$(BUILD)/make_vars.mk" _$@
+else
+all flash-uf2: configure
+	cmake --build "$(BUILD)" $(if $(CMAKE_TARGET),--target $(CMAKE_TARGET))
+
+flash flash-dfu gdbflash gdb linkermap: configure
+	cmake --build "$(BUILD)" --target $(CMAKE_TARGET)
+	@$(SUBMAKE) "$(BUILD)/make_vars.mk" _$@
+endif
 
 # need no compiler or submodule, as before the wrapper
 flash-sd flash-mbr erase:
@@ -149,10 +163,6 @@ copy-artifact:
 sd: flash-sd
 mbr: flash-mbr
 dfu-flash: flash-dfu
-
-# deploys bootloader_mbr.uf2, the same bytes as update-*_nosd.uf2
-flash-uf2: configure
-	+cmake --build "$(BUILD)" --target flash-uf2
 
 #------------------- recipes run by the sub-make -------------------
 
