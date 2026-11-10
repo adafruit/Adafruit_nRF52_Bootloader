@@ -37,6 +37,15 @@ def make(*args, cwd=ROOT, path_prefix=None, home=None):
   return subprocess.run(['make', '--no-print-directory', *args], cwd=cwd, env=env, capture_output=True, text=True)
 
 
+def dry_run(*args, cwd=ROOT):
+  """make -n with a silent cmake on PATH: make runs the + lines, cmake --build, under -n too."""
+  with tempfile.TemporaryDirectory() as d:
+    cmake = Path(d, 'cmake')
+    cmake.write_text('#!/bin/sh\n')
+    cmake.chmod(0o755)
+    return make('-n', *args, cwd=cwd, path_prefix=d)
+
+
 def user_checkout(d, makefile_user):
   """A checkout of symlinks to this one's entries, with its own Makefile.user."""
   for entry in ROOT.iterdir():
@@ -169,8 +178,8 @@ class Boards(unittest.TestCase):
 @unittest.skipUnless(HAVE_TOOLS, 'make and cmake needed')
 class Configure(unittest.TestCase):
   def test_variables_reach_cmake_as_make_had_them(self):
-    p = make('-n', 'BOARD=pca10056', 'BUILD=b dir', 'DUALBANK_FW=1', 'SIGNED_FW=ON', 'USE_NFCT=yes', 'DEBUG=1',
-             'SD_VERSION=7.3.0', 'SIGNED_FW_QX=0x1, 0x2', 'SIGNED_FW_QY=0x3', 'NRFUTIL=/x/nrfutil', 'all')
+    p = dry_run('BOARD=pca10056', 'BUILD=b dir', 'DUALBANK_FW=1', 'SIGNED_FW=ON', 'USE_NFCT=yes', 'DEBUG=1',
+                'SD_VERSION=7.3.0', 'SIGNED_FW_QX=0x1, 0x2', 'SIGNED_FW_QY=0x3', 'NRFUTIL=/x/nrfutil', 'all')
     self.assertEqual(p.returncode, 0, p.stderr)
     lines = p.stdout.splitlines()
     self.assertEqual(lines[0], 'cmake -E rm -f "b dir/CMakeCache.txt"')
@@ -182,24 +191,41 @@ class Configure(unittest.TestCase):
     self.assertEqual(lines[-1], 'cmake --build "b dir"')
 
   def test_omitted_variables_take_their_defaults(self):
-    cfg = configure_line(make('-n', 'BOARD=pca10056', 'all').stdout)
+    cfg = configure_line(dry_run('BOARD=pca10056', 'all').stdout)
     self.assertIn('-B "_build/build-pca10056"', cfg)
     for arg in ('-DCMAKE_BUILD_TYPE=MinSizeRel', '-DDUALBANK_FW=OFF', '-DSIGNED_FW=OFF', '-DFORCE_UF2=OFF',
                 '-DDEFAULT_TO_OTA_DFU=OFF', '"-DNRFUTIL:STRING=adafruit-nrfutil"'):
       self.assertIn(arg, cfg)
     for name in ('USE_NFCT', 'SD_NAME', 'SD_VERSION', 'SD_HEX', 'SIGNED_FW_QX', 'ANT_LICENSE_KEY', 'TRACE_ETM'):
       self.assertNotIn(f'-D{name}', cfg)
-    self.assertIn('-DUSE_NFCT=OFF', configure_line(make('-n', 'BOARD=m60_keyboard', 'USE_NFCT=no', 'all').stdout))
+    self.assertIn('-DUSE_NFCT=OFF', configure_line(dry_run('BOARD=m60_keyboard', 'USE_NFCT=no', 'all').stdout))
 
   def test_cmake_generator_overrides_the_default(self):
-    self.assertIn('-G "Ninja"', configure_line(make('-n', 'BOARD=pca10056', 'CMAKE_GENERATOR=Ninja', 'all').stdout))
+    self.assertIn('-G "Ninja"', configure_line(dry_run('BOARD=pca10056', 'CMAKE_GENERATOR=Ninja', 'all').stdout))
+
+  def test_build_takes_makes_jobserver(self):
+    """cmake --build's make finishes only at -j2 from make's jobserver: its two targets wait for each other. A pipe
+    jobserver, make's default before 4.4, reaches it only from a recipe line marked recursive."""
+    help_ = subprocess.run(['make', '--help'], capture_output=True, text=True).stdout
+    style = ('--jobserver-style=pipe',) if '--jobserver-style' in help_ else ()
+    wait = 'touch "$(D)/$@"; i=0; while [ ! -f "$(D)/$(OTHER)" ] && [ $$i -lt 100 ]; do sleep 0.1; i=$$((i+1)); done'
+    for goal in ('all', 'flash-uf2'):
+      with tempfile.TemporaryDirectory() as d, self.subTest(goal):
+        Path(d, 'child.mk').write_text('x: a b\na: OTHER = b\nb: OTHER = a\n'
+                                       f'a b:\n\t@{wait}; test -f "$(D)/$(OTHER)"\n')
+        cmake = Path(d, 'cmake')
+        cmake.write_text(f'#!/bin/sh\n[ "$1" = --build ] && exec make -f "{d}/child.mk" "D={d}"\nexit 0\n')
+        cmake.chmod(0o755)
+        p = make('-j2', *style, 'BOARD=pca10056', f'BUILD={d}/b', goal, path_prefix=d)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertNotIn('jobserver unavailable', p.stderr)
 
   def test_makefile_user_sets_variables(self):
     with tempfile.TemporaryDirectory() as d:
       for name in ('Makefile', 'src', 'cmake'):
         os.symlink(ROOT / name, Path(d) / name)
       (Path(d) / 'Makefile.user').write_text('BOARD = feather_nrf52832\nDUALBANK_FW = 1\n')
-      p = make('-n', 'all', cwd=d)
+      p = dry_run('all', cwd=d)
     self.assertEqual(p.returncode, 0, p.stderr)
     cfg = configure_line(p.stdout)
     for arg in ('-B "_build/build-feather_nrf52832"', '-DBOARD=feather_nrf52832', '-DDUALBANK_FW=ON'):

@@ -110,13 +110,14 @@ GDB_BMP = $(GDB) -ex 'target extended-remote $(BMP_PORT)' -ex 'monitor swdp_scan
 SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f
 
 # one configure and one build at a time in $(BUILD), whatever -j and the goals given
+# + hands the jobserver to cmake --build, so -j reaches a Makefile generator's make; -n runs those lines too
 .NOTPARALLEL:
 
 .PHONY: all configure clean flash flash-dfu dfu-flash flash-sd sd flash-mbr mbr flash-uf2 erase copy-artifact \
   linkermap gdbflash gdb
 
 all: configure
-	cmake --build "$(BUILD)"
+	+cmake --build "$(BUILD)"
 
 configure:
 	@cmake -E rm -f "$(BUILD)/CMakeCache.txt"
@@ -131,7 +132,7 @@ flash-dfu: CMAKE_TARGET = dfu-zip
 gdbflash: CMAKE_TARGET = merged-hex
 gdb linkermap: CMAKE_TARGET = bootloader
 flash flash-dfu gdbflash gdb linkermap: configure
-	cmake --build "$(BUILD)" --target $(CMAKE_TARGET)
+	+cmake --build "$(BUILD)" --target $(CMAKE_TARGET)
 	@$(SUBMAKE) "$(BUILD)/make_vars.mk" _$@
 
 # need no compiler or submodule, as before the wrapper
@@ -151,7 +152,7 @@ dfu-flash: flash-dfu
 
 # deploys bootloader_mbr.uf2, the same bytes as update-*_nosd.uf2
 flash-uf2: configure
-	cmake --build "$(BUILD)" --target flash-uf2
+	+cmake --build "$(BUILD)" --target flash-uf2
 
 #------------------- recipes run by the sub-make -------------------
 
