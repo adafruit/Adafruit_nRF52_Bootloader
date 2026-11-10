@@ -23,7 +23,7 @@ SD = ROOT / 'lib/softdevice'
 SCRUBBED = ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'MAKELEVEL', 'BOARD', 'BUILD', 'BIN', 'DEBUG',
             'CFLAGS', 'ASFLAGS', 'LDFLAGS', 'CMAKE_GENERATOR', 'CMAKE_BUILD_TYPE')
 HAVE_TOOLS = bool(shutil.which('make') and shutil.which('cmake'))
-HAVE_GCC = bool(shutil.which('arm-none-eabi-gcc') and shutil.which('ninja'))
+HAVE_GCC = bool(shutil.which('arm-none-eabi-gcc'))
 SLOW = 'pytest' in sys.modules or os.environ.get('WRAPPER_SLOW_TESTS') == '1'
 resolve = runpy.run_path(str(ROOT / 'tools/abs_flags.py'))['resolve']
 
@@ -175,7 +175,7 @@ class Configure(unittest.TestCase):
     lines = p.stdout.splitlines()
     self.assertEqual(lines[0], 'cmake -E rm -f "b dir/CMakeCache.txt"')
     cfg = configure_line(p.stdout)
-    for arg in ('-B "b dir"', '-G Ninja', '-DBOARD=pca10056', '-DDUALBANK_FW=ON', '-DSIGNED_FW=OFF', '-DUSE_NFCT=ON',
+    for arg in ('-B "b dir"', '-G "Unix Makefiles"', '-DBOARD=pca10056', '-DDUALBANK_FW=ON', '-DSIGNED_FW=OFF', '-DUSE_NFCT=ON',
                 '-DCMAKE_BUILD_TYPE=Debug', '"-DSD_VERSION=7.3.0"', '"-DSIGNED_FW_QX=0x1, 0x2"',
                 '"-DNRFUTIL:STRING=/x/nrfutil"', '"-DCROSS_COMPILE=arm-none-eabi-"', '-DCMAKE_C_FLAGS_DEBUG=-Os'):
       self.assertIn(arg, cfg)
@@ -190,6 +190,9 @@ class Configure(unittest.TestCase):
     for name in ('USE_NFCT', 'SD_NAME', 'SD_VERSION', 'SD_HEX', 'SIGNED_FW_QX', 'ANT_LICENSE_KEY', 'TRACE_ETM'):
       self.assertNotIn(f'-D{name}', cfg)
     self.assertIn('-DUSE_NFCT=OFF', configure_line(make('-n', 'BOARD=m60_keyboard', 'USE_NFCT=no', 'all').stdout))
+
+  def test_cmake_generator_overrides_the_make_generator(self):
+    self.assertIn('-G "Ninja"', configure_line(make('-n', 'BOARD=pca10056', 'CMAKE_GENERATOR=Ninja', 'all').stdout))
 
   def test_makefile_user_sets_variables(self):
     with tempfile.TemporaryDirectory() as d:
@@ -235,7 +238,7 @@ class Configure(unittest.TestCase):
     self.assertIn(f'CMAKE -S CFLAGS=[{cflags}] ASMFLAGS=[ {cflags}] LDFLAGS=[-Wl,-z -L {r}/linker]',
                   p.stdout.splitlines())
 
-  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
   def test_makefile_user_flags_compile_as_written_in_cmakes_compiler_check(self):
     """Each flag below fails the compiler check, or its #error, unless it reaches the compiler as written."""
     with tempfile.TemporaryDirectory() as d:
@@ -250,13 +253,13 @@ class Configure(unittest.TestCase):
       p = make('BOARD=pca10056', f'BUILD={d}/b', 'configure', cwd=d, home=home)
     self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
   def test_checkout_relative_flags_resolve_in_cmakes_compiler_check(self):
     with tempfile.TemporaryDirectory() as d:
       p = make('BOARD=pca10056', f'BUILD={d}/b', 'CFLAGS=-Isrc/usb/uf2 -include compile_date.h', 'configure')
     self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
   def test_quoted_operand_with_whitespace_and_quoted_option_text_compile(self):
     with tempfile.TemporaryDirectory() as d:
       user_checkout(d, 'CFLAGS += -I"custom includes" -include check.h -DMSG=\'"see -L linker"\'\n')
@@ -265,7 +268,7 @@ class Configure(unittest.TestCase):
       p = make('BOARD=pca10056', f'BUILD={d}/b', 'configure', cwd=d)
     self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
-  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
   def test_checkout_relative_flags_resolve_in_a_checkout_path_with_spaces(self):
     with tempfile.TemporaryDirectory() as d:
       checkout = Path(d, 'sp ace')
@@ -297,7 +300,7 @@ class Configure(unittest.TestCase):
     self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
     self.assertEqual(p.stdout.splitlines()[-1], f'ARG[-DPython_EXECUTABLE={bin_}/python]')
 
-  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
   def test_python_is_the_interpreter_cmake_runs_the_artifact_scripts_with(self):
     """PYTHON may be a command name: CMake gets the path it runs as, not its own FindPython pick."""
     with tempfile.TemporaryDirectory() as d:
@@ -309,7 +312,7 @@ class Configure(unittest.TestCase):
       cache = Path(d, 'b', 'CMakeCache.txt').read_text()
     self.assertEqual(re.search(r'^_Python_EXECUTABLE:INTERNAL=(.*)$', cache, re.M)[1], f'{bin_}/mypython')
 
-  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc and ninja needed')
+  @unittest.skipUnless(HAVE_GCC, 'arm-none-eabi-gcc needed')
   def test_each_configure_starts_from_an_empty_cache(self):
     with tempfile.TemporaryDirectory() as d:
       tc = Path(d) / 'tc'
@@ -419,7 +422,7 @@ class CopyArtifact(unittest.TestCase):
 
 
 @unittest.skipUnless(SLOW, 'slow: compiles a board; runs under pytest or with WRAPPER_SLOW_TESTS=1')
-@unittest.skipUnless(HAVE_TOOLS and HAVE_GCC, 'make, cmake, ninja and arm-none-eabi-gcc needed')
+@unittest.skipUnless(HAVE_TOOLS and HAVE_GCC, 'make, cmake and arm-none-eabi-gcc needed')
 class Build(unittest.TestCase):
   def test_targets_build_only_what_they_use(self):
     with tempfile.TemporaryDirectory() as d:

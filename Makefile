@@ -1,8 +1,9 @@
 #------------------------------------------------------------------------------
-# Wrapper over the CMake build (CMakeLists.txt): configures $(BUILD) with CMake and Ninja, then builds through it.
+# Wrapper over the CMake build (CMakeLists.txt): configures $(BUILD) with CMake, then builds through it.
 #
 # - BOARD              : board to build, a directory under src/boards
 # - BUILD              : build directory, default _build/build-$(BOARD)
+# - CMAKE_GENERATOR    : CMake generator, default Unix Makefiles
 # - BIN                : copy-artifact's directory, default _bin/$(BOARD)
 # - DEBUG              : 1 for a debug build (RTT, *_debug.ld linker script)
 # - SD_NAME            : e.g s132, s140
@@ -61,7 +62,8 @@ NRFUTIL ?= adafruit-nrfutil
 # invocation's variables apply. Flags are on only for 1 and USE_NFCT only for yes, as the make build had them.
 flag = -D$(1)=$(if $(filter 1,$($(1))),ON,OFF)
 optional = $(if $($(1)),"-D$(1)=$($(1))")
-CMAKE_ARGS = -G Ninja -DBOARD=$(BOARD) "-DCROSS_COMPILE=$(CROSS_COMPILE)" "-DNRFUTIL:STRING=$(NRFUTIL)" \
+CMAKE_GENERATOR ?= Unix Makefiles
+CMAKE_ARGS = -G "$(CMAKE_GENERATOR)" -DBOARD=$(BOARD) "-DCROSS_COMPILE=$(CROSS_COMPILE)" "-DNRFUTIL:STRING=$(NRFUTIL)" \
   -DCMAKE_BUILD_TYPE=$(if $(filter 1,$(DEBUG)),Debug,MinSizeRel) \
   $(foreach v,SIGNED_FW DUALBANK_FW FORCE_UF2 DEFAULT_TO_OTA_DFU,$(call flag,$(v))) \
   $(if $(USE_NFCT),-DUSE_NFCT=$(if $(filter yes,$(USE_NFCT)),ON,OFF)) \
