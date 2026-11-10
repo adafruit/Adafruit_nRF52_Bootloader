@@ -18,7 +18,7 @@ on:
         required: false
         default: ''
 
-# never cancelled: a battery killed mid-run leaves the board for recovery, so a newer push waits its turn
+# never cancelled: a battery killed mid-run leaves the board unrestored and its cleanup failed, so a newer push waits
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: false
@@ -156,8 +156,9 @@ jobs:
     needs: [select, hil-build]
     if: ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.boards != '' }}
     runs-on: [ self-hosted, Linux, X64, nrf52-bootloader ]
-    # a battery is ~3 min; the DK is shared with tinyusb and the Arduino HILs, so a run may wait up to 30 min for it
-    timeout-minutes: 60
+    # a profile's battery takes up to ~6 min (the contract, Execution); the DK is shared with tinyusb and the Arduino
+    # HILs, so each run may wait up to 30 min for it
+    timeout-minutes: 120
     # the attempt that uploaded the artifact: a re-run of failed jobs that does not re-run this job keeps its outputs
     outputs:
       attempt: ${{ github.run_attempt }}
@@ -197,13 +198,20 @@ jobs:
           name: hil-build
           path: cmake-build
 
+      # every profile of each board (hil_run_report.py profiles); fail_at goes to the profiles that have that step, and
+      # a step of no profile, or a plan that cannot be made, fails the job before any battery
       - name: Battery on the rig
         run: |
+          plan=$(python3 .claude/skills/hil-contract/scripts/hil_run_report.py profiles ${FAIL_AT:+--fail-at "$FAIL_AT"}) ||
+            { echo "::error::no battery plan (fail_at '$FAIL_AT')"; exit 1; }
+          [ -n "$plan" ] || { echo "::error::empty battery plan"; exit 1; }
           rc=0
           for b in $BOARDS; do
-            python3 .claude/skills/hil-contract/scripts/hil_test.py run -b "$b" --build-record "cmake-build/$b.hil.json" \
-              --base-dir cmake-build/hil-base --lock-wait 1800 --run-root "$HIL_OUT/$b" \
-              ${FAIL_AT:+--fail-at "$FAIL_AT"} test/hil/ci.json || rc=1
+            while read -r p fail; do
+              python3 .claude/skills/hil-contract/scripts/hil_test.py run -b "$b" --build-record "cmake-build/$b.hil.json" \
+                --base-dir cmake-build/hil-base --profile "$p" --lock-wait 1800 --run-root "$HIL_OUT/$b/$p" \
+                ${fail:+--fail-at "$fail"} test/hil/ci.json < /dev/null || rc=1
+            done <<< "$plan"
           done
           exit $rc
 

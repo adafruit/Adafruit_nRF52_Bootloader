@@ -11,16 +11,15 @@ SoftDevice, on the boards under `src/boards/`.
   `src/main.c`; UF2 drive `src/usb/uf2/ghostfat.c`, `src/usb/msc_uf2.c`, layout `src/usb/uf2/uf2cfg.h`; USB
   descriptors `src/usb/usb_desc.c`; flash writes `src/flash_nrf5x.c`; DFU packet validation and signed firmware
   `src/dfu_init.c`; serial and BLE DFU transports, settings and banks `lib/sdk11/components/libraries/bootloader_dfu/`;
-  boards `src/boards/<board>/` (`board.h`, `board.cmake`, `board.mk`, `pinconfig.c`) and `src/boards/boards.c`; memory
-  map `linker/`; MBR and SoftDevices `lib/softdevice/`; build `CMakeLists.txt`, `cmake/`.
+  boards `src/boards/<board>/` (`board.h`, `board.cmake`, `pinconfig.c`) and `src/boards/boards.c`; memory map
+  `linker/`; MBR and SoftDevices `lib/softdevice/`; build `CMakeLists.txt`, `cmake/`, and `Makefile`.
 
 ## Code Rules
 
 - Formatting follows `.clang-format`. Line endings are mixed (CRLF in `Makefile`, some `board.cmake`, the workflows);
   keep each file's own.
-- CMake is the build; the `Makefile` is legacy and builds the same images until it becomes a thin CMake wrapper. A
-  change to compile or link semantics goes into both; a board override in `board.mk` is mirrored in `board.cmake` as
-  `if (NOT DEFINED <VAR>)`.
+- CMake is the build; the `Makefile` is a thin wrapper that configures and builds through it. A board override in
+  `board.cmake` is guarded with `if (NOT DEFINED <VAR>)`, so `-D` wins.
 - The bootloader region is fixed by `linker/<mcu>.ld`; check `Memory region` usage in the build log after a change
   that grows code.
 - USB VID/PID: a third-party board uses its own allocated VID/PID. Adafruit's VID `0x239A` is for Adafruit-allocated
@@ -44,8 +43,8 @@ SoftDevice, on the boards under `src/boards/`.
   decisions and app handoff: GPREGRET magic, double reset, app validity, SoftDevice enable/disable, interrupt
   forwarding`; `ISR and shared state, and register use vs the nRF52 product specifications and errata: cross-check
   them via the read-doc skill; a lookup that cannot run is pending and its conclusion unverified (never a web or
-  filesystem substitute); a missing erratum workaround is a finding`; `build and configuration: CMake and make
-  parity, board overrides, feature flags`; `style: repo conventions and line endings`.
+  filesystem substitute); a missing erratum workaround is a finding`; `build and configuration: CMake and the
+  Makefile wrapper, board overrides, feature flags`; `style: repo conventions and line endings`.
 
 ## Build and Validate
 

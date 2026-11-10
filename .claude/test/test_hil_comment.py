@@ -19,41 +19,70 @@ META = {'head': 'a' * 40, 'tested': 'b' * 40, 'runUrl': 'https://x/runs/1/attemp
 SELECTION = {'boards': ['pca10056'], 'full': False, 'uncovered': ['nRF52832: no roster board on this host']}
 
 
-def report(passed=True, failed_step=None, exit_code=0, cleanup=True):
-  steps = [{'step': s, 'pass': s != failed_step, 'seconds': 2} for s in hc.STEPS]
+STEPS = hc.PROFILES['default']
+
+
+def report(passed=True, failed_step=None, exit_code=0, cleanup=True, profile='default', **extra):
+  names = hc.PROFILES[profile]
+  steps = [{'step': s, 'pass': s != failed_step, 'seconds': 2} for s in names]
   if failed_step:
-    steps = steps[:hc.STEPS.index(failed_step) + 1]
+    steps = steps[:names.index(failed_step) + 1]
     steps[-1]['detail'] = 'no drive'
   row = {'board': 'pca10056', 'ran': True, 'pass': passed, 'steps': steps, 'detail': None if passed else
          f'{failed_step}: no drive', 'firmware': {'version': '0.11.0'},
-         'cleanup': {'pass': cleanup, 'state': 'fixture running' if cleanup else 'unknown', 'heldAfter': not cleanup}}
+         'cleanup': {'pass': cleanup, 'state': 'fixture running' if cleanup else 'unknown', 'released': True,
+                     **({} if cleanup else {'failureLogged': True})}, **extra}
   return {'pass': passed, 'exitCode': exit_code, 'results': [row], 'uncovered': ['BLE OTA DFU']}
+
+
+def every(result, missing=()):
+  """`result` for pca10056's default profile, every other profile passing but those `missing`."""
+  return {('pca10056', p): result if p == 'default' else ('pass', '', report(profile=p)) for p in hc.PROFILES
+          if p not in missing}
 
 
 class Render(unittest.TestCase):
   def test_a_pass(self):
-    body = hc.render({'pca10056': ('pass', '', report())}, SELECTION, META)
-    self.assertIn('**✅ passed** · bootloader `0.11.0`', body)
-    self.assertIn('| `pca10056` |' + ' ✅ |' * 12 + ' 22s |', body)
+    body = hc.render(every(('pass', '', report())), SELECTION, META)
+    self.assertIn('**✅ passed** · profile `default` · bootloader `0.11.0`', body)
+    self.assertIn('| `pca10056` |' + ' ✅ |' * (len(STEPS) + 1) + f' {2 * len(STEPS)}s |', body)
+    for p, steps in hc.PROFILES.items():
+      self.assertIn(f'profile `{p}`', body)
+      self.assertIn('| Board | ' + ' | '.join(steps) + ' | cleanup | steps |', body)
+    self.assertEqual(body.count(hc.LEGEND), 1)
     self.assertIn('- `nRF52832: no roster board on this host`', body)
     self.assertIn('- `BLE OTA DFU`', body)
 
   def test_a_failed_step_and_a_blocker(self):
-    body = hc.render({'pca10056': ('fail', 'dfu: no drive', report(False, 'dfu', 1))}, SELECTION, META)
+    body = hc.render(every(('fail', 'dfu: no drive', report(False, 'dfu', 1))), SELECTION, META)
     self.assertIn('**❌ failed**', body)
     self.assertIn('- `pca10056`: `dfu: no drive`', body)
-    body = hc.render({'pca10056': ('blocker', 'report corrupt: x', None)}, SELECTION, META)
+    body = hc.render(every(('blocker', 'report corrupt: x', None)), SELECTION, META)
     self.assertIn('**⛔ blocked**', body)
     self.assertIn('`report corrupt: x`', body)
 
+  def test_a_failed_cleanup_and_an_earlier_one_are_named(self):
+    earlier = {'event': 'failed', 'id': 'f1', 'at': '2026-11-08T10:00:00+0700', 'reason': 'hil_test.py',
+               'detail': 'interrupted before cleanup'}
+    body = report(False, 'dfu', 4, cleanup=False, previousCleanupFailure=earlier)
+    verdict, detail = hc.run_report.verdict(4, body, 'pca10056')
+    self.assertEqual(verdict, 'blocker')
+    text = hc.render(every((verdict, detail, body)), SELECTION, META)
+    self.assertIn("Cleanup failed (unknown): logged in the board's cleanup log; lock released", text)
+    self.assertIn('- `Found an earlier failed cleanup on the board: 2026-11-08T10:00:00+0700 hil_test.py: '
+                  'interrupted before cleanup`', text)
+    self.assertNotIn('earlier failed cleanup', hc.render(every(('pass', '', report())), SELECTION, META))
+
   def test_missing_run_selection_and_no_boards(self):
-    self.assertIn('HIL report unavailable for `pca10056`', hc.render({'pca10056': None}, SELECTION, META))
+    self.assertIn('HIL report unavailable for `pca10056`, profile `default`', hc.render({}, SELECTION, META))
+    body = hc.render(every(('pass', '', report()), missing=['signed']), SELECTION, META)
+    self.assertIn('HIL report unavailable for `pca10056`, profile `signed`', body)
+    self.assertNotIn('profile `default`: no run', body)
     self.assertIn('_Selection unavailable._', hc.render({}, None, META))
     self.assertIn('_No affected boards on this rig', hc.render({}, {'boards': [], 'uncovered': []}, META))
 
   def test_report_text_cannot_render_markdown_or_mention(self):
-    body = hc.render({'pca10056': ('fail', 'dfu: @someone [x](http://y) `z`', report(False, 'dfu', 1))}, SELECTION,
-                     META)
+    body = hc.render(every(('fail', 'dfu: @someone [x](http://y) `z`', report(False, 'dfu', 1))), SELECTION, META)
     self.assertIn('`` dfu: @\u200bsomeone [x](http://y) `z` ``', body)
     self.assertNotIn('@someone', body)
 
@@ -66,8 +95,8 @@ class BoardResult(unittest.TestCase):
     self.tmp = tempfile.TemporaryDirectory()
     self.addCleanup(self.tmp.cleanup)
 
-  def publish(self, name, body, termination='completed'):
-    run_dir = Path(self.tmp.name, 'pca10056', name)
+  def publish(self, name, body, termination='completed', profile='default'):
+    run_dir = Path(self.tmp.name, 'pca10056', profile, name)
     run_dir.mkdir(parents=True)
     schema = hc.run_report.schema(self.core)
     attempt = self.core.start_attempt(run_dir, schema, False, name)
@@ -78,23 +107,24 @@ class BoardResult(unittest.TestCase):
 
   def test_a_published_pass(self):
     self.publish('run-20260101-000000-1', report())
-    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056')[:2], ('pass', ''))
+    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056', 'default')[:2], ('pass', ''))
 
   def test_an_aborted_run_or_a_caveat_is_not_a_pass(self):
     self.publish('run-20260101-000000-1', report(), termination='aborted')
-    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056')[0], 'blocker')
+    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056', 'default')[0], 'blocker')
     self.publish('run-20260101-000100-2', dict(report(), caveat='lock lost'))
-    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056')[0], 'blocker')
+    self.assertEqual(hc.board_result(self.core, self.tmp.name, 'pca10056', 'default')[0], 'blocker')
 
   def test_an_unreadable_newest_report_never_falls_back_to_an_older_pass(self):
     self.publish('run-20260101-000000-1', report())
-    newest = Path(self.tmp.name, 'pca10056', 'run-20260101-000100-2')
+    newest = Path(self.tmp.name, 'pca10056', 'default', 'run-20260101-000100-2')
     newest.mkdir()
     (newest / 'hil_report.json').write_text('{"truncated')
-    verdict, detail, body = hc.board_result(self.core, self.tmp.name, 'pca10056')
+    verdict, detail, body = hc.board_result(self.core, self.tmp.name, 'pca10056', 'default')
     self.assertEqual((verdict, body), ('blocker', None))
     self.assertIn('report', detail)
-    self.assertIsNone(hc.board_result(self.core, self.tmp.name, 'pca10100'))
+    self.assertIsNone(hc.board_result(self.core, self.tmp.name, 'pca10100', 'default'))
+    self.assertIsNone(hc.board_result(self.core, self.tmp.name, 'pca10056', 'signed'))
 
 
 class Fresh(unittest.TestCase):

@@ -23,8 +23,6 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/toolchain/arm_gcc.cmake)
 set(NRFX_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/nrfx)
 set(SDK11_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/sdk11/components)
 set(SDK_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/sdk/components)
-set(SOFTDEVICE_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/softdevice)
-set(MBR_HEX ${SOFTDEVICE_DIR}/mbr/hex/mbr_nrf52_2.4.1_mbr.hex)
 set(TINYUSB_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb/src)
 set(TCRYPT_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinycrypt/lib)
 
@@ -180,7 +178,7 @@ target_compile_options(bootloader PUBLIC
   )
 
 # Nordic SoftDevice headers have inline asm with broken constraints: gcc-11's IPA-modref pass drops the
-# arguments of SVCALL() wrappers and breaks the bootloader (see Makefile)
+# arguments of SVCALL() wrappers and breaks the bootloader
 include(CheckCCompilerFlag)
 check_c_compiler_flag(-fno-ipa-modref HAS_FNO_IPA_MODREF)
 if (HAS_FNO_IPA_MODREF)
@@ -255,25 +253,12 @@ else ()
     )
 endif ()
 
-# startup assembled last: make links it after the C objects
-target_sources(bootloader PUBLIC ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S)
-
 #----------------------------------------------------
 # MCU Variant differences
 # Supported are: nrf52 (nrf52832), nrf52833, nrf52840
 #----------------------------------------------------
 
-# SD_VERSION can be overwritten by board.cmake
-if(NOT DEFINED SD_VERSION)
-  if(MCU_VARIANT STREQUAL "nrf52833")
-    set(SD_VERSION 7.3.0)
-  else()
-    set(SD_VERSION 6.1.1)
-  endif()
-endif ()
-
 if (MCU_VARIANT STREQUAL "nrf52")
-  set(SD_NAME s132)
   set(DFU_DEV_REV 0xADAF)
   set(DFU_APP_DATA_RESERVED 7*4096)
   target_compile_definitions(bootloader PUBLIC NRF52 NRF52832_XXAA)
@@ -281,23 +266,16 @@ elseif (MCU_VARIANT STREQUAL "nrf52833")
   set(DFU_DEV_REV 52833)
   set(DFU_APP_DATA_RESERVED 7*4096)
   target_compile_definitions(bootloader PUBLIC NRF52833_XXAA)
-  if (NOT DEFINED SD_NAME)
-    set(SD_NAME s140)
-  endif ()
 elseif (MCU_VARIANT STREQUAL "nrf52840")
   set(DFU_DEV_REV 52840)
   # App reserved 40KB (8+32) to match circuitpython for 840
   set(DFU_APP_DATA_RESERVED 10*4096)
   target_compile_definitions(bootloader PUBLIC NRF52840_XXAA)
-  if (NOT DEFINED SD_NAME)
-    set(SD_NAME s140)
-  endif ()
 else ()
   message(FATAL_ERROR "MCU_VARIANT ${MCU_VARIANT} is unknown")
 endif ()
 
-set(SD_FILENAME ${SD_NAME}_nrf52_${SD_VERSION})
-set(SD_HEX ${SOFTDEVICE_DIR}/${SD_FILENAME}/${SD_FILENAME}_softdevice.hex)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/softdevice.cmake)
 
 string(TOUPPER ${SD_NAME} SD_NAME_UPPER)
 target_compile_definitions(bootloader PUBLIC ${SD_NAME_UPPER})
@@ -324,6 +302,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 else ()
   target_compile_definitions(bootloader PUBLIC DFU_APP_DATA_RESERVED=${DFU_APP_DATA_RESERVED})
 endif ()
+
+# startup assembled last: make links it after the C objects (SEGGER_RTT.c in a debug build included)
+target_sources(bootloader PUBLIC ${NRFX_DIR}/mdk/gcc_startup_${MCU_VARIANT}.S)
 
 #----------------------------------
 # ANT_LICENSE_KEY handling
@@ -377,12 +358,14 @@ add_custom_command(TARGET bootloader POST_BUILD
     ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2
   VERBATIM)
 
-# Release artifacts, named as the Makefile names them
+# Release artifacts, with the names the make build gave them
 # Paths are spelled out: OUTPUT takes no generator expressions before CMake 3.20
 set(OUT_NAME ${BOARD}_bootloader-${GIT_VERSION})
 set(MERGED_NAME ${OUT_NAME}_${SD_NAME}_${SD_VERSION})
 set(BL_HEX ${CMAKE_CURRENT_BINARY_DIR}/bootloader.hex)
+set(BL_MBR_HEX ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.hex)
 set(BL_MBR_UF2 ${CMAKE_CURRENT_BINARY_DIR}/bootloader_mbr.uf2)
+set(NOSD_HEX ${CMAKE_CURRENT_BINARY_DIR}/${OUT_NAME}_nosd.hex)
 set(MERGED_HEX ${CMAKE_CURRENT_BINARY_DIR}/${MERGED_NAME}.hex)
 set(UPDATE_UF2 ${CMAKE_CURRENT_BINARY_DIR}/update-${OUT_NAME}_nosd.uf2)
 set(MERGED_ZIP ${CMAKE_CURRENT_BINARY_DIR}/${MERGED_NAME}.zip)
@@ -395,7 +378,11 @@ add_custom_command(OUTPUT ${UPDATE_UF2}
   COMMAND ${CMAKE_COMMAND} -E copy ${BL_MBR_UF2} ${UPDATE_UF2}
   DEPENDS bootloader ${BL_MBR_UF2}
   VERBATIM)
-set(RELEASE_FILES ${MERGED_HEX} ${UPDATE_UF2})
+add_custom_command(OUTPUT ${NOSD_HEX}
+  COMMAND ${CMAKE_COMMAND} -E copy ${BL_MBR_HEX} ${NOSD_HEX}
+  DEPENDS bootloader ${BL_MBR_HEX}
+  VERBATIM)
+set(RELEASE_FILES ${MERGED_HEX} ${UPDATE_UF2} ${NOSD_HEX})
 
 # DFU package (bootloader + SoftDevice) for adafruit-nrfutil over CDC/serial
 find_program(NRFUTIL adafruit-nrfutil)
@@ -410,6 +397,25 @@ else ()
 endif ()
 
 add_custom_target(release ALL DEPENDS ${RELEASE_FILES})
+
+# one artifact each, what the Makefile wrapper's flash and debug targets build
+add_custom_target(nosd-hex DEPENDS ${NOSD_HEX})
+add_custom_target(merged-hex DEPENDS ${MERGED_HEX})
+if (NRFUTIL)
+  add_custom_target(dfu-zip DEPENDS ${MERGED_ZIP})
+endif ()
+
+# what the Makefile wrapper's flash, debug and copy recipes need, read by its sub-make
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/make_vars.mk
+  "MCU_VARIANT = ${MCU_VARIANT}\n"
+  "SD_HEX = ${SD_HEX}\n"
+  "MBR_HEX = ${MBR_HEX}\n"
+  "BL_ELF = ${CMAKE_CURRENT_BINARY_DIR}/bootloader${CMAKE_EXECUTABLE_SUFFIX}\n"
+  "NOSD_HEX = ${NOSD_HEX}\n"
+  "UPDATE_UF2 = ${UPDATE_UF2}\n"
+  "MERGED_HEX = ${MERGED_HEX}\n"
+  "MERGED_ZIP = ${MERGED_ZIP}\n"
+  )
 
 #----------------------------------
 # Flashing target

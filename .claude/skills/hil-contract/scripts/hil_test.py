@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: MIT
 """The bootloader's HIL battery on one rig board (.claude/skills/hil-contract/SKILL.md). The last stdout line is JSON.
 
-  hil_test.py run -b BOARD --build-record REC --base-dir DIR [--run-root DIR] [--lock-wait S] [--fail-at STEP] ROSTER
+  hil_test.py run -b BOARD --build-record REC --base-dir DIR [--profile P] [--run-root DIR] [--lock-wait S]
+                [--fail-at STEP] ROSTER
   hil_test.py install -b BOARD --build-record REC --under-hold REASON ROSTER
-  hil_test.py restore -b BOARD --build-record REC --under-hold REASON ROSTER
+  hil_test.py restore -b BOARD --build-record REC (--under-hold REASON | --recover-holder PID) ROSTER
   hil_test.py fat-read --dev DEV --file NAME [--offset N] [--length N]   (child: one bounded FAT read)
   hil_test.py flush --dev DEV                                             (child: fsync of the drive)
 
 Exit: 0 pass (and cleaned up), 1 a step failed or the board did not run, 2 refused before any hardware access,
-4 cleanup failed: the board stays held by a cleanup holder (SKILL.md Recovery).
+4 cleanup failed (run) or a command failed after touching the board (install, restore): a run's failure is logged in
+the board's cleanup log and its lock released (SKILL.md Recovery).
 """
 import argparse
 import contextlib
@@ -18,12 +20,14 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import socket
 import struct
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -33,8 +37,10 @@ import agentrc  # noqa: E402
 import hil_run_report as run_report  # noqa: E402
 
 REASON = 'hil_test.py'
-PENDING_KIND = 'nrf52-bootloader'   # hil_lock.PendingSessions: <lock>.nrf52-bootloader-pending.json
-STEPS = run_report.STEPS
+# the hil_lock.PendingSessions kind of this harness's claims, and of the pending marks older harnesses left
+CLAIM_KIND = 'nrf52-bootloader'
+CLAIM_SETTLE = 30            # s an earlier invocation's unproven tools get to end before an attempt gives the board up
+PROFILE_STEPS = run_report.PROFILE_STEPS
 REENTRY = ('gpregret',)
 # nRF52 NVMC (PS v1.7 4.3.9) and POWER.GPREGRET (5.3.7.16); the same offsets on nRF52832/833
 NVMC_READY, NVMC_CONFIG, NVMC_ERASEALL = 0x4001E400, 0x4001E504, 0x4001E50C
@@ -43,14 +49,25 @@ GPREGRET = 0x4000051C
 DFU_MAGIC_UF2_RESET, DFU_MAGIC_SERIAL_ONLY_RESET = 0x57, 0x4E   # src/main.c
 ADAFRUIT_DEVICE_TYPE = 0x0052   # src/dfu_init.c: every init packet's device type
 MBR_SIZE = 0x1000            # nrf_mbr.h
+PAGE = 0x1000                # nRF52840 flash: 256 pages of 4 kB (PS v1.7 4.2.2); src/flash_nrf5x.c buffers one page
+BOOTLOADER_SETTINGS = 0x000FF000   # dfu_types.h, nRF52840: bootloader_settings_t, bank_0 and bank_0_crc its first word
+BANK_VALID_APP, BANK_INVALID_APP = 0x01, 0xFF   # bootloader_types.h
+DHCSR, DHCSR_S_HALT = 0xE000EDF0, 1 << 17   # ARMv7-M ARM DDI 0403D C1.6.2: the core in Debug state
+RESETREAS, RESETREAS_SREQ = 0x40000400, 1 << 2   # nRF52840 PS v1.7 5.3.7.11: cumulative, write 1 to clear
 APP_FAMILY = {'nrf52840': 0xADA52840, 'nrf52833': 0x621E937A}   # src/usb/uf2/uf2cfg.h CFG_UF2_FAMILY_APP_ID
 UF2_MAGIC = (0x0A324655, 0x9E5D5157, 0x0AB16F30)
 UF2_FLAG_FAMILY = 0x2000
 JLINK_SPEED = 4000
 ERASEALL_WAIT_MS = 1000      # tERASEALL is at most 169 ms (PS v1.7 4.3.10); READY is read after it
 PROBE_TIMEOUT, INSTALL_TIMEOUT, NRFUTIL_TIMEOUT = 60, 180, 120
+# a dual-bank serial transfer cut short: about 240 KiB, which adafruit-nrfutil needs ~6 s of erase wait (dfu
+# serial get_erase_wait_time) and ~16 s at the DK's ~15 KB/s to send; its bound ends it about a third in
+CUT_PAGES, CUT_AFTER = 60, 12
 USB_TIMEOUT, UDEV_TIMEOUT, CHILD_TIMEOUT, LEAVE_TIMEOUT, QUIET = 30, 10, 30, 15, 3
 APP_SAMPLE_MS = 200
+# nRESET pulses through the DK's interface MCU (J-Link r0/r1); src/main.c enters DFU on a pin reset within
+# DFU_DBL_RESET_DELAY (500 ms) of the previous one
+RESET_PULSE_MS, DBL_IN_WINDOW_MS, DBL_OUT_OF_WINDOW_MS = 20, 150, 1500
 LOCK_RETRY = 15
 FLUSH_GONE = 3
 SETTLE = 1.0                 # s after a tool exits for its descendants to be proven gone (hil_process.run_tracked)
@@ -58,8 +75,11 @@ UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] 
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
                   'SIGNED_FW_QX': '', 'SIGNED_FW_QY': '', 'FORCE_UF2': 'OFF'}
-UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU', 'SIGNED_FW and dual-bank builds',
-             'a physical double reset', 'an interrupted update', 'a SoftDevice update')
+UNCOVERED = ('nRF52832 (serial DFU, no USB) and nRF52833: no rig board', 'BLE OTA DFU',
+             'another SoftDevice version than the build\'s',
+             'copying a different SoftDevice or bootloader through serial DFU (the softdevice step sends the '
+             'installed images, which the bootloader finds equal and does not copy)',
+             'a SoftDevice or bootloader update on a dual-bank or SIGNED_FW build')
 
 
 class Refused(Exception):
@@ -96,6 +116,10 @@ def report_core():
 
 def process():
   return agentrc.load_file('skills/hil/scripts/hil_process.py')
+
+
+def usb():
+  return agentrc.load_file('skills/hil/scripts/usb_observe.py')
 
 
 # ------------------------------------------------------------------ roster, record, facts
@@ -171,24 +195,35 @@ def git(*args):
     raise Refused(str(e))
 
 
-def admit(record_path, board, roster_path, workdir):
-  """The build record's row for `board`, checked against this checkout, the roster and the agentrc loaded here, its
-  artifacts copied into `workdir` from bytes that hash as recorded. Refused otherwise."""
+def admit(record_path, board, roster_path, workdir, profile='default'):
+  """The build record's row for `board` in `profile` (check_build.hil_profiles), checked against this checkout, the
+  roster and the agentrc loaded here, its artifacts copied into `workdir`/`profile` from bytes that hash as recorded.
+  Refused otherwise."""
   try:
     rec = json.loads(Path(record_path).read_text())
   except (OSError, ValueError) as e:
     raise Refused(f'build record {record_path}: {e}')
-  rows = [r for r in rec.get('boards', []) if r.get('board') == board and r.get('status') == 'ok']
+  rows = [r for r in rec.get('boards', []) if r.get('board') == board and r.get('profile') == profile
+          and r.get('status') == 'ok']
   if not rec.get('pass') or len(rows) != 1 or 'hilRecord' not in rec or 'sha256' not in rows[0]:
-    raise Refused(f'{record_path}: not a passing HIL record of {board} (check_build.py --board {board} --shared '
-                  f'--hil-config {roster_path})')
+    raise Refused(f'{record_path}: not a passing HIL record of {board} in profile {profile} (check_build.py --board '
+                  f'{board} --shared --hil-config {roster_path})')
   row, inp = rows[0], rec.get('input')
   if not isinstance(inp, dict):
     raise Refused(f'{record_path}: no input record')
+  try:
+    want, key = build().hil_profiles()[profile], build().SIGNED_FW_TEST_KEY
+  except build().Refusal as e:
+    raise Refused(str(e))
+  bound = rec['hilRecord']
+  if (bound.get('profiles') or {}).get(profile) != want or row.get('defines') != want or \
+     (bound.get('signedFwKey') or {}).get('sha256') != build().sha256(key):
+    raise Refused(f'{record_path}: profile {profile} is not built as this checkout defines it ({want}): rebuild')
   config = row.get('config') or {}
-  wrong = {k: config.get(k) for k, v in {**DEFAULT_CONFIG, 'BOARD': board}.items() if config.get(k) != v}
+  expected = {**DEFAULT_CONFIG, 'BOARD': board, **dict(d.split('=', 1) for d in want)}
+  wrong = {k: config.get(k) for k, v in expected.items() if config.get(k) != v}
   if rec.get('defines') or wrong:
-    raise Refused(f'{record_path}: not the default configuration (defines {rec.get("defines")}, {wrong})')
+    raise Refused(f'{record_path}: not profile {profile}\'s configuration (defines {rec.get("defines")}, {wrong})')
   if set(row.get('artifacts') or {}) != ARTIFACTS or set(row.get('sha256') or {}) != ARTIFACTS:
     raise Refused(f'{record_path}: artifacts {sorted(row.get("artifacts") or {})} are not {sorted(ARTIFACTS)}')
   head, dirty = git('rev-parse', 'HEAD').strip(), bool(git('status', '--porcelain').strip())
@@ -210,11 +245,12 @@ def admit(record_path, board, roster_path, workdir):
   bound = rec['hilRecord'].get('agentrc') or {}
   if (bound.get('commit'), bound.get('sha256')) != (here.get('commit'), here.get('sha256')):
     raise Refused(f'{record_path} binds agentrc {bound.get("commit")}, this run loads {here.get("commit")}: rebuild')
-  copies = {}
-  for key, rel in row['artifacts'].items():
+  copies, into = {}, Path(workdir) / profile
+  into.mkdir(exist_ok=True)
+  for name, rel in row['artifacts'].items():
     src = ROOT / rel
-    copies[key] = Path(workdir) / src.name
-    copy_pinned(src, copies[key], row['sha256'][key], f'{rel} does not hash as {record_path} records: rebuild')
+    copies[name] = into / src.name
+    copy_pinned(src, copies[name], row['sha256'][name], f'{rel} does not hash as {record_path} records: rebuild')
   return rec, row, copies
 
 
@@ -299,25 +335,79 @@ def facts(board, row, copies, workdir):
   if not flash or not boot:
     raise Refused(f'{mcu}: cannot establish the flash size or the bootloader start')
   check_spans(merged, int(flash[2], 16), MBR_SIZE + int(sd_size, 0), int(boot[1], 16), copies['merged'].name)
+  bank1 = bank_1_start(mcu, MBR_SIZE + int(sd_size, 0), int(boot[1], 16))
   hex_runs = runs(merged)
   versions = {v for _, data in hex_runs for v in re.findall(rb'UF2 Bootloader ([^\r\n\x00]+)\r\n', data)}
-  if len(versions) != 1:
-    raise Refused(f'{copies["merged"].name}: expected one "UF2 Bootloader <version>" string, found {len(versions)}')
+  drive = has_drive(row)
+  if len(versions) != int(drive):
+    raise Refused(f'{copies["merged"].name}: expected {int(drive)} "UF2 Bootloader <version>" string, found '
+                  f'{len(versions)}')
   for a, b in hex_runs:
     (Path(workdir) / f'run-{a:08x}.bin').write_bytes(b)
   return {'mcu': mcu, 'family': APP_FAMILY[mcu], 'appStart': MBR_SIZE + int(sd_size, 0),
-          'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0), 'cdcPid': int(cdc_pid, 0),
-          'boardId': board_id.strip('"'), 'version': versions.pop().decode(),
+          'bank1': bank1, 'ramEnd': int(ram[1], 16) + int(ram[2], 16), 'vid': int(vid, 0), 'pid': int(pid, 0),
+          'cdcPid': int(cdc_pid, 0),
+          'boardId': board_id.strip('"'), 'version': versions.pop().decode() if drive else None, 'drive': drive,
           'softdevice': f'S{row["softdevice"]["name"][1:]} {row["softdevice"]["version"]}',
-          'hex': str(copies['merged']), 'update': str(copies['update']), 'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
+          'hex': str(copies['merged']), 'update': str(copies['update']), 'zip': str(copies['zip']),
+          'runs': [(a, str(Path(workdir) / f'run-{a:08x}.bin')) for a, _ in hex_runs]}
+
+
+def has_drive(row):
+  """Whether the record row's build has the UF2 drive: SIGNED_FW drops it unless FORCE_UF2 (src/usb/tusb_config.h)."""
+  defines = row.get('defines') or []
+  return 'SIGNED_FW=ON' not in defines or 'FORCE_UF2=ON' in defines
+
+
+def bank_1_start(mcu, app_start, boot_start):
+  """DFU_BANK_1_REGION_START (dfu_types.h): each bank half the app region less the MCU's DFU_APP_DATA_RESERVED
+  (CMakeLists.txt), rounded down to two pages, bank 0 at the app start."""
+  m = re.search(rf'MCU_VARIANT STREQUAL "{mcu}"\)(?:(?!elseif|endif).)*?set\(DFU_APP_DATA_RESERVED (\d+)\*4096\)',
+                (ROOT / 'CMakeLists.txt').read_text(), re.S)
+  if not m:
+    raise Refused(f'{mcu}: cannot establish DFU_APP_DATA_RESERVED')
+  full = boot_start - app_start - int(m[1]) * 4096
+  return app_start + (full - full % (2 * PAGE)) // 2
+
+
+def serial_argv(pkg, tty, singlebank):
+  """adafruit-nrfutil's arguments sending genpkg package `pkg` over CDC `tty`; `singlebank` for a single-bank build,
+  where it skips the bank 1 to bank 0 copy's wait."""
+  return ['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200',
+          *(['--singlebank'] if singlebank else [])]
+
+
+def repackage_image(pkg):
+  """The application image a genpkg package `pkg` carries."""
+  with zipfile.ZipFile(pkg) as z:
+    app = json.loads(z.read('manifest.json'))['manifest']['application']
+    return z.read(app['bin_file'])
+
+
+def repackage(src, dst, edit):
+  """genpkg package `src` written again to `dst`, each init packet and image replaced by edit(dat, image)."""
+  with zipfile.ZipFile(src) as z:
+    files = {n: z.read(n) for n in z.namelist()}
+  for part in json.loads(files['manifest.json'])['manifest'].values():
+    if isinstance(part, dict) and 'dat_file' in part:
+      files[part['dat_file']], files[part['bin_file']] = edit(files[part['dat_file']], files[part['bin_file']])
+  with zipfile.ZipFile(dst, 'w') as z:
+    for n, data in files.items():
+      z.writestr(n, data)
+  return dst
+
+
+def flip_crc(dat, image):
+  """An unsigned init packet whose trailing CRC-16 (dfu_init.c postvalidate) no longer matches `image`."""
+  return dat[:-2] + bytes(b ^ 0xFF for b in dat[-2:]), image
 
 
 # ------------------------------------------------------------------ the fixture app
 
-def fixture(f, nonce):
+def fixture(f, nonce, pattern=0x1000):
   """An app the probe can prove ran, and which one: SP and reset vectors, every other vector a fault loop, a reset
-  handler that loads a word of `nonce` into r1 and counts in r0 forever, then a 4 KiB pattern from `nonce`, so an
-  earlier copy's image reads back different."""
+  handler that loads a word of `nonce` into r1 and counts in r0 forever, then a `pattern`-byte pattern from `nonce`
+  (a multiple of 32), so an earlier copy's image reads back different."""
   start, table = f['appStart'], 64
   handler = start + table
   loop, fault = handler + 2, handler + 6
@@ -325,10 +415,15 @@ def fixture(f, nonce):
   vectors = [f['ramEnd'], handler | 1] + [fault | 1] * (table // 4 - 2)
   # ldr r1, [pc, #4] (the marker) ; loop: adds r0, #1 ; b loop ; fault: b . ; marker
   code = struct.pack('<HHHHI', 0x4901, 0x3001, 0xE7FD, 0xE7FE, marker)
-  pattern = b''.join(hashlib.sha256(nonce + i.to_bytes(4, 'little')).digest() for i in range(128))
+  pattern = b''.join(hashlib.sha256(nonce + i.to_bytes(4, 'little')).digest() for i in range(pattern // 32))
   img = struct.pack(f'<{len(vectors)}I', *vectors) + code + pattern
   img += b'\xff' * (-len(img) % 256)
   return {'image': img, 'handler': handler, 'loop': loop, 'fault': fault, 'marker': marker, 'start': start}
+
+
+def shown(fx, nonce):
+  """A step's evidence naming fixture `fx`: its span and the nonce it came from."""
+  return {'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
 
 
 def make_uf2(img, base, family):
@@ -351,40 +446,104 @@ def uf2_payload(blob, base, length):
   return b''.join(got[a] for a in sorted(got))
 
 
+# ------------------------------------------------------------------ signed packages (SIGNED_FW profile)
+
+# NIST P-256 (FIPS 186-4 D.1.2.3), the curve src/dfu_init.c verifies with (tinycrypt uECC_secp256r1)
+P256_P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+P256_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+P256_G = (0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
+          0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5)
+DFU_INIT_USES_ECDS = 2   # src/dfu_init.c DFU_INIT_PACKET_USES_ECDS
+
+
+def ec_add(a, b):
+  """a + b on P-256 in affine coordinates, None the point at infinity."""
+  if a is None or b is None:
+    return a or b
+  if a[0] == b[0] and (a[1] + b[1]) % P256_P == 0:
+    return None
+  if a == b:
+    m = 3 * (a[0] * a[0] - 1) * pow(2 * a[1], -1, P256_P)   # curve a = -3
+  else:
+    m = (b[1] - a[1]) * pow(b[0] - a[0], -1, P256_P)
+  x = (m * m - a[0] - b[0]) % P256_P
+  return x, (m * (a[0] - x) - a[1]) % P256_P
+
+
+def ec_mul(k, point=P256_G):
+  out = None
+  while k:
+    if k & 1:
+      out = ec_add(out, point)
+    point, k = ec_add(point, point), k >> 1
+  return out
+
+
+def public_key(d):
+  """The 64-byte X || Y (big endian) of private key `d`, as SIGNED_FW_QX/QY take it."""
+  x, y = ec_mul(d)
+  return x.to_bytes(32, 'big') + y.to_bytes(32, 'big')
+
+
+def ecdsa_sign(d, message):
+  """ECDSA P-256 with SHA-256 over `message`: r || s, 32 bytes each big endian, as uECC_verify takes it."""
+  z = int.from_bytes(hashlib.sha256(message).digest(), 'big')
+  while True:
+    k = secrets.randbelow(P256_N - 1) + 1
+    r = ec_mul(k)[0] % P256_N
+    s = pow(k, -1, P256_N) * (z + r * d) % P256_N
+    if r and s:
+      return r.to_bytes(32, 'big') + s.to_bytes(32, 'big')
+
+
+def signed_init_packet(dat, image, d):
+  """An init packet `src/dfu_init.c` verifies under SIGNED_FW from adafruit-nrfutil's CRC16 one (`dat`): its fields
+  without the CRC, then the ECDS identifier, the image length and SHA-256, signed with `d` over all of that."""
+  signed = dat[:-2] + struct.pack('<II', DFU_INIT_USES_ECDS, len(image)) + hashlib.sha256(image).digest()
+  return signed + ecdsa_sign(d, signed)
+
+
+def signed_by(d):
+  """A repackage edit signing each init packet with private key `d`."""
+  return lambda dat, image: (signed_init_packet(dat, image, d), image)
+
+
+def tampered_after_signing(d):
+  """A repackage edit signing each image with `d`, then flipping the image's last byte."""
+  return lambda dat, image: (signed_init_packet(dat, image, d), image[:-1] + bytes([image[-1] ^ 0xFF]))
+
+
+def signing_key():
+  """The private key of the signed profile's test key (check_build.signed_fw_test_key), checked against its public
+  key, which the build compiles in."""
+  try:
+    key = build().signed_fw_test_key()
+  except build().Refusal as e:
+    raise Refused(str(e)) from None
+  d = int.from_bytes(key['d'], 'big')
+  if public_key(d) != key['qx'] + key['qy']:
+    raise Refused(f'{build().SIGNED_FW_TEST_KEY.name}: d does not give qx, qy')
+  return d
+
+
 # ------------------------------------------------------------------ processes
-
-def private_dir(path):
-  """`path` created as a directory nobody else can write, in a parent likewise (run_tracked's state dir), whatever
-  the umask."""
-  path = Path(path)
-  path.mkdir(parents=True, exist_ok=True)
-  os.chmod(path.parent, 0o755)
-  os.chmod(path, 0o700)
-  return str(path)
-
 
 class Tools:
   """Every child runs under hil_process.run_tracked, which proves its process tree ended (`cleanup` 'done') or names
-  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the cleanup holder.
-  run_tracked keeps a child's files in `dir` until it is proven ended: the board's pending mark names `dir` (claim)."""
+  a receipt; one that is not proven ended stops the battery (NotEnded) and its receipt goes to the board's cleanup log.
+  run_tracked keeps a child's files in `dir` until it is proven ended: the board's claim names `dir` (claim)."""
   def __init__(self, workdir, log):
-    self.dir, self.log, self.receipts = private_dir(Path(workdir) / 'ops'), log, []
+    self.dir, self.log, self.receipts = process().state_dir(str(workdir), 'ops'), log, []
 
   def run(self, cmd, cwd=None, *, env=None, timeout):
     """hil_flash's runner contract: a CompletedProcess carrying `cleanup` and `receipt`."""
     if env:
       raise ValueError('no tool here takes an environment')
     argv = [str(a) for a in cmd]
-    before = set(os.listdir(self.dir))
     try:
       r = process().run_tracked(argv, cwd=cwd, timeout=timeout, settle=SETTLE, state_dir=self.dir, quiet=True)
     except BaseException as e:
-      cleanup, receipt = getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None)
-      if cleanup == 'done' and receipt is None:   # proven ended; a supervisor that never started leaves its log
-        for name in set(os.listdir(self.dir)) - before:
-          with contextlib.suppress(OSError):
-            os.unlink(os.path.join(self.dir, name))
-      self.note(argv, cleanup, receipt)
+      self.note(argv, getattr(e, 'cleanup', 'unknown'), getattr(e, 'receipt', None))
       raise
     self.note(argv, r.cleanup, r.receipt)   # before anything else can fail
     with open(self.log, 'a') as fh:
@@ -399,6 +558,12 @@ class Tools:
   def check(self, what):
     if self.receipts:
       raise NotEnded(f'{what}: a tool is not proven ended', {'receipts': self.receipts})
+
+  def logged(self):
+    """What the board's cleanup log keeps of each tool not proven ended: its receipt, or for one run_tracked named
+    none, an entry nothing rechecks done, so its failure stays open."""
+    return [r['receipt'] if r['receipt'] is not None else {'unrecheckable': f'{r["cmd"]}: cleanup {r["cleanup"]}'}
+            for r in self.receipts]
 
   def spawn(self, argv, timeout):
     """(exit, output) of a bounded child; exit 124 on the bound."""
@@ -418,6 +583,12 @@ class Tools:
 
 # ------------------------------------------------------------------ probe
 
+def verify_runs(f):
+  """(J-Link verifybin commands, evidence) for every run of the merged HEX `f` describes."""
+  return ([f'verifybin {p} {a:08X}' for a, p in f['runs']],
+          [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in f['runs']])
+
+
 class Probe:
   """J-Link sessions through agentrc's provider, each command judged from its own output."""
   def __init__(self, board, workdir, tools):
@@ -425,12 +596,12 @@ class Probe:
     self.profile = {'interface': 'swd', 'speed': JLINK_SPEED, 'autoconnect': True, 'device': board['device'],
                     'workdir': str(workdir)}
 
-  def session(self, commands, timeout=PROBE_TIMEOUT, judge=True):
+  def session(self, commands, timeout=PROBE_TIMEOUT, judge=True, connect=True):
     def crashed(a):   # the OB's libjlinkarm crash before any target access
       out = process().cmd_stdout_text(a.result.stdout)
       return a.result.returncode in provider().JLINK_CRASH_RCS and 'Found Cortex' not in out
-    op = provider().run_jlink_commands(self.b['flasher'], list(commands), **self.profile, timeout=timeout,
-                                       run=self.tools.run, retry_if=crashed, retry_delay=2)
+    op = provider().run_jlink_commands(self.b['flasher'], list(commands), **{**self.profile, 'autoconnect': connect},
+                                       timeout=timeout, run=self.tools.run, retry_if=crashed, retry_delay=2)
     self.tools.check('JLinkExe')
     out, last = process().cmd_stdout_text(op.stdout), op.attempts[-1]
     tail = {'tail': out.strip().splitlines()[-6:]}
@@ -446,12 +617,12 @@ class Probe:
     blocks ERASEALL, and only a reset clears the ACL (PS v1.7 6.3, 5.3.6.8)."""
     out = self.session(['r', f'w4 {NVMC_CONFIG:08X} {CONFIG_EEN:08X}', f'w4 {NVMC_ERASEALL:08X} 00000001',
                         f'sleep {ERASEALL_WAIT_MS}', f'mem32 {NVMC_READY:08X} 1', f'w4 {NVMC_CONFIG:08X} {CONFIG_REN:08X}',
-                        f'loadfile {f["hex"]}', 'h', *[f'verifybin {p} {a:08X}' for a, p in f['runs']], 'r', 'g'],
+                        f'loadfile {f["hex"]}', 'h', *verify_runs(f)[0], 'r', 'g'],
                        timeout=INSTALL_TIMEOUT)
     ready = word_at(out, NVMC_READY)
     if ready is None or ready & 1 != 1:
       raise StepFail(f'NVMC not ready after ERASEALL ({"no read" if ready is None else f"{ready:08X}"})')
-    return {'erased': True, 'verified': [f'{a:#010x}+{Path(p).stat().st_size}' for a, p in f['runs']]}
+    return {'erased': True, 'verified': verify_runs(f)[1]}
 
   def samples(self):
     """Two register samples a commanded APP_SAMPLE_MS apart, the CPU running between them, in one session."""
@@ -483,26 +654,44 @@ class Probe:
       raise StepFail('the SYSRESETREQ write was not issued')
     return {'gpregret': f'{value:08X}'}
 
+  def pin_resets(self, gaps):
+    """nRESET pulses `gaps` ms apart, each RESET_PULSE_MS low, from J-Link r0/r1 in a session that never connects to
+    the target: on the DK the interface MCU drives the nRF52840's nRESET (nRF52840 DK guide, book 1602 pp14, 25;
+    qualified on the rig: RESETREAS.RESETPIN set). The pulses are judged by their echoes, which no completion rule
+    covers."""
+    pulse = ['r0', f'sleep {RESET_PULSE_MS}', 'r1']
+    commands = [*pulse, *(c for g in gaps for c in (f'sleep {g}', *pulse))]
+    out = self.session(commands, judge=False, connect=False)
+    echoed = provider().jlink_echoed(out)
+    failed = [c for c, chunk in echoed if re.search(provider().JLINK_ERRORS, chunk)]
+    if [c for c, _ in echoed] != [*commands, 'exit'] or failed:
+      raise StepFail(f'the nRESET pulses were not all issued (failed: {failed})',
+                     {'tail': out.strip().splitlines()[-8:]})
+    return {'pulses': len(gaps) + 1, 'gapsMs': list(gaps)}
+
 
 def word_at(out, addr):
   """The word a J-Link `mem32 <addr> 1` printed in `out`, None when it printed none."""
-  m = re.search(rf'^{addr:08X} = ([0-9A-F]{{8}})', out, re.M)
-  return int(m[1], 16) if m else None
+  words = words_at(out, addr, 1)
+  return words[0] if words else None
+
+
+def words_at(out, addr, n):
+  """The `n` words a J-Link `mem32 <addr> <n>` printed in `out` (n <= 4, one line), None when it printed fewer."""
+  m = re.search(rf'^{addr:08X} = ((?:[0-9A-F]{{8}} ?){{{n}}})', out, re.M)
+  return [int(w, 16) for w in m[1].split()] if m else None
 
 
 # ------------------------------------------------------------------ USB drive
 
 def usb_device(vid, pid, serial):
-  hits = []
-  for d in Path('/sys/bus/usb/devices').iterdir():
-    try:
-      if (int((d / 'idVendor').read_text(), 16), int((d / 'idProduct').read_text(), 16)) == (vid, pid) and \
-         (d / 'serial').read_text().strip() == serial:
-        hits.append(d.name)
-    except (OSError, ValueError):
-      continue
+  """The one enumerated USB device vid:pid whose serial is exactly `serial`, as agentrc usb_observe.usb_scan gives it
+  ({busport, ino, ...}; ino, the kernfs enumeration_id, changes on every re-enumeration), None when there is none.
+  A device whose serial cannot be read is not returned (usb_absent counts it as maybe present)."""
+  hits = [d for d in usb().usb_scan(vid_pid=(f'{vid:04x}', f'{pid:04x}'), serial=serial) if d['serial'] == serial]
   if len(hits) > 1:
-    raise StepFail(f'{len(hits)} USB devices {vid:04x}:{pid:04x} with serial {serial}: {hits}')
+    raise StepFail(f'{len(hits)} USB devices {vid:04x}:{pid:04x} with serial {serial}: '
+                   f'{[d["busport"] for d in hits]}')
   return hits[0] if hits else None
 
 
@@ -560,7 +749,11 @@ class Drive:
 
   def present(self):
     usb = usb_device(self.f['vid'], self.f['pid'], self.b['uid'])
-    return block_device(usb) if usb else None
+    return block_device(usb['busport']) if usb else None
+
+  def absent(self):
+    """No bootloader device with the board's serial enumerated: one whose serial cannot be read may be it."""
+    return usb().usb_absent(vid_pid=(f'{self.f["vid"]:04x}', f'{self.f["pid"]:04x}'), serial=self.b['uid'])
 
   def wait(self):
     dev = wait_for(self.present, USB_TIMEOUT, f'UF2 drive {self.f["vid"]:04x}:{self.f["pid"]:04x} {self.b["uid"]}')
@@ -586,7 +779,9 @@ class Drive:
       raise StepFail(f'INFO_UF2.TXT does not name {bad}', {'info': lines})
     return lines
 
-  def copy(self, dev, uf2, workdir):
+  def copy(self, dev, uf2, workdir, leaves=True):
+    """`uf2` copied to the drive and flushed; the drive then leaves, or with `leaves` False (a transfer the
+    bootloader cannot complete) stays."""
     path = Path(workdir) / 'copy.uf2'
     path.write_bytes(uf2)
     code, out = self.tools.spawn(['mcopy', '-o', '-i', dev, path, '::APP.UF2'], 60)
@@ -595,15 +790,21 @@ class Drive:
     code, res = self.tools.child_json(['flush', '--dev', dev], CHILD_TIMEOUT, 'flush')
     if code not in (0, FLUSH_GONE):
       raise StepFail('flush failed', {'result': res})
-    wait_for(lambda: not self.present(), LEAVE_TIMEOUT, 'the drive leaving after the copy')
+    if not leaves:
+      stays_away(lambda: not self.present(), QUIET, 'the drive left after a copy it cannot complete')
+      return {'flush': 'flushed' if code == 0 else 'device gone before flush', 'stayed': QUIET}
+    wait_for(self.absent, LEAVE_TIMEOUT, 'the drive leaving after the copy')
     return {'flush': 'flushed' if code == 0 else 'device gone before flush'}
 
 
 # ------------------------------------------------------------------ the battery
 
 class Battery:
-  def __init__(self, board, f, workdir, log, fail_at=None):
-    self.b, self.f, self.dir, self.fail_at = board, f, Path(workdir), fail_at
+  """One profile's battery (hil_run_report.PROFILE_STEPS) on the image `f` describes; cleanup restores `home`, the
+  default profile's image, `f` itself when that is the default."""
+  def __init__(self, board, f, workdir, log, fail_at=None, profile='default', home=None):
+    self.b, self.f, self.dir, self.fail_at, self.profile = board, f, Path(workdir), fail_at, profile
+    self.home = home or f
     self.tools = Tools(workdir, log)
     self.probe, self.drive = Probe(board, workdir, self.tools), Drive(board, f, self.tools)
     self.steps, self.touched = [], False
@@ -637,13 +838,13 @@ class Battery:
     fx = fixture(self.f, nonce)
     dev = self.drive.wait()
     ev = self.drive.copy(dev, make_uf2(fx['image'], fx['start'], self.f['family']), self.dir)
-    return {**ev, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return {**ev, **shown(fx, nonce)}
 
   def app_ran(self, nonce):
     """The app the copy wrote runs after the bootloader's own reset: no probe reset first. The drive stays away, then
     two samples: thread mode, PC in the counting loop, r1 this copy's marker, r0 advancing."""
     fx = fixture(self.f, nonce)
-    stays_away(self.drive.present, QUIET, 'the UF2 drive came back instead of the app')
+    stays_away(lambda: not self.drive.absent(), QUIET, 'the UF2 drive came back instead of the app')
     first, second = self.probe.samples()
     ev = {'samples': [{k: hex(v) for k, v in s.items()} for s in (first, second)]}
     loop = range(fx['loop'], fx['fault'])
@@ -653,6 +854,16 @@ class Battery:
                        {**ev, 'loop': hex(fx['loop']), 'marker': hex(fx['marker'])})
     if (second['r0'] - first['r0']) & 0xFFFFFFFF == 0:
       raise StepFail('r0 did not advance', ev)
+    return ev
+
+  def double_reset(self, nonce):
+    """src/main.c's double reset on the reset pin (SKILL.md Execution, double-reset): one pulse and two
+    DBL_OUT_OF_WINDOW_MS apart leave app `nonce` running, two DBL_IN_WINDOW_MS apart bring the drive."""
+    ev = {}
+    for name, gaps in (('single', []), ('outOfWindow', [DBL_OUT_OF_WINDOW_MS])):
+      ev[name] = {**self.probe.pin_resets(gaps), 'appRan': self.app_ran(nonce)}
+    ev['inWindow'] = self.probe.pin_resets([DBL_IN_WINDOW_MS])
+    ev['inWindow']['info'] = self.drive.info(self.drive.wait())
     return ev
 
   def reenter(self, nonce):
@@ -665,25 +876,63 @@ class Battery:
       raise StepFail('CURRENT.UF2 does not read back the copied app', {'read': len(got)})
     return {**ev, 'method': 'gpregret', 'readBack': len(got)}
 
-  def serial(self, nonce):
-    """App C through CDC-only serial DFU: GPREGRET 0x4E enumerates the bootloader as one CDC port and no drive
-    (src/main.c, src/usb/usb_desc.c); adafruit-nrfutil sends the package and the bootloader starts the app."""
+  def serial(self, nonce, singlebank=True, edit=None):
+    """App `nonce` through CDC-only serial DFU (SKILL.md Execution, serial), its package rewritten by `edit`."""
     fx = fixture(self.f, nonce)
-    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
-    usb = wait_for(lambda: usb_device(self.f['vid'], self.f['cdcPid'], self.b['uid']), USB_TIMEOUT,
-                   f'serial DFU {self.f["vid"]:04x}:{self.f["cdcPid"]:04x} {self.b["uid"]}')
-    tty = wait_for(lambda: cdc_tty(usb), UDEV_TIMEOUT, f'the CDC tty of {usb}')
+    ev, tty = self.enter_cdc()
+    self.dfu_serial(self.package(fx['image'], f'serial-{nonce.hex()[:8]}', edit), tty, singlebank)
+    return {**ev, 'tty': tty, **shown(fx, nonce)}
+
+  def package(self, image, name, edit=None):
+    """An adafruit-nrfutil genpkg app package of `image`, rewritten by repackage's edit(dat, image) when given."""
+    app, pkg = self.dir / f'{name}.bin', self.dir / f'{name}.zip'
+    app.write_bytes(image)
+    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
+    return repackage(pkg, pkg, edit) if edit else pkg
+
+  def cdc_only(self, pid=None, stale=()):
+    """The tty of the bootloader in CDC-only serial DFU (`pid` default its CDC PID) and the roster serial, one tty, no
+    drive. The enumeration still up from before the reset can carry the same PID (pca10056): one of `stale`
+    (enumerations()) is skipped, and a drive must drop first."""
+    pid = pid or self.f['cdcPid']
+    want = f'serial DFU {self.f["vid"]:04x}:{pid:04x} {self.b["uid"]}'
+    seen = {}
+
+    def cdc():
+      usb = usb_device(self.f['vid'], pid, self.b['uid'])
+      seen['drive'] = None
+      if not usb or (usb['busport'], usb['ino']) in stale:
+        return None
+      seen['drive'] = block_device(usb['busport'])
+      return usb['busport'] if not seen['drive'] and cdc_tty(usb['busport']) else None
+    try:
+      usb = wait_for(cdc, USB_TIMEOUT, want)
+    except StepFail:
+      if seen.get('drive'):
+        raise StepFail(f'{want} enumerated a drive in CDC-only serial DFU', {'drive': seen['drive']}) from None
+      raise
+    tty = cdc_tty(usb)
     wait_for(lambda: os.access(tty, os.R_OK | os.W_OK), UDEV_TIMEOUT, f'read-write access to {tty}')
     if block_device(usb):
       raise StepFail(f'{usb} enumerated a drive in CDC-only serial DFU')
-    app, pkg = self.dir / 'app-serial.bin', self.dir / 'app-serial.zip'
-    app.write_bytes(fx['image'])
-    self.nrfutil(['dfu', 'genpkg', '--dev-type', f'{ADAFRUIT_DEVICE_TYPE:#06x}', '--application', app, pkg], 'genpkg')
-    out = self.nrfutil(['--verbose', 'dfu', 'serial', '--package', pkg, '-p', tty, '-b', '115200', '--singlebank'],
-                       'dfu serial')
+    return tty
+
+  def enumerations(self):
+    """The board's USB enumerations now, on its UF2 and CDC PIDs: (busport, ino), which a new one changes."""
+    found = (usb_device(self.f['vid'], pid, self.b['uid']) for pid in {self.f['pid'], self.f['cdcPid']})
+    return {(usb['busport'], usb['ino']) for usb in found if usb}
+
+  def enter_cdc(self):
+    """GPREGRET 0x4E and a reset, then the tty of the new CDC-only enumeration."""
+    stale = self.enumerations()
+    ev = self.probe.reenter(DFU_MAGIC_SERIAL_ONLY_RESET)
+    return ev, self.cdc_only(stale=stale)
+
+  def dfu_serial(self, pkg, tty, singlebank=True):
+    out = self.nrfutil(serial_argv(pkg, tty, singlebank), 'dfu serial')
     if 'Device programmed.' not in out:   # it exits 0 on a failed upgrade too
       raise StepFail('adafruit-nrfutil did not program the device', {'tail': out.strip().splitlines()[-8:]})
-    return {**ev, 'tty': tty, 'image': f'{fx["start"]:#010x}+{len(fx["image"])}', 'nonce': nonce.hex()}
+    return out
 
   def nrfutil(self, argv, what):
     code, out = self.tools.spawn(['adafruit-nrfutil', *argv], NRFUTIL_TIMEOUT)
@@ -692,8 +941,7 @@ class Battery:
     return out
 
   def update(self, uf2, version, nonce):
-    """A bootloader update UF2 copied to the drive: the bootloader stages it in the app region's top and has the MBR
-    copy it over itself (src/usb/uf2/ghostfat.c, src/usb/msc_uf2.c). The app `nonce` still runs after it, and
+    """A bootloader update UF2 copied to the drive (SKILL.md Execution, update-base): app `nonce` still runs, and
     re-entered, the drive names `version`."""
     ev = {}
     if not self.drive.present():
@@ -707,13 +955,196 @@ class Battery:
     ev['info'] = self.drive.info(self.drive.wait(), version)
     return ev
 
+  def interrupted(self, nonce):
+    """An interrupted UF2 transfer (SKILL.md Execution, interrupted): app D copied up to the first block of its
+    third page (src/flash_nrf5x.c writes a page once the transfer moves past it), J-Link reads two pages written and
+    the third not, resets, and the mixed image runs, bank 0 being valid with CRC 0; then the whole of D runs."""
+    fx = fixture(self.f, nonce, pattern=3 * PAGE)
+    uf2 = make_uf2(fx['image'], fx['start'], self.f['family'])
+    written, whole = Path(self.dir) / 'interrupted-written.bin', Path(self.dir) / 'interrupted-whole.bin'
+    written.write_bytes(fx['image'][:2 * PAGE])
+    whole.write_bytes(fx['image'])
+    ev = {'enter': self.probe.reenter()}
+    ev['partial'] = self.drive.copy(self.drive.wait(), uf2[:(2 * PAGE // 256 + 1) * 512], self.dir, leaves=False)
+    third = fx['start'] + 2 * PAGE
+    out = self.probe.session(['h', f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'verifybin {written} {fx["start"]:08X}',
+                              f'mem32 {third:08X} 4', 'r', 'g'])
+    settings, after = word_at(out, BOOTLOADER_SETTINGS), words_at(out, third, 4)
+    if settings is None or after is None:
+      raise StepFail('the bootloader settings or the third page did not read back', {'tail': out.splitlines()[-8:]})
+    ev['bank0'] = {'state': settings & 0xFFFF, 'crc': settings >> 16}
+    if ev['bank0'] != {'state': BANK_VALID_APP, 'crc': 0}:
+      raise StepFail('bank 0 is not a valid app without a CRC: this outcome does not apply', ev)
+    if struct.pack('<4I', *after) == fx['image'][2 * PAGE:2 * PAGE + 16]:
+      raise StepFail("D's third page is in flash: the transfer was not cut short", ev)
+    ev['readBack'] = {'written': f'{fx["start"]:#010x}+{2 * PAGE}', 'notWritten': f'{third:#010x}'}
+    wait_for(self.drive.absent, USB_TIMEOUT, 'the drive leaving on the reset')
+    ev['mixedRan'] = self.app_ran(nonce)
+    ev['reenter'] = self.probe.reenter()
+    ev['copy'] = self.drive.copy(self.drive.wait(), uf2, self.dir)
+    self.probe.session(['h', f'verifybin {whole} {fx["start"]:08X}', 'g'])
+    ev['appRan'] = self.app_ran(nonce)
+    return {**ev, **shown(fx, nonce)}
+
+  def softdevice(self, nonce):
+    """A same-image SoftDevice and bootloader transfer and validation through the release package (SKILL.md
+    Execution, softdevice): back in DFU by itself, every run of the merged HEX verifies and app `nonce` runs."""
+    ev, tty = self.enter_cdc()
+    ev = {'enter': ev, 'tty': tty}
+    self.dfu_serial(self.f['zip'], tty)
+    dev = self.drive.wait()
+    commands, ev['verified'] = verify_runs(self.f)
+    self.probe.session(['h', *commands, 'g'])
+    ev['info'] = self.drive.info(dev)
+    ev['copy'] = self.copy(nonce)
+    ev['appRan'] = self.app_ran(nonce)
+    return {**ev, 'package': Path(self.f['zip']).name}
+
+  def banked(self, nonce):
+    """App `nonce` through dual-bank serial DFU (SKILL.md Execution, dualbank): once the bootloader left on
+    activation, it reads back in both banks with bank 0 valid."""
+    fx = fixture(self.f, nonce)
+    ev = self.serial(nonce, singlebank=False)
+    self.cdc_gone('the bootloader leaving on activation')
+    ev['bank0'] = self.bank_check(fx['image'], fx['image'], ['g'])
+    return ev
+
+  def refused(self, nonce, running):
+    """App `nonce` with a flipped init packet CRC-16 (SKILL.md Execution, dualbank refused): the bootloader stays in
+    DFU, bank 1 holds it, bank 0 still `running`, which runs after a J-Link reset."""
+    fx = fixture(self.f, nonce)
+    ev, tty = self.enter_cdc()
+    pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', flip_crc)
+    code, out = self.tools.spawn(['adafruit-nrfutil', *serial_argv(pkg, tty, False)], NRFUTIL_TIMEOUT)
+    ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}   # it reports success either way
+    if code or 'Activating new firmware' not in out:   # the bootloader checks the CRC on the stop packet
+      raise StepFail('adafruit-nrfutil did not send the whole image and its stop packet', ev)
+    stays_away(self.cdc_absent, QUIET,
+               'the bootloader reset as if it activated the refused package')
+    ev['bank0'] = self.bank_check(fx['image'], fixture(self.f, running)['image'], ['r', 'g'])
+    self.cdc_gone('the bootloader leaving on the reset')
+    ev['appRan'] = self.app_ran(running)
+    return {**ev, **shown(fx, nonce)}
+
+  def cut_short(self, nonce, running):
+    """A dual-bank serial transfer of app `nonce` (CUT_PAGES) ended by adafruit-nrfutil's CUT_AFTER bound (SKILL.md
+    Execution, dualbank interrupted): its first page in bank 1, not its last; `running` runs after a J-Link reset."""
+    fx = fixture(self.f, nonce, pattern=CUT_PAGES * PAGE)
+    enter, tty = self.enter_cdc()
+    ev = {'enter': enter}
+    pkg = self.package(fx['image'], f'cut-{nonce.hex()[:8]}')
+    code, out = self.tools.spawn(['adafruit-nrfutil', *serial_argv(pkg, tty, False)], CUT_AFTER)
+    if code != 124:
+      raise StepFail(f'adafruit-nrfutil was not cut short: exit {code}', {'tail': out.strip().splitlines()[-4:]})
+    ev['bank0'] = self.bank_check(fx['image'][:PAGE], fixture(self.f, running)['image'], ['r', 'g'],
+                                  whole=fx['image'])
+    self.cdc_gone('the bootloader leaving on the reset')
+    ev['appRan'] = self.app_ran(running)
+    return {**ev, **shown(fx, nonce)}
+
+  def cdc_gone(self, what):
+    wait_for(self.cdc_absent, USB_TIMEOUT, what)
+
+  def cdc_absent(self):
+    """No CDC-only bootloader with the board's serial enumerated: one whose serial cannot be read may be it."""
+    return usb().usb_absent(vid_pid=(f'{self.f["vid"]:04x}', f'{self.f["cdcPid"]:04x}'), serial=self.b['uid'])
+
+  def bank_check(self, bank1, bank0, then, whole=None):
+    """Halted, bank 1 verifies `bank1`, bank 0 `bank0` and the settings mark bank 0 valid; with `whole`, the first 16
+    bytes of its last page in bank 1 are not its own (its tail is 0xFF padding). Then the J-Link commands `then`."""
+    files = []
+    for name, data in (('bank1', bank1), ('bank0', bank0)):
+      files.append(Path(self.dir) / f'{name}-check.bin')
+      files[-1].write_bytes(data)
+    last = (len(whole or b'') - 1) // PAGE * PAGE
+    end = self.f['bank1'] + last
+    out = self.probe.session(['h', f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'verifybin {files[0]} {self.f["bank1"]:08X}',
+                              f'verifybin {files[1]} {self.f["appStart"]:08X}',
+                              *([f'mem32 {end:08X} 4'] if whole else []), *then])
+    settings = word_at(out, BOOTLOADER_SETTINGS)
+    if settings is None or settings & 0xFFFF != BANK_VALID_APP:
+      raise StepFail('the bootloader settings do not mark bank 0 valid', {'tail': out.splitlines()[-8:]})
+    ev = {'state': settings & 0xFFFF, 'crc': settings >> 16, 'bank1': f'{self.f["bank1"]:#010x}+{len(bank1)}',
+          'verified': len(bank0)}
+    if whole:
+      got = words_at(out, end, 4)
+      if got is None or struct.pack('<4I', *got) == whole[last:last + 16]:
+        raise StepFail("bank 1's last page did not read back or holds the whole image: not cut short",
+                       {**ev, 'tail': out.splitlines()[-8:]})
+      ev['notWritten'] = f'{end:#010x}'
+    return ev
+
+  def cdc_dfu(self, stale=()):
+    """SIGNED_FW without FORCE_UF2 has no drive (src/usb/tusb_config.h, usb_desc.c): with no app the bootloader stays
+    in DFU as one CDC port on its UF2 PID; `stale` as for cdc_only."""
+    return {'tty': self.cdc_only(self.f['pid'], stale)}
+
+  def refused_init(self, nonce, edit, key):
+    """An init packet SIGNED_FW refuses (unsigned, or signed by another key): the fresh app erased, bank 0 invalid,
+    and the bootloader reset (RESETREAS SREQ) or halted at BKPT (DHCSR S_HALT)."""
+    ev, rb = self.signed_transfer(nonce, edit, key, False)
+    if rb['app'] != (0xFFFFFFFF,) * 4 or not (ev['halted'] or rb['reset']):
+      raise StepFail('no init packet refusal: the app is not erased, or the bootloader neither reset nor halted', ev)
+    return self.back_in_dfu(ev, rb)
+
+  def refused_image(self, nonce, key):
+    """An image changed after signing with `key`: received whole, its validation requested, then refused: no reset, no
+    halt, bank 0 invalid and holding it."""
+    ev, rb = self.signed_transfer(nonce, tampered_after_signing(key), key, True)
+    if ev['halted'] or rb['reset']:
+      raise StepFail('the bootloader halted or reset on a received image instead of refusing its activation', ev)
+    ev['verified'] = f'{self.f["appStart"]:#010x}+{rb["image"].stat().st_size}'
+    return self.back_in_dfu(ev, rb)
+
+  def signed_transfer(self, nonce, edit, key, received):
+    """A fresh app signed with `key` running, RESETREAS cleared, app `nonce`'s package rewritten by `edit` sent
+    through CDC-only serial DFU, then DHCSR read before a halt, RESETREAS, the settings and the app start read back
+    (with `received`, the whole image verified) and a reset (SKILL.md Execution, signed). (evidence, read-back) once
+    bank 0 reads invalid; with `received`, adafruit-nrfutil must have sent the stop packet."""
+    fresh = os.urandom(16)
+    ev = {'before': {'serial': self.serial(fresh, edit=signed_by(key)), 'appRan': self.app_ran(fresh)}}
+    fx = fixture(self.f, nonce)
+    ev['enter'], tty = self.enter_cdc()
+    pkg = self.package(fx['image'], f'refused-{nonce.hex()[:8]}', edit)
+    image = Path(self.dir) / f'refused-{nonce.hex()[:8]}-image.bin'
+    image.write_bytes(repackage_image(pkg))
+    out = self.probe.session([f'w4 {RESETREAS:08X} FFFFFFFF', f'mem32 {RESETREAS:08X} 1'])
+    if word_at(out, RESETREAS) != 0:
+      raise StepFail('RESETREAS did not clear', {'tail': out.splitlines()[-4:]})
+    code, out = self.tools.spawn(['adafruit-nrfutil', *serial_argv(pkg, tty, True)], NRFUTIL_TIMEOUT)
+    ev['nrfutil'] = {'exit': code, 'tail': out.strip().splitlines()[-2:]}
+    if received and (code or 'Activating new firmware' not in out):
+      raise StepFail('adafruit-nrfutil did not send the whole image and its stop packet', ev)
+    stale = self.enumerations()
+    out = self.probe.session([f'mem32 {DHCSR:08X} 1', 'h', f'mem32 {RESETREAS:08X} 1',
+                              f'mem32 {BOOTLOADER_SETTINGS:08X} 1', f'mem32 {self.f["appStart"]:08X} 4',
+                              *([f'verifybin {image} {self.f["appStart"]:08X}'] if received else []), 'r', 'g'])
+    dhcsr, reas, settings = word_at(out, DHCSR), word_at(out, RESETREAS), word_at(out, BOOTLOADER_SETTINGS)
+    app = words_at(out, self.f['appStart'], 4)
+    if dhcsr is None or reas is None or settings is None or app is None:
+      raise StepFail('DHCSR, RESETREAS, the settings or the app start did not read back',
+                     {'tail': out.splitlines()[-8:]})
+    ev.update(halted=bool(dhcsr & DHCSR_S_HALT), resetreas=f'{reas:08X}',
+              bank0={'state': settings & 0xFFFF, 'appStart': [f'{w:08X}' for w in app]}, package=pkg.name,
+              nonce=nonce.hex())
+    if settings & 0xFFFF != BANK_INVALID_APP:
+      raise StepFail('bank 0 is not marked invalid', ev)
+    return ev, {'app': tuple(app), 'reset': bool(reas & RESETREAS_SREQ), 'image': image, 'stale': stale}
+
+  def back_in_dfu(self, ev, rb):
+    ev['dfu'] = self.cdc_dfu(rb['stale'])
+    return ev
+
   def current_span(self, length):
     """(offset, length) of CURRENT.UF2 holding [appStart, appStart + length): one 512-byte block per 256 bytes of flash
     from USER_FLASH_START = MBR_SIZE (src/usb/uf2/ghostfat.c, uf2cfg.h)."""
     return (self.f['appStart'] - MBR_SIZE) // 256 * 512, length // 256 * 512
 
   def battery(self, base):
-    a, b, c = os.urandom(16), os.urandom(16), os.urandom(16)
+    {'default': self.default, 'dualbank': self.dualbank, 'signed': self.signed}[self.profile](base)
+
+  def default(self, base):
+    a, b, c, d, e = (os.urandom(16) for _ in range(5))
     self.step('install', self.install)
     self.step('dfu', self.dfu)
     self.step('copy', lambda: self.copy(a))
@@ -721,10 +1152,37 @@ class Battery:
     self.step('reenter', lambda: self.reenter(a))
     self.step('copy-b', lambda: self.copy(b))
     self.step('app-ran-b', lambda: self.app_ran(b))
+    self.step('double-reset', lambda: self.double_reset(b))
     self.step('serial', lambda: self.serial(c))
     self.step('app-ran-c', lambda: self.app_ran(c))
     self.step('update-base', lambda: self.update(base['path'], base['version'], c))
     self.step('update', lambda: self.update(self.f['update'], self.f['version'], c))
+    self.step('interrupted', lambda: self.interrupted(d))
+    self.step('softdevice', lambda: self.softdevice(e))
+
+  def dualbank(self, base):
+    a, b, c, d = (os.urandom(16) for _ in range(4))
+    self.step('install', self.install)
+    self.step('dfu', self.dfu)
+    self.step('serial', lambda: self.banked(a))
+    self.step('app-ran', lambda: self.app_ran(a))
+    self.step('serial-b', lambda: self.banked(b))
+    self.step('app-ran-b', lambda: self.app_ran(b))
+    self.step('refused', lambda: self.refused(c, b))
+    self.step('interrupted', lambda: self.cut_short(d, b))
+
+  def signed(self, base):
+    a, b, c, d, e = (os.urandom(16) for _ in range(5))
+    key, other = signing_key(), secrets.randbelow(P256_N - 1) + 1
+    self.step('install', self.install)
+    self.step('dfu', self.cdc_dfu)
+    self.step('serial', lambda: self.serial(a, edit=signed_by(key)))
+    self.step('app-ran', lambda: self.app_ran(a))
+    self.step('unsigned', lambda: self.refused_init(c, None, key))
+    self.step('wrong-key', lambda: self.refused_init(d, signed_by(other), key))
+    self.step('tampered', lambda: self.refused_image(e, key))
+    self.step('serial-b', lambda: self.serial(b, edit=signed_by(key)))
+    self.step('app-ran-b', lambda: self.app_ran(b))
 
   def restore(self):
     """The candidate installed again and the benign fixture copied through it and running; never while a tool of the
@@ -735,6 +1193,7 @@ class Battery:
       return {'pass': False, 'state': 'unknown', 'detail': 'a tool is not proven ended; not restored',
               'receipts': self.tools.receipts}
     ev, nonce = {}, b'restore'.ljust(16, b'\0')
+    self.f, self.drive = self.home, Drive(self.b, self.home, self.tools)
     try:
       ev['install'] = self.probe.install(self.f)
       ev['dfu'] = self.dfu()
@@ -748,7 +1207,18 @@ class Battery:
 
 # ------------------------------------------------------------------ locks
 
+class InUse(Refused):
+  """The board is not free for this invocation: another one on it is alive (`occupied` None), or what an earlier one
+  left, or another JLinkExe on the probe, still occupies it after the settle (`occupied` names it). `found` is the
+  board's open failed cleanups, those the claim logged included."""
+  def __init__(self, msg, found, occupied=None):
+    super().__init__(msg)
+    self.found, self.occupied = found, occupied
+
+
 def take_lock(board, run_dir, wait):
+  """(handle, None) once the board's flock is taken, the handle's `cleanup_failures` the board's open failed cleanups;
+  (None, the row's fields) when it is not."""
   helper = lock_helper()
   end = time.monotonic() + wait
   while True:
@@ -760,64 +1230,134 @@ def take_lock(board, run_dir, wait):
       if time.monotonic() >= end:
         return None, {'locked': True, 'recoveryBlocker': False, 'detail': str(e)}
       time.sleep(min(LOCK_RETRY, max(0, end - time.monotonic())))
+    except helper.LockUnavailable as e:
+      return None, {'detail': str(e)}
 
 
-def claim(board, ops):
-  """The board's pending mark names this invocation and its ops dir before its first tool starts; refused while it
-  names another invocation not ended (invocation_ended), so a later one, a recovery's included, refuses while this one
-  lives or a tool it started is not proven ended. add() runs under the mark's mutex: of two invocations claiming at
-  once, the later one lists the earlier."""
-  helper = lock_helper()
-  me = {'ops': os.path.realpath(ops), 'pid': os.getpid(), 'start': helper.proc_start(os.getpid())}
+def log_failure(board, detail, receipts, task=None):
+  """A cleanup this invocation, or an earlier one (`task`, its claim), could not prove, appended to the board's cleanup
+  log without touching its lock; '' or why it was not logged."""
   try:
-    if me['start'] is None:
-      raise OSError('own start time unreadable')
-    listed = helper.PendingSessions(board['lock'], PENDING_KIND).add([{'receipt': me, 'cmd': 'hil_test.py'}])
-  except (OSError, ValueError, helper.PendingRefused) as e:
-    raise Refused(f'the board\'s pending mark could not name this invocation: {type(e).__name__}: {e}')
-  left = [e['receipt'] for e in listed if e['receipt'] != me and not ended_quietly(board, e)]
-  if left:
-    raise Refused(f'an earlier invocation, or a tool it started, is not proven ended: {left}')
+    lock_helper().log_cleanup_failure(board['lock'], REASON, detail=detail, task=task, receipts=receipts)
+  except Exception as e:
+    return f'cleanup log not written: {type(e).__name__}: {e}'
+  return ''
 
 
-def invocation_ended(board, session):
-  """A claim's invocation is gone (or is this one) and every tool it started rechecks done: run_tracked removes a
-  child's files once it is, so each hil_op_*.log left in its ops dir is one to recheck. An ops dir this user cannot
-  list, another user's or gone, is not ended (the listing raises). A receipt the board's holder names keeps its files:
-  a cleanup holder's release rechecks them."""
+def refreshed(board, found):
+  """The board's open failed cleanups read now, plus what of `found` (the take's) the log cannot hold: a leftover whose
+  append failed, or all of it while the log is unreadable now."""
+  fresh = lock_helper().open_cleanup_failures(board['lock'])
+  if any('unavailable' in f for f in fresh):
+    return found + [f for f in fresh if f not in found]
+  return fresh + [f for f in found if not isinstance(f.get('id'), str) and f not in fresh]
+
+
+def holder_tokens(board):
+  """The receipt tokens the board's holder record names, an older helper's cleanup holder's: its release by token
+  rechecks their files."""
   rec = lock_helper().read_record(board['lock'])
-  held = {h.get('token') for h in rec.get('receipts') or [] if isinstance(h, dict)} if isinstance(rec, dict) else set()
-  r = session['receipt']
-  if r['pid'] != os.getpid() and lock_helper().proc_start(r['pid']) == r['start']:
-    return False
-  for name in os.listdir(r['ops']):
-    if not (name.startswith('hil_op_') and name.endswith('.log')):
-      continue
-    base = os.path.join(r['ops'], name[:-len('.log')])
-    receipt = {'token': name[len('hil_op_'):-len('.log')], 'supervisor': None, 'lock': f'{base}.lock',
-               'record': f'{base}.json', 'log': f'{base}.log'}
-    if process().recheck(receipt) != 'done':
-      return False
-    if receipt['token'] not in held:
-      process().tidy(receipt)
-  return True
+  receipts = rec.get('receipts') if isinstance(rec, dict) else None
+  token = lock_helper().receipt_token
+  return {t for r in receipts if (t := token(r))} if isinstance(receipts, list) else set()
 
 
-def ended_quietly(board, session):
-  try:
-    return invocation_ended(board, session) is True
-  except Exception:
-    return False
-
-
-def unmark(board):
-  """The mark removed once every invocation it names, this one included, ended; kept otherwise, for the next claim
-  to judge."""
+def claim(board, ops, found):
+  """Name this invocation and its ops dir in the board's claim record before its first tool, under the run's flock or
+  the caller's hold (agentrc `hil` Board locks). The tools an earlier invocation left not proven ended are logged in
+  the board's cleanup log; they, and any JLinkExe on the probe, then get CLAIM_SETTLE to end. Its claim leaves the
+  record unless one of them still rechecks pending or its log failed. Returns (claim, `found` refreshed, '' or what was
+  not logged or removed); Refused when the record cannot name this invocation, InUse while the board is not free, this
+  claim removed again."""
   helper = lock_helper()
+  record = helper.PendingSessions(board['lock'], CLAIM_KIND)
   try:
-    helper.PendingSessions(board['lock'], PENDING_KIND).clear(lambda s: invocation_ended(board, s))
-  except (OSError, helper.PendingRefused):
-    pass
+    entry = helper.claim_entry(ops, REASON)
+    others = record.claim(entry)
+  except (OSError, ValueError, helper.PendingRefused) as e:
+    raise Refused(f'the board\'s claim record could not name this invocation: {type(e).__name__}: {e}')
+  notes, earlier = [], []
+  try:
+    if alive := [s['receipt'] for s in others if helper.claim_alive(s)]:
+      raise InUse(f'another invocation on the board is running: {alive}', found)
+    # read after the gate: a claimant alive at the take may have logged, and so keeps, a receipt since
+    found = refreshed(board, found)
+    keep = helper.logged_tokens(found) | holder_tokens(board)
+    for s in others:
+      state, receipts = helper.invocation_state(s, keep)
+      if state == 'alive':   # not after the gate, but a live claim is never removed
+        continue
+      why = ''
+      if new := [r for r in receipts if helper.receipt_token(r) not in keep]:
+        if why := log_failure(board, 'an earlier invocation ended with tools not proven ended', new, s['receipt']):
+          notes.append(why)
+        else:
+          found = refreshed(board, found)
+      earlier.append((s, receipts, bool(why)))
+    unsettled = [r for _, receipts, _ in earlier for r in receipts]
+    wait = CLAIM_SETTLE if unsettled else 0
+    states, named = helper.settle(unsettled, wait, busy=lambda: probe_users(board))
+    each = iter(states)
+    for s, receipts, unlogged in earlier:
+      if 'pending' not in [next(each) for _ in receipts] and not unlogged:
+        try:
+          record.remove(s)
+        except (OSError, helper.PendingRefused) as e:
+          notes.append(f'earlier claim not removed: {e}')
+    if left := helper.open_runs(unsettled, states) + named:
+      raise InUse(f'still on the board after {wait}s: {left}', found, left)
+  except InUse:
+    with contextlib.suppress(OSError, helper.PendingRefused):
+      record.remove(entry)
+    raise
+  return entry, found, '; '.join(notes)
+
+
+def unclaim(board, entry, tools):
+  """Remove this invocation's claim once recheck_dir of its ops dir answers done, the files of the receipts it logged
+  kept for resolve_restored; before its lock goes. An unclean end keeps it, for the next claim to judge. '' or why it
+  stays."""
+  if entry is None:
+    return ''
+  try:
+    verdict, _ = process().recheck_dir(tools.dir, {lock_helper().receipt_token(r) for r in tools.logged()})
+    if verdict != 'done':
+      return f'claim kept: its tools recheck {verdict}'
+    lock_helper().PendingSessions(board['lock'], CLAIM_KIND).remove(entry)
+  except Exception as e:   # the lock ends after this whatever it found
+    return f'claim not removed: {type(e).__name__}: {e}'
+  return ''
+
+
+def note(fields, key, why):
+  if why:
+    fields[key] = '; '.join(filter(None, (fields.get(key), why)))
+
+
+def resolve(board, found, state):
+  """The board was restored: each of `found` (open failed cleanups) whose own receipts recheck done is marked restored,
+  every other kept open. '' or why some stay."""
+  try:
+    return '; '.join(lock_helper().resolve_restored(board['lock'], found, evidence=f'{board["name"]}: {state}'))
+  except Exception as e:
+    return f'restorations not logged: {type(e).__name__}: {e}'
+
+
+def end_lock(board, fh, cleanup, detail, tools, found):
+  """The run's lock ends with it: after a proven cleanup the open failures it found are resolved and the lock released;
+  otherwise end_failed logs the cleanup it could not prove, with the receipts of tools not proven ended, and releases.
+  `cleanup` (the row's) records which."""
+  helper = lock_helper()
+  if cleanup['pass']:
+    if cleanup['state'] != 'untouched':
+      note(cleanup, 'restoredNote', resolve(board, found, cleanup['state']))
+    helper.release_board_lock(fh)
+  else:
+    errors = helper.end_failed({board['lock']: fh}, REASON, detail=detail, receipts=tools.logged()).get(board['lock'])
+    cleanup['failureLogged'] = not any(e.startswith('cleanup log not written') for e in errors or [])
+    if errors:
+      cleanup['endErrors'] = errors
+  cleanup['released'] = True
 
 
 def prove_hold(board, reason):
@@ -828,8 +1368,8 @@ def prove_hold(board, reason):
 
 
 def prove_cleanup_holder(board, pid):
-  """The board's lock record: a live cleanup holder `pid` (a failed run's, or a takeover's) of this board alone, every
-  receipt it was handed rechecking `done`, and no tool of a run left on the host."""
+  """The board's lock record: an older helper's live cleanup holder `pid` of this board alone, every receipt it was
+  handed rechecking `done`, and no tool of a run left on the host."""
   helper = lock_helper()
   rec = helper.read_record(board['lock'])
   if not helper.is_cleanup_holder(rec) or rec.get('pid') != pid or not helper.holder_alive(rec) \
@@ -875,10 +1415,10 @@ def cmd_run(args, argv):
   run_dir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / f'run-{time.strftime("%Y%m%d-%H%M%S")}-{os.getpid()}'
   run_dir.mkdir(parents=True)
   log = run_dir / 'hil.log'
-  row = {'board': args.board, 'ran': False, 'pass': False, 'locked': False, 'steps': [],
+  row = {'board': args.board, 'profile': args.profile, 'ran': False, 'pass': False, 'locked': False, 'steps': [],
          'cleanup': {'pass': True, 'state': 'untouched'}}
   result = {'pass': False, 'caveat': '', 'results': [row], 'reportPath': str(run_dir / 'hil_report.json'),
-            'heldInProcess': False, 'uncovered': list(UNCOVERED)}
+            'uncovered': list(UNCOVERED)}
 
   def finish(code):
     result['exitCode'] = code
@@ -890,15 +1430,25 @@ def cmd_run(args, argv):
     board = load_board(args.roster, args.board)
     if not board['reentry']:
       raise Refused(f'{args.board} is pending commissioning (no nrf52.reentry): commissioning.md')
-    rec, rrow, copies = admit(args.build_record, args.board, args.roster, run_dir)
-    f = facts(args.board, rrow, copies, run_dir)
+    if args.fail_at and args.fail_at not in PROFILE_STEPS[args.profile]:
+      raise Refused(f'--fail-at {args.fail_at} is no step of profile {args.profile}: {PROFILE_STEPS[args.profile]}')
+    rec, rrow, copies = admit(args.build_record, args.board, args.roster, run_dir, args.profile)
+    f = facts(args.board, rrow, copies, run_dir / args.profile)
+    home = None
+    if args.profile != 'default':
+      _, hrow, hcopies = admit(args.build_record, args.board, args.roster, run_dir)
+      home = facts(args.board, hrow, hcopies, run_dir / 'default')
     row['firmware'] = {'version': f['version'], 'buildRecord': args.build_record, 'merged': rrow['sha256']['merged'],
-                       'head': rec['input']['head']}
+                       'head': rec['input']['head'], 'profile': args.profile}
     base = admit_base(board, args.base_dir, run_dir)
     row['selfUpdateBase'] = {k: base[k] for k in ('version', 'file', 'sha256')}
     for tool, what in (('mcopy', 'mtools'), ('adafruit-nrfutil', 'the farm\'s hil-venv')):
       if not shutil.which(tool):
         raise Refused(f'{tool} ({what}) must be on PATH')
+    try:
+      bat = Battery(board, f, run_dir, log, args.fail_at, args.profile, home)
+    except OSError as e:
+      raise Refused(f'ops dir in {run_dir}: {type(e).__name__}: {e}')
   except Refused as e:
     row['detail'] = result['error'] = str(e)
     return finish(2)
@@ -907,19 +1457,20 @@ def cmd_run(args, argv):
   if fh is None:
     row.update(held)
     return finish(1)
-  bat = Battery(board, f, run_dir, log, args.fail_at)
+  helper, found, entry = lock_helper(), fh.cleanup_failures, None
+  row.update(helper.failure_report(found))
   code, row['cleanup'] = 1, None
   try:
     try:
-      claim(board, bat.tools.dir)
-      blocked, users = None, probe_users(board)
+      entry, found, why = claim(board, bat.tools.dir, found)
+    except InUse as e:
+      row.update(detail=f'board in use: {e}', **helper.failure_report(e.found),
+                 **({'occupiedBy': e.occupied} if e.occupied else {'locked': True}))
     except Refused as e:
-      blocked, users = str(e), []
-    if blocked:
-      row.update(recoveryBlocker=True, detail=blocked)
-    elif users:
-      row.update(probeUsers=users, detail='another JLinkExe uses the probe')
+      row.update(recoveryBlocker=True, detail=str(e))
     else:
+      row.update(helper.failure_report(found))
+      note(row, 'claimNote', why)
       row['ran'] = True
       try:
         bat.battery(base)
@@ -928,35 +1479,28 @@ def cmd_run(args, argv):
         row['detail'] = f'{bat.steps[-1]["step"]}: {e}'
       row['cleanup'] = bat.restore()
       code = 0 if row['pass'] and row['cleanup']['pass'] else 1
-  except BaseException as e:   # an interrupt or an error outside a step: reported, the board handed over below
+  except BaseException as e:   # an interrupt or an error outside a step: reported, the board's failure logged below
     row['detail'] = f'{type(e).__name__}: {e}'
   finally:
     row['steps'] = bat.steps
     if row['cleanup'] is None:   # never restored: an interrupt, or nothing written
       row['cleanup'] = ({'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
                          'receipts': bat.tools.receipts} if bat.touched else {'pass': True, 'state': 'untouched'})
+    note(row, 'claimNote', unclaim(board, entry, bat.tools))
+    end_lock(board, fh, row['cleanup'], row['cleanup'].get('detail') or row.get('detail'), bat.tools, found)
     if not row['cleanup']['pass']:
-      try:
-        token = lock_helper().hand_to_cleanup_holder(
-          {board['lock']: fh}, REASON, detail=row['cleanup'].get('detail'),
-          receipts=[r['receipt'] for r in bat.tools.receipts if r['receipt'] is not None])
-        row['cleanup'].update(heldAfter=True, holder={'token': token})
-      except Exception as e:
-        row['cleanup'].update(heldAfter=True, holder={'error': str(e)})
-      fh.close()
       code = 4
-    else:
-      unmark(board)
-      lock_helper().release_board_lock(fh)
   result['pass'] = code == 0
   return finish(code)
 
 
 def cmd_manual(args, argv):
-  """install or restore under the caller's own hold, or restore under a cleanup holder, ended once it passed."""
+  """install or restore under the caller's own hold, or restore under an older helper's cleanup holder, ended once
+  it passed. Nothing here ends a hold: a restore that failed, or a tool not proven ended, is only logged."""
   workdir = Path(args.run_root or ROOT / 'cmake-build' / 'hil') / \
     f'{args.cmd}-{time.strftime("%Y%m%d-%H%M%S")}-{os.getpid()}'
   workdir.mkdir(parents=True)
+  helper = lock_helper()
   try:
     board = load_board(args.roster, args.board)
     holder = None
@@ -964,34 +1508,47 @@ def cmd_manual(args, argv):
       prove_hold(board, args.under_hold)
     else:
       holder = prove_cleanup_holder(board, args.recover_holder)
+    found = helper.open_cleanup_failures(board['lock'])
     _, rrow, copies = admit(args.build_record, args.board, args.roster, workdir)
-    f = facts(args.board, rrow, copies, workdir)
-    bat = Battery(board, f, workdir, workdir / 'hil.log')
-    claim(board, bat.tools.dir)
-    if probe_users(board):
-      raise Refused('another JLinkExe uses the probe')
+    f = facts(args.board, rrow, copies, workdir / 'default')
+    try:
+      bat = Battery(board, f, workdir, workdir / 'hil.log')
+    except OSError as e:
+      raise Refused(f'ops dir in {workdir}: {type(e).__name__}: {e}')
+    entry, found, why = claim(board, bat.tools.dir, found)
   except Refused as e:
-    print(json.dumps({'pass': False, 'error': str(e)}))
+    print(json.dumps({'pass': False, 'error': str(e),
+                      **(helper.failure_report(e.found) if isinstance(e, InUse) else {})}))
     return 2
+  out, interrupt = {**helper.failure_report(found)}, None
+  note(out, 'claimNote', why)
   bat.touched = True
   try:
     if args.cmd == 'install':
-      ev = {'install': bat.install(), 'dfu': bat.dfu()}
-      out = {'pass': True, 'evidence': ev}
+      out.update({'pass': True, 'evidence': {'install': bat.install(), 'dfu': bat.dfu()}})
     else:
-      out = bat.restore()
-  except StepFail as e:
-    print(json.dumps({'pass': False, 'error': str(e), 'evidence': e.evidence}))
-    return 4
-  if out['pass'] and holder:
-    try:
-      lock_helper().release_token(holder['token'])
-      out['recovered'] = {'holder': holder['pid'], 'released': True}
-    except lock_helper().ReleaseRefused as e:
-      out.update({'pass': False, 'recovered': {'holder': holder['pid'], 'released': False, 'error': str(e)}})
-  if out['pass']:
-    unmark(board)
-  print(json.dumps(out))
+      out.update(bat.restore())
+  except BaseException as e:
+    out.update({'pass': False, 'error': f'{type(e).__name__}: {e}', 'evidence': getattr(e, 'evidence', {})})
+    interrupt = None if isinstance(e, Exception) else e
+  try:
+    if not out['pass'] and (args.cmd == 'restore' or bat.tools.receipts):
+      why = log_failure(board, f'{args.cmd} failed: {out.get("detail") or out.get("error")}', bat.tools.logged())
+      out['failureLogged'] = not why
+      note(out, 'logError', why)
+    elif out['pass'] and args.cmd == 'restore':
+      note(out, 'restoredNote', resolve(board, found, out['state']))
+      if holder:
+        try:
+          helper.release_token(holder['token'])
+          out['recovered'] = {'holder': holder['pid'], 'released': True}
+        except helper.ReleaseRefused as e:
+          out.update({'pass': False, 'recovered': {'holder': holder['pid'], 'released': False, 'error': str(e)}})
+  finally:
+    note(out, 'claimNote', unclaim(board, entry, bat.tools))
+    print(json.dumps(out))
+  if interrupt:
+    raise interrupt
   return 0 if out['pass'] else 4
 
 
@@ -1064,7 +1621,8 @@ def main(argv=None):
     if name == 'run':
       p.add_argument('--lock-wait', type=float, default=0)
       p.add_argument('--base-dir', required=True, help="holds the roster's nrf52.selfUpdateBase file")
-      p.add_argument('--fail-at', choices=STEPS)
+      p.add_argument('--profile', choices=list(PROFILE_STEPS), default='default')
+      p.add_argument('--fail-at', choices=sorted({s for steps in PROFILE_STEPS.values() for s in steps}))
     elif name == 'install':
       p.add_argument('--under-hold', required=True, metavar='REASON')
     else:

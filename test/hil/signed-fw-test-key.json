@@ -1,0 +1,6 @@
+{
+ "use": "TEST ONLY. The HIL battery signs its SIGNED_FW profile with this published key (hil-contract SKILL.md); a bootloader built with it accepts packages anyone can sign. Never ship it.",
+ "d": "79c3f58b4dc7886a78f09631e0e5ca1b0f2c4fdca53844f34ffb961afb2cb4c5",
+ "qx": "aa9ab2063f852bccbef7a5b7c7e7638cd53208b04da0424aa10b17417e3bda68",
+ "qy": "7da485f76d204bc18b687aad6fce9f7eb3d7166c3581ea91f52fe921c3cba750"
+}

@@ -8,7 +8,8 @@ CMake + Ninja the way CI (.github/workflows/githubci.yml) does, in a private bui
   check_build.py --diff-file FILE                   same, from a file listing one changed path per line
   check_build.py --board B [--board B ...]          these boards
   check_build.py ... --select-only [--hil-config ROSTER]   the selection alone, no toolchain needed
-  check_build.py --board B --shared [--hil-config ROSTER]  keep cmake-build/cmake-build-B (flash, HIL record)
+  check_build.py --board B --shared [--hil-config ROSTER]  keep cmake-build/cmake-build-B (flash); with ROSTER the HIL
+                                                           record, every HIL profile in cmake-build-B[-PROFILE]
   check_build.py ... -D NAME=VALUE                  a CMake option (DUALBANK_FW, SIGNED_FW, ...), never in a HIL record
 
 Exit: 0 pass, 1 a build or test failed, 2 usage, resolution or a missing prerequisite.
@@ -46,6 +47,8 @@ CMAKE_FALSE = ('', '0', 'OFF', 'NO', 'FALSE', 'N', 'IGNORE', 'NOTFOUND')
 RECORDED_CACHE = ('BOARD', 'CMAKE_BUILD_TYPE', 'CMAKE_GENERATOR', 'CMAKE_OBJCOPY', 'NRFUTIL',
                   'Python_EXECUTABLE', *OPTIONS)
 TESTS = ('python3', '-m', 'unittest', 'discover', '-s', '.claude/test', '-p', 'test_*.py')
+# the SIGNED_FW profile's published key: test only (hil-contract SKILL.md, Profiles)
+SIGNED_FW_TEST_KEY = ROOT / 'test' / 'hil' / 'signed-fw-test-key.json'
 MCU_NAMES = {'nrf52': 'nRF52832', 'nrf52833': 'nRF52833', 'nrf52840': 'nRF52840'}
 
 DOCS = re.compile(r'^(README\.md|changelog\.md|CODE_OF_CONDUCT\.md|LICENSE|supported_boards\.md|CLAUDE\.md|AGENTS\.md'
@@ -54,7 +57,6 @@ DOCS = re.compile(r'^(README\.md|changelog\.md|CODE_OF_CONDUCT\.md|LICENSE|suppo
                   r'|\.claude/skills/[^/]+/[^/]+\.md)$')
 # (pattern, rule, what it selects); first match wins
 RULES = (
-  (r'^src/boards/([^/]+)/board\.mk$', 'board-make', 'the board, plus legacy make builds of it and the mandated boards'),
   (r'^src/boards/([^/]+)(/|$)', 'board', 'the board'),
   (r'^\.claude/skills/build/scripts/', 'contract-build', 'contract tests, the representatives and every roster board'),
   (r'^(\.claude/skills/hil-contract/scripts/|test/hil/)', 'contract-hil',
@@ -62,7 +64,8 @@ RULES = (
   (r'^\.github/workflows/hil\.yml$', 'contract-hil', 'contract tests, the representatives and every roster board'),
   (r'^(\.claude/test/|\.pre-commit-config\.yaml$)', 'tests', 'contract tests'),
   (r'^\.github/workflows/githubci\.yml$', 'ci', 'contract tests and the mandated boards'),
-  (r'^(Makefile|tools/build_all\.py)$', 'make', 'a legacy make build of the mandated boards'),
+  (r'^Makefile$', 'make', 'contract tests and a build of the mandated boards through the Makefile wrapper'),
+  (r'^tools/build_all\.py$', 'tools', 'the mandated boards'),
   (r'^lib/softdevice/(s\d+_nrf52_[0-9.]+)/', 'softdevice', 'the boards that use this SoftDevice'),
   (r'^(CMakeLists\.txt|cmake/|src/|lib/|linker/|tools/hexmerge\.py$)', 'shared', 'the representatives'),
 )
@@ -134,16 +137,13 @@ def classify(path, boards):
     m = re.match(pattern, path)
     if not m:
       continue
-    if rule in ('board', 'board-make'):
+    if rule == 'board':
       board = m.group(1)
       if path == f'src/boards/{board}' and board not in boards:
         continue   # a file beside the boards (boards.c, boards.h) is shared code
       if board not in boards:
         return rule, f'{board} is no board in this tree (removed): nothing to build', {}
-      sel = {'boards': {board}, 'direct': {board}}
-      if rule == 'board-make':
-        sel['make'] = {board, *MANDATED}
-      return rule, f'{what}', sel
+      return rule, f'{what}', {'boards': {board}, 'direct': {board}}
     if rule == 'softdevice':
       users = {b for b in boards if board_config(b)[1] == m.group(1)}
       return rule, f'{what}: {", ".join(sorted(users)) or "none"}', {'boards': users, 'direct': users}
@@ -151,7 +151,8 @@ def classify(path, boards):
            'contract-hil': {'tests': True, 'boards': set(REPRESENTATIVES), 'hil_full': True},
            'tests': {'tests': True},
            'ci': {'tests': True, 'boards': set(MANDATED)},
-           'make': {'make': set(MANDATED)},
+           'make': {'tests': True, 'make': set(MANDATED)},
+           'tools': {'boards': set(MANDATED)},
            'shared': {'boards': set(REPRESENTATIVES), 'shared': True}}[rule]
     return rule, what, sel
   return 'unclassified', 'not classified: built like shared code (the representatives)', \
@@ -242,6 +243,23 @@ def prerequisites(make=False, defines=()):
       raise Refusal(f'{path} missing: git submodule update --init')
 
 
+def signed_fw_test_key():
+  """{d, qx, qy} of the SIGNED_FW profile's test-only key, each as bytes."""
+  try:
+    key = json.loads(SIGNED_FW_TEST_KEY.read_text())
+    return {k: bytes.fromhex(key[k]) for k in ('d', 'qx', 'qy')}
+  except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+    raise Refusal(f'{SIGNED_FW_TEST_KEY.relative_to(ROOT)}: not a key ({e})') from None
+
+
+def hil_profiles():
+  """name -> the -D options of each configuration a HIL record builds, the default first."""
+  key = signed_fw_test_key()
+  qx, qy = (','.join(f'0x{b:02x}' for b in key[k]) for k in ('qx', 'qy'))
+  return {'default': [], 'dualbank': ['DUALBANK_FW=ON'],
+          'signed': ['SIGNED_FW=ON', f'SIGNED_FW_QX={qx}', f'SIGNED_FW_QY={qy}']}
+
+
 def sha256(path):
   return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -263,8 +281,9 @@ def expected_artifacts(bdir, board):
 
 
 def make_artifacts(bdir, board):
-  """name -> path of every file the Makefile's `all` target produces, or a list of what is missing or ambiguous."""
-  return unique_matches(bdir, {'out': f'{board}_bootloader-*.out', 'hexNosd': f'{board}_bootloader-*_nosd.hex',
+  """name -> path of every file the Makefile wrapper's `all` target must produce under make's names, or a list of
+  what is missing or ambiguous."""
+  return unique_matches(bdir, {'elf': 'bootloader.elf', 'hexNosd': f'{board}_bootloader-*_nosd.hex',
                                'update': f'update-{board}_bootloader-*_nosd.uf2',
                                'merged': f'{board}_bootloader-*_s*.hex', 'zip': f'{board}_bootloader-*_s*.zip'})
 
@@ -310,12 +329,15 @@ def run_logged(cmd, log, verbose):
     return p.wait()
 
 
-def build_board(board, defines, shared, verbose):
-  bdir = ROOT / 'cmake-build' / (f'cmake-build-{board}' if shared else f'cmake-build-agent-{os.getpid()}-{board}')
+def build_board(board, defines, shared, verbose, profile=None):
+  name = f'cmake-build-{board}' if shared else f'cmake-build-agent-{os.getpid()}-{board}'
+  bdir = ROOT / 'cmake-build' / (name if profile in (None, 'default') else f'{name}-{profile}')
   shutil.rmtree(bdir, ignore_errors=True)
   bdir.mkdir(parents=True)
   log = bdir / 'check_build.log'
   row = {'board': str(board), 'buildDir': str(bdir.relative_to(ROOT)), 'log': str(log.relative_to(ROOT))}
+  if profile:
+    row.update(profile=profile, defines=list(defines))
   cmd = ['cmake', '-S', str(ROOT), '-B', str(bdir), '-G', 'Ninja', f'-DBOARD={board}', *(f'-D{d}' for d in defines)]
   rc = run_logged(cmd, log, verbose) or run_logged(['cmake', '--build', str(bdir)], log, verbose)
   if rc:
@@ -345,7 +367,7 @@ def make_board(board, verbose):
   shutil.rmtree(bdir, ignore_errors=True)
   bdir.mkdir(parents=True)
   log = bdir / 'check_build.log'
-  rc = run_logged(['make', '-j', f'BOARD={board}', f'BUILD={bdir}', 'all'], log, verbose)
+  rc = run_logged(['make', f'-j{os.cpu_count() or 1}', f'BOARD={board}', f'BUILD={bdir}', 'all'], log, verbose)
   row = {'board': board, 'backend': 'make', 'buildDir': str(bdir.relative_to(ROOT))}
   problems = [] if rc else make_artifacts(bdir, board)[1]
   if rc or problems:
@@ -404,9 +426,10 @@ def main(argv=None):
       return out(result, 0)
     record = bool(args.hil_config and args.shared)
     if record and args.defines:
-      raise Refusal('a HIL record builds the default configuration: drop -D')
+      raise Refusal('a HIL record builds its profiles: drop -D')
+    profiles = hil_profiles() if record else {None: args.defines}
     if result['build']['boards'] or result['build']['make']:
-      prerequisites(make=bool(result['build']['make']), defines=args.defines)
+      prerequisites(make=bool(result['build']['make']), defines=[d for ds in profiles.values() for d in ds])
     result['input'] = inputs()
     result['input']['sourceDateEpoch'] = os.environ.get('SOURCE_DATE_EPOCH')
     if record:
@@ -416,11 +439,15 @@ def main(argv=None):
         ident = agentrc.identity()
       except ImportError as e:
         raise Refusal(f'agentrc: {e}') from None
-      result['hilRecord'] = {'roster': {'path': args.hil_config, 'sha256': sha256(args.hil_config)}, 'agentrc': ident}
+      result['hilRecord'] = {'roster': {'path': args.hil_config, 'sha256': sha256(args.hil_config)}, 'agentrc': ident,
+                             'profiles': profiles,
+                             'signedFwKey': {'path': str(SIGNED_FW_TEST_KEY.relative_to(ROOT)),
+                                             'sha256': sha256(SIGNED_FW_TEST_KEY)}}
   except Refusal as e:
     return out({'pass': False, 'error': str(e)}, 2)
 
-  rows = [build_board(b, args.defines, args.shared, args.verbose) for b in result['build']['boards']]
+  rows = [build_board(b, defines, args.shared, args.verbose, profile)
+          for b in result['build']['boards'] for profile, defines in profiles.items()]
   rows += [make_board(b, args.verbose) for b in result['build']['make']]
   if result['build']['tests']:
     p = subprocess.run(TESTS, cwd=ROOT, capture_output=True, text=True)

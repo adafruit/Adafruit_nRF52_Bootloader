@@ -7,10 +7,11 @@ as Markdown, and the check that this run is still the newest for the PR's head b
                         --out FILE
   hil_comment.py fresh --repo R --pr N --head SHA --run-id N --attempt N
 
-`--reports` is the rig job's run root, one `<board>/run-*/` per battery: each board's newest report is read through
-agentrc's report core and judged by its shared run rules, so an aborted run, a caveat or an unreadable newest report
-is never a pass and never falls back to an older one. A board without a run, or a missing or unreadable `--selection`,
-renders as such, never as a pass or as no affected boards.
+`--reports` is the rig job's run root, one `<board>/<profile>/run-*/` per battery: each board's newest report of each
+profile (hil_run_report.PROFILE_STEPS) is read through agentrc's report core and judged by its shared run rules, so an
+aborted run, a caveat or an unreadable newest report is never a pass and never falls back to an older one. A board or
+profile without a run, or a missing or unreadable `--selection`, renders as such, never as a pass or as no affected
+boards.
 `fresh` exits 0 when the run is the newest attempt of the PR's newest HIL run for its current head, 1 when it is
 stale (the reason on stdout), 2 when the API cannot tell. `render` loads the report core through agentrc.py (in CI
 the pin, after `agentrc.py fetch`).
@@ -26,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hil_run_report as run_report  # noqa: E402
 
 TITLE = '## Hardware-in-the-loop (HIL) Test Report'
-STEPS = run_report.STEPS
+PROFILES = run_report.PROFILE_STEPS
 VERDICT = {'pass': '✅ passed', 'fail': '❌ failed', 'blocker': '⛔ blocked', 'not-run': '⚪ not run'}
 LEGEND = '✅ passed · ❌ failed · blank not run · cleanup: the candidate reinstalled and a benign app proven running'
 RUN_NAME = 'HIL PR #{}'   # hil.yml's run-name: a run's pull_requests lists every PR on its head, not the one it is for
@@ -45,10 +46,10 @@ def literal(v, table=False):
   return f'{fence}{pad}{text}{pad}{fence}'
 
 
-def board_result(core, run_root, board):
-  """(verdict, detail, native body or None) of `board`'s newest run under run_root/<board>, by the shared run rules;
-  None when it has no run."""
-  runs = sorted(Path(run_root, board).glob('run-*'))   # run-<time>-<pid>: oldest first
+def board_result(core, run_root, board, profile):
+  """(verdict, detail, native body or None) of `board`'s newest `profile` run under run_root/<board>/<profile>, by the
+  shared run rules; None when it has no run."""
+  runs = sorted(Path(run_root, board, profile).glob('run-*'))   # run-<time>-<pid>: oldest first
   if not runs:
     return None
   reading = core.read_document(runs[-1] / 'hil_report.json', run_report.schema(core))
@@ -57,10 +58,11 @@ def board_result(core, run_root, board):
   return row['verdict'], row['detail'], body
 
 
-def board_lines(result, board):
+def board_lines(result, board, profile):
   verdict, detail, report = result
+  title = f'**{VERDICT[verdict]}** · profile {literal(profile)}'
   if report is None:
-    return [f'**{VERDICT[verdict]}**', '', f'- {literal(board)}: {literal(detail)}', '']
+    return [title, '', f'- {literal(board)}: {literal(detail)}', '']
   row = run_report.row_of(report, board) or {}
   marks = {s.get('step'): run_report.STEP_MARK[bool(s.get('pass'))] for s in row.get('steps') or []
            if isinstance(s, dict)}
@@ -68,13 +70,16 @@ def board_lines(result, board):
   clean = run_report.STEP_MARK[bool(cleanup.get('pass'))] if cleanup.get('state') not in (None, 'untouched') else ''
   seconds = sum(s.get('seconds') or 0 for s in row.get('steps') or [] if isinstance(s, dict))
   fw = row.get('firmware') or {}
-  lines = [f'**{VERDICT[verdict]}**' + (f' · bootloader {literal(fw["version"])}' if fw.get('version') else ''), '',
-           '| Board | ' + ' | '.join(STEPS) + ' | cleanup | steps |',
-           '| --- | ' + ' | '.join(':-:' for _ in STEPS) + ' | :-: | --: |',
-           '| ' + ' | '.join([literal(board, table=True), *(marks.get(s, '') for s in STEPS), clean,
-                              f'{seconds:.0f}s']) + ' |', '', LEGEND, '']
-  if verdict != 'pass':
+  steps = PROFILES[profile]
+  lines = [title + (f' · bootloader {literal(fw["version"])}' if fw.get('version') else ''), '',
+           '| Board | ' + ' | '.join(steps) + ' | cleanup | steps |',
+           '| --- | ' + ' | '.join(':-:' for _ in steps) + ' | :-: | --: |',
+           '| ' + ' | '.join([literal(board, table=True), *(marks.get(s, '') for s in steps), clean,
+                              f'{seconds:.0f}s']) + ' |', '']
+  if verdict != 'pass':   # a failed cleanup's detail says whether the board's cleanup log took it
     lines += [f'- {literal(board)}: {literal(detail)}', '']
+  if earlier := run_report.previous_failure(row):
+    lines += [f'- {literal(earlier)}', '']
   return lines
 
 
@@ -85,8 +90,8 @@ def uncovered(selection, report=None):
 
 
 def render(results, selection, meta):
-  """The comment body. `results` maps a board to board_result()'s; `selection` is the parsed file or None; `meta`
-  is {head, tested, runUrl, runId, attempt}."""
+  """The comment body. `results` maps (board, profile) to board_result()'s; `selection` is the parsed file or None;
+  `meta` is {head, tested, runUrl, runId, attempt}."""
   lines = [TITLE, '', '### ci.json (ci.lan)', '',
            f'_PR head `{meta["head"][:7]}` · tested `{meta["tested"][:7]}` · '
            f'[run {meta["runId"]}, attempt {meta["attempt"]}]({meta["runUrl"]})_', '']
@@ -99,9 +104,13 @@ def render(results, selection, meta):
     lines += ['_Every roster board: the HIL contract or the roster changed._' if selection.get('full')
               else '_Boards the change reaches._', '']
     for board in boards:
-      lines += (board_lines(results[board], board) if results.get(board)
-                else [f'**HIL report unavailable for {literal(board)}: no run of it (run incomplete).**', ''])
+      for profile in PROFILES:
+        lines += (board_lines(results[board, profile], board, profile) if results.get((board, profile))
+                  else [f'**HIL report unavailable for {literal(board)}, profile {literal(profile)}: no run of it '
+                        '(run incomplete).**', ''])
   report = next((r[2] for r in results.values() if r and r[2]), None)
+  if report:   # once, under every table
+    lines += [LEGEND, '']
   return finish(lines + uncovered(selection, report) + [f'_[Reports and logs]({meta["runUrl"]})_'])
 
 
@@ -149,7 +158,8 @@ def main(argv=None):
   ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
   sub = ap.add_subparsers(dest='cmd', required=True)
   r = sub.add_parser('render', help='write the comment body')
-  r.add_argument('--reports', required=True, help="the rig job's run root (<board>/run-*/), which may be missing")
+  r.add_argument('--reports', required=True,
+                 help="the rig job's run root (<board>/<profile>/run-*/), which may be missing")
   r.add_argument('--selection', required=True, help="the select job's hil-selection.json, which may be missing")
   r.add_argument('--head', required=True, help="the PR's head SHA")
   r.add_argument('--tested', required=True, help='the merge commit the rig tested')
@@ -170,7 +180,8 @@ def main(argv=None):
     import agentrc
     core = agentrc.load_file('skills/hil/scripts/hil_report_core.py')
     selection = read_selection(args.selection)
-    results = {b: board_result(core, args.reports, b) for b in (selection or {}).get('boards') or []}
+    results = {(b, p): board_result(core, args.reports, b, p) for b in (selection or {}).get('boards') or []
+               for p in PROFILES}
     Path(args.out).write_text(render(results, selection, meta), encoding='utf-8')
     return 0
   try:
