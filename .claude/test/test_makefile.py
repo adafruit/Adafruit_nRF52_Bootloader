@@ -195,14 +195,15 @@ class Configure(unittest.TestCase):
     self.assertIn('-G "Ninja"', configure_line(make('-n', 'BOARD=pca10056', 'CMAKE_GENERATOR=Ninja', 'configure').stdout))
 
   def build_dir(self, d, recipe):
-    """A build dir whose stub Makefile (the make generator's) runs `recipe` for a and b, then touches built-<goal>
-    for all, its default goal, and flash-uf2, under a no-op cmake on PATH for the configure."""
+    """A build dir whose stub Makefile (the make generator's) touches parsed when read, runs `recipe` for a and b,
+    then touches built-<goal> for all, its default goal, and flash-uf2, under a no-op cmake on PATH for the
+    configure."""
     cmake = Path(d, 'cmake')
     cmake.write_text('#!/bin/sh\nexit 0\n')
     cmake.chmod(0o755)
     Path(d, 'build').mkdir()
-    Path(d, 'build', 'Makefile').write_text(f'all flash-uf2: a b\n\ttouch "{d}/built-$@"\na: OTHER = b\nb: OTHER = a\n'
-                                            f'a b:\n\t{recipe}\n')
+    Path(d, 'build', 'Makefile').write_text(f'$(shell touch "{d}/parsed")\nall flash-uf2: a b\n\ttouch "{d}/built-$@"\n'
+                                            f'a: OTHER = b\nb: OTHER = a\na b:\n\t{recipe}\n')
     return Path(d, 'build')
 
   def built(self, d):
@@ -234,8 +235,10 @@ class Configure(unittest.TestCase):
         self.assertIn(f'touch "{d}/built-a"', p.stdout)
         self.assertIn(f'touch "{d}/built-{goal}"', p.stdout)
         self.assertNotIn('flash-uf2' if goal == 'all' else 'built-all', p.stdout)
+        self.assertTrue(Path(d, 'parsed').exists())
+        Path(d, 'parsed').unlink()
         p = make('-q', 'BOARD=pca10056', f'BUILD={b}', goal, path_prefix=d)
-        self.assertEqual((p.returncode, self.built(d)), (1, []))
+        self.assertEqual((p.returncode, self.built(d), Path(d, 'parsed').exists()), (1, [], False))
     for goal, line in (('all', 'cmake --build "b dir"'), ('flash-uf2', 'cmake --build "b dir" --target flash-uf2')):
       p = make('-n', 'BOARD=pca10056', 'BUILD=b dir', 'CMAKE_GENERATOR=Ninja', goal)
       self.assertEqual(p.returncode, 0, p.stderr)
@@ -254,7 +257,7 @@ class Configure(unittest.TestCase):
     for user in ('.DEFAULT_GOAL := mine\nmine:\n\t@echo MINE\n', 'mine:\n\t@echo MINE\n'):
       with tempfile.TemporaryDirectory() as d, self.subTest(user):
         p = make('BOARD=pca10056', cwd=user_checkout(d, user))
-      self.assertEqual((p.returncode, p.stdout), (0, 'MINE\n'), p.stderr)
+        self.assertEqual((p.returncode, p.stdout), (0, 'MINE\n'), p.stderr)
 
   def test_makefile_user_sets_variables(self):
     with tempfile.TemporaryDirectory() as d:
