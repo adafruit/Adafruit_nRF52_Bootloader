@@ -22,7 +22,10 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[2]
 SD = ROOT / 'lib/softdevice'
 SCRUBBED = ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'MAKELEVEL', 'BOARD', 'BUILD', 'BIN', 'DEBUG',
-            'CFLAGS', 'ASFLAGS', 'LDFLAGS', 'CMAKE_GENERATOR', 'CMAKE_BUILD_TYPE')
+            'CFLAGS', 'ASFLAGS', 'LDFLAGS', 'CMAKE_GENERATOR', 'CMAKE_BUILD_TYPE', 'CMAKE_TOOLCHAIN_FILE', 'CROSS_COMPILE',
+            'NRFUTIL', 'FLASHER', 'PYOCD', 'SERIAL', 'SD_NAME', 'SD_VERSION', 'SD_HEX', 'USE_NFCT', 'SIGNED_FW',
+            'SIGNED_FW_QX', 'SIGNED_FW_QY', 'DUALBANK_FW', 'FORCE_UF2', 'DEFAULT_TO_OTA_DFU', 'ANT_LICENSE_KEY',
+            'TRACE_ETM')
 HAVE_TOOLS = bool(shutil.which('make') and shutil.which('cmake'))
 HAVE_GCC = bool(shutil.which('arm-none-eabi-gcc'))
 SLOW = 'pytest' in sys.modules or os.environ.get('WRAPPER_SLOW_TESTS') == '1'
