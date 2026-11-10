@@ -8,6 +8,7 @@ WRAPPER_SLOW_TESTS=1; pre-commit and CI's `unittest discover` skip it."""
 import os
 import re
 import runpy
+import shlex
 import shutil
 import signal
 import subprocess
@@ -291,7 +292,7 @@ class Configure(unittest.TestCase):
       cmake = Path(d, 'cmake')
       cmake.write_text('#!/bin/sh\nfor a; do printf "ARG[%s]\\n" "$a"; done\n')
       cmake.chmod(0o755)
-      quoted = "'" + str(bin_ / 'python').replace("'", "'\\''") + "'"
+      quoted = shlex.quote(str(bin_ / 'python'))
       p = make('BOARD=pca10056', f'BUILD={d}/b', 'PYTHON=' + quoted.replace('$', '$$'), 'configure', path_prefix=d)
     self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
     self.assertEqual(p.stdout.splitlines()[-1], f'ARG[-DPython_EXECUTABLE={bin_}/python]')
