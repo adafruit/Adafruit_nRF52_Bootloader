@@ -17,6 +17,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SD = ROOT / 'lib/softdevice'
@@ -194,14 +195,18 @@ class Configure(unittest.TestCase):
     self.assertIn('-G "Ninja"', configure_line(make('-n', 'BOARD=pca10056', 'CMAKE_GENERATOR=Ninja', 'configure').stdout))
 
   def build_dir(self, d, recipe):
-    """A build dir whose stub Makefile (the make generator's) runs `recipe` for all and flash-uf2, under a no-op
-    cmake on PATH for the configure."""
+    """A build dir whose stub Makefile (the make generator's) runs `recipe` for a and b, then touches built-<goal>
+    for all, its default goal, and flash-uf2, under a no-op cmake on PATH for the configure."""
     cmake = Path(d, 'cmake')
     cmake.write_text('#!/bin/sh\nexit 0\n')
     cmake.chmod(0o755)
     Path(d, 'build').mkdir()
-    Path(d, 'build', 'Makefile').write_text(f'all flash-uf2: a b\na: OTHER = b\nb: OTHER = a\na b:\n\t{recipe}\n')
+    Path(d, 'build', 'Makefile').write_text(f'all flash-uf2: a b\n\ttouch "{d}/built-$@"\na: OTHER = b\nb: OTHER = a\n'
+                                            f'a b:\n\t{recipe}\n')
     return Path(d, 'build')
+
+  def built(self, d):
+    return sorted(p.name for p in Path(d).glob('built-*'))
 
   def test_build_takes_makes_jobserver(self):
     """The generated build finishes only at -j2 from make's jobserver: its two targets wait for each other. A pipe
@@ -216,21 +221,40 @@ class Configure(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertNotIn('jobserver unavailable', p.stderr)
         self.assertTrue(Path(d, 'a').exists() and Path(d, 'b').exists())
+        self.assertEqual(self.built(d), [f'built-{goal}'])
 
-  def test_dry_run_and_question_never_build(self):
-    """-n prints the generated build's recipes and -q only asks; under Ninja, -n prints cmake --build."""
-    for flag in ('-n', '-q'):
-      for goal in ('all', 'flash-uf2'):
-        with tempfile.TemporaryDirectory() as d, self.subTest(flag=flag, goal=goal):
-          b = self.build_dir(d, f'touch "{d}/built-$@"')
-          p = make(flag, 'BOARD=pca10056', f'BUILD={b}', goal, path_prefix=d)
-          self.assertEqual(list(Path(d).glob('built-*')), [])
-          if flag == '-n':
-            self.assertEqual(p.returncode, 0, p.stderr)
-            self.assertIn(f'touch "{d}/built-a"', p.stdout)
-    p = make('-n', 'BOARD=pca10056', 'BUILD=b dir', 'CMAKE_GENERATOR=Ninja', 'all')
-    self.assertEqual(p.returncode, 0, p.stderr)
+  def test_dry_run_never_builds_and_question_stops_at_configure(self):
+    """-n prints the generated build's recipes for the goal; under Ninja, the cmake --build it would run."""
+    for goal in ('all', 'flash-uf2'):
+      with tempfile.TemporaryDirectory() as d, self.subTest(goal):
+        b = self.build_dir(d, f'touch "{d}/built-$@"')
+        p = make('-n', 'BOARD=pca10056', f'BUILD={b}', goal, path_prefix=d)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertEqual(self.built(d), [])
+        self.assertIn(f'touch "{d}/built-a"', p.stdout)
+        self.assertIn(f'touch "{d}/built-{goal}"', p.stdout)
+        self.assertNotIn('flash-uf2' if goal == 'all' else 'built-all', p.stdout)
+        p = make('-q', 'BOARD=pca10056', f'BUILD={b}', goal, path_prefix=d)
+        self.assertEqual((p.returncode, self.built(d)), (1, []))
+    for goal, line in (('all', 'cmake --build "b dir"'), ('flash-uf2', 'cmake --build "b dir" --target flash-uf2')):
+      p = make('-n', 'BOARD=pca10056', 'BUILD=b dir', 'CMAKE_GENERATOR=Ninja', goal)
+      self.assertEqual(p.returncode, 0, p.stderr)
+      self.assertEqual(p.stdout.splitlines()[-1].strip(), line)
+
+  def test_all_builds_the_default_target_whatever_cmake_target_holds(self):
+    with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'CMAKE_TARGET': 'flash-uf2'}):
+      b = self.build_dir(d, 'true')
+      p = make('BOARD=pca10056', f'BUILD={b}', 'all', path_prefix=d)
+      self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+      self.assertEqual(self.built(d), ['built-all'])
+      p = make('-n', 'BOARD=pca10056', 'BUILD=b dir', 'CMAKE_GENERATOR=Ninja', 'all')
     self.assertEqual(p.stdout.splitlines()[-1].strip(), 'cmake --build "b dir"')
+
+  def test_makefile_user_can_set_the_default_goal(self):
+    for user in ('.DEFAULT_GOAL := mine\nmine:\n\t@echo MINE\n', 'mine:\n\t@echo MINE\n'):
+      with tempfile.TemporaryDirectory() as d, self.subTest(user):
+        p = make('BOARD=pca10056', cwd=user_checkout(d, user))
+      self.assertEqual((p.returncode, p.stdout), (0, 'MINE\n'), p.stderr)
 
   def test_makefile_user_sets_variables(self):
     with tempfile.TemporaryDirectory() as d:

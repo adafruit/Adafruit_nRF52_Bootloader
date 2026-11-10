@@ -115,7 +115,7 @@ SUBMAKE = $(MAKE) --no-print-directory -f $(THIS_MAKEFILE) -f
 .PHONY: all configure clean flash flash-dfu dfu-flash flash-sd sd flash-mbr mbr flash-uf2 erase copy-artifact \
   linkermap gdbflash gdb
 
-.DEFAULT_GOAL := all
+all: configure
 
 configure:
 	@cmake -E rm -f "$(BUILD)/CMakeCache.txt"
@@ -124,15 +124,18 @@ configure:
 clean:
 	@cmake -E rm -rf "$(BUILD)" "$(BIN)"
 
-# each builds only the artifact it uses; flash-uf2 deploys bootloader_mbr.uf2, the same bytes as update-*_nosd.uf2
+# each builds only the artifact it uses, all the build's default target, named differently by generators; flash-uf2
+# deploys bootloader_mbr.uf2, the same bytes as update-*_nosd.uf2
+all: CMAKE_TARGET =
 flash: CMAKE_TARGET = nosd-hex
 flash-dfu: CMAKE_TARGET = dfu-zip
 gdbflash: CMAKE_TARGET = merged-hex
 gdb linkermap: CMAKE_TARGET = bootloader
 flash-uf2: CMAKE_TARGET = flash-uf2
 
-# The make generator's build runs as a sub-make, so make's -j (its pipe jobserver too), -n, -t and -q reach it.
-# cmake --build runs unmarked: -n, -t and -q do not execute it, and Ninja joins -j only through make 4.4's fifo.
+# The make generator's build runs as a sub-make, so make's -j (its pipe jobserver too), -n and -t reach it; -q stops
+# at the phony configure. cmake --build runs unmarked: -n and -t skip it, and only Ninja 1.13+ joins -j, as a client
+# of make 4.4's fifo jobserver.
 ifeq ($(CMAKE_GENERATOR),Unix Makefiles)
 all flash-uf2: configure
 	$(MAKE) --no-print-directory -C "$(BUILD)" $(CMAKE_TARGET)
