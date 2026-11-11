@@ -48,7 +48,7 @@ def render(core, body):
     lines += ['', f'### {cell(r.get("board", "?"))}', '']
     if r.get('detail'):
       lines += [cell(r['detail']), '']
-    if failed := cleanup_failure(r):
+    if failed := cleanup_failure(r) or lock_failure(r, body.get('exitCode')):
       lines += [cell(failed), '']
     if earlier := previous_failure(r):
       lines += [cell(earlier), '']
@@ -74,6 +74,14 @@ def cleanup_failure(row):
   if c.get('pass') is not False:
     return ''
   return f'Cleanup failed ({c.get("state")}): {c.get("lock") or "lock end not reported"}'
+
+
+def lock_failure(row, code):
+  """'' unless the run exited 4 with its cleanup passed: then its lock did not end as its verdict said (describe())."""
+  c = row.get('cleanup') if isinstance(row.get('cleanup'), dict) else {}
+  if code != 4 or c.get('pass') is False:
+    return ''
+  return f'Lock did not end cleanly: {c.get("lock") or "lock end not reported"}'
 
 
 def previous_failure(row):

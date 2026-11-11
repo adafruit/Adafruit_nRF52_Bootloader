@@ -6,6 +6,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -74,6 +75,20 @@ class Render(unittest.TestCase):
     self.assertIn('- `Found an earlier failed cleanup on the board: 2026-11-08T10:00:00+0700 hil_test.py: '
                   'interrupted before cleanup`', text)
     self.assertNotIn('earlier failed cleanup', hc.render(every(('pass', '', report())), SELECTION, META))
+
+  def test_the_markdown_report_names_a_lock_that_did_not_end_cleanly_apart_from_the_restore(self):
+    core = unittest.mock.Mock(table=lambda h, rows, center: '\n'.join(' | '.join(r) for r in rows))
+    lock = 'nrf52840dk: lock released, errors: record not cleared'
+    body = report(exit_code=4)
+    body['results'][0]['cleanup']['lock'] = lock
+    text = hc.run_report.render(core, body)
+    self.assertIn(f'Lock did not end cleanly: {lock}', text)
+    self.assertIn('cleanup | ✅ | fixture running', text)
+    self.assertNotIn('Cleanup failed', text)
+    self.assertNotIn('Lock did not end', hc.run_report.render(core, dict(report(), exitCode=0)))
+    failed = report(False, 'dfu', 4, cleanup=False)
+    self.assertNotIn('Lock did not end', hc.run_report.render(core, failed))
+    self.assertIn('Cleanup failed (unknown)', hc.run_report.render(core, failed))
 
   def test_missing_run_selection_and_no_boards(self):
     self.assertIn('HIL report unavailable for `pca10056`, profile `default`', hc.render({}, SELECTION, META))
