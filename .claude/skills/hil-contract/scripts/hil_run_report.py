@@ -104,7 +104,7 @@ def verdict(code, report, board):
   cleanup = row.get('cleanup') or {}
   if code in (4, None) or row.get('ran') is None or cleanup.get('pass') is False:
     return 'blocker', f'{cleanup_failure(row) or "cleanup failed or no report"}: {row.get("detail")}'[:400]
-  if row.get('occupiedBy') or row.get('recoveryBlocker') and not row.get('locked'):
+  if row.get('occupiedBy'):
     return 'blocker', str(row.get('detail'))
   if row.get('locked'):
     return ('blocker' if row.get('recoveryBlocker') else 'not-run'), f'locked: {row.get("detail")}'

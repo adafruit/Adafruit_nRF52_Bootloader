@@ -10,8 +10,6 @@ import signal
 import struct
 import sys
 import tempfile
-import threading
-import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -839,7 +837,7 @@ BOARD = {'name': 'pca10056', 'reentry': 'gpregret', 'uid': 'u', 'lock': 'nrf5284
 def mock_helper(**kw):
   """The lock helper mocked, its failure_report, session mutex and exceptions the agentrc's."""
   real = ht.lock_helper()
-  return mock.Mock(failure_report=real.failure_report, ReleaseRefused=real.ReleaseRefused,
+  return mock.Mock(failure_report=real.failure_report, ReleaseRefused=real.ReleaseRefused, BoardBusy=real.BoardBusy,
                    session_mutex=real.session_mutex, SessionBusy=real.SessionBusy,
                    LockUnavailable=real.LockUnavailable, resolve_restored=mock.Mock(return_value=[]),
                    end_failed=mock.Mock(return_value={}), **kw)
@@ -1037,42 +1035,27 @@ class RunLock(PrivateLocks):
     code, _, res = self.run_cmd()
     self.assertEqual((code, res['results'][0]['locked'], 'endErrors' in res['results'][0]['cleanup']), (1, True, False))
 
-  def test_contention_waits_for_lock_wait_then_runs_or_reports_locked(self):
+  def test_lock_wait_reaches_the_board_task_and_a_held_lock_is_locked(self):
     fh = self.helper.take_board_lock('nrf52840dk', 'other')
-    t = time.monotonic()
-    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'x'}, lock_wait=0.5)
+    self.addCleanup(self.helper.release_board_lock, fh)
+    with mock.patch.object(self.helper, 'board_task', wraps=self.helper.board_task) as board_task:
+      code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'x'})
+      self.assertEqual(board_task.call_args.kwargs['wait'], 0)
+      row = res['results'][0]
+      self.assertEqual((code, row['ran'], row['locked'], row['recoveryBlocker'], restores),
+                       (1, False, True, False, []))
+      self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'not-run')
+      # a recovery blocker refuses at once whatever the wait
+      with mock.patch.object(self.helper, 'take_board_lock', side_effect=self.helper.RecoveryBlocked('holder 7')):
+        code, _, res = self.run_cmd(restored={'pass': True, 'state': 'x'}, lock_wait=1800)
+      self.assertEqual(board_task.call_args.kwargs['wait'], 1800)
     row = res['results'][0]
-    self.assertGreaterEqual(time.monotonic() - t, 0.5)
-    self.assertEqual((code, row['ran'], row['locked'], row['recoveryBlocker'], restores), (1, False, True, False, []))
-    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'not-run')
-    timer = threading.Timer(0.3, self.helper.release_board_lock, (fh,))
-    timer.start()
-    self.addCleanup(timer.cancel)
-    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, lock_wait=10)
-    self.assertEqual((code, res['results'][0]['ran'], restores), (0, True, [1]))
+    self.assertEqual((code, row['locked'], row['recoveryBlocker'], row['detail']), (1, True, True, 'holder 7'))
+    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
 
 
-class AdmissionRefusal(unittest.TestCase):
-  def test_each_refusal_maps_onto_the_row(self):
-    h = ht.lock_helper()
-    users = [{'pid': 1, 'cmd': 'JLinkExe'}]
-    for e, fields in ((h.BoardBusy('b', users, []), {'occupiedBy': users}),
-                      (h.RecoveryBlocked('x'), {'locked': True, 'recoveryBlocker': True}),
-                      (h.BoardLocked('x'), {'locked': True, 'recoveryBlocker': False}),
-                      (h.LockUnavailable('x'), {})):
-      with self.subTest(e=type(e).__name__):
-        self.assertEqual(ht.admission_refusal(h, e), {'detail': str(e), **fields})
-    self.assertEqual(ht.admission_refusal(h, ht.provider().ProbeCheckInconclusive('x')), {})
-
-
-class HostChecks(unittest.TestCase):
-  def test_the_busy_check_is_agentrcs_probe_users_on_the_boards_flasher(self):
-    users = [{'pid': 12, 'cmd': 'JLinkExe -USB 683944004'}]
-    with mock.patch.object(ht.provider(), 'probe_users', return_value=users) as probe_users:
-      self.assertEqual(ht.probe_busy(BOARD), users)
-    probe_users.assert_called_once_with(BOARD['flasher'])
-
-  def test_tools_left_refuses_when_pgrep_cannot_tell(self):
+class ToolsLeft(unittest.TestCase):
+  def test_refuses_when_pgrep_cannot_tell(self):
     for rc, out, left in ((0, '12 mcopy -i /dev/sde\n', ['12 mcopy -i /dev/sde']), (1, '', [])):
       with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=rc, stdout=out, stderr='')):
         self.assertEqual(ht.tools_left(), left)

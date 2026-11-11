@@ -213,8 +213,8 @@ python3 ~/.claude/skills/hil/scripts/hil_lock.py release nrf52840dk
 (with `recoveryBlocker`), `occupiedBy` (the busy check's users), `detail`, `previousCleanupFailure` and
 `openCleanupFailures` (the board's open failed cleanups the run found, `hil_lock.failure_report`), `firmware` (version,
 record, merged sha256, head), `steps[]` (`step`, `pass`, `detail`, `evidence`, `seconds`) and `cleanup` (`pass`,
-`state`, `receipts`, `released`, `failureLogged` after a failed cleanup, `endErrors` the board task's errors ending the
-lock, `restoredNote` naming failures kept open).
+`state`, `receipts`, `released`, `failureLogged` when the lock's end logged a failed cleanup, `endErrors` the board
+task's errors ending the lock, `restoredNote` naming failures kept open).
 
 Exits: 0 pass and cleaned up; 1 a step failed, the board did not run, or it was locked; 2 refused before any hardware
 access; 4 cleanup failed, logged in the board's cleanup log (`failureLogged`) and the lock released, or the lock did

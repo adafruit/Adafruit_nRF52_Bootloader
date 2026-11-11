@@ -1337,11 +1337,10 @@ def cmd_run(args, argv):
   helper = lock_helper()
   task = helper.board_task(board['lock'], REASON, busy=lambda: probe_busy(board), wait=args.lock_wait,
                            runDir=str(run_dir))
-  code, entered = 1, False
+  code = 1
   try:
     with task:
-      entered = True
-      row['ran'], row['cleanup'] = True, None
+      row['ran'] = True
       try:
         try:
           bat.battery(base)
@@ -1352,19 +1351,19 @@ def cmd_run(args, argv):
         code = 0 if row['pass'] and row['cleanup']['pass'] else 1
       finally:
         row['steps'] = bat.steps
-        if row['cleanup'] is None:   # never restored: an interrupt or an error outside a step
-          row['cleanup'] = ({'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
-                             'receipts': bat.tools.receipts} if bat.touched or bat.tools.receipts
-                            else {'pass': True, 'state': 'untouched'})
+        # touched but never restored (an interrupt or an error outside a step): restore() never says untouched then
+        if row['cleanup']['state'] == 'untouched' and (bat.touched or bat.tools.receipts):
+          row['cleanup'] = {'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
+                            'receipts': bat.tools.receipts}
         give_verdict(task, board, row, bat.tools)
   except BaseException as e:   # a refused admission, or an interrupt or error after the verdict: the run aborted
     row['detail'] = f'{type(e).__name__}: {e}'
-    if entered:
+    if row['ran']:
       row['pass'], code = False, code or 1
     else:
       row.update(admission_refusal(helper, e))
   row.update(helper.failure_report(task.cleanup_failures))
-  if end_task(task, row['cleanup']) and (task.released or not task.ended):   # a lock was taken
+  if end_task(task, row['cleanup']):
     code = 4
   result['pass'] = code == 0
   return finish(code)
@@ -1394,17 +1393,15 @@ def admission_refusal(helper, e):
 
 
 def end_task(task, cleanup):
-  """`cleanup` (the row's) given how the board task ended; True when a run that took the lock must exit 4: its cleanup
-  failed, or its lock did not end as its verdict (or its refusal) said."""
+  """`cleanup` (the row's) given how the board task ended; True when the run must exit 4: its cleanup failed, or the
+  lock it took did not end as its verdict (or its refusal) said."""
   cleanup['released'] = task.released
   if task.errors:
     cleanup['endErrors'] = task.errors
+  if task.failure_logged is not None:
+    cleanup['failureLogged'] = task.failure_logged
   note(cleanup, 'restoredNote', '; '.join(task.restore_notes))
-  if not cleanup['pass']:
-    cleanup['failureLogged'] = not any(e.startswith(('cleanup log not written', 'end_failed')) for e in task.errors)
-    return True
-  # an interrupt hold that could not be set up, or restorations not logged (failures kept open), change no outcome
-  return not task.released or any(not e.startswith(('interrupt hold', 'restoration')) for e in task.errors)
+  return not cleanup['pass'] or (task.taken and not task.ended_cleanly)
 
 
 def cmd_manual(args, argv):
@@ -1438,8 +1435,8 @@ def cmd_manual(args, argv):
       print(json.dumps({'pass': False, 'error': str(e)}))
       return 2
     if users:
-      print(json.dumps({'pass': False, 'error': f'board busy: {board["lock"]} in use by {users}', 'occupiedBy': users,
-                        **helper.failure_report(found)}))
+      print(json.dumps({'pass': False, 'error': str(helper.BoardBusy(board['lock'], users, found)),
+                        'occupiedBy': users, **helper.failure_report(found)}))
       return 2
     return manual_session(args, board, holder, found, bat)
 
