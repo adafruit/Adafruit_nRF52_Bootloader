@@ -919,7 +919,7 @@ class RunLock(PrivateLocks):
     (event,) = self.new_events()
     self.assertEqual((event['event'], event['failure'], event['evidence']),
                      ('restored', self.previous['id'], 'pca10056: fixture running'))
-    self.assertEqual((row['cleanup']['released'], 'endErrors' in row['cleanup']), (True, False))
+    self.assertEqual((row['cleanup']['released'], row['cleanup']['lock']), (True, 'nrf52840dk: lock released'))
     self.assertTrue(self.lock_is_free())
 
   def test_a_failed_step_whose_restore_passed_is_restored_and_fails(self):
@@ -939,7 +939,8 @@ class RunLock(PrivateLocks):
                      ('dfu: no drive', True, True))
     self.assertEqual(len(self.helper.open_cleanup_failures('nrf52840dk')), 2)
     self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
-    self.assertIn("logged in the board's cleanup log; lock released", rr.verdict(code, res, 'pca10056')[1])
+    self.assertIn('Cleanup failed (unknown): nrf52840dk: lock released, failure logged in',
+                  rr.verdict(code, res, 'pca10056')[1])
     self.assertTrue(self.lock_is_free())
 
   def test_an_error_or_interrupt_after_touching_skips_the_restore_and_logs(self):
@@ -976,8 +977,8 @@ class RunLock(PrivateLocks):
       code, _, res = self.run_cmd(OSError('boom'))
     cleanup = res['results'][0]['cleanup']
     self.assertEqual((code, cleanup['failureLogged'], cleanup['released']), (4, False, True))
-    self.assertTrue(cleanup['endErrors'][0].startswith('cleanup log not written'))
-    self.assertIn('NOT logged', rr.verdict(code, res, 'pca10056')[1])
+    self.assertIn('errors: cleanup log not written', cleanup['lock'])
+    self.assertIn('failure NOT logged', rr.verdict(code, res, 'pca10056')[1])
     code, _, _ = self.run_cmd(dfu_fails, {'pass': False, 'state': 'unknown', 'detail': 'restore: no drive'})
     self.assertEqual((code, len(self.helper.open_cleanup_failures('nrf52840dk'))), (4, 2))
     with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
@@ -1028,12 +1029,14 @@ class RunLock(PrivateLocks):
     with mock.patch.object(self.helper, 'clear_record', return_value=False):
       code, restores, res = self.run_cmd(busy=ht.provider().ProbeCheckInconclusive('/proc may hide others'))
     row = res['results'][0]
-    self.assertEqual((code, row['ran'], restores, row['cleanup']['endErrors']), (4, False, [], ['record not cleared']))
+    self.assertEqual((code, row['ran'], restores), (4, False, []))
+    self.assertTrue(row['cleanup']['lock'].endswith('errors: record not cleared'))
     self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
     fh = self.helper.take_board_lock('nrf52840dk', 'other')   # a lock never taken ends nothing: still exit 1
     self.addCleanup(self.helper.release_board_lock, fh)
     code, _, res = self.run_cmd()
-    self.assertEqual((code, res['results'][0]['locked'], 'endErrors' in res['results'][0]['cleanup']), (1, True, False))
+    self.assertEqual((code, res['results'][0]['locked'], res['results'][0]['cleanup']['lock']),
+                     (1, True, 'nrf52840dk: lock not taken'))
 
   def test_lock_wait_reaches_the_board_task_and_a_held_lock_is_locked(self):
     fh = self.helper.take_board_lock('nrf52840dk', 'other')
@@ -1216,10 +1219,11 @@ class Verdict(unittest.TestCase):
 
   def test_render_names_a_failed_cleanup_and_an_earlier_one(self):
     core = mock.Mock(table=lambda h, rows, center: '')
-    body = self.row(cleanup={'pass': False, 'state': 'unknown', 'failureLogged': True, 'released': True},
+    body = self.row(cleanup={'pass': False, 'state': 'unknown', 'failureLogged': True, 'released': True,
+                             'lock': 'nrf52840dk: lock released, failure logged in x.cleanup.jsonl'},
                     previousCleanupFailure=PREVIOUS, openCleanupFailures=2)
     text = rr.render(core, {'pass': False, **body})
-    self.assertIn("Cleanup failed (unknown): logged in the board's cleanup log; lock released", text)
+    self.assertIn('Cleanup failed (unknown): nrf52840dk: lock released, failure logged in x.cleanup.jsonl', text)
     self.assertIn('earlier failed cleanup on the board (2 open): 2026-11-08T10:00:00+0700 hil_test.py: earlier run',
                   text)
 

@@ -1395,13 +1395,11 @@ def admission_refusal(helper, e):
 def end_task(task, cleanup):
   """`cleanup` (the row's) given how the board task ended; True when the run must exit 4: its cleanup failed, or the
   lock it took did not end as its verdict (or its refusal) said."""
-  cleanup['released'] = task.released
-  if task.errors:
-    cleanup['endErrors'] = task.errors
+  cleanup['released'], cleanup['lock'] = task.released, task.describe()
   if task.failure_logged is not None:
     cleanup['failureLogged'] = task.failure_logged
   note(cleanup, 'restoredNote', '; '.join(task.restore_notes))
-  return not cleanup['pass'] or (task.taken and not task.ended_cleanly)
+  return not cleanup['pass'] or not task.ended_cleanly
 
 
 def cmd_manual(args, argv):

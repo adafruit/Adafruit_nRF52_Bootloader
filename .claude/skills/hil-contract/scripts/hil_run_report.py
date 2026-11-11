@@ -69,13 +69,11 @@ def exit_of(body):
 
 
 def cleanup_failure(row):
-  """'' unless the row's cleanup failed: then whether the board's cleanup log took it and that the lock was released."""
+  """'' unless the row's cleanup failed: then how its lock ended (the board task's describe())."""
   c = row.get('cleanup') if isinstance(row.get('cleanup'), dict) else {}
   if c.get('pass') is not False:
     return ''
-  logged = ("logged in the board's cleanup log" if c.get('failureLogged') else
-            f"NOT logged in the board's cleanup log ({'; '.join(map(str, c.get('endErrors') or ['no record']))})")
-  return f'Cleanup failed ({c.get("state")}): {logged}; lock {"released" if c.get("released") else "not released"}'
+  return f'Cleanup failed ({c.get("state")}): {c.get("lock") or "lock end not reported"}'
 
 
 def previous_failure(row):
@@ -103,7 +101,8 @@ def verdict(code, report, board):
     return 'blocker', f'report has no row for {board} (exit {code}): {report.get("caveat") or report.get("error")}'
   cleanup = row.get('cleanup') or {}
   if code in (4, None) or row.get('ran') is None or cleanup.get('pass') is False:
-    return 'blocker', f'{cleanup_failure(row) or "cleanup failed or no report"}: {row.get("detail")}'[:400]
+    why = cleanup_failure(row) or cleanup.get('lock') or 'cleanup failed or no report'
+    return 'blocker', f'{why}: {row.get("detail")}'[:400]
   if row.get('occupiedBy'):
     return 'blocker', str(row.get('detail'))
   if row.get('locked'):

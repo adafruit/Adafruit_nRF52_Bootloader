@@ -31,7 +31,9 @@ def report(passed=True, failed_step=None, exit_code=0, cleanup=True, profile='de
   row = {'board': 'pca10056', 'ran': True, 'pass': passed, 'steps': steps, 'detail': None if passed else
          f'{failed_step}: no drive', 'firmware': {'version': '0.11.0'},
          'cleanup': {'pass': cleanup, 'state': 'fixture running' if cleanup else 'unknown', 'released': True,
-                     **({} if cleanup else {'failureLogged': True})}, **extra}
+                     **({} if cleanup else {'failureLogged': True,
+                                            'lock': 'nrf52840dk: lock released, failure logged in x.cleanup.jsonl'})},
+         **extra}
   return {'pass': passed, 'exitCode': exit_code, 'results': [row], 'uncovered': ['BLE OTA DFU']}
 
 
@@ -68,7 +70,7 @@ class Render(unittest.TestCase):
     verdict, detail = hc.run_report.verdict(4, body, 'pca10056')
     self.assertEqual(verdict, 'blocker')
     text = hc.render(every((verdict, detail, body)), SELECTION, META)
-    self.assertIn("Cleanup failed (unknown): logged in the board's cleanup log; lock released", text)
+    self.assertIn('Cleanup failed (unknown): nrf52840dk: lock released, failure logged in x.cleanup.jsonl', text)
     self.assertIn('- `Found an earlier failed cleanup on the board: 2026-11-08T10:00:00+0700 hil_test.py: '
                   'interrupted before cleanup`', text)
     self.assertNotIn('earlier failed cleanup', hc.render(every(('pass', '', report())), SELECTION, META))
