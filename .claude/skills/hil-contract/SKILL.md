@@ -175,10 +175,13 @@ shared run rules. Runs are never cancelled: a newer push waits.
   killed (its record found left, with its `runDir`) an operation in that run dir's `ops` (`hil_process.recheck_dir`);
   and, needing no lock record or cleanup log (a killed `install` or `restore`, a failure that could not be logged),
   each `mcopy`, `adafruit-nrfutil dfu serial` or `hil_test.py fat-read|flush` on the host whose device (`-i`, `-p`,
-  `--dev`) belongs to a USB device with the board's serial (`dut_tools`); it cannot tell, and refuses, when such a
-  tool names no device or its device is gone or its serial unreadable. The check is a limited snapshot (its
-  docstring): a GDB client attached to a server, a tool whose device node was reused by another device, and a child
-  that opens the probe or the drive after the check are not seen.
+  `--dev`, a relative one under the tool's cwd; naming none, each node it holds open) is a node of the USB device with
+  the board's serial (`dut_tools`). A tool on a node gone, of no USB device or of one with no or another serial is
+  not the board's, so another project's tools on a shared host do not refuse. It cannot tell, and refuses, when a
+  tool's device or a device-less tool's fds cannot be read, or its device's USB serial cannot be read while the board
+  is not seen at another port (it is one USB device), or the scan does not finish in `DUT_SCAN_BOUND` s. The check is
+  a limited snapshot (its docstring): a GDB client attached to a server, a tool whose device node was reused by
+  another device, and a child that opens the probe or the drive after the check are not seen.
 - The lock ends on the run's cleanup verdict, failed before restored before clean. A cleanup that failed or was never
   proven (a failed restore, a tool not proven ended, an interrupt or an error outside a step once the board was
   touched) is logged in the board's cleanup log by `end_failed` with the receipts of tools not proven ended (exit 4).

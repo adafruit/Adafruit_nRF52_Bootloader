@@ -71,6 +71,7 @@ SETTLE = 1.0                 # s after a tool exits for its descendants to be pr
 SYS_DEV = '/sys/dev'          # {block,char}/MAJ:MIN: a device node's sysfs device
 # the DUT-side tools a run or manual command starts, each with the options naming its drive or tty
 DUT_TOOLS = {'mcopy': ('-i',), 'adafruit-nrfutil': ('-p', '--port'), 'hil_test.py': ('--dev',)}
+DUT_SCAN_BOUND = 20.0         # s for dut_tools' scan and pgrep: a cmdline read takes the target's mm lock, can block
 UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] MBR parameter page
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
@@ -1257,9 +1258,12 @@ def prove_cleanup_holder(board, pid):
 
 def tools_left():
   """Every JLinkExe, mcopy, adafruit-nrfutil and hil_test.py child on the host (recovery's host-wide check); Refused
-  when pgrep cannot tell."""
-  p = subprocess.run(['pgrep', '-af', r'JLinkExe|mcopy|adafruit-nrfutil|hil_test\.py (fat-read|flush)'],
-                     capture_output=True, text=True)
+  when pgrep cannot tell, or does not finish in DUT_SCAN_BOUND s."""
+  try:
+    p = subprocess.run(['pgrep', '-af', r'JLinkExe|mcopy|adafruit-nrfutil|hil_test\.py (fat-read|flush)'],
+                       capture_output=True, text=True, timeout=DUT_SCAN_BOUND)
+  except subprocess.TimeoutExpired as e:
+    raise Refused(f'tools of an earlier run: pgrep did not finish in {DUT_SCAN_BOUND} s') from e
   if p.returncode not in (0, 1):   # pgrep(1): 1 none matched, 2 syntax error, 3 fatal error
     raise Refused(f'tools of an earlier run: pgrep exited {p.returncode}: {p.stderr.strip()[:200]}')
   return [l for l in p.stdout.splitlines() if l.split(maxsplit=1)[0] != str(os.getpid())]
@@ -1271,60 +1275,109 @@ def probe_busy(board):
   return provider().probe_users(board['flasher'])
 
 
+_dut_scan = []   # the last dut_tools scan's thread: while it is blocked no other starts
+
+
 def dut_tools(board):
   """The busy check's view of DUT-side tools, which needs no lock record or cleanup log naming them (a killed
-  command's, or a run's whose failure could not be logged): [{'pid', 'cmd'}] for each process tools_left shows whose
-  command line runs mcopy, adafruit-nrfutil or hil_test.py fat-read or flush on a device of a USB device with the
-  board's serial, whoever started it. Refused when it cannot tell: tools_left cannot, or a command line cannot be
-  read, or such a tool's device cannot be resolved (dut_device)."""
+  command's, or a run's whose failure could not be logged): [{'pid', 'cmd'}] for each process tools_left shows that
+  runs mcopy, adafruit-nrfutil or hil_test.py fat-read or flush on a node of the board's USB device (dut_nodes,
+  on_board), whoever started it. Refused when it cannot tell: tools_left cannot, a command line cannot be read, or
+  dut_nodes or on_board cannot tell; also when the scan does not finish in DUT_SCAN_BOUND s or an earlier one is still
+  blocked, bounded as agentrc's probe_users bounds its /proc walk."""
+  users = process()._bounded(lambda: _dut_users(board['uid']), DUT_SCAN_BOUND, _dut_scan, reraise=True)
+  if users is None:
+    raise Refused(f'DUT-side tools: the scan did not finish in {DUT_SCAN_BOUND} s, or an earlier one is still blocked')
+  return users
+
+
+def _dut_users(uid):
   users = []
   for line in tools_left():
     pid = int(line.split(maxsplit=1)[0])
     try:
-      argv = [a.decode(errors='replace') for a in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')[:-1]]
+      argv = cmdline(pid)
     except (FileNotFoundError, ProcessLookupError):
       continue   # it ended
     except OSError as e:
       raise Refused(f'DUT-side tools: pid {pid}: {e}') from e
-    if (serial := dut_device(argv)) and serial.lower() == board['uid'].lower():
+    if any(on_board(st, uid) for st in dut_nodes(argv, pid)):
       users.append({'pid': pid, 'cmd': ' '.join(argv)})
   return users
 
 
-def dut_device(argv):
-  """The USB serial of the device a DUT-side tool's `argv` names (DUT_TOOLS, run directly or as a Python script); ''
-  when argv is no such tool, adafruit-nrfutil without `serial` (genpkg), or its device is a file or not on USB.
-  Refused when it cannot tell: a tool naming no device, a device gone, or a serial that cannot be read."""
-  prog = argv
-  if argv and os.path.basename(argv[0]).startswith('python'):
-    prog = provider()._python_program(argv) or []   # the script or module a Python interpreter runs, and its args
-  name, args = (os.path.basename(prog[0]), prog[1:]) if prog else ('', [])
+def cmdline(pid):
+  return [a.decode(errors='replace') for a in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')[:-1]]
+
+
+def dut_nodes(argv, pid=None):
+  """The device nodes (os.stat results) a DUT-side tool (DUT_TOOLS, run directly or as a Python script) running `argv`
+  as process `pid` works on: the one its option names, a relative one under the process's cwd; naming none (mcopy's
+  drive from its mtools config), each node the process holds open. Empty when argv is no such tool or adafruit-nrfutil
+  without `serial` (genpkg), or its device is a file or gone: a node gone cannot reach the board's current device.
+  Refused when it cannot tell: the device or the fds cannot be read, or the tool names no device and `pid` is None."""
+  name, *args = provider()._program(argv)
   if name not in DUT_TOOLS or name == 'hil_test.py' and args[:1] not in (['fat-read'], ['flush']) \
      or name == 'adafruit-nrfutil' and 'serial' not in args:
-    return ''
+    return []
   opts = DUT_TOOLS[name]
   dev = next((v for a, v in zip(args, args[1:]) if a in opts), None) or \
     next((a.partition('=')[2] for a in args if a.partition('=')[0] in opts), None)
   if not dev:
-    raise Refused(f'DUT-side tool names no device: {" ".join(argv)}')
+    if pid is None:
+      raise Refused(f'DUT-side tool names no device: {" ".join(argv)}')
+    return held_nodes(pid, argv)
   try:
-    st = os.stat(dev)
+    st = os.stat(os.path.join('' if pid is None else f'/proc/{pid}/cwd', dev))
+  except (FileNotFoundError, NotADirectoryError, ProcessLookupError):
+    return []
   except OSError as e:
-    raise Refused(f'DUT-side tool on a device gone: {" ".join(argv)}: {e}') from e
-  kind = 'block' if stat.S_ISBLK(st.st_mode) else 'char' if stat.S_ISCHR(st.st_mode) else None
-  if kind is None:
-    return ''   # an image file (mcopy -i)
-  sysdev = f'{SYS_DEV}/{kind}/{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
-  if not os.path.exists(sysdev):
-    raise Refused(f'DUT-side tool on {dev}: no {sysdev}')
-  d = os.path.realpath(sysdev)
+    raise Refused(f'DUT-side tool on {dev}: {e}: {" ".join(argv)}') from e
+  return [st] if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) else []
+
+
+def held_nodes(pid, argv):
+  """The device nodes the process `pid` holds open; Refused when its fds cannot be read (another uid's)."""
+  fds = f'/proc/{pid}/fd'
+  try:
+    names = os.listdir(fds)
+  except (FileNotFoundError, ProcessLookupError):
+    return []   # it ended
+  except OSError as e:
+    raise Refused(f'DUT-side tool names no device and its fds cannot be read: {e}: {" ".join(argv)}') from e
+  nodes = []
+  for fd in names:
+    try:
+      st = os.stat(f'{fds}/{fd}')
+    except (FileNotFoundError, ProcessLookupError):
+      continue
+    except OSError as e:
+      raise Refused(f'DUT-side tool names no device and its fd {fd} cannot be read: {e}: {" ".join(argv)}') from e
+    if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode):
+      nodes.append(st)
+  return nodes
+
+
+def on_board(st, uid):
+  """Whether the block or char device node `st` (os.stat) is the board's: a node under the USB device whose serial is
+  `uid` (case aside). A node of no registered device, of no USB device or of one without a serial is not. Refused when
+  its USB device's serial cannot be read and no device with `uid` is enumerated at another port: the board is one USB
+  device (the nRF52840's USBD), so while it is seen elsewhere the unreadable one is not it; otherwise it may be."""
+  kind = 'block' if stat.S_ISBLK(st.st_mode) else 'char'
+  d = os.path.realpath(f'{SYS_DEV}/{kind}/{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}')
+  if not os.path.exists(d):
+    return False
   while d != os.path.dirname(d) and not usb().BUSPORT_RE.match(os.path.basename(d)):
     d = os.path.dirname(d)
-  if d == os.path.dirname(d):
-    return ''   # not a USB device's
-  if (serial := usb().read_sysfs(os.path.join(d, 'serial'))) is None:
-    raise Refused(f'DUT-side tool on {dev}: the serial of USB device {os.path.basename(d)} cannot be read')
-  return serial
+  attr = os.path.join(d, 'serial')
+  if d == os.path.dirname(d) or not os.path.lexists(attr):
+    return False
+  if (serial := usb().read_sysfs(attr)) is not None:
+    return serial.lower() == uid.lower()
+  port = os.path.basename(d)
+  if any(dev['busport'] != port for dev in usb().usb_scan(serial=uid)):
+    return False
+  raise Refused(f'DUT-side tool on a node of USB device {port}, whose serial cannot be read and which may be the board')
 
 
 def earlier_runs(failures):

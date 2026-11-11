@@ -14,6 +14,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -874,7 +875,7 @@ class FakeOp:
 
 
 def board_device(test, serial='u'):
-  """/dev/null planted in a private sysfs (ht.SYS_DEV) as the tty of a USB device with `serial` (None: unreadable),
+  """/dev/null planted in a private sysfs (ht.SYS_DEV) as the tty of a USB device with `serial` (None: it has none),
   BOARD's by default: the device a DUT-side tool names, as dut_tools resolves it."""
   tmp = tempfile.mkdtemp()
   test.addCleanup(shutil.rmtree, tmp)
@@ -1222,50 +1223,115 @@ class RunLock(PrivateLocks):
 class ToolsLeft(unittest.TestCase):
   def test_refuses_when_pgrep_cannot_tell(self):
     for rc, out, left in ((0, '12 mcopy -i /dev/sde\n', ['12 mcopy -i /dev/sde']), (1, '', [])):
-      with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=rc, stdout=out, stderr='')):
+      with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=rc, stdout=out, stderr='')) as run:
         self.assertEqual(ht.tools_left(), left)
+      self.assertEqual(run.call_args.kwargs['timeout'], ht.DUT_SCAN_BOUND)
     for rc in (2, 3):
       with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=rc, stdout='', stderr='x')), \
            self.assertRaisesRegex(ht.Refused, f'pgrep exited {rc}'):
         ht.tools_left()
+    with mock.patch.object(ht.subprocess, 'run', side_effect=subprocess.TimeoutExpired('pgrep', 20)), \
+         self.assertRaisesRegex(ht.Refused, 'pgrep did not finish'):
+      ht.tools_left()
+
+
+def on_board(argv, uid='u', pid=None):
+  return any(ht.on_board(st, uid) for st in ht.dut_nodes(argv, pid))
+
+
+def running(test, argv, **kw):
+  """`argv` running until the test ends, its stdio pipes (not /dev/null, which board_device plants as the board's)."""
+  pipes = {'stdin': subprocess.PIPE, 'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
+  tool = subprocess.Popen(argv, **{**pipes, **kw})
+  test.addCleanup(lambda: tool.kill() or tool.communicate())
+  return tool
 
 
 class DutTools(unittest.TestCase):
-  """dut_tools and dut_device over a planted sysfs: which processes are DUT-side tools on the board's devices, and
-  when the check cannot tell."""
-  def test_a_tool_on_a_usb_device_gives_its_serial_anything_else_none(self):
+  """dut_tools, dut_nodes and on_board over a planted sysfs: which processes are DUT-side tools on the board's
+  devices, and when the check cannot tell."""
+  def test_a_tool_on_a_node_of_the_boards_usb_device_is_on_it_anything_else_not(self):
     dev = board_device(self, 'U')
     rdev = os.stat('/dev/zero').st_rdev   # a device of no USB device
     Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
     with tempfile.NamedTemporaryFile() as image:
-      for argv, serial in ((['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2'], 'U'),
-                           (['/venv/bin/python3', '/venv/bin/adafruit-nrfutil', '--verbose', 'dfu', 'serial',
-                             '--package', 'p.zip', '-p', dev, '-b', '115200'], 'U'),
-                           ([sys.executable, '-B', '/x/hil_test.py', 'fat-read', '--dev', dev, '--file', 'A'], 'U'),
-                           (['python3', '/x/hil_test.py', 'flush', f'--dev={dev}'], 'U'),
-                           (['mcopy', '-i', '/dev/zero', 'f', '::X'], ''),
-                           (['mcopy', '-i', image.name, 'f', '::X'], ''),
-                           (['adafruit-nrfutil', 'dfu', 'genpkg', '--application', 'a.bin', 'p.zip'], ''),
-                           (['python3', '/x/hil_test.py', 'restore', '-b', 'pca10056'], ''),
-                           (['python3', '-I', '/x/hil_process.py', '--supervise', '{"cmd": ["mcopy", "-i"]}'], ''),
-                           (['python3', '-c', 'mcopy'], ''), (['JLinkExe', '-USB', '1'], ''), (['less', 'mcopy'], '')):
+      for argv, on in ((['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2'], True),
+                       (['/venv/bin/python3', '/venv/bin/adafruit-nrfutil', '--verbose', 'dfu', 'serial',
+                         '--package', 'p.zip', '-p', dev, '-b', '115200'], True),
+                       ([sys.executable, '-B', '/x/hil_test.py', 'fat-read', '--dev', dev, '--file', 'A'], True),
+                       (['python3', '/x/hil_test.py', 'flush', f'--dev={dev}'], True),
+                       (['mcopy', '-i', '/dev/zero', 'f', '::X'], False),
+                       (['mcopy', '-i', image.name, 'f', '::X'], False),
+                       (['adafruit-nrfutil', 'dfu', 'genpkg', '--application', 'a.bin', 'p.zip'], False),
+                       (['python3', '/x/hil_test.py', 'restore', '-b', 'pca10056'], False),
+                       (['python3', '-I', '/x/hil_process.py', '--supervise', '{"cmd": ["mcopy", "-i"]}'], False),
+                       (['python3', '-c', 'mcopy'], False), (['JLinkExe', '-USB', '1'], False),
+                       (['less', 'mcopy'], False)):
         with self.subTest(argv=argv):
-          self.assertEqual(ht.dut_device(argv), serial)
+          self.assertEqual(on_board(argv), on)
 
   def mkdir(self, rel):
     d = Path(ht.SYS_DEV).parent / rel
     d.mkdir(parents=True)
     return d
 
+  def test_a_tool_that_cannot_be_on_the_board_is_no_user(self):
+    """Another project's tools on a shared host: on a node gone (a drive leaving), of no USB device, of a USB device
+    without a serial or with another serial, or naming none and holding none of the board's nodes."""
+    board_device(self, 'u')
+    rdev = os.stat('/dev/zero').st_rdev
+    Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
+    mcopy, script = fake_tool(self, 'mcopy'), fake_tool(self, 'hil_test.py')
+    tools = [running(self, [mcopy, '-o', '-i', '/dev/sdzz', 'copy.uf2', '::APP.UF2']),
+             running(self, [sys.executable, '-B', script, 'flush', '--dev', '/dev/sdzz']),
+             running(self, [mcopy, '-i', '/dev/zero', 'f', '::X']),
+             running(self, [mcopy, 'x.uf2', 'a:'])]
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{t.pid} mcopy' for t in tools]):   # not the host's
+      self.assertEqual(ht.dut_tools(BOARD), [])
+    serialless = board_device(self, None)
+    tool = running(self, [mcopy, '-i', serialless, 'f', '::X'])
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{tool.pid} mcopy']):
+      self.assertEqual(ht.dut_tools(BOARD), [])
+
+  def test_a_tool_on_the_boards_node_by_a_relative_path_or_an_open_fd_is_a_user(self):
+    dev, mcopy = board_device(self), fake_tool(self, 'mcopy')
+    relative = running(self, [mcopy, '-i', os.path.basename(dev), 'f', '::X'], cwd=os.path.dirname(dev))
+    with open(dev, 'rb') as node:
+      holding = running(self, [mcopy, 'x.uf2', 'a:'], stdin=node)
+    tools = [relative, holding]
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{t.pid} mcopy' for t in tools]):
+      self.assertEqual([u['pid'] for u in ht.dut_tools(BOARD)], [t.pid for t in tools])
+
   def test_refuses_when_it_cannot_tell(self):
-    board_device(self, None)
-    for argv, why in ((['mcopy', 'copy.uf2', 'a:'], 'names no device'),
-                      (['python3', '/x/hil_test.py', 'flush'], 'names no device'),
-                      (['mcopy', '-i', '/nonexistent/sdz', 'f', '::X'], 'device gone'),
-                      (['mcopy', '-i', '/dev/zero', 'f', '::X'], 'no .*/char/'),
-                      (['mcopy', '-i', '/dev/null', 'f', '::X'], 'serial of USB device 1-9 cannot be read')):
-      with self.subTest(argv=argv), self.assertRaisesRegex(ht.Refused, why):
-        ht.dut_device(argv)
+    board_device(self)
+    unreadable = mock.patch.object(ht.usb(), 'read_sysfs', return_value=None)
+    unreadable.start()
+    self.addCleanup(unreadable.stop)
+    for argv, board_at, why in ((['mcopy', 'copy.uf2', 'a:'], [], 'names no device'),
+                                (['mcopy', '-i', '/dev/null', 'f', '::X'], [],
+                                 'USB device 1-9, whose serial cannot be read'),
+                                (['mcopy', '-i', '/dev/null', 'f', '::X'], [{'busport': '1-9'}],
+                                 'USB device 1-9, whose serial cannot be read')):
+      with self.subTest(argv=argv, board_at=board_at), self.assertRaisesRegex(ht.Refused, why), \
+           mock.patch.object(ht.usb(), 'usb_scan', return_value=board_at):
+        on_board(argv)
+    # the board seen at another port: the unreadable device is not it
+    with mock.patch.object(ht.usb(), 'usb_scan', return_value=[{'busport': '1-3'}]) as found:
+      self.assertFalse(on_board(['mcopy', '-i', '/dev/null', 'f', '::X']))
+    self.assertEqual(found.call_args.kwargs, {'serial': 'u'})
+    loop = Path(ht.SYS_DEV).parent / 'loop'   # a device that is not gone yet cannot be read
+    loop.symlink_to(loop)
+    with self.assertRaisesRegex(ht.Refused, 'Too many levels of symbolic links'):
+      ht.dut_nodes(['mcopy', '-i', str(loop), 'f', '::X'])
+    listdir = os.listdir
+
+    def other_uids(path):
+      if str(path).startswith('/proc/'):
+        raise PermissionError(13, 'Permission denied', path)
+      return listdir(path)
+    with mock.patch.object(ht.os, 'listdir', other_uids), \
+         self.assertRaisesRegex(ht.Refused, 'names no device and its fds cannot be read'):
+      ht.dut_nodes(['mcopy', 'x.uf2', 'a:'], os.getpid())
 
   def test_only_a_tool_on_the_boards_serial_is_a_user(self):
     tool = subprocess.Popen([fake_tool(self, 'mcopy'), '-o', '-i', '/dev/null', 'copy.uf2', '::APP.UF2'])
@@ -1281,6 +1347,27 @@ class DutTools(unittest.TestCase):
     with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=3, stdout='', stderr='x')), \
          self.assertRaisesRegex(ht.Refused, 'pgrep exited 3'):
       ht.dut_tools(BOARD)
+
+  def test_a_scan_that_does_not_finish_refuses_and_the_next_while_it_is_blocked(self):
+    """pgrep or a command line read blocked (the target's mm lock) is 'cannot tell', like probe_users' bound."""
+    stuck = threading.Event()
+    self.addCleanup(stuck.set)
+
+    def block(*_):
+      stuck.wait(30)
+      return []
+    for what, patch in (('pgrep', mock.patch.object(ht, 'tools_left', block)),
+                        ('cmdline', mock.patch.object(ht, 'cmdline', block))):
+      with self.subTest(what), patch, mock.patch.object(ht, 'tools_left', return_value=['1 mcopy']) \
+           if what == 'cmdline' else contextlib.nullcontext(), mock.patch.object(ht, 'DUT_SCAN_BOUND', 0.2), \
+           mock.patch.object(ht, '_dut_scan', []):
+        stuck.clear()
+        for _ in range(2):
+          with self.assertRaisesRegex(ht.Refused, 'did not finish in 0.2 s, or an earlier one is still blocked'):
+            ht.dut_tools(BOARD)
+        (scan,) = ht._dut_scan
+        stuck.set()
+        self.assertTrue(scan.finished.wait(5))
 
 
 class Manual(PrivateLocks):
