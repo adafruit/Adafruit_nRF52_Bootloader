@@ -172,9 +172,13 @@ shared run rules. Runs are never cancelled: a newer push waits.
   (`ProbeCheckInconclusive`, e.g. a J-Link tool of another user that selects no other probe); either refusal releases
   the lock with nothing logged and is never waited out. It also names, in `occupiedBy`, each tool of an earlier run
   still running (`earlier_runs`): a receipt of an open failed cleanup that rechecks `pending`, and for a run that was
-  killed (its record found left, with its `runDir`) an operation in that run dir's `ops` (`hil_process.recheck_dir`).
-  The check is a limited snapshot (its docstring): `adafruit-nrfutil` or `mcopy` of no run on the board's CDC port or
-  drive, a GDB client attached to a server, and a child that opens the probe after the check are not seen.
+  killed (its record found left, with its `runDir`) an operation in that run dir's `ops` (`hil_process.recheck_dir`);
+  and, needing no lock record or cleanup log (a killed `install` or `restore`, a failure that could not be logged),
+  each `mcopy`, `adafruit-nrfutil dfu serial` or `hil_test.py fat-read|flush` on the host whose device (`-i`, `-p`,
+  `--dev`) belongs to a USB device with the board's serial (`dut_tools`); it cannot tell, and refuses, when such a
+  tool names no device or its device is gone or its serial unreadable. The check is a limited snapshot (its
+  docstring): a GDB client attached to a server, a tool whose device node was reused by another device, and a child
+  that opens the probe or the drive after the check are not seen.
 - The lock ends on the run's cleanup verdict, failed before restored before clean. A cleanup that failed or was never
   proven (a failed restore, a tool not proven ended, an interrupt or an error outside a step once the board was
   touched) is logged in the board's cleanup log by `end_failed` with the receipts of tools not proven ended (exit 4).

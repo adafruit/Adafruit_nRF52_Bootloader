@@ -8,10 +8,13 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import signal
 import struct
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -870,6 +873,71 @@ class FakeOp:
       self.fd = None
 
 
+def board_device(test, serial='u'):
+  """/dev/null planted in a private sysfs (ht.SYS_DEV) as the tty of a USB device with `serial` (None: unreadable),
+  BOARD's by default: the device a DUT-side tool names, as dut_tools resolves it."""
+  tmp = tempfile.mkdtemp()
+  test.addCleanup(shutil.rmtree, tmp)
+  usb = Path(tmp, 'devices/usb1/1-9')
+  (usb / '1-9:1.0/tty/ttyACM9').mkdir(parents=True)
+  if serial is not None:
+    (usb / 'serial').write_text(serial + '\n')
+  rdev = os.stat('/dev/null').st_rdev
+  link = Path(tmp, 'dev/char', f'{os.major(rdev)}:{os.minor(rdev)}')
+  link.parent.mkdir(parents=True)
+  link.symlink_to(usb / '1-9:1.0/tty/ttyACM9')
+  patch = mock.patch.object(ht, 'SYS_DEV', str(Path(tmp, 'dev')))
+  patch.start()
+  test.addCleanup(patch.stop)
+  return '/dev/null'
+
+
+def fake_tool(test, name):
+  """`name` in a private dir, a Python script that sleeps 30 s: a DUT-side tool as /proc shows one."""
+  d = tempfile.mkdtemp()
+  test.addCleanup(shutil.rmtree, d)
+  path = Path(d, name)
+  path.write_text(f'#!{sys.executable}\nimport time\ntime.sleep(30)\n')
+  path.chmod(0o755)
+  return str(path)
+
+
+def wait_for_tool(path):
+  """The pid of the process /proc shows running the script `path`, once one does."""
+  for _ in range(100):
+    for pid in filter(str.isdigit, os.listdir('/proc')):
+      with contextlib.suppress(OSError):
+        if path.encode() in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0'):
+          return int(pid)
+    time.sleep(0.1)
+  raise AssertionError(f'{path} never ran')
+
+
+def end_tool(pid, ops):
+  """Kill the tool `pid` and wait for its supervisor to prove it ended (the ops dir rechecks done)."""
+  with contextlib.suppress(ProcessLookupError):
+    os.kill(pid, signal.SIGKILL)
+  for _ in range(100):
+    if ht.process().recheck_dir(str(ops))[0] == 'done':
+      return
+    time.sleep(0.1)
+  raise AssertionError(f'{ops} never rechecked done')
+
+
+# a hil_test.py command under the board's session mutex running mcopy through run_tracked, until SIGKILLed
+KILLED_COMMAND = '''
+import importlib.util, sys
+scripts, lock_dir, work, dev = sys.argv[1:]
+sys.path.insert(0, scripts)
+spec = importlib.util.spec_from_file_location('hil_test', f'{scripts}/hil_test.py')
+ht = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ht)
+ht.lock_helper().BOARD_LOCK_DIR = lock_dir
+with ht.lock_helper().session_mutex('nrf52840dk'):
+  ht.Tools(work, f'{work}/hil.log').run(['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2'], timeout=60)
+'''
+
+
 class PrivateLocks(unittest.TestCase):
   """agentrc's real lock helper over a private lock dir."""
   def setUp(self):
@@ -904,10 +972,10 @@ class RunLock(PrivateLocks):
     self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='earlier run')
     (self.previous,) = self.helper.open_cleanup_failures('nrf52840dk')
 
-  def run_cmd(self, fail=None, restored=None, busy=(), lock_wait=0):
+  def run_cmd(self, fail=None, restored=None, busy=(), lock_wait=0, dut=False):
     """cmd_run with the battery raising `fail` after install touched the board (`fail(bat)` when callable, which
     touches it itself), then the restore returning `restored` (None: the real one); `busy` the probe users, or what
-    the check raises."""
+    the check raises; `dut` the real dut_tools, else none."""
     def battery(bat, base):
       if callable(fail):
         return fail(bat)
@@ -924,6 +992,8 @@ class RunLock(PrivateLocks):
                mock.patch.object(ht.Battery, 'battery', battery),
                mock.patch.object(ht, 'probe_busy', side_effect=raises(busy) if isinstance(busy, Exception)
                                  else lambda board: list(busy))]
+    if not dut:
+      patches.append(mock.patch.object(ht, 'dut_tools', return_value=[]))
     if restored is not None:
       patches.append(mock.patch.object(ht.Battery, 'restore', lambda bat: restores.append(1) or restored))
     with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
@@ -1011,6 +1081,7 @@ class RunLock(PrivateLocks):
     with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
          mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht, 'prove_hold'), \
          mock.patch.object(ht, 'probe_busy', return_value=[]), \
+         mock.patch.object(ht, 'dut_tools', return_value=[]), \
          mock.patch.object(ht, 'admit', return_value=({}, {}, {})), \
          mock.patch.object(ht, 'facts', return_value=FACTS), \
          mock.patch.object(ht.Battery, 'restore', lambda bat: {'pass': True, 'state': 'fixture running'}):
@@ -1103,6 +1174,32 @@ class RunLock(PrivateLocks):
     code, _, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
     self.assertEqual((code, self.helper.open_cleanup_failures('nrf52840dk')), (0, []))
 
+  def test_a_tool_left_pending_whose_failure_was_not_logged_refuses_the_next_run(self):
+    dev, tools = board_device(self), []
+
+    def left_pending(bat):   # the run's mcopy outlives it, and its failed cleanup cannot be logged
+      bat.touched = True
+      tools.append(subprocess.Popen([fake_tool(self, 'mcopy'), '-o', '-i', dev, 'copy.uf2', '::APP.UF2']))
+      self.addCleanup(lambda: tools[0].kill() or tools[0].wait())
+      bat.tools.receipts.append({'cmd': 'mcopy', 'cleanup': 'pending', 'receipt': {'token': 'r'}})
+      raise ht.NotEnded('mcopy: a tool is not proven ended')
+    only = mock.patch.object(ht, 'tools_left', lambda: [f'{t.pid} mcopy' for t in tools])   # not the host's
+    only.start()
+    self.addCleanup(only.stop)
+    with mock.patch.object(self.helper, 'log_cleanup_failure', side_effect=OSError(28, 'No space left')):
+      code, _, res = self.run_cmd(left_pending, dut=True)
+    self.assertEqual((code, res['results'][0]['cleanup']['failureLogged'], self.new_events()), (4, False, []))
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, dut=True)
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], restores), (1, False, []))
+    self.assertEqual([u['pid'] for u in row['occupiedBy']], [tools[0].pid])
+    self.assertIn(f'-i {dev}', row['occupiedBy'][0]['cmd'])
+    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
+    tools[0].kill()
+    tools[0].wait()
+    code, restores, _ = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, dut=True)
+    self.assertEqual((code, restores), (0, [1]))
+
   def test_lock_wait_reaches_the_board_task_and_a_held_lock_is_locked(self):
     fh = self.helper.take_board_lock('nrf52840dk', 'other')
     self.addCleanup(self.helper.release_board_lock, fh)
@@ -1133,10 +1230,63 @@ class ToolsLeft(unittest.TestCase):
         ht.tools_left()
 
 
+class DutTools(unittest.TestCase):
+  """dut_tools and dut_device over a planted sysfs: which processes are DUT-side tools on the board's devices, and
+  when the check cannot tell."""
+  def test_a_tool_on_a_usb_device_gives_its_serial_anything_else_none(self):
+    dev = board_device(self, 'U')
+    rdev = os.stat('/dev/zero').st_rdev   # a device of no USB device
+    Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
+    with tempfile.NamedTemporaryFile() as image:
+      for argv, serial in ((['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2'], 'U'),
+                           (['/venv/bin/python3', '/venv/bin/adafruit-nrfutil', '--verbose', 'dfu', 'serial',
+                             '--package', 'p.zip', '-p', dev, '-b', '115200'], 'U'),
+                           ([sys.executable, '-B', '/x/hil_test.py', 'fat-read', '--dev', dev, '--file', 'A'], 'U'),
+                           (['python3', '/x/hil_test.py', 'flush', f'--dev={dev}'], 'U'),
+                           (['mcopy', '-i', '/dev/zero', 'f', '::X'], ''),
+                           (['mcopy', '-i', image.name, 'f', '::X'], ''),
+                           (['adafruit-nrfutil', 'dfu', 'genpkg', '--application', 'a.bin', 'p.zip'], ''),
+                           (['python3', '/x/hil_test.py', 'restore', '-b', 'pca10056'], ''),
+                           (['python3', '-I', '/x/hil_process.py', '--supervise', '{"cmd": ["mcopy", "-i"]}'], ''),
+                           (['python3', '-c', 'mcopy'], ''), (['JLinkExe', '-USB', '1'], ''), (['less', 'mcopy'], '')):
+        with self.subTest(argv=argv):
+          self.assertEqual(ht.dut_device(argv), serial)
+
+  def mkdir(self, rel):
+    d = Path(ht.SYS_DEV).parent / rel
+    d.mkdir(parents=True)
+    return d
+
+  def test_refuses_when_it_cannot_tell(self):
+    board_device(self, None)
+    for argv, why in ((['mcopy', 'copy.uf2', 'a:'], 'names no device'),
+                      (['python3', '/x/hil_test.py', 'flush'], 'names no device'),
+                      (['mcopy', '-i', '/nonexistent/sdz', 'f', '::X'], 'device gone'),
+                      (['mcopy', '-i', '/dev/zero', 'f', '::X'], 'no .*/char/'),
+                      (['mcopy', '-i', '/dev/null', 'f', '::X'], 'serial of USB device 1-9 cannot be read')):
+      with self.subTest(argv=argv), self.assertRaisesRegex(ht.Refused, why):
+        ht.dut_device(argv)
+
+  def test_only_a_tool_on_the_boards_serial_is_a_user(self):
+    tool = subprocess.Popen([fake_tool(self, 'mcopy'), '-o', '-i', '/dev/null', 'copy.uf2', '::APP.UF2'])
+    self.addCleanup(tool.wait)
+    self.addCleanup(tool.kill)
+    board_device(self, 'other')
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{tool.pid} mcopy']):   # not the host's
+      self.assertEqual(ht.dut_tools(BOARD), [])
+      board_device(self, 'U')   # the serial case aside
+      (user,) = ht.dut_tools(BOARD)
+    self.assertEqual((user['pid'], user['cmd'].split()[1:]),
+                     (tool.pid, [tool.args[0], '-o', '-i', '/dev/null', 'copy.uf2', '::APP.UF2']))
+    with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=3, stdout='', stderr='x')), \
+         self.assertRaisesRegex(ht.Refused, 'pgrep exited 3'):
+      ht.dut_tools(BOARD)
+
+
 class Manual(PrivateLocks):
   """install and restore under the caller's hold, or restore under an older helper's cleanup holder, one at a time
   under the board's session mutex: they only log."""
-  def manual(self, cmd, outcome, hold=('--under-hold', 'dbg'), receipts=(), busy=(), found=(PREVIOUS,)):
+  def manual(self, cmd, outcome, hold=('--under-hold', 'dbg'), receipts=(), busy=(), found=(PREVIOUS,), dut=False):
     helper = mock_helper(open_cleanup_failures=mock.Mock(return_value=list(found)))
     ran = []
 
@@ -1155,7 +1305,8 @@ class Manual(PrivateLocks):
          mock.patch.object(ht, 'facts', return_value=FACTS), \
          mock.patch.object(ht, 'probe_busy', side_effect=raises(busy) if isinstance(busy, Exception)
                            else lambda board: list(busy)), \
-         mock.patch.object(ht.Battery, 'restore', restore), mock.patch.object(ht.Battery, 'install', restore):
+         mock.patch.object(ht.Battery, 'restore', restore), mock.patch.object(ht.Battery, 'install', restore), \
+         (contextlib.nullcontext() if dut else mock.patch.object(ht, 'dut_tools', return_value=[])):
       code = ht.main([cmd, '-b', 'pca10056', '--build-record', 'r', '--run-root', d, *hold, 'roster'])
     helper.end_failed.assert_not_called()
     helper.release_board_lock.assert_not_called()
@@ -1219,6 +1370,33 @@ class Manual(PrivateLocks):
     op.end()
     code, helper, _ = self.manual('restore', {'pass': True, 'state': 'x'}, found=[failure])
     self.assertEqual((code, helper.resolve_restored.call_args[0]), (0, ('nrf52840dk', [failure])))
+
+  def test_a_killed_commands_tool_still_running_refuses_the_next_command(self):
+    """A command SIGKILLed while run_tracked's mcopy runs: the tool outlives it and its session mutex frees, with no
+    cleanup event and no runDir to recheck."""
+    dev, work = board_device(self), Path(self.tmp) / 'killed'
+    tool = fake_tool(self, 'mcopy')
+    env = {**os.environ, 'PATH': f'{Path(tool).parent}{os.pathsep}{os.environ["PATH"]}'}
+    child = subprocess.Popen([sys.executable, '-c', KILLED_COMMAND, str(SCRIPTS), self.helper.BOARD_LOCK_DIR, str(work),
+                              dev], env=env)
+    self.addCleanup(child.wait)
+    self.addCleanup(child.kill)
+    pid = wait_for_tool(tool)
+    self.addCleanup(end_tool, pid, work / 'ops')
+    child.kill()
+    child.wait()
+    only = mock.patch.object(ht, 'tools_left', return_value=[f'{pid} mcopy'])   # not the host's
+    only.start()
+    self.addCleanup(only.stop)
+    for hold in (('--under-hold', 'dbg'), ('--recover-holder', '7')):
+      with self.subTest(hold=hold[0]):
+        code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, found=[], dut=True)
+        self.assertEqual((code, self.ran, [u['pid'] for u in out['occupiedBy']]), (2, [], [pid]))
+        self.assertIn('board busy', out['error'])
+        self.assertIn(f'-i {dev}', out['occupiedBy'][0]['cmd'])
+    end_tool(pid, work / 'ops')
+    code, _, _ = self.manual('restore', {'pass': True, 'state': 'x'}, found=[], dut=True)
+    self.assertEqual((code, self.ran), (0, [1]))
 
   def test_a_runs_lock_is_no_hold_to_work_under(self):
     with self.helper.board_task('nrf52840dk', ht.REASON, busy=list, runDir='r') as task:

@@ -23,6 +23,7 @@ import re
 import secrets
 import shutil
 import socket
+import stat
 import struct
 import subprocess
 import sys
@@ -67,6 +68,9 @@ APP_SAMPLE_MS = 200
 RESET_PULSE_MS, DBL_IN_WINDOW_MS, DBL_OUT_OF_WINDOW_MS = 20, 150, 1500
 FLUSH_GONE = 3
 SETTLE = 1.0                 # s after a tool exits for its descendants to be proven gone (hil_process.run_tracked)
+SYS_DEV = '/sys/dev'          # {block,char}/MAJ:MIN: a device node's sysfs device
+# the DUT-side tools a run or manual command starts, each with the options naming its drive or tty
+DUT_TOOLS = {'mcopy': ('-i',), 'adafruit-nrfutil': ('-p', '--port'), 'hil_test.py': ('--dev',)}
 UICR_NRFFW = (0x10001014, 0x1000101C)   # NRFFW[0] bootloader address, NRFFW[1] MBR parameter page
 ARTIFACTS = {'elf', 'hex', 'hexMbr', 'map', 'merged', 'uf2Mbr', 'update', 'zip'}   # check_build.expected_artifacts
 DEFAULT_CONFIG = {'CMAKE_BUILD_TYPE': 'MinSizeRel', 'DUALBANK_FW': 'OFF', 'DEFAULT_TO_OTA_DFU': 'OFF', 'SIGNED_FW': 'OFF',
@@ -1267,6 +1271,62 @@ def probe_busy(board):
   return provider().probe_users(board['flasher'])
 
 
+def dut_tools(board):
+  """The busy check's view of DUT-side tools, which needs no lock record or cleanup log naming them (a killed
+  command's, or a run's whose failure could not be logged): [{'pid', 'cmd'}] for each process tools_left shows whose
+  command line runs mcopy, adafruit-nrfutil or hil_test.py fat-read or flush on a device of a USB device with the
+  board's serial, whoever started it. Refused when it cannot tell: tools_left cannot, or a command line cannot be
+  read, or such a tool's device cannot be resolved (dut_device)."""
+  users = []
+  for line in tools_left():
+    pid = int(line.split(maxsplit=1)[0])
+    try:
+      argv = [a.decode(errors='replace') for a in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')[:-1]]
+    except (FileNotFoundError, ProcessLookupError):
+      continue   # it ended
+    except OSError as e:
+      raise Refused(f'DUT-side tools: pid {pid}: {e}') from e
+    if (serial := dut_device(argv)) and serial.lower() == board['uid'].lower():
+      users.append({'pid': pid, 'cmd': ' '.join(argv)})
+  return users
+
+
+def dut_device(argv):
+  """The USB serial of the device a DUT-side tool's `argv` names (DUT_TOOLS, run directly or as a Python script); ''
+  when argv is no such tool, adafruit-nrfutil without `serial` (genpkg), or its device is a file or not on USB.
+  Refused when it cannot tell: a tool naming no device, a device gone, or a serial that cannot be read."""
+  prog = argv
+  if argv and os.path.basename(argv[0]).startswith('python'):
+    prog = provider()._python_program(argv) or []   # the script or module a Python interpreter runs, and its args
+  name, args = (os.path.basename(prog[0]), prog[1:]) if prog else ('', [])
+  if name not in DUT_TOOLS or name == 'hil_test.py' and args[:1] not in (['fat-read'], ['flush']) \
+     or name == 'adafruit-nrfutil' and 'serial' not in args:
+    return ''
+  opts = DUT_TOOLS[name]
+  dev = next((v for a, v in zip(args, args[1:]) if a in opts), None) or \
+    next((a.partition('=')[2] for a in args if a.partition('=')[0] in opts), None)
+  if not dev:
+    raise Refused(f'DUT-side tool names no device: {" ".join(argv)}')
+  try:
+    st = os.stat(dev)
+  except OSError as e:
+    raise Refused(f'DUT-side tool on a device gone: {" ".join(argv)}: {e}') from e
+  kind = 'block' if stat.S_ISBLK(st.st_mode) else 'char' if stat.S_ISCHR(st.st_mode) else None
+  if kind is None:
+    return ''   # an image file (mcopy -i)
+  sysdev = f'{SYS_DEV}/{kind}/{os.major(st.st_rdev)}:{os.minor(st.st_rdev)}'
+  if not os.path.exists(sysdev):
+    raise Refused(f'DUT-side tool on {dev}: no {sysdev}')
+  d = os.path.realpath(sysdev)
+  while d != os.path.dirname(d) and not usb().BUSPORT_RE.match(os.path.basename(d)):
+    d = os.path.dirname(d)
+  if d == os.path.dirname(d):
+    return ''   # not a USB device's
+  if (serial := usb().read_sysfs(os.path.join(d, 'serial'))) is None:
+    raise Refused(f'DUT-side tool on {dev}: the serial of USB device {os.path.basename(d)} cannot be read')
+  return serial
+
+
 def earlier_runs(failures):
   """(judged, running) for the board's open failed cleanups `failures`. judged: each as resolve_restored is to judge
   it, one a killed run left (found-left, its record's runDir) carrying the operations of its ops dir not proven ended
@@ -1369,11 +1429,11 @@ def cmd_run(args, argv):
   found = []   # the take's failures as logged, for the report
 
   def busy():
-    """probe_busy plus an earlier run's operation still running; the task's restored verdict resolves its failures
-    as earlier_runs judged them."""
+    """probe_busy plus an earlier run's operation still running and dut_tools; the task's restored verdict resolves
+    its failures as earlier_runs judged them."""
     found[:] = task.cleanup_failures
     task.cleanup_failures[:], running = earlier_runs(found)
-    return [*probe_busy(board), *running]
+    return [*probe_busy(board), *running, *dut_tools(board)]
   task = helper.board_task(board['lock'], REASON, busy=busy, wait=args.lock_wait, runDir=str(run_dir))
   code = 1
   try:
@@ -1465,7 +1525,7 @@ def cmd_manual(args, argv):
         raise Refused(f'ops dir in {workdir}: {type(e).__name__}: {e}')
       try:
         judged, running = earlier_runs(found)
-        users = [*probe_busy(board), *running]
+        users = [*probe_busy(board), *running, *dut_tools(board)]
       except Exception as e:
         raise Refused(f'{type(e).__name__}: {e}') from e
     except Refused as e:
