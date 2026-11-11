@@ -170,16 +170,19 @@ shared run rules. Runs are never cancelled: a newer push waits.
   `hil_flash.probe_users` on the board's J-Link) refuses the run when a process names the probe's serial in its
   command line or holds the probe's USB device (`occupiedBy`, each `{pid, cmd}`), or when it cannot tell
   (`ProbeCheckInconclusive`, e.g. a J-Link tool of another user that selects no other probe); either refusal releases
-  the lock with nothing logged and is never waited out. The check is a limited snapshot (its docstring):
-  `adafruit-nrfutil` or `mcopy` on the board's CDC port or drive, a GDB client attached to a server, and a child that
-  opens the probe after the check are not seen.
+  the lock with nothing logged and is never waited out. It also names, in `occupiedBy`, each tool of an earlier run
+  still running (`earlier_runs`): a receipt of an open failed cleanup that rechecks `pending`, and for a run that was
+  killed (its record found left, with its `runDir`) an operation in that run dir's `ops` (`hil_process.recheck_dir`).
+  The check is a limited snapshot (its docstring): `adafruit-nrfutil` or `mcopy` of no run on the board's CDC port or
+  drive, a GDB client attached to a server, and a child that opens the probe after the check are not seen.
 - The lock ends on the run's cleanup verdict, failed before restored before clean. A cleanup that failed or was never
   proven (a failed restore, a tool not proven ended, an interrupt or an error outside a step once the board was
   touched) is logged in the board's cleanup log by `end_failed` with the receipts of tools not proven ended (exit 4).
   A passing restore, after a failed step too, marks restored the open failed cleanups the run found
-  (`previousCleanupFailure`) whose receipts recheck `done` (`resolve_restored`); the run keeps its own result (a failed
-  step exits 1). An untouched board ends clean. An interrupt while the lock ends keeps that verdict and aborts the
-  run (exit 1). Nothing holds the board after a run.
+  (`previousCleanupFailure`) whose receipts recheck `done` (`resolve_restored`), a killed run's once every operation in
+  its run dir's `ops` rechecks `done`; the run keeps its own result (a failed step exits 1). An untouched board ends
+  clean. An interrupt while the lock ends keeps that verdict and aborts the run (exit 1). Nothing holds the board
+  after a run.
 - One board per process: a signal that arrives as the run's board task starts ending can leave its lock held until
   the process exits (`board_task`'s limit), and the process exits right after.
 - Manual sessions (commissioning, debugging) hold first, then work under the hold:
@@ -194,8 +197,9 @@ python3 ~/.claude/skills/hil/scripts/hil_lock.py release nrf52840dk
   `install` writes the candidate and checks its drive; `restore` is the cleanup below, and once it passes marks
   restored the board's open failed cleanups whose receipts recheck `done`. Release only after a passing `restore`.
   Each command first takes the board's session mutex (`hil_lock.session_mutex`), before it checks the hold, so a
-  second command under the same hold refuses while one runs; then the busy check above refuses a busy or
-  undecidable probe. Both refusals exit 2 before any tool.
+  second command under the same hold refuses while one runs; a run's own lock (a protected record) is no hold to work
+  under. Then the busy check above refuses a busy or undecidable probe or a tool of an earlier run still running. Each
+  refusal exits 2 before any tool.
   Neither ever ends the hold: a failed `restore`, or a tool not proven ended, is logged in the board's cleanup log
   (`log_cleanup_failure`, `failureLogged`) and exits 4, the hold staying the caller's.
 - Cleanup (`cleanup` in the row): untouched when nothing was written; otherwise the candidate installed again and a
@@ -231,10 +235,10 @@ retries a fail once per `hil` Caller rules.
   (`/tmp/tinyusb-hil-locks/nrf52840dk.cleanup.jsonl`) keeps it and nothing holds the board, so no unlock step follows.
   The next `run` installs from an erase anyway and, once its cleanup passes, marks it restored when its receipts
   recheck `done`; to restore without a run, hold, `restore --under-hold`, release (Reservation). A failure that stays
-  open (`restoredNote`) names a tool not proven ended: once no `JLinkExe`, `mcopy`, `adafruit-nrfutil` or
-  `hil_test.py` child of it is left on the host, a passing `restore` resolves it; a tool that never ends (D state) is
-  `usb-kernel-recover`'s, then the human's. A receipt in another user's run dir rechecks `done` only for that user, so
-  only that user's restore resolves it.
+  open (`restoredNote`) names a tool not proven ended (a killed run's: an operation in its run dir's `ops`): once no
+  `JLinkExe`, `mcopy`, `adafruit-nrfutil` or `hil_test.py` child of it is left on the host, a passing `restore`
+  resolves it; a tool that never ends (D state) is `usb-kernel-recover`'s, then the human's. A receipt in another
+  user's run dir rechecks `done` only for that user, so only that user's restore resolves it.
 - `recoveryBlocker`: an older helper's cleanup holder still holds the lock (`hil_lock.py status` shows `role:
   cleanup-holder` and its pid) and never frees on its own. Once no tool of its run is left on the host, a
   `hw-validator` or the human runs, with that run's record or one rebuilt on a known-good clean HEAD:

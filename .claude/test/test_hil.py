@@ -3,9 +3,11 @@
 """Tests for .claude/skills/hil-contract/scripts/hil_test.py and hil_run_report.py without hardware: the image and UF2
 mechanics, the FAT reader, roster and record refusals, the J-Link transcripts it judges and the run's verdicts."""
 import contextlib
+import fcntl
 import importlib.util
 import io
 import json
+import os
 import signal
 import struct
 import sys
@@ -838,9 +840,34 @@ def mock_helper(**kw):
   """The lock helper mocked, its failure_report, session mutex and exceptions the agentrc's."""
   real = ht.lock_helper()
   return mock.Mock(failure_report=real.failure_report, ReleaseRefused=real.ReleaseRefused, BoardBusy=real.BoardBusy,
-                   session_mutex=real.session_mutex, SessionBusy=real.SessionBusy,
+                   session_mutex=real.session_mutex, SessionBusy=real.SessionBusy, settle=real.settle,
+                   logged_tokens=real.logged_tokens, open_runs=real.open_runs,
                    LockUnavailable=real.LockUnavailable, resolve_restored=mock.Mock(return_value=[]),
                    end_failed=mock.Mock(return_value={}), **kw)
+
+
+class FakeOp:
+  """A run_tracked operation's files in the state dir `ops`, as hil_process.recheck reads them: running (its lock
+  held, no record yet) until end() leaves it done, or with done=False not provable (no record)."""
+  def __init__(self, ops, token='t0'):
+    self.base = Path(ops) / f'hil_op_{token}'
+    self.fd = os.open(f'{self.base}.lock', os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(self.fd, fcntl.LOCK_EX)
+    st = os.fstat(self.fd)
+    self.lock = [st.st_dev, st.st_ino]
+    self.receipt = {'token': token, 'supervisor': {'pid': 4242, 'start': None, 'lock': self.lock},
+                    'lock': f'{self.base}.lock', 'record': f'{self.base}.json', 'log': f'{self.base}.log',
+                    'survivors': None}
+
+  def end(self, done=True):
+    if done:
+      Path(f'{self.base}.log').write_text('')
+      fd = os.open(f'{self.base}.json', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+      with os.fdopen(fd, 'w') as f:
+        json.dump({'token': self.receipt['token'], 'lock': self.lock, 'pid': 4242, 'cleanup': 'done'}, f)
+    if self.fd is not None:
+      os.close(self.fd)
+      self.fd = None
 
 
 class PrivateLocks(unittest.TestCase):
@@ -1038,6 +1065,44 @@ class RunLock(PrivateLocks):
     self.assertEqual((code, res['results'][0]['locked'], res['results'][0]['cleanup']['lock']),
                      (1, True, 'nrf52840dk: lock not taken'))
 
+  def fake_op(self, run_dir):
+    op = FakeOp(ht.process().state_dir(run_dir, 'ops'))
+    self.addCleanup(op.end, False)
+    return op
+
+  def test_an_earlier_runs_tool_still_running_refuses_the_run_until_it_ended(self):
+    op = self.fake_op(Path(self.tmp) / 'earlier')
+    logged = self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='JLinkExe pending',
+                                             receipts=[op.receipt])
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], restores, row['occupiedBy'][0]['pid']), (1, False, [], 4242))
+    self.assertIn(f'failed cleanup {logged["id"]}: receipt t0', row['occupiedBy'][0]['cmd'])
+    self.assertEqual((row['previousCleanupFailure'], row['openCleanupFailures']), (logged, 2))
+    self.assertEqual((self.new_events()[1:], rr.verdict(code, res, 'pca10056')[0]), ([], 'blocker'))
+    op.end()
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    self.assertEqual((code, restores), (0, [1]))
+    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
+
+  def test_a_killed_runs_tools_keep_its_failure_open_until_they_ended(self):
+    run_dir = Path(self.tmp) / 'killed'
+    op = self.fake_op(run_dir)
+    self.helper.take_board_lock('nrf52840dk', 'hil_test.py', protected=True, runDir=str(run_dir)).close()
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})   # logs it found-left
+    row = res['results'][0]
+    (left,) = [f for f in self.helper.open_cleanup_failures('nrf52840dk') if f['how'] == 'found-left']
+    self.assertEqual((code, row['ran'], restores, row['previousCleanupFailure']), (1, False, [], left))
+    self.assertIn(f'failed cleanup {left["id"]}', row['occupiedBy'][0]['cmd'])
+    op.end(done=False)   # gone, its end never proven: admitted, the failure kept open
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    self.assertEqual((code, restores), (0, [1]))
+    self.assertIn(f'{left["id"]} stays open', res['results'][0]['cleanup']['restoredNote'])
+    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [left])
+    op.end()
+    code, _, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    self.assertEqual((code, self.helper.open_cleanup_failures('nrf52840dk')), (0, []))
+
   def test_lock_wait_reaches_the_board_task_and_a_held_lock_is_locked(self):
     fh = self.helper.take_board_lock('nrf52840dk', 'other')
     self.addCleanup(self.helper.release_board_lock, fh)
@@ -1071,8 +1136,8 @@ class ToolsLeft(unittest.TestCase):
 class Manual(PrivateLocks):
   """install and restore under the caller's hold, or restore under an older helper's cleanup holder, one at a time
   under the board's session mutex: they only log."""
-  def manual(self, cmd, outcome, hold=('--under-hold', 'dbg'), receipts=(), busy=()):
-    helper = mock_helper(open_cleanup_failures=mock.Mock(return_value=[PREVIOUS]))
+  def manual(self, cmd, outcome, hold=('--under-hold', 'dbg'), receipts=(), busy=(), found=(PREVIOUS,)):
+    helper = mock_helper(open_cleanup_failures=mock.Mock(return_value=list(found)))
     ran = []
 
     def restore(bat):
@@ -1140,6 +1205,35 @@ class Manual(PrivateLocks):
           self.assertEqual(out.get('occupiedBy'), busy if isinstance(busy, list) else None)
           for unused in (helper.log_cleanup_failure, helper.resolve_restored, helper.release_token):
             unused.assert_not_called()
+
+  def test_an_earlier_runs_tool_still_running_refuses_before_any_tool(self):
+    op = FakeOp(ht.process().state_dir(Path(self.tmp) / 'earlier', 'ops'))
+    self.addCleanup(op.end, False)
+    failure = {**PREVIOUS, 'receipts': [op.receipt]}
+    for hold in (('--under-hold', 'dbg'), ('--recover-holder', '7')):
+      with self.subTest(hold=hold[0]):
+        code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, found=[failure])
+        self.assertEqual((code, self.ran, out['occupiedBy'][0]['pid']), (2, [], 4242))
+        self.assertIn('board busy', out['error'])
+        helper.resolve_restored.assert_not_called()
+    op.end()
+    code, helper, _ = self.manual('restore', {'pass': True, 'state': 'x'}, found=[failure])
+    self.assertEqual((code, helper.resolve_restored.call_args[0]), (0, ('nrf52840dk', [failure])))
+
+  def test_a_runs_lock_is_no_hold_to_work_under(self):
+    with self.helper.board_task('nrf52840dk', ht.REASON, busy=list, runDir='r') as task:
+      with self.assertRaisesRegex(ht.Refused, 'is not held with reason'):
+        ht.prove_hold(BOARD, ht.REASON)
+      with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
+           mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht.Battery, 'restore') as run:
+        code = ht.main(['restore', '-b', 'pca10056', '--build-record', 'r', '--run-root', d, '--under-hold', ht.REASON,
+                        'roster'])
+      self.assertEqual((code, run.called), (2, False))
+      self.assertIn('is not held', json.loads(out.getvalue())['error'])
+      task.clean()
+    fh = self.helper.take_board_lock('nrf52840dk', 'dbg')   # a hold's record, unprotected
+    self.addCleanup(self.helper.release_board_lock, fh)
+    ht.prove_hold(BOARD, 'dbg')
 
   def test_a_second_command_under_the_hold_refuses_before_checking_the_hold(self):
     restored = {'pass': True, 'state': 'fixture running'}

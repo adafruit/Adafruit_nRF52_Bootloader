@@ -1228,9 +1228,10 @@ def resolve(board, found, state):
 
 
 def prove_hold(board, reason):
+  """A live manual hold of the board with `reason`; a run's record (protected) is never one."""
   helper = lock_helper()
   rec = helper.read_record(board['lock'])
-  if not rec or rec.get('reason') != reason or not helper.holder_alive(rec):
+  if not rec or rec.get('reason') != reason or not helper.holder_alive(rec) or helper.is_protected(rec):
     raise Refused(f'{board["lock"]} is not held with reason {reason!r}: take it first (hil_lock.py hold)')
 
 
@@ -1264,6 +1265,36 @@ def probe_busy(board):
   """The busy check before any hardware access (SKILL.md Reservation): agentrc's hil_flash.probe_users on the board's
   J-Link, [{'pid', 'cmd'}], empty when idle; ProbeCheckInconclusive when it cannot tell."""
   return provider().probe_users(board['flasher'])
+
+
+def earlier_runs(failures):
+  """(judged, running) for the board's open failed cleanups `failures`. judged: each as resolve_restored is to judge
+  it, one a killed run left (found-left, its record's runDir) carrying the operations of its ops dir not proven ended
+  (hil_process.recheck_dir, which keeps the files of every logged receipt) as its receipts, so it stays open until
+  they are done; running: [{'pid', 'cmd'}] for each receipt still running ('pending'), which the busy check adds to
+  the probe's users."""
+  helper = lock_helper()
+  keep, judged, running = helper.logged_tokens(failures), [], []
+  for f in failures:
+    task = f.get('task') if isinstance(f.get('task'), dict) else {}
+    if f.get('how') == 'found-left' and not f.get('receipts') and not task.get('receipts') \
+       and isinstance(task.get('runDir'), str):
+      ops = os.path.join(task['runDir'], 'ops')
+      try:
+        verdict, entries = process().recheck_dir(ops, keep)
+      except Exception as e:   # a recheck that cannot run proves nothing ended
+        verdict, entries = 'unknown', [{'unrecheckable': f'{ops}: {type(e).__name__}: {e}'}]
+      if verdict != 'done':
+        f = {**f, 'receipts': entries}
+    judged.append(f)
+    receipts = next((r for r in (f.get('receipts'), task.get('receipts')) if isinstance(r, list) and r), [])
+    states, _ = helper.settle(receipts, 0)   # one recheck pass, any error read as unknown
+    pending = [r for r, s in zip(receipts, states) if s == 'pending']
+    for r, text in zip(pending, helper.open_runs(pending, ['pending'] * len(pending))):
+      sup = r.get('supervisor') if isinstance(r, dict) else None
+      running.append({'pid': sup.get('pid') if isinstance(sup, dict) else None,
+                      'cmd': f'failed cleanup {f.get("id")}: {text}'})
+  return judged, running
 
 
 def session_mutex(board, stack):
@@ -1335,8 +1366,15 @@ def cmd_run(args, argv):
     return finish(2)
 
   helper = lock_helper()
-  task = helper.board_task(board['lock'], REASON, busy=lambda: probe_busy(board), wait=args.lock_wait,
-                           runDir=str(run_dir))
+  found = []   # the take's failures as logged, for the report
+
+  def busy():
+    """probe_busy plus an earlier run's operation still running; the task's restored verdict resolves its failures
+    as earlier_runs judged them."""
+    found[:] = task.cleanup_failures
+    task.cleanup_failures[:], running = earlier_runs(found)
+    return [*probe_busy(board), *running]
+  task = helper.board_task(board['lock'], REASON, busy=busy, wait=args.lock_wait, runDir=str(run_dir))
   code = 1
   try:
     with task:
@@ -1362,7 +1400,7 @@ def cmd_run(args, argv):
       row['pass'], code = False, code or 1
     else:
       row.update(admission_refusal(helper, e))
-  row.update(helper.failure_report(task.cleanup_failures))
+  row.update(helper.failure_report(found or task.cleanup_failures))
   if end_task(task, row['cleanup']):
     code = 4
   result['pass'] = code == 0
@@ -1426,7 +1464,8 @@ def cmd_manual(args, argv):
       except OSError as e:
         raise Refused(f'ops dir in {workdir}: {type(e).__name__}: {e}')
       try:
-        users = probe_busy(board)
+        judged, running = earlier_runs(found)
+        users = [*probe_busy(board), *running]
       except Exception as e:
         raise Refused(f'{type(e).__name__}: {e}') from e
     except Refused as e:
@@ -1436,11 +1475,12 @@ def cmd_manual(args, argv):
       print(json.dumps({'pass': False, 'error': str(helper.BoardBusy(board['lock'], users, found)),
                         'occupiedBy': users, **helper.failure_report(found)}))
       return 2
-    return manual_session(args, board, holder, found, bat)
+    return manual_session(args, board, holder, found, judged, bat)
 
 
-def manual_session(args, board, holder, found, bat):
-  """The hardware part of cmd_manual, under the board's session mutex."""
+def manual_session(args, board, holder, found, judged, bat):
+  """The hardware part of cmd_manual, under the board's session mutex; a passing restore resolves `judged`
+  (earlier_runs' view of `found`)."""
   helper = lock_helper()
   out, interrupt = {**helper.failure_report(found)}, None
   bat.touched = True
@@ -1458,7 +1498,7 @@ def manual_session(args, board, holder, found, bat):
       out['failureLogged'] = not why
       note(out, 'logError', why)
     elif out['pass'] and args.cmd == 'restore':
-      note(out, 'restoredNote', resolve(board, found, out['state']))
+      note(out, 'restoredNote', resolve(board, judged, out['state']))
       if holder:
         try:
           helper.release_token(holder['token'])
