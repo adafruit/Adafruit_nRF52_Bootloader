@@ -844,8 +844,7 @@ def mock_helper(**kw):
   """The lock helper mocked, its failure_report, session mutex and exceptions the agentrc's."""
   real = ht.lock_helper()
   return mock.Mock(failure_report=real.failure_report, ReleaseRefused=real.ReleaseRefused, BoardBusy=real.BoardBusy,
-                   session_mutex=real.session_mutex, SessionBusy=real.SessionBusy, settle=real.settle,
-                   logged_tokens=real.logged_tokens, open_runs=real.open_runs,
+                   session_mutex=real.session_mutex, SessionBusy=real.SessionBusy, open_runs=real.open_runs,
                    LockUnavailable=real.LockUnavailable, resolve_restored=mock.Mock(return_value=[]),
                    end_failed=mock.Mock(return_value={}), **kw)
 
@@ -1083,7 +1082,9 @@ class RunLock(PrivateLocks):
     self.assertIn('errors: cleanup log not written', cleanup['lock'])
     self.assertIn('failure NOT logged', rr.verdict(code, res, 'pca10056')[1])
     code, _, _ = self.run_cmd(dfu_fails, {'pass': False, 'state': 'unknown', 'detail': 'restore: no drive'})
-    self.assertEqual((code, len(self.helper.open_cleanup_failures('nrf52840dk'))), (4, 2))
+    # the unlogged run kept its record (agentrc#538): this take logs it found-left before its own failure
+    self.assertEqual((code, [f['how'] for f in self.helper.open_cleanup_failures('nrf52840dk')]),
+                     (4, ['ended-failed', 'found-left', 'ended-failed']))
     with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
          mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht, 'prove_hold'), \
          mock.patch.object(ht, 'probe_busy', return_value=[]), \
@@ -1094,7 +1095,8 @@ class RunLock(PrivateLocks):
       code = ht.main(['restore', '-b', 'pca10056', '--build-record', 'r', '--run-root', d, '--under-hold', 'dbg',
                       'roster'])
     self.assertEqual((code, json.loads(out.getvalue())['pass']), (0, True))
-    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
+    # all but the found-left, whose run dir this test removed: its operations cannot be proven ended
+    self.assertEqual([f['how'] for f in self.helper.open_cleanup_failures('nrf52840dk')], ['found-left'])
 
   def test_a_busy_probe_refuses_before_the_body_without_an_event(self):
     users = [{'pid': 123, 'cmd': 'JLinkExe -USB 1'}]
