@@ -1453,6 +1453,13 @@ def earlier_runs(failures):
   return judged, running
 
 
+def occupants(board, running):
+  """The busy check's users: probe_busy, `running` (earlier_runs') and dut_tools, each pid once: a pending supervisor
+  dut_tools also sees keeps earlier_runs' entry, which names its failed cleanup."""
+  pids = {u['pid'] for u in running}
+  return [*probe_busy(board), *running, *(u for u in dut_tools(board) if u['pid'] not in pids)]
+
+
 def session_mutex(board, stack):
   """The board's session mutex (hil_lock.session_mutex), held for `stack`'s life: commands under one hold run one at a
   time. Refused when another command holds it or it cannot be used."""
@@ -1529,7 +1536,7 @@ def cmd_run(args, argv):
     its failures as earlier_runs judged them."""
     found[:] = task.cleanup_failures
     task.cleanup_failures[:], running = earlier_runs(found)
-    return [*probe_busy(board), *running, *dut_tools(board)]
+    return occupants(board, running)
   task = helper.board_task(board['lock'], REASON, busy=busy, wait=args.lock_wait, runDir=str(run_dir))
   code = 1
   try:
@@ -1621,7 +1628,7 @@ def cmd_manual(args, argv):
         raise Refused(f'ops dir in {workdir}: {type(e).__name__}: {e}')
       try:
         judged, running = earlier_runs(found)
-        users = [*probe_busy(board), *running, *dut_tools(board)]
+        users = occupants(board, running)
       except Exception as e:
         raise Refused(f'{type(e).__name__}: {e}') from e
     except Refused as e:

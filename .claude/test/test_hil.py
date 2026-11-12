@@ -874,6 +874,11 @@ class FakeOp:
       self.fd = None
 
 
+# dut_tools' view of FakeOp's pending supervisor, which earlier_runs also names, and of another tool on the board
+SUPERVISOR_SEEN = [{'pid': 4242, 'cmd': 'python3 -I /x/hil_process.py --supervise {"cmd": ["mcopy"]}'},
+                   {'pid': 99, 'cmd': 'mcopy -i /dev/ttyACM9 f ::X'}]
+
+
 def board_device(test, serial='u'):
   """/dev/null planted in a private sysfs (ht.SYS_DEV) as the tty of a USB device with `serial` (None: it has none),
   BOARD's by default: the device a DUT-side tool names, as dut_tools resolves it."""
@@ -1146,9 +1151,10 @@ class RunLock(PrivateLocks):
     op = self.fake_op(Path(self.tmp) / 'earlier')
     logged = self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='JLinkExe pending',
                                              receipts=[op.receipt])
-    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    with mock.patch.object(ht, 'dut_tools', return_value=SUPERVISOR_SEEN):   # its pending supervisor, and another
+      code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, dut=True)
     row = res['results'][0]
-    self.assertEqual((code, row['ran'], restores, row['occupiedBy'][0]['pid']), (1, False, [], 4242))
+    self.assertEqual((code, row['ran'], restores, [u['pid'] for u in row['occupiedBy']]), (1, False, [], [4242, 99]))
     self.assertIn(f'failed cleanup {logged["id"]}: receipt t0', row['occupiedBy'][0]['cmd'])
     self.assertEqual((row['previousCleanupFailure'], row['openCleanupFailures']), (logged, 2))
     self.assertEqual((self.new_events()[1:], rr.verdict(code, res, 'pca10056')[0]), ([], 'blocker'))
@@ -1482,8 +1488,10 @@ class Manual(PrivateLocks):
     failure = {**PREVIOUS, 'receipts': [op.receipt]}
     for hold in (('--under-hold', 'dbg'), ('--recover-holder', '7')):
       with self.subTest(hold=hold[0]):
-        code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, found=[failure])
-        self.assertEqual((code, self.ran, out['occupiedBy'][0]['pid']), (2, [], 4242))
+        with mock.patch.object(ht, 'dut_tools', return_value=SUPERVISOR_SEEN):
+          code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, found=[failure], dut=True)
+        self.assertEqual((code, self.ran, [u['pid'] for u in out['occupiedBy']]), (2, [], [4242, 99]))
+        self.assertIn(f'failed cleanup {PREVIOUS["id"]}: receipt t0', out['occupiedBy'][0]['cmd'])
         self.assertIn('board busy', out['error'])
         helper.resolve_restored.assert_not_called()
     op.end()
