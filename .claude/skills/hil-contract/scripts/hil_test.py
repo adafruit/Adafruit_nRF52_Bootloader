@@ -1357,7 +1357,7 @@ def supervised_nodes(argv, job, pid):
   except (IndexError, ValueError, TypeError, KeyError) as e:
     raise Refused(f'run_tracked supervisor whose job cannot be read ({e}): {" ".join(argv)}') from e
   if isinstance(cmd, str):
-    if re.search('|'.join(map(re.escape, DUT_TOOLS)), cmd):
+    if any(name in cmd for name in DUT_TOOLS):
       raise Refused(f'run_tracked supervisor of a shell command naming a DUT-side tool: {" ".join(argv)}')
     return []
   dev = tool_device(provider()._program(cmd))
