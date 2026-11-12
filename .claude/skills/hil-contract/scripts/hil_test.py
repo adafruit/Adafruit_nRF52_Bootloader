@@ -1423,6 +1423,14 @@ def on_board(st, uid):
   raise Refused(f'DUT-side tool on a node of USB device {port}, whose serial cannot be read and which may be the board')
 
 
+def recheck(receipt):
+  """hil_process.recheck's state of `receipt`, any error read as unknown: a malformed receipt proves nothing."""
+  try:
+    return process().recheck(receipt)
+  except Exception as e:
+    return f'unknown ({e!r:.80})'
+
+
 def earlier_runs(failures):
   """(judged, running) for the board's open failed cleanups `failures`. judged: each as resolve_restored is to judge
   it, one a killed run left (found-left, its record's runDir) carrying the operations of its ops dir not proven ended
@@ -1430,7 +1438,9 @@ def earlier_runs(failures):
   they are done; running: [{'pid', 'cmd'}] for each receipt still running ('pending'), which the busy check adds to
   the probe's users."""
   helper = lock_helper()
-  keep, judged, running = helper.logged_tokens(failures), [], []
+  keep = {r['token'] for f in failures if isinstance(f.get('receipts'), list) for r in f['receipts']
+          if isinstance(r, dict) and isinstance(r.get('token'), str)}
+  judged, running = [], []
   for f in failures:
     task = f.get('task') if isinstance(f.get('task'), dict) else {}
     if f.get('how') == 'found-left' and not f.get('receipts') and not task.get('receipts') \
@@ -1444,7 +1454,7 @@ def earlier_runs(failures):
         f = {**f, 'receipts': entries}
     judged.append(f)
     receipts = next((r for r in (f.get('receipts'), task.get('receipts')) if isinstance(r, list) and r), [])
-    states, _ = helper.settle(receipts, 0)   # one recheck pass, any error read as unknown
+    states = [recheck(r) for r in receipts]
     pending = [r for r, s in zip(receipts, states) if s == 'pending']
     for r, text in zip(pending, helper.open_runs(pending, ['pending'] * len(pending))):
       sup = r.get('supervisor') if isinstance(r, dict) else None
@@ -1522,6 +1532,7 @@ def cmd_run(args, argv):
         raise Refused(f'{tool} ({what}) must be on PATH')
     try:
       bat = Battery(board, f, run_dir, log, args.fail_at, args.profile, home)
+      row['steps'] = bat.steps   # appended to as the battery runs
     except OSError as e:
       raise Refused(f'ops dir in {run_dir}: {type(e).__name__}: {e}')
   except Refused as e:
@@ -1537,26 +1548,19 @@ def cmd_run(args, argv):
     found[:] = task.cleanup_failures
     task.cleanup_failures[:], running = earlier_runs(found)
     return occupants(board, running)
-  task = helper.board_task(board['lock'], REASON, busy=busy, wait=args.lock_wait, runDir=str(run_dir))
+  task = helper.board_task(board['lock'], REASON, busy=busy, wait=args.lock_wait, runDir=str(run_dir),
+                           verdict=lambda task, exc: give_verdict(task, board, row, bat))
   code = 1
   try:
     with task:
       row['ran'] = True
       try:
-        try:
-          bat.battery(base)
-          row['pass'] = True
-        except StepFail as e:
-          row['detail'] = f'{bat.steps[-1]["step"]}: {e}'
-        row['cleanup'] = bat.restore()
-        code = 0 if row['pass'] and row['cleanup']['pass'] else 1
-      finally:
-        row['steps'] = bat.steps
-        # touched but never restored (an interrupt or an error outside a step): restore() never says untouched then
-        if row['cleanup']['state'] == 'untouched' and (bat.touched or bat.tools.receipts):
-          row['cleanup'] = {'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
-                            'receipts': bat.tools.receipts}
-        give_verdict(task, board, row, bat.tools)
+        bat.battery(base)
+        row['pass'] = True
+      except StepFail as e:
+        row['detail'] = f'{bat.steps[-1]["step"]}: {e}'
+      row['cleanup'] = bat.restore()
+      code = 0 if row['pass'] and row['cleanup']['pass'] else 1
   except BaseException as e:   # a refused admission, or an interrupt or error after the verdict: the run aborted
     row['detail'] = f'{type(e).__name__}: {e}'
     if row['ran']:
@@ -1570,12 +1574,16 @@ def cmd_run(args, argv):
   return finish(code)
 
 
-def give_verdict(task, board, row, tools):
-  """The board task's cleanup verdict, its last hardware action, by precedence failed, restored, clean: a failed step
+def give_verdict(task, board, row, bat):
+  """The board task's verdict collector, from the battery's state, by precedence failed, restored, clean: a failed step
   whose restore passed is restored."""
+  # touched but never restored (an interrupt or an error outside a step): restore() never says untouched then
+  if row['cleanup']['state'] == 'untouched' and (bat.touched or bat.tools.receipts):
+    row['cleanup'] = {'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',
+                      'receipts': bat.tools.receipts}
   cleanup = row['cleanup']
   if not cleanup['pass']:
-    task.failed(detail=cleanup.get('detail') or row.get('detail') or 'cleanup failed', receipts=tools.logged())
+    task.failed(detail=cleanup.get('detail') or row.get('detail') or 'cleanup failed', receipts=bat.tools.logged())
   elif cleanup['state'] == 'untouched':
     task.clean()
   else:
