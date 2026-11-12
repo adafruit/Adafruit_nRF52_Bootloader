@@ -1438,7 +1438,6 @@ def earlier_runs(failures):
   they are done; running: [{'pid', 'cmd'}] for each receipt still running ('pending'), which the busy check adds to
   the probe's users."""
   helper = lock_helper()
-  # the logged receipts' tokens: recheck_dir keeps their files for resolve_restored
   keep = {r['token'] for f in failures if isinstance(f.get('receipts'), list) for r in f['receipts']
           if isinstance(r, dict) and isinstance(r.get('token'), str)}
   judged, running = [], []
@@ -1533,6 +1532,7 @@ def cmd_run(args, argv):
         raise Refused(f'{tool} ({what}) must be on PATH')
     try:
       bat = Battery(board, f, run_dir, log, args.fail_at, args.profile, home)
+      row['steps'] = bat.steps   # appended to as the battery runs
     except OSError as e:
       raise Refused(f'ops dir in {run_dir}: {type(e).__name__}: {e}')
   except Refused as e:
@@ -1577,7 +1577,6 @@ def cmd_run(args, argv):
 def give_verdict(task, board, row, bat):
   """The board task's verdict collector, from the battery's state, by precedence failed, restored, clean: a failed step
   whose restore passed is restored."""
-  row['steps'] = bat.steps
   # touched but never restored (an interrupt or an error outside a step): restore() never says untouched then
   if row['cleanup']['state'] == 'untouched' and (bat.touched or bat.tools.receipts):
     row['cleanup'] = {'pass': False, 'state': 'unknown', 'detail': 'interrupted before cleanup',

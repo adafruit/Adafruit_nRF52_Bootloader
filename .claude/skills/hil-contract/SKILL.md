@@ -189,7 +189,8 @@ shared run rules. Runs are never cancelled: a newer push waits.
 - The lock ends on the run's cleanup verdict, failed before restored before clean, which its verdict collector
   (`board_task(..., verdict=)`, `give_verdict`) gives at the task's end from the battery's state. A cleanup that
   failed or was never proven (a failed restore, a tool not proven ended, an interrupt or an error outside a step once
-  the board was touched) is logged in the board's cleanup log by `end_failed` with the receipts of tools not proven ended (exit 4).
+  the board was touched) is logged in the board's cleanup log by `end_failed` with the receipts of tools not proven
+  ended (exit 4).
   A passing restore, after a failed step too, marks restored the open failed cleanups the run found
   (`previousCleanupFailure`) whose receipts recheck `done` (`resolve_restored`), a killed run's once every operation in
   its run dir's `ops` rechecks `done`; the run keeps its own result (a failed step exits 1). An untouched board ends
