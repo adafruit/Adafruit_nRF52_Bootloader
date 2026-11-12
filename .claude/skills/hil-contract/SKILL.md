@@ -145,15 +145,7 @@ against:
 `--fail-at STEP` fails that step on purpose, to exercise cleanup. Every tool (JLinkExe, mcopy, adafruit-nrfutil, the FAT
 reader and flush) runs under agentrc's `hil_process.run_tracked` with its files in the run dir's `ops`
 (`hil_process.state_dir`); one whose process tree is not proven ended stops the battery, skips the restore and its
-receipt goes to the board's cleanup log. Before its first tool, every `run`, `install` and `restore` claims the board
-(agentrc `hil` Board locks): its pid, start time and ops dir in its own claim file (`hil_lock.PendingSessions`, kind
-`nrf52-bootloader`, which also reads the pending record older harnesses left), refused when that cannot be written.
-Another invocation still alive refuses it (two commands under one hold). An earlier one that ended with a tool not
-proven ended has that tool's receipt logged in the board's cleanup log, and the tool, and any `JLinkExe` on the board's
-probe, get up to 30 s to end (`hil_test.py` `CLAIM_SETTLE`); a receipt whose state cannot be read (`unknown`) is not
-waited on. Anything not ended refuses the attempt. The earlier claim is removed unless one of its tools still rechecks
-`pending` (proven running) or its log could not be written, so a later attempt waits only on a tool that runs. An
-invocation removes its own claim once its own tools recheck `done`, and keeps it otherwise for the next claim to judge.
+receipt goes to the board's cleanup log, which a later restore rechecks (Recovery).
 
 ### CI
 
@@ -173,11 +165,37 @@ shared run rules. Runs are never cancelled: a newer push waits.
 ## Reservation
 
 - Lock helper: agentrc's `hil_lock.py` through `scripts/agentrc.py`; lock name `nrf52840dk` from the registry.
-- `run` locks itself (`take_board_lock`, protected). The lock ends with the run: after a passing cleanup the open failed
-  cleanups it found (`previousCleanupFailure`) whose receipts recheck `done` are marked restored (`resolve_restored`)
-  and the lock released; after a failed one `end_failed` logs it in the board's cleanup log, with the receipts of tools
-  not proven ended, and releases. Nothing holds the board after a run. A board in use (Execution) is not run
-  (`locked`, or `occupiedBy` when an earlier invocation's tool or another `JLinkExe` stayed).
+- `run` locks itself through `hil_lock.board_task` (protected; it waits out contention for `--lock-wait` seconds; no
+  bypass). Under the lock, before any hardware access, the busy check (`hil_test.py` `probe_busy`: agentrc's
+  `hil_flash.probe_users` on the board's J-Link) refuses the run when a process names the probe's serial in its
+  command line or holds the probe's USB device (`occupiedBy`, each `{pid, cmd}`), or when it cannot tell
+  (`ProbeCheckInconclusive`, e.g. a J-Link tool of another user that selects no other probe); either refusal releases
+  the lock with nothing logged and is never waited out. It also names, in `occupiedBy`, each tool of an earlier run
+  still running (`earlier_runs`): a receipt of an open failed cleanup that rechecks `pending`, and for a run that was
+  killed (its record found left, with its `runDir`) an operation in that run dir's `ops` (`hil_process.recheck_dir`);
+  and, needing no lock record or cleanup log (a killed `install` or `restore`, a failure that could not be logged),
+  each `mcopy`, `adafruit-nrfutil dfu serial` or `hil_test.py fat-read|flush` on the host whose device (`-i`, `-p`,
+  `--dev`, a relative one under the tool's cwd; naming none, each node it holds open) is a node of the USB device with
+  the board's serial (`dut_tools`); a `hil_process.py --supervise` supervisor counts as the tool its job names, which
+  it launches after its caller's hello, so a caller killed before then leaves it about to. A tool on a node gone, of no
+  USB device or of one with no or another serial is not the board's, so another project's tools on a shared host do
+  not refuse. It cannot tell, and refuses, when a tool's device, a device-less tool's fds or a supervisor's job cannot
+  be read, a supervisor's tool names no device, or a device's USB serial cannot be read while the board is not seen
+  at another port (it is one USB device), or the scan does not finish in `DUT_SCAN_BOUND` s. It scans every uid's
+  processes, not only its own: the farm's runner and the admin's manual session share the board as different uids,
+  so another uid's tool whose device, cwd or fds cannot be read refuses rather than being skipped. The check is
+  a limited snapshot (its docstring): a GDB client attached to a server, a tool whose device node was reused by
+  another device, and a child that opens the probe or the drive after the check are not seen.
+- The lock ends on the run's cleanup verdict, failed before restored before clean. A cleanup that failed or was never
+  proven (a failed restore, a tool not proven ended, an interrupt or an error outside a step once the board was
+  touched) is logged in the board's cleanup log by `end_failed` with the receipts of tools not proven ended (exit 4).
+  A passing restore, after a failed step too, marks restored the open failed cleanups the run found
+  (`previousCleanupFailure`) whose receipts recheck `done` (`resolve_restored`), a killed run's once every operation in
+  its run dir's `ops` rechecks `done`; the run keeps its own result (a failed step exits 1). An untouched board ends
+  clean. An interrupt while the lock ends keeps that verdict and aborts the run (exit 1). Nothing holds the board
+  after a run.
+- One board per process: a signal that arrives as the run's board task starts ending can leave its lock held until
+  the process exits (`board_task`'s limit), and the process exits right after.
 - Manual sessions (commissioning, debugging) hold first, then work under the hold:
 
 ```bash
@@ -189,6 +207,10 @@ python3 ~/.claude/skills/hil/scripts/hil_lock.py release nrf52840dk
 
   `install` writes the candidate and checks its drive; `restore` is the cleanup below, and once it passes marks
   restored the board's open failed cleanups whose receipts recheck `done`. Release only after a passing `restore`.
+  Each command first takes the board's session mutex (`hil_lock.session_mutex`), before it checks the hold, so a
+  second command under the same hold refuses while one runs; a run's own lock (a protected record) is no hold to work
+  under. Then the busy check above refuses a busy or undecidable probe or a tool of an earlier run still running. Each
+  refusal exits 2 before any tool.
   Neither ever ends the hold: a failed `restore`, or a tool not proven ended, is logged in the board's cleanup log
   (`log_cleanup_failure`, `failureLogged`) and exits 4, the hold staying the caller's.
 - Cleanup (`cleanup` in the row): untouched when nothing was written; otherwise the candidate installed again and a
@@ -203,13 +225,16 @@ python3 ~/.claude/skills/hil/scripts/hil_lock.py release nrf52840dk
 `<run-root>/run-<time>-<pid>/hil_report.json` and `.md` through agentrc's report core (`hil` Reporting), body schema
 `nrf52-bootloader-hil-run`; the same JSON is the last stdout line. Fields: `pass`, `exitCode`, `caveat`, `error`,
 `reportPath`, `uncovered` (what the rig cannot establish, Limits), and per board `results[]`: `ran`, `pass`, `locked`
-(with `recoveryBlocker`), `occupiedBy`, `detail`, `claimNote`, `previousCleanupFailure` and `openCleanupFailures` (the
-board's open failed cleanups the run found, `hil_lock.failure_report`), `firmware` (version, record, merged sha256,
-head), `steps[]` (`step`, `pass`, `detail`, `evidence`, `seconds`) and `cleanup` (`pass`, `state`, `receipts`,
-`released`, `failureLogged` and `endErrors` after a failed cleanup, `restoredNote` naming failures kept open).
+(with `recoveryBlocker`), `occupiedBy` (the busy check's users), `detail`, `previousCleanupFailure` and
+`openCleanupFailures` (the board's open failed cleanups the run found, `hil_lock.failure_report`), `firmware` (version,
+record, merged sha256, head), `steps[]` (`step`, `pass`, `detail`, `evidence`, `seconds`) and `cleanup` (`pass`,
+`state`, `receipts`, `released`, `failureLogged` when the lock's end logged a failed cleanup, `lock` the board task's
+one line on how its lock ended (`describe()`: released, the failure logged and where, its errors), `restoredNote` naming
+failures kept open).
 
 Exits: 0 pass and cleaned up; 1 a step failed, the board did not run, or it was locked; 2 refused before any hardware
-access; 4 cleanup failed, logged in the board's cleanup log (`failureLogged`) and the lock released.
+access; 4 cleanup failed, logged in the board's cleanup log (`failureLogged`) and the lock released, or the lock did
+not end as its verdict said (`lock`).
 `scripts/hil_run_report.py`'s `verdict()` maps a row onto the `hil` verdicts: pass; fail (a step failed, cleanup
 passed); not-run (locked, refused, or failed with nothing written); blocker (exit 4 or a failed cleanup, a recovery
 blocker, `occupiedBy`, no report). A delegated run (`hil-operator`) adds nothing to the native report; its caller
@@ -221,10 +246,10 @@ retries a fail once per `hil` Caller rules.
   (`/tmp/tinyusb-hil-locks/nrf52840dk.cleanup.jsonl`) keeps it and nothing holds the board, so no unlock step follows.
   The next `run` installs from an erase anyway and, once its cleanup passes, marks it restored when its receipts
   recheck `done`; to restore without a run, hold, `restore --under-hold`, release (Reservation). A failure that stays
-  open (`restoredNote`) names a tool not proven ended: once no `JLinkExe`, `mcopy`, `adafruit-nrfutil` or
-  `hil_test.py` child of it is left on the host, a passing `restore` resolves it; a tool that never ends (D state) is
-  `usb-kernel-recover`'s, then the human's. A receipt in another user's run dir rechecks `done` only for that user, so
-  only that user's restore resolves it.
+  open (`restoredNote`) names a tool not proven ended (a killed run's: an operation in its run dir's `ops`): once no
+  `JLinkExe`, `mcopy`, `adafruit-nrfutil` or `hil_test.py` child of it is left on the host, a passing `restore`
+  resolves it; a tool that never ends (D state) is `usb-kernel-recover`'s, then the human's. A receipt in another
+  user's run dir rechecks `done` only for that user, so only that user's restore resolves it.
 - `recoveryBlocker`: an older helper's cleanup holder still holds the lock (`hil_lock.py status` shows `role:
   cleanup-holder` and its pid) and never frees on its own. Once no tool of its run is left on the host, a
   `hw-validator` or the human runs, with that run's record or one rebuilt on a known-good clean HEAD:
@@ -237,9 +262,9 @@ retries a fail once per `hil` Caller rules.
   It proves `<pid>` is the board's live cleanup holder, restores under it, and only after the restore passed ends the
   holder by its token (`recovered.released`). A failed restore (exit 4) is logged and leaves the holder: the board goes
   to the human. A dead holder's record on a free lock needs nothing: the next taker logs it as a failed cleanup.
-- `occupiedBy`: an earlier invocation's tool, or another `JLinkExe` on the probe, outlived the settle, or its state
-  could not be read; the earlier invocation's failure is logged and its claim kept or removed as Execution says (the
-  failure stays open until a restore resolves it). A `JLinkExe` still on the probe refuses every attempt.
+- `occupiedBy`: the busy check found a process using the board's probe (its `pid` and `cmd`); nothing was touched or
+  logged. Never kill it: find whose it is (`ps -o user,pid,args -p <pid>`) and retry once it ended. A refusal naming
+  `ProbeCheckInconclusive` says what the check could not read.
 - A J-Link that no longer connects: agentrc's `usb-kernel-recover` rungs, then the registry's `flasher_recover`
   (openocd `nrf52.cfg`). An APPROTECT recover is never automatic.
 - A UF2 drive that never enumerates after a passing `install`: check the DK's nRF USB cable (J3) and the hub port;

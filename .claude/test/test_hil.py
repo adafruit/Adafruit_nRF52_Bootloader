@@ -7,9 +7,15 @@ import fcntl
 import importlib.util
 import io
 import json
+import os
+import shutil
+import signal
 import struct
+import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -835,127 +841,582 @@ BOARD = {'name': 'pca10056', 'reentry': 'gpregret', 'uid': 'u', 'lock': 'nrf5284
 
 
 def mock_helper(**kw):
-  """The lock helper mocked, its failure_report and exceptions the agentrc's."""
+  """The lock helper mocked, its failure_report, session mutex and exceptions the agentrc's."""
   real = ht.lock_helper()
-  return mock.Mock(failure_report=real.failure_report, ReleaseRefused=real.ReleaseRefused,
-                   resolve_restored=mock.Mock(return_value=[]), end_failed=mock.Mock(return_value={}), **kw)
+  return mock.Mock(failure_report=real.failure_report, ReleaseRefused=real.ReleaseRefused, BoardBusy=real.BoardBusy,
+                   session_mutex=real.session_mutex, SessionBusy=real.SessionBusy, settle=real.settle,
+                   logged_tokens=real.logged_tokens, open_runs=real.open_runs,
+                   LockUnavailable=real.LockUnavailable, resolve_restored=mock.Mock(return_value=[]),
+                   end_failed=mock.Mock(return_value={}), **kw)
 
 
-class RunLock(unittest.TestCase):
-  """cmd_run's lock lifecycle (agentrc#474): released after a proven cleanup, else ended through end_failed."""
-  def run_cmd(self, fail=None, restored=None, claim=None, end_errors=None):
-    """cmd_run with the battery raising `fail` after install touched the board, then the restore returning `restored`
-    (None: the real one); claim and unclaim stubbed (Claim tests them)."""
-    fh = mock.Mock(cleanup_failures=[PREVIOUS])
-    helper = mock_helper(take_board_lock=mock.Mock(return_value=fh))
-    if end_errors:
-      helper.end_failed.return_value = end_errors
+class FakeOp:
+  """A run_tracked operation's files in the state dir `ops`, as hil_process.recheck reads them: running (its lock
+  held, no record yet) until end() leaves it done, or with done=False not provable (no record)."""
+  def __init__(self, ops, token='t0'):
+    self.base = Path(ops) / f'hil_op_{token}'
+    self.fd = os.open(f'{self.base}.lock', os.O_RDWR | os.O_CREAT, 0o600)
+    fcntl.flock(self.fd, fcntl.LOCK_EX)
+    st = os.fstat(self.fd)
+    self.lock = [st.st_dev, st.st_ino]
+    self.receipt = {'token': token, 'supervisor': {'pid': 4242, 'start': None, 'lock': self.lock},
+                    'lock': f'{self.base}.lock', 'record': f'{self.base}.json', 'log': f'{self.base}.log',
+                    'survivors': None}
 
+  def end(self, done=True):
+    if done:
+      Path(f'{self.base}.log').write_text('')
+      fd = os.open(f'{self.base}.json', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+      with os.fdopen(fd, 'w') as f:
+        json.dump({'token': self.receipt['token'], 'lock': self.lock, 'pid': 4242, 'cleanup': 'done'}, f)
+    if self.fd is not None:
+      os.close(self.fd)
+      self.fd = None
+
+
+# dut_tools' view of FakeOp's pending supervisor, which earlier_runs also names, and of another tool on the board
+SUPERVISOR_SEEN = [{'pid': 4242, 'cmd': 'python3 -I /x/hil_process.py --supervise {"cmd": ["mcopy"]}'},
+                   {'pid': 99, 'cmd': 'mcopy -i /dev/ttyACM9 f ::X'}]
+
+
+def board_device(test, serial='u'):
+  """/dev/null planted in a private sysfs (ht.SYS_DEV) as the tty of a USB device with `serial` (None: it has none),
+  BOARD's by default: the device a DUT-side tool names, as dut_tools resolves it."""
+  tmp = tempfile.mkdtemp()
+  test.addCleanup(shutil.rmtree, tmp)
+  usb = Path(tmp, 'devices/usb1/1-9')
+  (usb / '1-9:1.0/tty/ttyACM9').mkdir(parents=True)
+  if serial is not None:
+    (usb / 'serial').write_text(serial + '\n')
+  rdev = os.stat('/dev/null').st_rdev
+  link = Path(tmp, 'dev/char', f'{os.major(rdev)}:{os.minor(rdev)}')
+  link.parent.mkdir(parents=True)
+  link.symlink_to(usb / '1-9:1.0/tty/ttyACM9')
+  patch = mock.patch.object(ht, 'SYS_DEV', str(Path(tmp, 'dev')))
+  patch.start()
+  test.addCleanup(patch.stop)
+  return '/dev/null'
+
+
+def fake_tool(test, name):
+  """`name` in a private dir, a Python script that sleeps 30 s: a DUT-side tool as /proc shows one."""
+  d = tempfile.mkdtemp()
+  test.addCleanup(shutil.rmtree, d)
+  path = Path(d, name)
+  path.write_text(f'#!{sys.executable}\nimport time\ntime.sleep(30)\n')
+  path.chmod(0o755)
+  return str(path)
+
+
+def wait_for_tool(path):
+  """The pid of the process /proc shows running the script `path`, once one does."""
+  for _ in range(100):
+    for pid in filter(str.isdigit, os.listdir('/proc')):
+      with contextlib.suppress(OSError):
+        if path.encode() in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0'):
+          return int(pid)
+    time.sleep(0.1)
+  raise AssertionError(f'{path} never ran')
+
+
+def end_tool(pid, ops):
+  """Kill the tool `pid` and wait for its supervisor to prove it ended (the ops dir rechecks done)."""
+  with contextlib.suppress(ProcessLookupError):
+    os.kill(pid, signal.SIGKILL)
+  for _ in range(100):
+    if ht.process().recheck_dir(str(ops))[0] == 'done':
+      return
+    time.sleep(0.1)
+  raise AssertionError(f'{ops} never rechecked done')
+
+
+# a hil_test.py command under the board's session mutex running mcopy through run_tracked, until SIGKILLed
+KILLED_COMMAND = '''
+import importlib.util, sys
+scripts, lock_dir, work, dev = sys.argv[1:]
+sys.path.insert(0, scripts)
+spec = importlib.util.spec_from_file_location('hil_test', f'{scripts}/hil_test.py')
+ht = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ht)
+ht.lock_helper().BOARD_LOCK_DIR = lock_dir
+with ht.lock_helper().session_mutex('nrf52840dk'):
+  ht.Tools(work, f'{work}/hil.log').run(['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2'], timeout=60)
+'''
+
+
+class PrivateLocks(unittest.TestCase):
+  """agentrc's real lock helper over a private lock dir."""
+  def setUp(self):
+    self.tmp = tempfile.mkdtemp()
+    self.addCleanup(lambda: __import__('shutil').rmtree(self.tmp))
+    self.helper = ht.lock_helper()
+    patch = mock.patch.object(self.helper, 'BOARD_LOCK_DIR', str(Path(self.tmp) / 'locks'))
+    patch.start()
+    self.addCleanup(patch.stop)
+
+  def lock_is_free(self):
+    self.helper.release_board_lock(self.helper.take_board_lock('nrf52840dk', 'check'))
+    return True
+
+
+def raises(e):
+  def fn(*_):
+    raise e
+  return fn
+
+
+def dfu_fails(bat):
+  bat.touched = True
+  bat.step('dfu', raises(ht.StepFail('no drive')))
+
+
+class RunLock(PrivateLocks):
+  """cmd_run on agentrc's real board_task: the busy check under the lock, one cleanup verdict by precedence failed,
+  restored, clean, and the lock ended with the run."""
+  def setUp(self):
+    super().setUp()
+    self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='earlier run')
+    (self.previous,) = self.helper.open_cleanup_failures('nrf52840dk')
+
+  def run_cmd(self, fail=None, restored=None, busy=(), lock_wait=0, dut=False):
+    """cmd_run with the battery raising `fail` after install touched the board (`fail(bat)` when callable, which
+    touches it itself), then the restore returning `restored` (None: the real one); `busy` the probe users, or what
+    the check raises; `dut` the real dut_tools, else none."""
     def battery(bat, base):
-      bat.touched = True
       if callable(fail):
-        fail(bat)
-      elif fail:
+        return fail(bat)
+      bat.touched = True
+      if fail:
         raise fail
     restores = []
-    patches = [mock.patch.object(ht, 'lock_helper', return_value=helper),
-               mock.patch.object(ht, 'load_board', return_value=BOARD),
+    patches = [mock.patch.object(ht, 'load_board', return_value=BOARD),
                mock.patch.object(ht, 'admit', return_value=({'input': {'head': 'h'}}, {'sha256': {'merged': 'm'}}, {})),
                mock.patch.object(ht, 'facts', return_value={**FACTS, 'version': 'v', 'vid': 1, 'pid': 2}),
                mock.patch.object(ht, 'publish'),
                mock.patch.object(ht, 'admit_base', return_value={'version': 'v', 'file': 'f', 'sha256': 's'}),
                mock.patch.object(ht.shutil, 'which', return_value='/bin/true'),
                mock.patch.object(ht.Battery, 'battery', battery),
-               mock.patch.object(ht, 'claim',
-                                 side_effect=claim or (lambda b, ops, found: ({'receipt': 'me'}, found, ''))),
-               mock.patch.object(ht, 'unclaim', return_value='')]
+               mock.patch.object(ht, 'probe_busy', side_effect=raises(busy) if isinstance(busy, Exception)
+                                 else lambda board: list(busy))]
+    if not dut:
+      patches.append(mock.patch.object(ht, 'dut_tools', return_value=[]))
     if restored is not None:
       patches.append(mock.patch.object(ht.Battery, 'restore', lambda bat: restores.append(1) or restored))
     with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
          contextlib.ExitStack() as stack:
       for patch in patches:
         stack.enter_context(patch)
-      code = ht.main(['run', '-b', 'pca10056', '--build-record', 'r', '--base-dir', d, '--run-root', d, 'roster'])
+      code = ht.main(['run', '-b', 'pca10056', '--build-record', 'r', '--base-dir', d, '--run-root', d,
+                      '--lock-wait', str(lock_wait), 'roster'])
     res = json.loads(out.getvalue().splitlines()[-1])
-    return code, helper, fh, restores, res
+    return code, restores, res
+
+  def new_events(self):
+    return self.helper.cleanup_events('nrf52840dk')[1:]
 
   def test_a_passing_run_resolves_the_failures_it_found_then_releases(self):
-    code, helper, fh, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
     row = res['results'][0]
     self.assertEqual((code, res['exitCode'], restores), (0, 0, [1]))
-    self.assertEqual(row['previousCleanupFailure'], PREVIOUS)
-    names = [c[0] for c in helper.mock_calls]
-    self.assertLess(names.index('resolve_restored'), names.index('release_board_lock'))
-    self.assertEqual(helper.resolve_restored.call_args[0], ('nrf52840dk', [PREVIOUS]))
-    helper.release_board_lock.assert_called_once_with(fh)
-    helper.end_failed.assert_not_called()
-    self.assertTrue(row['cleanup']['released'])
-    self.assertNotIn('heldInProcess', res)
+    self.assertEqual(row['previousCleanupFailure'], self.previous)
+    (event,) = self.new_events()
+    self.assertEqual((event['event'], event['failure'], event['evidence']),
+                     ('restored', self.previous['id'], 'pca10056: fixture running'))
+    self.assertEqual((row['cleanup']['released'], row['cleanup']['lock']), (True, 'nrf52840dk: lock released'))
+    self.assertTrue(self.lock_is_free())
 
-  def test_a_failed_restore_ends_the_lock_through_end_failed(self):
-    def step_fails(bat):
-      bat.step('dfu', lambda: (_ for _ in ()).throw(ht.StepFail('no drive')))
-    code, helper, fh, _, res = self.run_cmd(step_fails,
-                                           {'pass': False, 'state': 'unknown', 'detail': 'restore: no drive'})
-    self.assertEqual((code, res['results'][0]['detail']), (4, 'dfu: no drive'))
-    helper.end_failed.assert_called_once_with({'nrf52840dk': fh}, 'hil_test.py', detail='restore: no drive',
-                                              receipts=[])
-    helper.release_board_lock.assert_not_called()
-    helper.resolve_restored.assert_not_called()
+  def test_a_failed_step_whose_restore_passed_is_restored_and_fails(self):
+    code, restores, res = self.run_cmd(dfu_fails, {'pass': True, 'state': 'fixture running'})
+    row = res['results'][0]
+    self.assertEqual((code, restores, row['detail'], row['cleanup']['pass']), (1, [1], 'dfu: no drive', True))
+    self.assertEqual([e['event'] for e in self.new_events()], ['restored'])
+    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'fail')
+
+  def test_a_failed_restore_ends_the_lock_as_a_logged_failure(self):
+    code, _, res = self.run_cmd(dfu_fails, {'pass': False, 'state': 'unknown', 'detail': 'restore: no drive'})
+    (event,) = self.new_events()
+    self.assertEqual((code, event['event'], event['how'], event['detail'], event['receipts']),
+                     (4, 'failed', 'ended-failed', 'restore: no drive', []))
     cleanup = res['results'][0]['cleanup']
-    self.assertEqual((cleanup['failureLogged'], cleanup['released']), (True, True))
+    self.assertEqual((res['results'][0]['detail'], cleanup['failureLogged'], cleanup['released']),
+                     ('dfu: no drive', True, True))
+    self.assertEqual(len(self.helper.open_cleanup_failures('nrf52840dk')), 2)
     self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
-    self.assertIn("logged in the board's cleanup log; lock released", rr.verdict(code, res, 'pca10056')[1])
+    self.assertIn('Cleanup failed (unknown): nrf52840dk: lock released, failure logged in',
+                  rr.verdict(code, res, 'pca10056')[1])
+    self.assertTrue(self.lock_is_free())
 
-  def test_an_error_or_interrupt_outside_a_step_skips_the_restore_and_logs(self):
+  def test_an_error_or_interrupt_after_touching_skips_the_restore_and_logs(self):
     for fail, detail in ((OSError('boom'), 'OSError: boom'), (KeyboardInterrupt(), 'KeyboardInterrupt: ')):
       with self.subTest(fail=detail):
-        code, helper, _, restores, res = self.run_cmd(fail, {'pass': True, 'state': 'x'})
+        code, restores, res = self.run_cmd(fail, {'pass': True, 'state': 'x'})
         row = res['results'][0]
         self.assertEqual((code, restores, row['detail'], row['cleanup']['state']), (4, [], detail, 'unknown'))
-        self.assertEqual(helper.end_failed.call_args.kwargs['detail'], 'interrupted before cleanup')
-        helper.release_board_lock.assert_not_called()
+        self.assertTrue(self.new_events()[-1]['detail'].startswith('interrupted before cleanup; then '))
+        self.assertTrue(self.lock_is_free())
+
+  def test_an_interrupt_before_touching_aborts_the_run_and_ends_clean(self):
+    def interrupted(bat):
+      raise KeyboardInterrupt
+    code, restores, res = self.run_cmd(interrupted)
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], row['cleanup']['state'], row['cleanup']['released']),
+                     (1, True, 'untouched', True))
+    self.assertEqual((self.new_events(), rr.verdict(code, res, 'pca10056')[0]), ([], 'blocker'))
+    self.assertIn('aborted', rr.verdict(code, res, 'pca10056')[1])
 
   def test_tools_not_proven_ended_go_to_the_cleanup_log_with_their_receipts(self):
     def not_ended(bat):
+      bat.touched = True
       bat.tools.receipts += [{'cmd': 'JLinkExe', 'cleanup': 'pending', 'receipt': {'token': 'r'}},
                              {'cmd': 'mcopy', 'cleanup': 'unknown', 'receipt': None}]
       raise ht.NotEnded('JLinkExe: a tool is not proven ended')
-    code, helper, _, _, res = self.run_cmd(not_ended)   # the real restore refuses to touch the board
+    code, _, res = self.run_cmd(not_ended)   # the real restore refuses to touch the board
     self.assertEqual((code, res['results'][0]['cleanup']['state']), (4, 'unknown'))
-    self.assertEqual(helper.end_failed.call_args.kwargs['receipts'],
-                     [{'token': 'r'}, {'unrecheckable': 'mcopy: cleanup unknown'}])
+    self.assertEqual(self.new_events()[0]['receipts'], [{'token': 'r'}, {'unrecheckable': 'mcopy: cleanup unknown'}])
 
-  def test_a_cleanup_log_that_cannot_be_written_is_reported(self):
-    errors = {'nrf52840dk': ['cleanup log not written: OSError(28)']}
-    code, _, _, _, res = self.run_cmd(OSError('boom'), end_errors=errors)
+  def test_a_cleanup_log_that_cannot_be_written_is_reported_then_a_manual_restore_resolves(self):
+    with mock.patch.object(self.helper, 'log_cleanup_failure', side_effect=OSError(28, 'No space left')):
+      code, _, res = self.run_cmd(OSError('boom'))
     cleanup = res['results'][0]['cleanup']
-    self.assertEqual((code, cleanup['failureLogged'], cleanup['endErrors']), (4, False, errors['nrf52840dk']))
-    self.assertIn('NOT logged', rr.verdict(code, res, 'pca10056')[1])
+    self.assertEqual((code, cleanup['failureLogged'], cleanup['released']), (4, False, True))
+    self.assertIn('errors: cleanup log not written', cleanup['lock'])
+    self.assertIn('failure NOT logged', rr.verdict(code, res, 'pca10056')[1])
+    code, _, _ = self.run_cmd(dfu_fails, {'pass': False, 'state': 'unknown', 'detail': 'restore: no drive'})
+    self.assertEqual((code, len(self.helper.open_cleanup_failures('nrf52840dk'))), (4, 2))
+    with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
+         mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht, 'prove_hold'), \
+         mock.patch.object(ht, 'probe_busy', return_value=[]), \
+         mock.patch.object(ht, 'dut_tools', return_value=[]), \
+         mock.patch.object(ht, 'admit', return_value=({}, {}, {})), \
+         mock.patch.object(ht, 'facts', return_value=FACTS), \
+         mock.patch.object(ht.Battery, 'restore', lambda bat: {'pass': True, 'state': 'fixture running'}):
+      code = ht.main(['restore', '-b', 'pca10056', '--build-record', 'r', '--run-root', d, '--under-hold', 'dbg',
+                      'roster'])
+    self.assertEqual((code, json.loads(out.getvalue())['pass']), (0, True))
+    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
 
-  def test_a_board_in_use_is_not_run_and_its_lock_released(self):
-    def in_use(occupied):
-      def claim(board, ops, found):
-        raise ht.InUse('x', found + [dict(PREVIOUS, id='f2')], occupied)
-      return claim
-    code, helper, fh, restores, res = self.run_cmd(claim=in_use(None))
+  def test_a_busy_probe_refuses_before_the_body_without_an_event(self):
+    users = [{'pid': 123, 'cmd': 'JLinkExe -USB 1'}]
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'x'}, busy=users)
     row = res['results'][0]
-    self.assertEqual((code, row['ran'], row['locked'], restores), (1, False, True, []))
-    self.assertEqual((row['openCleanupFailures'], row['previousCleanupFailure']['id']), (2, 'f2'))
-    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'not-run')
-    helper.release_board_lock.assert_called_once_with(fh)
-    helper.resolve_restored.assert_not_called()
-    code, _, _, _, res = self.run_cmd(claim=in_use(['123 JLinkExe -USB 1']))
-    self.assertEqual((res['results'][0]['occupiedBy'], rr.verdict(code, res, 'pca10056')[0]),
-                     (['123 JLinkExe -USB 1'], 'blocker'))
+    self.assertEqual((code, row['ran'], restores, row['occupiedBy']), (1, False, [], users))
+    self.assertIn('board busy', row['detail'])
+    self.assertEqual((row['previousCleanupFailure'], row['cleanup']['released']), (self.previous, True))
+    self.assertEqual((self.new_events(), rr.verdict(code, res, 'pca10056')[0]), ([], 'blocker'))
+    self.assertTrue(self.lock_is_free())
+
+  def test_an_inconclusive_busy_check_refuses_without_an_event(self):
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'x'},
+                                       busy=ht.provider().ProbeCheckInconclusive('/proc may hide others'))
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], restores, row['cleanup']['released']), (1, False, [], True))
+    self.assertIn('ProbeCheckInconclusive: /proc may hide others', row['detail'])
+    self.assertEqual((self.new_events(), rr.verdict(code, res, 'pca10056')[0]), ([], 'not-run'))
+    self.assertTrue(self.lock_is_free())
+
+  def test_an_interrupt_while_the_lock_ends_keeps_the_restoration_and_aborts_the_run(self):
+    def interrupted(board, failures, **evidence):   # a real SIGINT, deferred by the task's InterruptHold
+      ht.os.kill(ht.os.getpid(), signal.SIGINT)
+      return []
+    with mock.patch.object(self.helper, 'resolve_restored', side_effect=interrupted) as resolve:
+      code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    row = res['results'][0]
+    resolve.assert_called_once()
+    self.assertEqual((code, res['pass'], row['pass'], row['detail'], restores),
+                     (1, False, False, 'KeyboardInterrupt: ', [1]))
+    self.assertEqual((row['cleanup']['pass'], row['cleanup']['released'], self.new_events()), (True, True, []))
+    self.assertEqual(rr.verdict(code, res, 'pca10056'), ('blocker', 'aborted: KeyboardInterrupt: '))
+    self.assertTrue(self.lock_is_free())
+
+  def test_a_refusal_whose_lock_does_not_end_cleanly_exits_4(self):
+    with mock.patch.object(self.helper, 'clear_record', return_value=False):
+      code, restores, res = self.run_cmd(busy=ht.provider().ProbeCheckInconclusive('/proc may hide others'))
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], restores), (4, False, []))
+    self.assertTrue(row['cleanup']['lock'].endswith('errors: record not cleared'))
+    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
+    fh = self.helper.take_board_lock('nrf52840dk', 'other')   # a lock never taken ends nothing: still exit 1
+    self.addCleanup(self.helper.release_board_lock, fh)
+    code, _, res = self.run_cmd()
+    self.assertEqual((code, res['results'][0]['locked'], res['results'][0]['cleanup']['lock']),
+                     (1, True, 'nrf52840dk: lock not taken'))
+
+  def fake_op(self, run_dir):
+    op = FakeOp(ht.process().state_dir(run_dir, 'ops'))
+    self.addCleanup(op.end, False)
+    return op
+
+  def test_an_earlier_runs_tool_still_running_refuses_the_run_until_it_ended(self):
+    op = self.fake_op(Path(self.tmp) / 'earlier')
+    logged = self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='JLinkExe pending',
+                                             receipts=[op.receipt])
+    with mock.patch.object(ht, 'dut_tools', return_value=SUPERVISOR_SEEN):   # its pending supervisor, and another
+      code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, dut=True)
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], restores, [u['pid'] for u in row['occupiedBy']]), (1, False, [], [4242, 99]))
+    self.assertIn(f'failed cleanup {logged["id"]}: receipt t0', row['occupiedBy'][0]['cmd'])
+    self.assertEqual((row['previousCleanupFailure'], row['openCleanupFailures']), (logged, 2))
+    self.assertEqual((self.new_events()[1:], rr.verdict(code, res, 'pca10056')[0]), ([], 'blocker'))
+    op.end()
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    self.assertEqual((code, restores), (0, [1]))
+    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
+
+  def test_a_killed_runs_tools_keep_its_failure_open_until_they_ended(self):
+    run_dir = Path(self.tmp) / 'killed'
+    op = self.fake_op(run_dir)
+    self.helper.take_board_lock('nrf52840dk', 'hil_test.py', protected=True, runDir=str(run_dir)).close()
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})   # logs it found-left
+    row = res['results'][0]
+    (left,) = [f for f in self.helper.open_cleanup_failures('nrf52840dk') if f['how'] == 'found-left']
+    self.assertEqual((code, row['ran'], restores, row['previousCleanupFailure']), (1, False, [], left))
+    self.assertIn(f'failed cleanup {left["id"]}', row['occupiedBy'][0]['cmd'])
+    op.end(done=False)   # gone, its end never proven: admitted, the failure kept open
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    self.assertEqual((code, restores), (0, [1]))
+    self.assertIn(f'{left["id"]} stays open', res['results'][0]['cleanup']['restoredNote'])
+    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [left])
+    op.end()
+    code, _, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'})
+    self.assertEqual((code, self.helper.open_cleanup_failures('nrf52840dk')), (0, []))
+
+  def test_a_tool_left_pending_whose_failure_was_not_logged_refuses_the_next_run(self):
+    dev, tools = board_device(self), []
+
+    def left_pending(bat):   # the run's mcopy outlives it, and its failed cleanup cannot be logged
+      bat.touched = True
+      tools.append(subprocess.Popen([fake_tool(self, 'mcopy'), '-o', '-i', dev, 'copy.uf2', '::APP.UF2']))
+      self.addCleanup(lambda: tools[0].kill() or tools[0].wait())
+      bat.tools.receipts.append({'cmd': 'mcopy', 'cleanup': 'pending', 'receipt': {'token': 'r'}})
+      raise ht.NotEnded('mcopy: a tool is not proven ended')
+    only = mock.patch.object(ht, 'tools_left', lambda: [f'{t.pid} mcopy' for t in tools])   # not the host's
+    only.start()
+    self.addCleanup(only.stop)
+    with mock.patch.object(self.helper, 'log_cleanup_failure', side_effect=OSError(28, 'No space left')):
+      code, _, res = self.run_cmd(left_pending, dut=True)
+    self.assertEqual((code, res['results'][0]['cleanup']['failureLogged'], self.new_events()), (4, False, []))
+    code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, dut=True)
+    row = res['results'][0]
+    self.assertEqual((code, row['ran'], restores), (1, False, []))
+    self.assertEqual([u['pid'] for u in row['occupiedBy']], [tools[0].pid])
+    self.assertIn(f'-i {dev}', row['occupiedBy'][0]['cmd'])
+    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
+    tools[0].kill()
+    tools[0].wait()
+    code, restores, _ = self.run_cmd(restored={'pass': True, 'state': 'fixture running'}, dut=True)
+    self.assertEqual((code, restores), (0, [1]))
+
+  def test_lock_wait_reaches_the_board_task_and_a_held_lock_is_locked(self):
+    fh = self.helper.take_board_lock('nrf52840dk', 'other')
+    self.addCleanup(self.helper.release_board_lock, fh)
+    with mock.patch.object(self.helper, 'board_task', wraps=self.helper.board_task) as board_task:
+      code, restores, res = self.run_cmd(restored={'pass': True, 'state': 'x'})
+      self.assertEqual(board_task.call_args.kwargs['wait'], 0)
+      row = res['results'][0]
+      self.assertEqual((code, row['ran'], row['locked'], row['recoveryBlocker'], restores),
+                       (1, False, True, False, []))
+      self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'not-run')
+      # a recovery blocker refuses at once whatever the wait
+      with mock.patch.object(self.helper, 'take_board_lock', side_effect=self.helper.RecoveryBlocked('holder 7')):
+        code, _, res = self.run_cmd(restored={'pass': True, 'state': 'x'}, lock_wait=1800)
+      self.assertEqual(board_task.call_args.kwargs['wait'], 1800)
+    row = res['results'][0]
+    self.assertEqual((code, row['locked'], row['recoveryBlocker'], row['detail']), (1, True, True, 'holder 7'))
+    self.assertEqual(rr.verdict(code, res, 'pca10056')[0], 'blocker')
 
 
-class Manual(unittest.TestCase):
-  """install and restore under the caller's hold, or restore under an older helper's cleanup holder: they only log."""
-  def manual(self, cmd, outcome, hold=('--under-hold', 'dbg'), receipts=()):
-    helper = mock_helper(open_cleanup_failures=mock.Mock(return_value=[PREVIOUS]))
+class ToolsLeft(unittest.TestCase):
+  def test_refuses_when_pgrep_cannot_tell(self):
+    for rc, out, left in ((0, '12 mcopy -i /dev/sde\n', ['12 mcopy -i /dev/sde']), (1, '', [])):
+      with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=rc, stdout=out, stderr='')) as run:
+        self.assertEqual(ht.tools_left(), left)
+      self.assertEqual(run.call_args.kwargs['timeout'], ht.DUT_SCAN_BOUND)
+    for rc in (2, 3):
+      with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=rc, stdout='', stderr='x')), \
+           self.assertRaisesRegex(ht.Refused, f'pgrep exited {rc}'):
+        ht.tools_left()
+    with mock.patch.object(ht.subprocess, 'run', side_effect=subprocess.TimeoutExpired('pgrep', 20)), \
+         self.assertRaisesRegex(ht.Refused, 'pgrep did not finish'):
+      ht.tools_left()
+
+
+def on_board(argv, uid='u', pid=None):
+  return any(ht.on_board(st, uid) for st in ht.dut_nodes(argv, pid))
+
+
+def running(test, argv, **kw):
+  """`argv` running until the test ends, its stdio pipes (not /dev/null, which board_device plants as the board's)."""
+  pipes = {'stdin': subprocess.PIPE, 'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
+  tool = subprocess.Popen(argv, **{**pipes, **kw})
+  test.addCleanup(lambda: tool.kill() or tool.communicate())
+  return tool
+
+
+class DutTools(unittest.TestCase):
+  """dut_tools, dut_nodes and on_board over a planted sysfs: which processes are DUT-side tools on the board's
+  devices, and when the check cannot tell."""
+  def test_a_tool_on_a_node_of_the_boards_usb_device_is_on_it_anything_else_not(self):
+    dev = board_device(self, 'U')
+    rdev = os.stat('/dev/zero').st_rdev   # a device of no USB device
+    Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
+    with tempfile.NamedTemporaryFile() as image:
+      for argv, on in ((['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2'], True),
+                       (['/venv/bin/python3', '/venv/bin/adafruit-nrfutil', '--verbose', 'dfu', 'serial',
+                         '--package', 'p.zip', '-p', dev, '-b', '115200'], True),
+                       ([sys.executable, '-B', '/x/hil_test.py', 'fat-read', '--dev', dev, '--file', 'A'], True),
+                       (['python3', '/x/hil_test.py', 'flush', f'--dev={dev}'], True),
+                       (['mcopy', '-i', '/dev/zero', 'f', '::X'], False),
+                       (['mcopy', '-i', image.name, 'f', '::X'], False),
+                       (['adafruit-nrfutil', 'dfu', 'genpkg', '--application', 'a.bin', 'p.zip'], False),
+                       (['python3', '/x/hil_test.py', 'restore', '-b', 'pca10056'], False),
+                       (['python3', '-c', 'mcopy'], False), (['JLinkExe', '-USB', '1'], False),
+                       (['less', 'mcopy'], False)):
+        with self.subTest(argv=argv):
+          self.assertEqual(on_board(argv), on)
+
+  def mkdir(self, rel):
+    d = Path(ht.SYS_DEV).parent / rel
+    d.mkdir(parents=True)
+    return d
+
+  def test_a_tool_that_cannot_be_on_the_board_is_no_user(self):
+    """Another project's tools on a shared host: on a node gone (a drive leaving), of no USB device, of a USB device
+    without a serial or with another serial, or naming none and holding none of the board's nodes."""
+    board_device(self, 'u')
+    rdev = os.stat('/dev/zero').st_rdev
+    Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
+    mcopy, script = fake_tool(self, 'mcopy'), fake_tool(self, 'hil_test.py')
+    tools = [running(self, [mcopy, '-o', '-i', '/dev/sdzz', 'copy.uf2', '::APP.UF2']),
+             running(self, [sys.executable, '-B', script, 'flush', '--dev', '/dev/sdzz']),
+             running(self, [mcopy, '-i', '/dev/zero', 'f', '::X']),
+             running(self, [mcopy, 'x.uf2', 'a:'])]
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{t.pid} mcopy' for t in tools]):   # not the host's
+      self.assertEqual(ht.dut_tools(BOARD), [])
+    serialless = board_device(self, None)
+    tool = running(self, [mcopy, '-i', serialless, 'f', '::X'])
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{tool.pid} mcopy']):
+      self.assertEqual(ht.dut_tools(BOARD), [])
+
+  def test_a_tool_on_the_boards_node_by_a_relative_path_or_an_open_fd_is_a_user(self):
+    dev, mcopy = board_device(self), fake_tool(self, 'mcopy')
+    relative = running(self, [mcopy, '-i', os.path.basename(dev), 'f', '::X'], cwd=os.path.dirname(dev))
+    with open(dev, 'rb') as node:
+      holding = running(self, [mcopy, 'x.uf2', 'a:'], stdin=node)
+    tools = [relative, holding]
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{t.pid} mcopy' for t in tools]):
+      self.assertEqual([u['pid'] for u in ht.dut_tools(BOARD)], [t.pid for t in tools])
+
+  def test_refuses_when_it_cannot_tell(self):
+    board_device(self)
+    unreadable = mock.patch.object(ht.usb(), 'read_sysfs', return_value=None)
+    unreadable.start()
+    self.addCleanup(unreadable.stop)
+    for argv, board_at, why in ((['mcopy', 'copy.uf2', 'a:'], [], 'names no device'),
+                                (['mcopy', '-i', '/dev/null', 'f', '::X'], [],
+                                 'USB device 1-9, whose serial cannot be read'),
+                                (['mcopy', '-i', '/dev/null', 'f', '::X'], [{'busport': '1-9'}],
+                                 'USB device 1-9, whose serial cannot be read')):
+      with self.subTest(argv=argv, board_at=board_at), self.assertRaisesRegex(ht.Refused, why), \
+           mock.patch.object(ht.usb(), 'usb_scan', return_value=board_at):
+        on_board(argv)
+    # the board seen at another port: the unreadable device is not it
+    with mock.patch.object(ht.usb(), 'usb_scan', return_value=[{'busport': '1-3'}]) as found:
+      self.assertFalse(on_board(['mcopy', '-i', '/dev/null', 'f', '::X']))
+    self.assertEqual(found.call_args.kwargs, {'serial': 'u'})
+    loop = Path(ht.SYS_DEV).parent / 'loop'   # a device that is not gone yet cannot be read
+    loop.symlink_to(loop)
+    with self.assertRaisesRegex(ht.Refused, 'Too many levels of symbolic links'):
+      ht.dut_nodes(['mcopy', '-i', str(loop), 'f', '::X'])
+    listdir = os.listdir
+
+    def other_uids(path):
+      if str(path).startswith('/proc/'):
+        raise PermissionError(13, 'Permission denied', path)
+      return listdir(path)
+    with mock.patch.object(ht.os, 'listdir', other_uids), \
+         self.assertRaisesRegex(ht.Refused, 'names no device and its fds cannot be read'):
+      ht.dut_nodes(['mcopy', 'x.uf2', 'a:'], os.getpid())
+
+  def supervisor(self, cmd, job_cwd=None, **kw):
+    """A process with the command line of run_tracked's supervisor of `cmd` (hil_process.run_tracked's job) that has
+    not launched it yet."""
+    job = {'cmd': cmd, 'cwd': job_cwd, 'env': None, 'timeout': 60, 'settle': 1.0, 'reap_grace': 2.0, 'binary': False,
+           'split_stderr': False, 'report_fd': 5, 'token': 't', 'lock': '/x/op-t.lock', 'record': '/x/op-t.json'}
+    return running(self, [sys.executable, '-I', fake_tool(self, 'hil_process.py'), '--supervise', json.dumps(job)],
+                   **kw)
+
+  def test_a_supervisor_whose_tool_is_not_launched_yet_is_the_tool(self):
+    """A command killed after its supervisor's hello and before the supervisor launches its tool leaves the supervisor
+    alone: it is the tool its job runs, which pgrep lists by the job's JSON."""
+    dev = board_device(self)
+    rdev = os.stat('/dev/zero').st_rdev
+    Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
+    users = [self.supervisor(['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2']),
+             self.supervisor([sys.executable, '-B', '/x/hil_test.py', 'flush', '--dev', dev]),
+             self.supervisor(['mcopy', '-i', os.path.basename(dev), 'f', '::X'], job_cwd=os.path.dirname(dev)),
+             self.supervisor(['mcopy', '-i', os.path.basename(dev), 'f', '::X'], cwd=os.path.dirname(dev))]
+    others = [self.supervisor(['mcopy', '-i', '/dev/zero', 'f', '::X']), self.supervisor(['JLinkExe', '-USB', '1']),
+              self.supervisor(['adafruit-nrfutil', 'dfu', 'genpkg', 'p.zip']), self.supervisor('JLinkExe -USB 1')]
+    listed = {int(l.split(maxsplit=1)[0]) for l in ht.tools_left()}
+    self.assertLessEqual({t.pid for t in users}, listed)
+    tools = [*users, *others]
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{t.pid} x' for t in tools]):   # not the host's
+      self.assertEqual([u['pid'] for u in ht.dut_tools(BOARD)], [t.pid for t in users])
+    for job, why in (('{', 'job cannot be read'), ('{"cmd": ["mcopy", "-i"], "cwd": null}', 'names no device'),
+                     ('{"cmd": ["mcopy"]}', 'job cannot be read'), ('{"cmd": 7, "cwd": null}', 'job cannot be read'),
+                     ('{"cmd": "mcopy -i /dev/sda f ::X", "cwd": null}', 'shell command naming a DUT-side tool')):
+      with self.subTest(job=job), self.assertRaisesRegex(ht.Refused, why):
+        on_board(['python3', '-I', '/x/hil_process.py', '--supervise', job])
+    with self.assertRaisesRegex(ht.Refused, 'job cannot be read'):
+      on_board(['python3', '-I', '/x/hil_process.py', '--supervise'])
+
+  def test_only_a_tool_on_the_boards_serial_is_a_user(self):
+    tool = subprocess.Popen([fake_tool(self, 'mcopy'), '-o', '-i', '/dev/null', 'copy.uf2', '::APP.UF2'])
+    self.addCleanup(tool.wait)
+    self.addCleanup(tool.kill)
+    board_device(self, 'other')
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{tool.pid} mcopy']):   # not the host's
+      self.assertEqual(ht.dut_tools(BOARD), [])
+      board_device(self, 'U')   # the serial case aside
+      (user,) = ht.dut_tools(BOARD)
+    self.assertEqual((user['pid'], user['cmd'].split()[1:]),
+                     (tool.pid, [tool.args[0], '-o', '-i', '/dev/null', 'copy.uf2', '::APP.UF2']))
+    with mock.patch.object(ht.subprocess, 'run', return_value=mock.Mock(returncode=3, stdout='', stderr='x')), \
+         self.assertRaisesRegex(ht.Refused, 'pgrep exited 3'):
+      ht.dut_tools(BOARD)
+
+  def test_a_scan_that_does_not_finish_refuses_and_the_next_while_it_is_blocked(self):
+    """pgrep or a command line read blocked (the target's mm lock) is 'cannot tell', like probe_users' bound."""
+    stuck = threading.Event()
+    self.addCleanup(stuck.set)
+
+    def block(*_):
+      stuck.wait(30)
+      return []
+    for what, patch in (('pgrep', mock.patch.object(ht, 'tools_left', block)),
+                        ('cmdline', mock.patch.object(ht, 'cmdline', block))):
+      with self.subTest(what), patch, mock.patch.object(ht, 'tools_left', return_value=['1 mcopy']) \
+           if what == 'cmdline' else contextlib.nullcontext(), mock.patch.object(ht, 'DUT_SCAN_BOUND', 0.2), \
+           mock.patch.object(ht, '_dut_scan', []):
+        stuck.clear()
+        for _ in range(2):
+          with self.assertRaisesRegex(ht.Refused, 'did not finish in 0.2 s, or an earlier one is still blocked'):
+            ht.dut_tools(BOARD)
+        (scan,) = ht._dut_scan
+        stuck.set()
+        self.assertTrue(scan.finished.wait(5))
+
+
+class Manual(PrivateLocks):
+  """install and restore under the caller's hold, or restore under an older helper's cleanup holder, one at a time
+  under the board's session mutex: they only log."""
+  def manual(self, cmd, outcome, hold=('--under-hold', 'dbg'), receipts=(), busy=(), found=(PREVIOUS,), dut=False):
+    helper = mock_helper(open_cleanup_failures=mock.Mock(return_value=list(found)))
+    ran = []
 
     def restore(bat):
+      ran.append(1)
       bat.tools.receipts += list(receipts)
       if isinstance(outcome, BaseException):
         raise outcome
@@ -963,17 +1424,18 @@ class Manual(unittest.TestCase):
     holder = {'pid': 7, 'token': 'tok'}
     with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
          mock.patch.object(ht, 'lock_helper', return_value=helper), \
-         mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht, 'prove_hold'), \
+         mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht, 'prove_hold') as prove, \
          mock.patch.object(ht, 'prove_cleanup_holder', return_value=holder), \
          mock.patch.object(ht, 'admit', return_value=({}, {}, {})), \
          mock.patch.object(ht, 'facts', return_value=FACTS), \
-         mock.patch.object(ht, 'claim', side_effect=lambda b, ops, found: ({'receipt': 'me'}, found, '')), \
-         mock.patch.object(ht, 'unclaim', return_value='') as unclaim, \
-         mock.patch.object(ht.Battery, 'restore', restore), mock.patch.object(ht.Battery, 'install', restore):
+         mock.patch.object(ht, 'probe_busy', side_effect=raises(busy) if isinstance(busy, Exception)
+                           else lambda board: list(busy)), \
+         mock.patch.object(ht.Battery, 'restore', restore), mock.patch.object(ht.Battery, 'install', restore), \
+         (contextlib.nullcontext() if dut else mock.patch.object(ht, 'dut_tools', return_value=[])):
       code = ht.main([cmd, '-b', 'pca10056', '--build-record', 'r', '--run-root', d, *hold, 'roster'])
-    unclaim.assert_called_once()
     helper.end_failed.assert_not_called()
     helper.release_board_lock.assert_not_called()
+    self.prove, self.ran = prove, ran
     return code, helper, json.loads(out.getvalue().splitlines()[-1])
 
   def test_a_passing_restore_resolves_the_open_failures(self):
@@ -987,7 +1449,7 @@ class Manual(unittest.TestCase):
                                     receipts=[{'cmd': 'mcopy', 'cleanup': 'pending', 'receipt': {'token': 'r'}}])
     self.assertEqual((code, out['failureLogged']), (4, True))
     helper.log_cleanup_failure.assert_called_once_with('nrf52840dk', 'hil_test.py', detail='restore failed: no drive',
-                                                       task=None, receipts=[{'token': 'r'}])
+                                                       receipts=[{'token': 'r'}])
     helper.resolve_restored.assert_not_called()
 
   def test_a_failed_install_is_logged_only_with_a_tool_not_proven_ended(self):
@@ -1007,6 +1469,86 @@ class Manual(unittest.TestCase):
                                     hold=('--recover-holder', '7'))
     self.assertEqual(code, 4)
     helper.release_token.assert_not_called()
+
+  def test_a_busy_or_inconclusive_probe_refuses_before_any_tool_keeping_the_hold(self):
+    inconclusive = ht.provider().ProbeCheckInconclusive('/proc may hide others')
+    for busy, error in (([{'pid': 123, 'cmd': 'JLinkExe -USB 1'}], 'board busy'), (inconclusive, 'may hide others')):
+      for hold in (('--under-hold', 'dbg'), ('--recover-holder', '7')):
+        with self.subTest(busy=busy, hold=hold[0]):
+          code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, busy=busy)
+          self.assertEqual((code, out['pass'], self.ran), (2, False, []))
+          self.assertIn(error, out['error'])
+          self.assertEqual(out.get('occupiedBy'), busy if isinstance(busy, list) else None)
+          for unused in (helper.log_cleanup_failure, helper.resolve_restored, helper.release_token):
+            unused.assert_not_called()
+
+  def test_an_earlier_runs_tool_still_running_refuses_before_any_tool(self):
+    op = FakeOp(ht.process().state_dir(Path(self.tmp) / 'earlier', 'ops'))
+    self.addCleanup(op.end, False)
+    failure = {**PREVIOUS, 'receipts': [op.receipt]}
+    for hold in (('--under-hold', 'dbg'), ('--recover-holder', '7')):
+      with self.subTest(hold=hold[0]):
+        with mock.patch.object(ht, 'dut_tools', return_value=SUPERVISOR_SEEN):
+          code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, found=[failure], dut=True)
+        self.assertEqual((code, self.ran, [u['pid'] for u in out['occupiedBy']]), (2, [], [4242, 99]))
+        self.assertIn(f'failed cleanup {PREVIOUS["id"]}: receipt t0', out['occupiedBy'][0]['cmd'])
+        self.assertIn('board busy', out['error'])
+        helper.resolve_restored.assert_not_called()
+    op.end()
+    code, helper, _ = self.manual('restore', {'pass': True, 'state': 'x'}, found=[failure])
+    self.assertEqual((code, helper.resolve_restored.call_args[0]), (0, ('nrf52840dk', [failure])))
+
+  def test_a_killed_commands_tool_still_running_refuses_the_next_command(self):
+    """A command SIGKILLed while run_tracked's mcopy runs: the tool outlives it and its session mutex frees, with no
+    cleanup event and no runDir to recheck."""
+    dev, work = board_device(self), Path(self.tmp) / 'killed'
+    tool = fake_tool(self, 'mcopy')
+    env = {**os.environ, 'PATH': f'{Path(tool).parent}{os.pathsep}{os.environ["PATH"]}'}
+    child = subprocess.Popen([sys.executable, '-c', KILLED_COMMAND, str(SCRIPTS), self.helper.BOARD_LOCK_DIR, str(work),
+                              dev], env=env)
+    self.addCleanup(child.wait)
+    self.addCleanup(child.kill)
+    pid = wait_for_tool(tool)
+    self.addCleanup(end_tool, pid, work / 'ops')
+    child.kill()
+    child.wait()
+    only = mock.patch.object(ht, 'tools_left', return_value=[f'{pid} mcopy'])   # not the host's
+    only.start()
+    self.addCleanup(only.stop)
+    for hold in (('--under-hold', 'dbg'), ('--recover-holder', '7')):
+      with self.subTest(hold=hold[0]):
+        code, helper, out = self.manual('restore', {'pass': True, 'state': 'x'}, hold=hold, found=[], dut=True)
+        self.assertEqual((code, self.ran, [u['pid'] for u in out['occupiedBy']]), (2, [], [pid]))
+        self.assertIn('board busy', out['error'])
+        self.assertIn(f'-i {dev}', out['occupiedBy'][0]['cmd'])
+    end_tool(pid, work / 'ops')
+    code, _, _ = self.manual('restore', {'pass': True, 'state': 'x'}, found=[], dut=True)
+    self.assertEqual((code, self.ran), (0, [1]))
+
+  def test_a_runs_lock_is_no_hold_to_work_under(self):
+    with self.helper.board_task('nrf52840dk', ht.REASON, busy=list, runDir='r') as task:
+      with self.assertRaisesRegex(ht.Refused, 'is not held with reason'):
+        ht.prove_hold(BOARD, ht.REASON)
+      with tempfile.TemporaryDirectory() as d, contextlib.redirect_stdout(io.StringIO()) as out, \
+           mock.patch.object(ht, 'load_board', return_value=BOARD), mock.patch.object(ht.Battery, 'restore') as run:
+        code = ht.main(['restore', '-b', 'pca10056', '--build-record', 'r', '--run-root', d, '--under-hold', ht.REASON,
+                        'roster'])
+      self.assertEqual((code, run.called), (2, False))
+      self.assertIn('is not held', json.loads(out.getvalue())['error'])
+      task.clean()
+    fh = self.helper.take_board_lock('nrf52840dk', 'dbg')   # a hold's record, unprotected
+    self.addCleanup(self.helper.release_board_lock, fh)
+    ht.prove_hold(BOARD, 'dbg')
+
+  def test_a_second_command_under_the_hold_refuses_before_checking_the_hold(self):
+    restored = {'pass': True, 'state': 'fixture running'}
+    with self.helper.session_mutex('nrf52840dk'):
+      code, _, out = self.manual('restore', restored)
+    self.assertEqual((code, self.ran), (2, []))
+    self.assertIn('session busy', out['error'])
+    self.prove.assert_not_called()
+    code, _, _ = self.manual('restore', restored)   # free again once the other command ended
+    self.assertEqual((code, self.ran), (0, [1]))
 
 
 class Plan(unittest.TestCase):
@@ -1076,10 +1618,11 @@ class Verdict(unittest.TestCase):
 
   def test_render_names_a_failed_cleanup_and_an_earlier_one(self):
     core = mock.Mock(table=lambda h, rows, center: '')
-    body = self.row(cleanup={'pass': False, 'state': 'unknown', 'failureLogged': True, 'released': True},
+    body = self.row(cleanup={'pass': False, 'state': 'unknown', 'failureLogged': True, 'released': True,
+                             'lock': 'nrf52840dk: lock released, failure logged in x.cleanup.jsonl'},
                     previousCleanupFailure=PREVIOUS, openCleanupFailures=2)
     text = rr.render(core, {'pass': False, **body})
-    self.assertIn("Cleanup failed (unknown): logged in the board's cleanup log; lock released", text)
+    self.assertIn('Cleanup failed (unknown): nrf52840dk: lock released, failure logged in x.cleanup.jsonl', text)
     self.assertIn('earlier failed cleanup on the board (2 open): 2026-11-08T10:00:00+0700 hil_test.py: earlier run',
                   text)
 
@@ -1133,171 +1676,6 @@ class Cli(unittest.TestCase):
       proc.recheck.return_value = 'pending'
       with mock.patch.object(ht, 'tools_left', return_value=[]), self.assertRaisesRegex(ht.Refused, 'not yet done'):
         ht.prove_cleanup_holder(board, 1)
-
-
-class Claim(unittest.TestCase):
-  """The claim sequence against the agentrc's real PendingSessions, cleanup log and recheck_dir, in a private lock dir;
-  an earlier invocation's run_tracked files are planted, a live one's lock held by this test as its supervisor would."""
-  def setUp(self):
-    self.tmp = tempfile.mkdtemp()
-    self.addCleanup(lambda: __import__('shutil').rmtree(self.tmp))
-    self.helper = ht.lock_helper()
-    for patch in (mock.patch.object(self.helper, 'BOARD_LOCK_DIR', str(Path(self.tmp) / 'locks')),
-                  mock.patch.object(ht, 'probe_users', return_value=[]),
-                  mock.patch.object(ht, 'CLAIM_SETTLE', 0.3)):
-      patch.start()
-      self.addCleanup(patch.stop)
-    self.board = {'name': 'pca10056', 'lock': 'nrf52840dk', 'flasher': {'uid': '683944004'}}
-    self.tools = ht.Tools(Path(self.tmp) / 'run', Path(self.tmp) / 'hil.log')
-    self.earlier = ht.Tools(Path(self.tmp) / 'earlier', Path(self.tmp) / 'hil.log').dir
-
-  def listed(self):
-    return [e['receipt'] for e in self.helper.PendingSessions('nrf52840dk', ht.CLAIM_KIND).read()]
-
-  def other(self, pid, start, ops=None):
-    receipt = {'ops': ops or self.earlier, 'pid': pid, 'start': start}
-    self.helper.PendingSessions('nrf52840dk', ht.CLAIM_KIND).add([{'receipt': receipt, 'cmd': 'hil_test.py'}])
-    return receipt
-
-  def plant(self, ops, token, live):
-    """A run_tracked operation's files in `ops`: done, or `live` (its lock held, as a running supervisor holds it)."""
-    base = Path(ops, f'hil_op_{token}')
-    lock = Path(f'{base}.lock')
-    lock.touch(mode=0o600)
-    Path(f'{base}.log').touch(mode=0o600)
-    st = lock.stat()
-    Path(f'{base}.json').write_text(json.dumps({'token': token, 'lock': [st.st_dev, st.st_ino], 'pid': 1,
-                                                'cleanup': 'pending' if live else 'done'}))
-    Path(f'{base}.json').chmod(0o600)
-    if live:
-      fd = ht.os.open(lock, ht.os.O_RDONLY)
-      fcntl.flock(fd, fcntl.LOCK_EX)
-      self.addCleanup(ht.os.close, fd)
-      return fd
-    return None
-
-  def end(self, ops, token, fd):
-    """The planted live operation ends: its record says done, its lock is let go."""
-    path = Path(ops, f'hil_op_{token}.json')
-    path.write_text(json.dumps({**json.loads(path.read_text()), 'cleanup': 'done'}))
-    fcntl.flock(fd, fcntl.LOCK_UN)
-
-  def test_a_claim_names_this_invocation_and_unclaim_removes_only_it(self):
-    entry, found, why = ht.claim(self.board, self.tools.dir, [])
-    self.assertEqual((found, why), ([], ''))
-    self.assertEqual(entry['receipt'], {'ops': ht.os.path.realpath(self.tools.dir), 'pid': ht.os.getpid(),
-                                        'start': self.helper.proc_start(ht.os.getpid())})
-    later = self.other(ht.os.getppid(), self.helper.proc_start(ht.os.getppid()))
-    self.assertEqual(ht.unclaim(self.board, entry, self.tools), '')
-    self.assertEqual(self.listed(), [later])
-
-  def test_a_live_invocation_refuses_and_this_claim_goes(self):
-    parent = self.other(ht.os.getppid(), self.helper.proc_start(ht.os.getppid()))
-    with self.assertRaisesRegex(ht.InUse, 'another invocation on the board is running') as e:
-      ht.claim(self.board, self.tools.dir, [])
-    self.assertIsNone(e.exception.occupied)
-    self.assertEqual(self.listed(), [parent])
-
-  def test_a_dead_invocation_whose_tools_ended_is_removed_and_tidied(self):
-    self.other(999999999, '1')
-    self.plant(self.earlier, 'abc', live=False)
-    entry, found, _ = ht.claim(self.board, self.tools.dir, [])
-    self.assertEqual((self.listed(), found), ([entry['receipt']], []))
-    self.assertEqual(ht.os.listdir(self.earlier), [])
-    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
-
-  def test_a_dead_invocations_unproven_tool_is_logged_settled_then_resolved(self):
-    dead = self.other(999999999, '1')
-    fd = self.plant(self.earlier, 'abc', live=True)
-    with self.assertRaisesRegex(ht.InUse, r'still on the board after 0.3s: \[.receipt abc') as e:
-      ht.claim(self.board, self.tools.dir, [])
-    (failure,) = self.helper.open_cleanup_failures('nrf52840dk')
-    self.assertEqual((failure['task'], [r['token'] for r in failure['receipts']]), (dead, ['abc']))
-    self.assertEqual((e.exception.found, self.listed()), ([failure], [dead]))
-    # while the tool still runs, the next attempt refuses again without logging it twice
-    found = self.helper.open_cleanup_failures('nrf52840dk')
-    with self.assertRaisesRegex(ht.InUse, r'still on the board after 0.3s: \[.receipt abc'):
-      ht.claim(self.board, self.tools.dir, found)
-    self.assertEqual((self.helper.open_cleanup_failures('nrf52840dk'), self.listed()), ([failure], [dead]))
-    (why,) = self.helper.resolve_restored('nrf52840dk', found)
-    self.assertIn(f'{failure["id"]} stays open', why)
-    # once it ended, the next attempt removes that claim, the tool's files kept for resolve_restored
-    self.end(self.earlier, 'abc', fd)
-    entry, found, _ = ht.claim(self.board, self.tools.dir, found)
-    self.assertEqual((found, self.listed()), ([failure], [entry['receipt']]))
-    self.assertEqual(ht.unclaim(self.board, entry, self.tools), '')
-    self.assertTrue(Path(self.earlier, 'hil_op_abc.lock').exists())
-    self.assertEqual(self.helper.resolve_restored('nrf52840dk', found), [])
-    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
-
-  def test_a_failure_logged_since_the_take_is_returned_with_what_the_log_cannot_hold(self):
-    self.helper.log_cleanup_failure('nrf52840dk', 'hil_test.py', detail='a previous command under the hold')
-    left = {'how': 'found-left', 'detail': 'x', 'noteError': 'cleanup log not written: x'}   # the take's, unlogged
-    restored_since = dict(PREVIOUS, id='restored-since')
-    _, found, _ = ht.claim(self.board, self.tools.dir, [left, restored_since])
-    (logged,) = self.helper.open_cleanup_failures('nrf52840dk')
-    self.assertEqual(found, [logged, left])
-    self.assertEqual(self.helper.resolve_restored('nrf52840dk', found), [])
-    self.assertEqual(self.helper.open_cleanup_failures('nrf52840dk'), [])
-    unreadable = [{'unavailable': 'cleanup log unreadable: x'}]
-    with mock.patch.object(self.helper, 'open_cleanup_failures', return_value=unreadable):
-      _, found, _ = ht.claim(self.board, self.tools.dir, [left, restored_since])
-    self.assertEqual(found, [left, restored_since, *unreadable])
-
-  def test_a_recovery_keeps_the_receipts_its_legacy_holder_releases_on(self):
-    self.other(999999999, '1')
-    self.plant(self.earlier, 'legacy', live=False)
-    base = str(Path(self.earlier, 'hil_op_legacy'))
-    holder = {'role': 'cleanup-holder', 'pid': 7, 'start': '1', 'token': 'tok', 'locks': ['nrf52840dk'],
-              'receipts': [{'token': 'legacy', 'supervisor': None, 'lock': f'{base}.lock', 'record': f'{base}.json',
-                            'log': f'{base}.log'}]}
-    predicate = []
-
-    def release_token(token):   # what the real one rechecks before it signals the holder
-      predicate.append(self.helper._release_blocker(holder['receipts']))
-      return 7, ['nrf52840dk']
-    with contextlib.redirect_stdout(io.StringIO()) as out, \
-         mock.patch.object(self.helper, 'read_record', return_value=holder), \
-         mock.patch.object(self.helper, 'holder_alive', return_value=True), \
-         mock.patch.object(self.helper, 'release_token', side_effect=release_token), \
-         mock.patch.object(ht, 'tools_left', return_value=[]), \
-         mock.patch.object(ht, 'load_board', return_value=BOARD), \
-         mock.patch.object(ht, 'admit', return_value=({}, {}, {})), \
-         mock.patch.object(ht, 'facts', return_value=FACTS), \
-         mock.patch.object(ht.Battery, 'restore', lambda bat: {'pass': True, 'state': 'fixture running'}):
-      code = ht.main(['restore', '-b', 'pca10056', '--build-record', 'r', '--run-root', self.tmp,
-                      '--recover-holder', '7', 'roster'])
-    self.assertEqual((code, predicate), (0, ['']))
-    self.assertEqual(json.loads(out.getvalue().splitlines()[-1])['recovered'], {'holder': 7, 'released': True})
-    self.assertEqual(self.listed(), [])
-
-  def test_a_probe_user_refuses_without_a_wait(self):
-    with mock.patch.object(ht, 'probe_users', return_value=['123 JLinkExe -USB 683944004']), \
-         self.assertRaisesRegex(ht.InUse, 'after 0s') as e:
-      ht.claim(self.board, self.tools.dir, [])
-    self.assertEqual((e.exception.occupied, self.listed()), (['123 JLinkExe -USB 683944004'], []))
-
-  def test_an_ops_dir_gone_is_logged_once(self):
-    self.other(999999999, '1', str(Path(self.tmp) / 'gone'))
-    with self.assertRaises(ht.InUse):
-      ht.claim(self.board, self.tools.dir, [])
-    (failure,) = self.helper.open_cleanup_failures('nrf52840dk')
-    self.assertIn('unrecheckable', failure['receipts'][0])
-    entry, _, _ = ht.claim(self.board, self.tools.dir, [])
-    self.assertEqual(self.listed(), [entry['receipt']])
-
-  def test_a_claim_that_cannot_be_written_refuses_before_any_tool(self):
-    with mock.patch.object(self.helper.PendingSessions, 'claim', side_effect=OSError(28, 'No space left')), \
-         self.assertRaisesRegex(ht.Refused, 'could not name this invocation') as e:
-      ht.claim(self.board, self.tools.dir, [])
-    self.assertNotIsInstance(e.exception, ht.InUse)
-
-  def test_an_unclean_end_keeps_its_claim(self):
-    entry, _, _ = ht.claim(self.board, self.tools.dir, [])
-    self.plant(self.tools.dir, 'mine', live=True)
-    self.tools.receipts.append({'cmd': 'JLinkExe', 'cleanup': 'pending', 'receipt': {'token': 'mine'}})
-    self.assertEqual(ht.unclaim(self.board, entry, self.tools), 'claim kept: its tools recheck pending')
-    self.assertEqual(self.listed(), [entry['receipt']])
 
 
 class Tools(unittest.TestCase):

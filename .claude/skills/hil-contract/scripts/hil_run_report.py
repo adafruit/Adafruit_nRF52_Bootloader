@@ -48,7 +48,7 @@ def render(core, body):
     lines += ['', f'### {cell(r.get("board", "?"))}', '']
     if r.get('detail'):
       lines += [cell(r['detail']), '']
-    if failed := cleanup_failure(r):
+    if failed := cleanup_failure(r) or lock_failure(r, body.get('exitCode')):
       lines += [cell(failed), '']
     if earlier := previous_failure(r):
       lines += [cell(earlier), '']
@@ -69,13 +69,19 @@ def exit_of(body):
 
 
 def cleanup_failure(row):
-  """'' unless the row's cleanup failed: then whether the board's cleanup log took it and that the lock was released."""
+  """'' unless the row's cleanup failed: then how its lock ended (the board task's describe())."""
   c = row.get('cleanup') if isinstance(row.get('cleanup'), dict) else {}
   if c.get('pass') is not False:
     return ''
-  logged = ("logged in the board's cleanup log" if c.get('failureLogged') else
-            f"NOT logged in the board's cleanup log ({'; '.join(map(str, c.get('endErrors') or ['no record']))})")
-  return f'Cleanup failed ({c.get("state")}): {logged}; lock {"released" if c.get("released") else "not released"}'
+  return f'Cleanup failed ({c.get("state")}): {c.get("lock") or "lock end not reported"}'
+
+
+def lock_failure(row, code):
+  """'' unless the run exited 4 with its cleanup passed: then its lock did not end as its verdict said (describe())."""
+  c = row.get('cleanup') if isinstance(row.get('cleanup'), dict) else {}
+  if code != 4 or c.get('pass') is False:
+    return ''
+  return f'Lock did not end cleanly: {c.get("lock") or "lock end not reported"}'
 
 
 def previous_failure(row):
@@ -103,8 +109,9 @@ def verdict(code, report, board):
     return 'blocker', f'report has no row for {board} (exit {code}): {report.get("caveat") or report.get("error")}'
   cleanup = row.get('cleanup') or {}
   if code in (4, None) or row.get('ran') is None or cleanup.get('pass') is False:
-    return 'blocker', f'{cleanup_failure(row) or "cleanup failed or no report"}: {row.get("detail")}'[:400]
-  if row.get('occupiedBy') or row.get('recoveryBlocker') and not row.get('locked'):
+    why = cleanup_failure(row) or cleanup.get('lock') or 'cleanup failed or no report'
+    return 'blocker', f'{why}: {row.get("detail")}'[:400]
+  if row.get('occupiedBy'):
     return 'blocker', str(row.get('detail'))
   if row.get('locked'):
     return ('blocker' if row.get('recoveryBlocker') else 'not-run'), f'locked: {row.get("detail")}'
