@@ -176,10 +176,14 @@ shared run rules. Runs are never cancelled: a newer push waits.
   and, needing no lock record or cleanup log (a killed `install` or `restore`, a failure that could not be logged),
   each `mcopy`, `adafruit-nrfutil dfu serial` or `hil_test.py fat-read|flush` on the host whose device (`-i`, `-p`,
   `--dev`, a relative one under the tool's cwd; naming none, each node it holds open) is a node of the USB device with
-  the board's serial (`dut_tools`). A tool on a node gone, of no USB device or of one with no or another serial is
-  not the board's, so another project's tools on a shared host do not refuse. It cannot tell, and refuses, when a
-  tool's device or a device-less tool's fds cannot be read, or its device's USB serial cannot be read while the board
-  is not seen at another port (it is one USB device), or the scan does not finish in `DUT_SCAN_BOUND` s. The check is
+  the board's serial (`dut_tools`); a `hil_process.py --supervise` supervisor counts as the tool its job names, which
+  it launches after its caller's hello, so a caller killed before then leaves it about to. A tool on a node gone, of no
+  USB device or of one with no or another serial is not the board's, so another project's tools on a shared host do
+  not refuse. It cannot tell, and refuses, when a tool's device, a device-less tool's fds or a supervisor's job cannot
+  be read, a supervisor's tool names no device, or a device's USB serial cannot be read while the board is not seen
+  at another port (it is one USB device), or the scan does not finish in `DUT_SCAN_BOUND` s. It scans every uid's
+  processes, not only its own: the farm's runner and the admin's manual session share the board as different uids,
+  so another uid's tool whose device, cwd or fds cannot be read refuses rather than being skipped. The check is
   a limited snapshot (its docstring): a GDB client attached to a server, a tool whose device node was reused by
   another device, and a child that opens the probe or the drive after the check are not seen.
 - The lock ends on the run's cleanup verdict, failed before restored before clean. A cleanup that failed or was never

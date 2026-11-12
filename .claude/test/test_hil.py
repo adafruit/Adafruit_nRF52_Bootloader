@@ -1264,7 +1264,6 @@ class DutTools(unittest.TestCase):
                        (['mcopy', '-i', image.name, 'f', '::X'], False),
                        (['adafruit-nrfutil', 'dfu', 'genpkg', '--application', 'a.bin', 'p.zip'], False),
                        (['python3', '/x/hil_test.py', 'restore', '-b', 'pca10056'], False),
-                       (['python3', '-I', '/x/hil_process.py', '--supervise', '{"cmd": ["mcopy", "-i"]}'], False),
                        (['python3', '-c', 'mcopy'], False), (['JLinkExe', '-USB', '1'], False),
                        (['less', 'mcopy'], False)):
         with self.subTest(argv=argv):
@@ -1332,6 +1331,39 @@ class DutTools(unittest.TestCase):
     with mock.patch.object(ht.os, 'listdir', other_uids), \
          self.assertRaisesRegex(ht.Refused, 'names no device and its fds cannot be read'):
       ht.dut_nodes(['mcopy', 'x.uf2', 'a:'], os.getpid())
+
+  def supervisor(self, cmd, job_cwd=None, **kw):
+    """A process with the command line of run_tracked's supervisor of `cmd` (hil_process.run_tracked's job) that has
+    not launched it yet."""
+    job = {'cmd': cmd, 'cwd': job_cwd, 'env': None, 'timeout': 60, 'settle': 1.0, 'reap_grace': 2.0, 'binary': False,
+           'split_stderr': False, 'report_fd': 5, 'token': 't', 'lock': '/x/op-t.lock', 'record': '/x/op-t.json'}
+    return running(self, [sys.executable, '-I', fake_tool(self, 'hil_process.py'), '--supervise', json.dumps(job)],
+                   **kw)
+
+  def test_a_supervisor_whose_tool_is_not_launched_yet_is_the_tool(self):
+    """A command killed after its supervisor's hello and before the supervisor launches its tool leaves the supervisor
+    alone: it is the tool its job runs, which pgrep lists by the job's JSON."""
+    dev = board_device(self)
+    rdev = os.stat('/dev/zero').st_rdev
+    Path(ht.SYS_DEV, 'char', f'{os.major(rdev)}:{os.minor(rdev)}').symlink_to(self.mkdir('devices/virtual/mem/zero'))
+    users = [self.supervisor(['mcopy', '-o', '-i', dev, 'copy.uf2', '::APP.UF2']),
+             self.supervisor([sys.executable, '-B', '/x/hil_test.py', 'flush', '--dev', dev]),
+             self.supervisor(['mcopy', '-i', os.path.basename(dev), 'f', '::X'], job_cwd=os.path.dirname(dev)),
+             self.supervisor(['mcopy', '-i', os.path.basename(dev), 'f', '::X'], cwd=os.path.dirname(dev))]
+    others = [self.supervisor(['mcopy', '-i', '/dev/zero', 'f', '::X']), self.supervisor(['JLinkExe', '-USB', '1']),
+              self.supervisor(['adafruit-nrfutil', 'dfu', 'genpkg', 'p.zip']), self.supervisor('JLinkExe -USB 1')]
+    listed = {int(l.split(maxsplit=1)[0]) for l in ht.tools_left()}
+    self.assertLessEqual({t.pid for t in users}, listed)
+    tools = [*users, *others]
+    with mock.patch.object(ht, 'tools_left', return_value=[f'{t.pid} x' for t in tools]):   # not the host's
+      self.assertEqual([u['pid'] for u in ht.dut_tools(BOARD)], [t.pid for t in users])
+    for job, why in (('{', 'job cannot be read'), ('{"cmd": ["mcopy", "-i"], "cwd": null}', 'names no device'),
+                     ('{"cmd": ["mcopy"]}', 'job cannot be read'), ('{"cmd": 7, "cwd": null}', 'job cannot be read'),
+                     ('{"cmd": "mcopy -i /dev/sda f ::X", "cwd": null}', 'shell command naming a DUT-side tool')):
+      with self.subTest(job=job), self.assertRaisesRegex(ht.Refused, why):
+        on_board(['python3', '-I', '/x/hil_process.py', '--supervise', job])
+    with self.assertRaisesRegex(ht.Refused, 'job cannot be read'):
+      on_board(['python3', '-I', '/x/hil_process.py', '--supervise'])
 
   def test_only_a_tool_on_the_boards_serial_is_a_user(self):
     tool = subprocess.Popen([fake_tool(self, 'mcopy'), '-o', '-i', '/dev/null', 'copy.uf2', '::APP.UF2'])

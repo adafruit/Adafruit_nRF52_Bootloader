@@ -1257,10 +1257,11 @@ def prove_cleanup_holder(board, pid):
 
 
 def tools_left():
-  """Every JLinkExe, mcopy, adafruit-nrfutil and hil_test.py child on the host (recovery's host-wide check); Refused
-  when pgrep cannot tell, or does not finish in DUT_SCAN_BOUND s."""
+  """Every JLinkExe, mcopy, adafruit-nrfutil and hil_test.py child on the host, and every run_tracked supervisor of
+  one (its job's JSON in its command line), for recovery's host-wide check; Refused when pgrep cannot tell, or does
+  not finish in DUT_SCAN_BOUND s."""
   try:
-    p = subprocess.run(['pgrep', '-af', r'JLinkExe|mcopy|adafruit-nrfutil|hil_test\.py (fat-read|flush)'],
+    p = subprocess.run(['pgrep', '-af', r'JLinkExe|mcopy|adafruit-nrfutil|hil_test\.py( |", ")(fat-read|flush)'],
                        capture_output=True, text=True, timeout=DUT_SCAN_BOUND)
   except subprocess.TimeoutExpired as e:
     raise Refused(f'tools of an earlier run: pgrep did not finish in {DUT_SCAN_BOUND} s') from e
@@ -1315,24 +1316,66 @@ def dut_nodes(argv, pid=None):
   as process `pid` works on: the one its option names, a relative one under the process's cwd; naming none (mcopy's
   drive from its mtools config), each node the process holds open. Empty when argv is no such tool or adafruit-nrfutil
   without `serial` (genpkg), or its device is a file or gone: a node gone cannot reach the board's current device.
-  Refused when it cannot tell: the device or the fds cannot be read, or the tool names no device and `pid` is None."""
-  name, *args = provider()._program(argv)
-  if name not in DUT_TOOLS or name == 'hil_test.py' and args[:1] not in (['fat-read'], ['flush']) \
-     or name == 'adafruit-nrfutil' and 'serial' not in args:
+  Refused when it cannot tell: the device or the fds cannot be read, or the tool names no device and `pid` is None.
+  A run_tracked supervisor is the tool its job runs (supervised_nodes)."""
+  program = provider()._program(argv)
+  if program[:2] == ['hil_process.py', '--supervise']:
+    return supervised_nodes(argv, program[2:3], pid)
+  dev = tool_device(program)
+  if dev is None:
     return []
-  opts = DUT_TOOLS[name]
-  dev = next((v for a, v in zip(args, args[1:]) if a in opts), None) or \
-    next((a.partition('=')[2] for a in args if a.partition('=')[0] in opts), None)
   if not dev:
     if pid is None:
       raise Refused(f'DUT-side tool names no device: {" ".join(argv)}')
     return held_nodes(pid, argv)
+  return device_nodes(os.path.join('' if pid is None else f'/proc/{pid}/cwd', dev), argv)
+
+
+def tool_device(program):
+  """The device a DUT-side tool names, `program` its command line as _program gives it; '' when it names none, None
+  when it is no such tool or adafruit-nrfutil without `serial` (genpkg)."""
+  name, *args = program
+  if name not in DUT_TOOLS or name == 'hil_test.py' and args[:1] not in (['fat-read'], ['flush']) \
+     or name == 'adafruit-nrfutil' and 'serial' not in args:
+    return None
+  opts = DUT_TOOLS[name]
+  return next((v for a, v in zip(args, args[1:]) if a in opts), None) or \
+    next((a.partition('=')[2] for a in args if a.partition('=')[0] in opts), '')
+
+
+def supervised_nodes(argv, job, pid):
+  """The nodes of a run_tracked supervisor (`hil_process.py --supervise JOB`, `job` its JOB argument): those of the
+  device its job's command names, relative under the job's cwd, else the supervisor's, as dut_nodes resolves a tool's.
+  It launches that tool after its hello, so a caller killed before then leaves it about to. Refused when the job
+  cannot be read, its shell command names a DUT-side tool, or its tool names no device: the supervisor holds none."""
   try:
-    st = os.stat(os.path.join('' if pid is None else f'/proc/{pid}/cwd', dev))
+    job = json.loads(job[0])
+    cmd, cwd = job['cmd'], job['cwd']
+    if not (isinstance(cmd, str) or isinstance(cmd, list) and cmd and all(isinstance(a, str) for a in cmd)) \
+       or not isinstance(cwd, (str, type(None))):
+      raise TypeError('cmd or cwd')
+  except (IndexError, ValueError, TypeError, KeyError) as e:
+    raise Refused(f'run_tracked supervisor whose job cannot be read ({e}): {" ".join(argv)}') from e
+  if isinstance(cmd, str):
+    if re.search('|'.join(map(re.escape, DUT_TOOLS)), cmd):
+      raise Refused(f'run_tracked supervisor of a shell command naming a DUT-side tool: {" ".join(argv)}')
+    return []
+  dev = tool_device(provider()._program(cmd))
+  if dev is None:
+    return []
+  if not dev:
+    raise Refused(f'run_tracked supervisor of a DUT-side tool that names no device: {" ".join(argv)}')
+  return device_nodes(os.path.join('' if pid is None else f'/proc/{pid}/cwd', cwd or '', dev), argv)
+
+
+def device_nodes(path, argv):
+  """[os.stat] of the node `path` a tool running `argv` names; [] when it is a file or gone."""
+  try:
+    st = os.stat(path)
   except (FileNotFoundError, NotADirectoryError, ProcessLookupError):
     return []
   except OSError as e:
-    raise Refused(f'DUT-side tool on {dev}: {e}: {" ".join(argv)}') from e
+    raise Refused(f'DUT-side tool on {path}: {e}: {" ".join(argv)}') from e
   return [st] if stat.S_ISBLK(st.st_mode) or stat.S_ISCHR(st.st_mode) else []
 
 
