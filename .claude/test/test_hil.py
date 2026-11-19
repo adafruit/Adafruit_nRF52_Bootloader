@@ -582,9 +582,9 @@ class BatteryRun(unittest.TestCase):
     with mock.patch.object(bat.tools, 'spawn', return_value=(0, '')), \
          mock.patch.object(bat.tools, 'child_json', return_value=(0, {'ok': True})), \
          mock.patch.object(ht, 'QUIET', 0.3):
-      with mock.patch.object(bat.drive, 'present', return_value='/dev/sdz'):
+      with mock.patch.object(bat.drive, 'absent', return_value=False):
         self.assertEqual(bat.drive.copy('/dev/sdz', b'x', bat.dir, leaves=False)['stayed'], 0.3)
-      with mock.patch.object(bat.drive, 'present', return_value=None), \
+      with mock.patch.object(bat.drive, 'absent', return_value=True), \
            self.assertRaisesRegex(ht.StepFail, 'left after a copy it cannot complete'):
         bat.drive.copy('/dev/sdz', b'x', bat.dir, leaves=False)
 
@@ -1730,6 +1730,19 @@ class DriveAbsence(unittest.TestCase):
     with tempfile.TemporaryDirectory() as d, mock.patch.object(drive, 'present', return_value=None), \
          mock.patch.object(ht, 'LEAVE_TIMEOUT', 0.3), self.assertRaisesRegex(ht.StepFail, 'leaving after the copy'):
       drive.copy('/dev/sdz', b'uf2', d)
+
+  def test_a_copy_that_cannot_complete_counts_an_unreadable_serial_as_the_drive_staying(self):
+    for serial, left in ((None, False), (False, True)):
+      with self.subTest(serial=serial):
+        drive = self.drive(serial)
+        drive.tools = mock.Mock(spawn=mock.Mock(return_value=(0, '')), child_json=mock.Mock(return_value=(0, {})))
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(ht, 'QUIET', 0.3), \
+             mock.patch.object(drive, 'present', side_effect=AssertionError('presence is not absence')):
+          if left:
+            with self.assertRaisesRegex(ht.StepFail, 'left after a copy it cannot complete'):
+              drive.copy('/dev/sdz', b'uf2', d, leaves=False)
+          else:
+            self.assertEqual(drive.copy('/dev/sdz', b'uf2', d, leaves=False)['stayed'], 0.3)
 
 
 if __name__ == '__main__':

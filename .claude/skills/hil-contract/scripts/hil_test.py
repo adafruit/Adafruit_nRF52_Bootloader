@@ -792,7 +792,7 @@ class Drive:
     if code not in (0, FLUSH_GONE):
       raise StepFail('flush failed', {'result': res})
     if not leaves:
-      stays_away(lambda: not self.present(), QUIET, 'the drive left after a copy it cannot complete')
+      stays_away(self.absent, QUIET, 'the drive left after a copy it cannot complete')
       return {'flush': 'flushed' if code == 0 else 'device gone before flush', 'stayed': QUIET}
     wait_for(self.absent, LEAVE_TIMEOUT, 'the drive leaving after the copy')
     return {'flush': 'flushed' if code == 0 else 'device gone before flush'}
