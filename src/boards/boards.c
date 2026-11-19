@@ -54,7 +54,9 @@ void SysTick_Handler(void) {
 // An application's watchdog cannot be stopped and keeps running through a soft reset into the bootloader.
 void wdt_feed(void) {
   if (nrf_wdt_started(NRF_WDT)) {
-    for (uint8_t i = 0; i < 8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
+    for (uint8_t i = 0; i < 8; i++) {
+      nrf_wdt_reload_request_set(NRF_WDT, i);
+    }
   }
 }
 
