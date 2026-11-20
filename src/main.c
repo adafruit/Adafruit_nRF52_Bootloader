@@ -165,6 +165,17 @@ static void disable_softdevice(void) {
 //
 //--------------------------------------------------------------------+
 int main(void) {
+  // The ACL flash write protection armed in bootloader_util_app_start() is
+  // cleared only by a reset. The buttonless DFU handoff from the application
+  // (BLEDfu) is a soft jump that leaves the ACL active, which can wedge the
+  // first flash write of the OTA DFU session (issue #399). Convert it into
+  // the existing reset-based handoff: BLE peer data survives in NoInit RAM
+  // and the SoftDevice is re-initialized properly on reset.
+  if (NRF_POWER->GPREGRET == DFU_MAGIC_OTA_APPJUM) {
+    NRF_POWER->GPREGRET = DFU_MAGIC_OTA_RESET;
+    NVIC_SystemReset();
+  }
+
   // Populate Boot Address and MBR Param into MBR if not already
   // MBR_BOOTLOADER_ADDR/MBR_PARAM_PAGE_ADDR are used if available, else UICR registers are used
   // Note: skip it for now since this will prevent us to change the size of bootloader in the future
