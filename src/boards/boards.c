@@ -24,6 +24,7 @@
 
 #include "boards.h"
 #include "nrf_pwm.h"
+#include "nrf_wdt.h"
 #include "app_scheduler.h"
 #include "app_timer.h"
 
@@ -48,6 +49,15 @@ static uint32_t _systick_count = 0;
 void SysTick_Handler(void) {
   _systick_count++;
   led_tick();
+}
+
+// An application's watchdog cannot be stopped and keeps running through a soft reset into the bootloader.
+void wdt_feed(void) {
+  if (nrf_wdt_started(NRF_WDT)) {
+    for (uint8_t i = 0; i < 8; i++) {
+      nrf_wdt_reload_request_set(NRF_WDT, i);
+    }
+  }
 }
 
 #if defined(BUTTON_DFU) || defined(BUTTON_DFU_OTA)

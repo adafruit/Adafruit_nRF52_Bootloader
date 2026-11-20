@@ -41,6 +41,7 @@ void flash_nrf5x_erase (uint32_t dst, uint32_t len)
     {
         uint32_t const addr = page_addr + i * CODE_PAGE_SIZE;
         PRINTF("Erase 0x%08lX\r\n", addr);
+        wdt_feed();
         nrfx_nvmc_page_erase(addr);
     }
 }
@@ -62,10 +63,12 @@ void flash_nrf5x_flush (bool need_erase)
         if ( need_erase )
         {
             PRINTF("Erase and ");
+            wdt_feed();
             nrfx_nvmc_page_erase(_fl_addr);
         }
 
         PRINTF("Write 0x%08lX\r\n", _fl_addr);
+        wdt_feed();
         nrfx_nvmc_words_write(_fl_addr, (uint32_t *) _fl_buf, CODE_PAGE_SIZE / 4);
     }
 

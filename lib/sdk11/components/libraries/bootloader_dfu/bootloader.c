@@ -27,7 +27,6 @@
 #include "app_scheduler.h"
 
 #include "nrfx.h"
-#include "nrf_wdt.h"
 #include "app_timer.h"
 
 #include "boards.h"
@@ -133,12 +132,7 @@ static void wait_for_events(void)
 //    uint32_t err_code = sd_app_evt_wait();
 //    APP_ERROR_CHECK(err_code);
 
-    // Feed all Watchdog just in case application enable it
-    // WDT cannot be disabled once started. It even last through NVIC soft reset
-    if ( nrf_wdt_started(NRF_WDT) )
-    {
-      for (uint8_t i=0; i<8; i++) nrf_wdt_reload_request_set(NRF_WDT, i);
-    }
+    wdt_feed();
 
     // Event received. Process it from the scheduler.
     app_sched_execute();
