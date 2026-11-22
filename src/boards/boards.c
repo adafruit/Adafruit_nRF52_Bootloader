@@ -366,6 +366,15 @@ void led_pwm_teardown(void) {
 }
 
 void led_pwm_duty_cycle(uint32_t led_index, uint16_t duty_cycle) {
+  // nRF52 PWM (Up mode) drives the pin HIGH for the portion of the period
+  // below duty; with duty == 0 the pin sits HIGH. The LED logic here assumes
+  // "larger duty == brighter", which matches a common-anode LED (the pin
+  // sinks current to light it). A common-cathode LED is driven the opposite
+  // way, so invert the duty when LED_RGB_COMMON_CATHODE is defined. Boards
+  // default to common-anode (upstream behavior) when the macro is undefined.
+#ifdef LED_RGB_COMMON_CATHODE
+  duty_cycle = 0xff - duty_cycle;
+#endif
   led_duty_cycles[led_index] = duty_cycle;
   nrf_pwm_event_clear(NRF_PWM0, NRF_PWM_EVENT_SEQEND0);
   nrf_pwm_task_trigger(NRF_PWM0, NRF_PWM_TASK_SEQSTART0);
@@ -385,7 +394,7 @@ void led_tick(void) {
     cycle = primary_cycle_length - cycle;
   }
   uint16_t duty_cycle = 0x4f * cycle / half_cycle;
-  #if LED_STATE_ON == 1
+  #if LED_STATE_ON == 1 && !defined(LED_RGB_COMMON_CATHODE)
   duty_cycle = 0xff - duty_cycle;
   #endif
   led_pwm_duty_cycle(LED_PRIMARY, duty_cycle);
@@ -397,7 +406,7 @@ void led_tick(void) {
       cycle = secondary_cycle_length - cycle;
   }
   duty_cycle = 0x8f * cycle / half_cycle;
-  #if LED_STATE_ON == 1
+  #if LED_STATE_ON == 1 && !defined(LED_RGB_COMMON_CATHODE)
   duty_cycle = 0xff - duty_cycle;
   #endif
   led_pwm_duty_cycle(LED_SECONDARY, duty_cycle);
