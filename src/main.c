@@ -286,7 +286,19 @@ static void check_dfu_mode(void) {
     dfu_start = 1;
   }
 
-#ifdef DEFAULT_TO_OTA_DFU
+#if defined(DEFAULT_TO_OTA_DFU) && defined(OTA_DFU_ONLY_WITHOUT_APP)
+  // Variant of DEFAULT_TO_OTA_DFU: only a missing or invalid app selects OTA DFU. Explicit USB requests
+  // (double reset, DFU button, the app's UF2 or serial-only DFU request) still start USB DFU, so the UF2
+  // drive stays reachable while a device with no valid app can still be recovered over BLE.
+  bool const dbl_reset = ((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin;
+  if (!valid_app && !dbl_reset && !serial_only_dfu && !uf2_dfu
+#if defined(BUTTON_DFU)
+      && !button_pressed(BUTTON_DFU)
+#endif
+  ) {
+    _ota_dfu = 1;
+  }
+#elif defined(DEFAULT_TO_OTA_DFU)
   // Default to OTA DFU mode, instead of Serial DFU mode, if there is no app present, 
   // because otherwise, if there is no application, it will restart in Serial DFU mode,
   // making it IMPOSSIBLE to recover devices in the field if there are no user 

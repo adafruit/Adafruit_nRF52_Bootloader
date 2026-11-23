@@ -15,6 +15,7 @@
 # - DUALBANK_FW        : If bootloader will implement a dual bank feature to allow autorecover from failed
 # - FORCE_UF2          : if SIGNED_FW is 1, will force to include UF2 support (UNSECURE, UF2 does NOT validate signature!)
 # - DEFAULT_TO_OTA_DFU : if entering DFU, by default enter OTA DFU instead of Serial DFU
+# - OTA_DFU_ONLY_WITHOUT_APP : with DEFAULT_TO_OTA_DFU, only a missing app selects OTA DFU; double reset and app requests stay on USB
 # - USE_NFCT           : yes if the board uses the NFC pins as NFC, no if as GPIO (default from board.cmake)
 # - ANT_LICENSE_KEY    : ANT license key, with SD_NAME=s340
 # - TRACE_ETM          : 1 to set up ETM trace
@@ -65,7 +66,7 @@ optional = $(if $($(1)),"-D$(1)=$($(1))")
 CMAKE_GENERATOR ?= Unix Makefiles
 CMAKE_ARGS = -G "$(CMAKE_GENERATOR)" -DBOARD=$(BOARD) "-DCROSS_COMPILE=$(CROSS_COMPILE)" "-DNRFUTIL:STRING=$(NRFUTIL)" \
   -DCMAKE_BUILD_TYPE=$(if $(filter 1,$(DEBUG)),Debug,MinSizeRel) \
-  $(foreach v,SIGNED_FW DUALBANK_FW FORCE_UF2 DEFAULT_TO_OTA_DFU,$(call flag,$(v))) \
+  $(foreach v,SIGNED_FW DUALBANK_FW FORCE_UF2 DEFAULT_TO_OTA_DFU OTA_DFU_ONLY_WITHOUT_APP,$(call flag,$(v))) \
   $(if $(USE_NFCT),-DUSE_NFCT=$(if $(filter yes,$(USE_NFCT)),ON,OFF)) \
   $(foreach v,SD_NAME SD_VERSION SD_HEX SIGNED_FW_QX SIGNED_FW_QY ANT_LICENSE_KEY TRACE_ETM,$(call optional,$(v)))
 
