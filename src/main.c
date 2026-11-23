@@ -271,7 +271,8 @@ static void check_dfu_mode(void) {
   /*------------- Determine DFU mode (Serial, OTA, FRESET or normal) -------------*/
   // DFU button pressed
 #if defined(BUTTON_DFU)
-  dfu_start = dfu_start || button_pressed(BUTTON_DFU);
+  bool const dfu_button = button_pressed(BUTTON_DFU);
+  dfu_start = dfu_start || dfu_button;
 #endif
 
   // DFU + FRESET are pressed --> OTA
@@ -293,7 +294,7 @@ static void check_dfu_mode(void) {
   bool const dbl_reset = ((*dbl_reset_mem) == DFU_DBL_RESET_MAGIC) && reason_reset_pin;
   if (!valid_app && !dbl_reset && !serial_only_dfu && !uf2_dfu
 #if defined(BUTTON_DFU)
-      && !button_pressed(BUTTON_DFU)
+      && !dfu_button
 #endif
   ) {
     _ota_dfu = 1;
