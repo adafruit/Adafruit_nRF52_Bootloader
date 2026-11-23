@@ -27,6 +27,7 @@ set(TINYUSB_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinyusb/src)
 set(TCRYPT_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/tinycrypt/lib)
 
 option(DEFAULT_TO_OTA_DFU "Default to OTA DFU instead of Serial DFU" OFF)
+option(OTA_DFU_ONLY_WITHOUT_APP "With DEFAULT_TO_OTA_DFU, only a missing app selects OTA DFU; double reset and app DFU requests stay on USB" OFF)
 option(SIGNED_FW "Enable signed firmware verification" OFF)
 option(DUALBANK_FW "Enable dual bank DFU support" OFF)
 option(FORCE_UF2 "Force UF2 support even with SIGNED_FW" OFF)
@@ -215,6 +216,10 @@ endif ()
 
 if (DEFAULT_TO_OTA_DFU)
   target_compile_definitions(bootloader PUBLIC DEFAULT_TO_OTA_DFU)
+endif ()
+
+if (OTA_DFU_ONLY_WITHOUT_APP)
+  target_compile_definitions(bootloader PUBLIC OTA_DFU_ONLY_WITHOUT_APP)
 endif ()
 
 if (TRACE_ETM STREQUAL "1")
